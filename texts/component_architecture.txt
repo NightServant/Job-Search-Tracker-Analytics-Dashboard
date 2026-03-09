@@ -1,0 +1,456 @@
+================================================================================
+                JOB SEARCH TRACKER - COMPONENT ARCHITECTURE
+================================================================================
+
+This document describes the React component structure, their responsibilities,
+props, state, and how they compose together to form the application.
+
+================================================================================
+1. COMPONENT HIERARCHY
+================================================================================
+
+App
+├── AuthProvider (Context)
+│   └── QueryClientProvider (TanStack Query)
+│       └── ThemeProvider (Context)
+│           └── BrowserRouter
+│               └── Routes
+│                   ├── PublicRoute (/)
+│                   │   └── LoginPage
+│                   │       ├── LoginForm
+│                   │       └── SignupForm
+│                   │
+│                   └── ProtectedRoute
+│                       └── Layout
+│                           ├── Navbar
+│                           │   ├── Logo
+│                           │   ├── ThemeToggle
+│                           │   └── UserMenu
+│                           │
+│                           ├── Sidebar
+│                           │   └── NavLink (multiple)
+│                           │
+│                           └── MainContent
+│                               ├── DashboardPage (/dashboard)
+│                               │   ├── StatsCard (multiple)
+│                               │   ├── ApplicationsChart
+│                               │   └── StatusPieChart
+│                               │
+│                               └── JobsPage (/jobs)
+│                                   ├── SearchBar
+│                                   ├── StatusFilter
+│                                   ├── ViewToggle
+│                                   ├── AddJobButton
+│                                   ├── JobList (list view)
+│                                   │   └── JobCard (multiple)
+│                                   └── KanbanBoard (kanban view)
+│                                       └── KanbanColumn (5 columns)
+│                                           └── JobCard (multiple)
+
+================================================================================
+2. COMPONENT SPECIFICATIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1 APP SHELL COMPONENTS
+--------------------------------------------------------------------------------
+
+COMPONENT: App
+FILE: src/App.tsx
+PURPOSE: Root component, sets up providers and routing
+CHILDREN: AuthProvider, QueryClientProvider, ThemeProvider, Router
+STATE: None (providers manage state)
+
+COMPONENT: Layout
+FILE: src/components/Layout.tsx
+PURPOSE: Main application shell with navigation
+PROPS:
+  - children: React.ReactNode
+STATE:
+  - sidebarOpen: boolean (for mobile)
+CHILDREN: Navbar, Sidebar, main content area
+
+COMPONENT: Navbar
+FILE: src/components/Navbar.tsx
+PURPOSE: Top navigation bar
+PROPS: None (uses context)
+STATE: None
+CHILDREN: Logo, ThemeToggle, UserMenu
+CONTEXT: useAuth, useTheme
+
+COMPONENT: Sidebar
+FILE: src/components/Sidebar.tsx
+PURPOSE: Side navigation menu
+PROPS:
+  - isOpen: boolean
+  - onClose: () => void
+STATE: None
+CHILDREN: NavLink components
+
+--------------------------------------------------------------------------------
+2.2 AUTHENTICATION COMPONENTS
+--------------------------------------------------------------------------------
+
+COMPONENT: AuthProvider
+FILE: src/contexts/AuthContext.tsx
+PURPOSE: Provides authentication state and methods
+CONTEXT VALUE:
+  - user: User | null
+  - loading: boolean
+  - signIn: (email, password) => Promise
+  - signUp: (email, password) => Promise
+  - signOut: () => Promise
+
+COMPONENT: LoginForm
+FILE: src/components/auth/LoginForm.tsx
+PURPOSE: Email/password login form
+PROPS:
+  - onSuccess?: () => void
+  - onToggleMode: () => void
+STATE:
+  - email: string
+  - password: string
+  - error: string | null
+  - loading: boolean
+
+COMPONENT: SignupForm
+FILE: src/components/auth/SignupForm.tsx
+PURPOSE: User registration form
+PROPS:
+  - onSuccess?: () => void
+  - onToggleMode: () => void
+STATE:
+  - email: string
+  - password: string
+  - confirmPassword: string
+  - error: string | null
+  - loading: boolean
+
+COMPONENT: AuthGuard
+FILE: src/components/auth/AuthGuard.tsx
+PURPOSE: Protects routes from unauthenticated access
+PROPS:
+  - children: React.ReactNode
+BEHAVIOR: Redirects to login if not authenticated
+
+--------------------------------------------------------------------------------
+2.3 JOB MANAGEMENT COMPONENTS
+--------------------------------------------------------------------------------
+
+COMPONENT: JobCard
+FILE: src/components/jobs/JobCard.tsx
+PURPOSE: Displays a single job entry
+PROPS:
+  - job: Job
+  - onEdit: (job: Job) => void
+  - onDelete: (id: string) => void
+  - onStatusChange: (id: string, status: JobStatus) => void
+  - compact?: boolean (for Kanban view)
+STATE: None (controlled component)
+FEATURES:
+  - Company name and role
+  - Salary range display
+  - Status badge with color
+  - Action buttons (edit, delete)
+  - Link to job posting
+
+COMPONENT: JobForm
+FILE: src/components/jobs/JobForm.tsx
+PURPOSE: Form for creating/editing jobs
+PROPS:
+  - job?: Job (for edit mode)
+  - onSubmit: (data: JobFormData) => void
+  - onCancel: () => void
+  - isOpen: boolean
+STATE:
+  - formData: JobFormData
+  - errors: ValidationErrors
+  - isSubmitting: boolean
+FIELDS:
+  - company (text, required)
+  - role (text, required)
+  - salaryMin (number, optional)
+  - salaryMax (number, optional)
+  - url (url, optional)
+  - status (select)
+  - dateApplied (date)
+  - notes (textarea)
+
+COMPONENT: JobList
+FILE: src/components/jobs/JobList.tsx
+PURPOSE: Renders jobs in a list/table format
+PROPS:
+  - jobs: Job[]
+  - onEdit: (job: Job) => void
+  - onDelete: (id: string) => void
+  - onStatusChange: (id: string, status: JobStatus) => void
+  - isLoading: boolean
+STATE: None
+CHILDREN: JobCard (multiple)
+
+COMPONENT: KanbanBoard
+FILE: src/components/jobs/KanbanBoard.tsx
+PURPOSE: Kanban-style pipeline view
+PROPS:
+  - jobs: Job[]
+  - onEdit: (job: Job) => void
+  - onDelete: (id: string) => void
+  - onStatusChange: (id: string, status: JobStatus) => void
+  - isLoading: boolean
+STATE: None
+CHILDREN: KanbanColumn (5)
+
+COMPONENT: KanbanColumn
+FILE: src/components/jobs/KanbanColumn.tsx
+PURPOSE: Single column in Kanban board
+PROPS:
+  - status: JobStatus
+  - jobs: Job[]
+  - onEdit: (job: Job) => void
+  - onDelete: (id: string) => void
+  - onStatusChange: (id: string, status: JobStatus) => void
+  - color: string
+STATE: None
+CHILDREN: JobCard (multiple, compact mode)
+
+--------------------------------------------------------------------------------
+2.4 SEARCH & FILTER COMPONENTS
+--------------------------------------------------------------------------------
+
+COMPONENT: SearchBar
+FILE: src/components/filters/SearchBar.tsx
+PURPOSE: Search by company name
+PROPS:
+  - value: string
+  - onChange: (value: string) => void
+  - placeholder?: string
+STATE: None (controlled)
+FEATURES: Debounced input, clear button
+
+COMPONENT: StatusFilter
+FILE: src/components/filters/StatusFilter.tsx
+PURPOSE: Filter jobs by status
+PROPS:
+  - value: JobStatus | 'all'
+  - onChange: (status: JobStatus | 'all') => void
+STATE: None (controlled)
+FEATURES: Tabs or dropdown for status selection
+
+COMPONENT: ViewToggle
+FILE: src/components/filters/ViewToggle.tsx
+PURPOSE: Switch between list and kanban views
+PROPS:
+  - view: 'list' | 'kanban'
+  - onChange: (view: 'list' | 'kanban') => void
+STATE: None (controlled)
+
+--------------------------------------------------------------------------------
+2.5 DASHBOARD & ANALYTICS COMPONENTS
+--------------------------------------------------------------------------------
+
+COMPONENT: Dashboard
+FILE: src/pages/DashboardPage.tsx
+PURPOSE: Main analytics view
+PROPS: None
+STATE: Uses TanStack Query for data
+CHILDREN: StatsCard, ApplicationsChart, StatusPieChart
+
+COMPONENT: StatsCard
+FILE: src/components/dashboard/StatsCard.tsx
+PURPOSE: Displays a single metric
+PROPS:
+  - title: string
+  - value: string | number
+  - icon: LucideIcon
+  - trend?: { value: number, positive: boolean }
+  - color?: string
+STATE: None
+
+COMPONENT: ApplicationsChart
+FILE: src/components/dashboard/ApplicationsChart.tsx
+PURPOSE: Bar chart showing applications over time
+PROPS:
+  - data: { date: string, count: number }[]
+  - isLoading?: boolean
+STATE: None
+LIBRARY: Recharts BarChart
+
+COMPONENT: StatusPieChart
+FILE: src/components/dashboard/StatusPieChart.tsx
+PURPOSE: Pie chart showing status distribution
+PROPS:
+  - data: { status: JobStatus, count: number }[]
+  - isLoading?: boolean
+STATE: None
+LIBRARY: Recharts PieChart
+
+--------------------------------------------------------------------------------
+2.6 UTILITY COMPONENTS
+--------------------------------------------------------------------------------
+
+COMPONENT: ThemeToggle
+FILE: src/components/ui/ThemeToggle.tsx
+PURPOSE: Toggle dark/light mode
+PROPS: None (uses ThemeContext)
+STATE: None
+
+COMPONENT: Modal
+FILE: src/components/ui/Modal.tsx
+PURPOSE: Reusable modal dialog
+PROPS:
+  - isOpen: boolean
+  - onClose: () => void
+  - title?: string
+  - children: React.ReactNode
+STATE: None
+
+COMPONENT: Button
+FILE: src/components/ui/Button.tsx
+PURPOSE: Reusable button component
+PROPS:
+  - variant: 'primary' | 'secondary' | 'danger' | 'ghost'
+  - size: 'sm' | 'md' | 'lg'
+  - loading?: boolean
+  - icon?: LucideIcon
+  - children: React.ReactNode
+  - ...button props
+STATE: None
+
+COMPONENT: Badge
+FILE: src/components/ui/Badge.tsx
+PURPOSE: Status badge with colors
+PROPS:
+  - status: JobStatus
+  - size?: 'sm' | 'md'
+STATE: None
+
+COMPONENT: EmptyState
+FILE: src/components/ui/EmptyState.tsx
+PURPOSE: Display when no data available
+PROPS:
+  - title: string
+  - description: string
+  - action?: { label: string, onClick: () => void }
+  - icon?: LucideIcon
+STATE: None
+
+COMPONENT: LoadingSpinner
+FILE: src/components/ui/LoadingSpinner.tsx
+PURPOSE: Loading indicator
+PROPS:
+  - size?: 'sm' | 'md' | 'lg'
+STATE: None
+
+================================================================================
+3. STATE MANAGEMENT
+================================================================================
+
+3.1 GLOBAL STATE (React Context)
+--------------------------------------------------------------------------------
+- AuthContext: User authentication state
+- ThemeContext: Dark/light mode preference
+
+3.2 SERVER STATE (TanStack Query)
+--------------------------------------------------------------------------------
+- useJobs(): Fetches and caches all user jobs
+- useJob(id): Fetches single job
+- useCreateJob(): Mutation for creating jobs
+- useUpdateJob(): Mutation for updating jobs
+- useDeleteJob(): Mutation for deleting jobs
+- useJobStats(): Fetches aggregated statistics
+
+3.3 LOCAL STATE (useState)
+--------------------------------------------------------------------------------
+- Form inputs and validation
+- Modal open/close state
+- Sidebar open/close state
+- View mode (list/kanban)
+- Filter values
+
+================================================================================
+4. DATA FLOW
+================================================================================
+
+                    ┌──────────────────┐
+                    │    Supabase DB   │
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼─────────┐
+                    │   jobService.ts  │  API Layer
+                    └────────┬─────────┘
+                             │
+                    ┌────────▼─────────┐
+                    │  TanStack Query  │  Cache & Sync
+                    └────────┬─────────┘
+                             │
+          ┌──────────────────┼──────────────────┐
+          │                  │                  │
+    ┌─────▼────┐      ┌──────▼─────┐     ┌─────▼─────┐
+    │ JobsPage │      │ Dashboard  │     │  Layout   │
+    └─────┬────┘      └──────┬─────┘     └───────────┘
+          │                  │
+    ┌─────▼────┐      ┌──────▼─────┐
+    │ JobList/ │      │   Charts   │
+    │ Kanban   │      └────────────┘
+    └─────┬────┘
+          │
+    ┌─────▼────┐
+    │ JobCard  │
+    └──────────┘
+
+================================================================================
+5. FILE ORGANIZATION
+================================================================================
+
+src/
+├── components/
+│   ├── auth/
+│   │   ├── AuthGuard.tsx
+│   │   ├── LoginForm.tsx
+│   │   └── SignupForm.tsx
+│   ├── dashboard/
+│   │   ├── ApplicationsChart.tsx
+│   │   ├── StatsCard.tsx
+│   │   └── StatusPieChart.tsx
+│   ├── filters/
+│   │   ├── SearchBar.tsx
+│   │   ├── StatusFilter.tsx
+│   │   └── ViewToggle.tsx
+│   ├── jobs/
+│   │   ├── JobCard.tsx
+│   │   ├── JobForm.tsx
+│   │   ├── JobList.tsx
+│   │   ├── KanbanBoard.tsx
+│   │   └── KanbanColumn.tsx
+│   ├── ui/
+│   │   ├── Badge.tsx
+│   │   ├── Button.tsx
+│   │   ├── EmptyState.tsx
+│   │   ├── LoadingSpinner.tsx
+│   │   └── Modal.tsx
+│   ├── Layout.tsx
+│   ├── Navbar.tsx
+│   └── Sidebar.tsx
+├── contexts/
+│   ├── AuthContext.tsx
+│   └── ThemeContext.tsx
+├── hooks/
+│   ├── useJobs.ts
+│   └── useJobStats.ts
+├── pages/
+│   ├── DashboardPage.tsx
+│   ├── JobsPage.tsx
+│   └── LoginPage.tsx
+├── services/
+│   └── jobService.ts
+├── lib/
+│   └── supabase.ts
+├── types/
+│   └── index.ts
+├── App.tsx
+├── main.tsx
+└── index.css
+
+================================================================================
+END OF COMPONENT ARCHITECTURE
+================================================================================

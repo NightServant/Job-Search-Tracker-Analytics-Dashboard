@@ -1,0 +1,444 @@
+================================================================================
+                        DATA DICTIONARY
+================================================================================
+
+This document provides detailed descriptions of all data entities, fields, and
+their relationships in the Job Search Tracker application.
+
+================================================================================
+1. CORE ENTITIES
+================================================================================
+
+--------------------------------------------------------------------------------
+1.1 Job Entity
+--------------------------------------------------------------------------------
+
+The Job entity represents a single job application tracked by a user. Each job
+contains information about the company, role, compensation, application status,
+and associated metadata.
+
+DATABASE TABLE: jobs
+
+| Field Name    | Data Type      | Constraints              | Description                                    |
+|---------------|----------------|--------------------------|------------------------------------------------|
+| id            | UUID           | PRIMARY KEY              | Unique identifier for the job entry            |
+| user_id       | UUID           | FOREIGN KEY, NOT NULL    | References auth.users(id), owner of the job    |
+| company       | VARCHAR(255)   | NOT NULL                 | Name of the company offering the position      |
+| role          | VARCHAR(255)   | NOT NULL                 | Job title or position name                     |
+| salary_min    | INTEGER        | CHECK (>= 0)             | Minimum annual salary offered (in USD)         |
+| salary_max    | INTEGER        | CHECK (>= 0)             | Maximum annual salary offered (in USD)         |
+| url           | TEXT           | NULL                     | URL to the job posting or application page     |
+| status        | VARCHAR(50)    | CHECK (IN enum), DEFAULT | Current stage of the application process       |
+| date_applied  | DATE           | NULL                     | Date when the application was submitted        |
+| notes         | TEXT           | NULL                     | User's personal notes about the job            |
+| created_at    | TIMESTAMPTZ    | DEFAULT NOW()            | Timestamp when the record was created          |
+| updated_at    | TIMESTAMPTZ    | DEFAULT NOW()            | Timestamp when the record was last updated     |
+
+CONSTRAINTS:
+- salary_max >= salary_min (when both provided)
+- status must be one of: 'wishlist', 'applied', 'interviewing', 'offer', 'rejected'
+- Row Level Security (RLS) ensures users can only access their own jobs
+
+INDEXES:
+- idx_jobs_user_id: B-tree index on user_id (for filtering)
+- idx_jobs_status: B-tree index on status (for status-based queries)
+- idx_jobs_date_applied: B-tree index on date_applied (for time-series queries)
+- idx_jobs_user_status: Composite index on (user_id, status)
+- idx_jobs_company_lower: Index on LOWER(company) for case-insensitive search
+
+--------------------------------------------------------------------------------
+1.2 User Entity (Managed by Supabase Auth)
+--------------------------------------------------------------------------------
+
+The User entity represents an authenticated user of the application. This entity
+is managed by Supabase's auth system and cannot be directly modified.
+
+DATABASE TABLE: auth.users (Supabase managed)
+
+| Field Name    | Data Type      | Description                                    |
+|---------------|----------------|------------------------------------------------|
+| id            | UUID           | Unique user identifier                         |
+| email         | VARCHAR        | User's email address (used for login)          |
+| created_at    | TIMESTAMPTZ    | Account creation timestamp                     |
+
+RELATIONSHIP:
+- One user can have many jobs (1:N relationship via jobs.user_id)
+
+================================================================================
+2. ENUMERATIONS
+================================================================================
+
+--------------------------------------------------------------------------------
+2.1 JobStatus Enum
+--------------------------------------------------------------------------------
+
+The status field indicates where a job application stands in the recruitment
+pipeline. Each status represents a distinct stage in the job search process.
+
+TYPE: String enumeration (stored as VARCHAR(50))
+
+VALUES:
+
+| Status        | Label          | Description                                    | Color   |
+|---------------|----------------|------------------------------------------------|---------|
+| wishlist      | Wishlist       | Job of interest, not yet applied               | Gray    |
+| applied       | Applied        | Application submitted, awaiting response       | Blue    |
+| interviewing  | Interviewing   | Currently in interview process                 | Yellow  |
+| offer         | Offer          | Job offer received                             | Green   |
+| rejected      | Rejected       | Application or candidacy rejected              | Red     |
+
+VALID TRANSITIONS:
+- wishlist → applied
+- applied → interviewing | rejected
+- interviewing → offer | rejected
+- offer → (terminal state)
+- rejected → (terminal state)
+
+Note: The application allows any status transition for user flexibility.
+
+================================================================================
+3. FRONTEND DATA TYPES (TypeScript)
+================================================================================
+
+--------------------------------------------------------------------------------
+3.1 Job Interface
+--------------------------------------------------------------------------------
+
+TYPE: Interface
+FILE: src/types/index.ts
+
+Represents a job entry in the frontend application. Mirrors the database schema
+with JavaScript-native types.
+
+```typescript
+interface Job {
+  id: string                    // UUID as string
+  user_id: string               // UUID as string
+  company: string               // Company name
+  role: string                  // Job title
+  salary_min: number | null     // Min salary or null
+  salary_max: number | null     // Max salary or null
+  url: string | null            // Job posting URL or null
+  status: JobStatus             // Current status (enum)
+  date_applied: string | null   // ISO date string or null
+  notes: string | null          // User notes or null
+  created_at: string            // ISO datetime string
+  updated_at: string            // ISO datetime string
+}
+```
+
+--------------------------------------------------------------------------------
+3.2 JobFormData Interface
+--------------------------------------------------------------------------------
+
+TYPE: Interface
+FILE: src/types/index.ts
+
+Represents the data structure used when creating or updating a job. Contains
+only user-editable fields. System-managed fields (id, user_id, timestamps) are
+omitted.
+
+```typescript
+interface JobFormData {
+  company: string               // Required: Company name
+  role: string                  // Required: Job title
+  salary_min?: number           // Optional: Min salary
+  salary_max?: number           // Optional: Max salary
+  url?: string                  // Optional: Job posting URL
+  status: JobStatus             // Required: Application status
+  date_applied?: string         // Optional: Application date
+  notes?: string                // Optional: User notes
+}
+```
+
+VALIDATION RULES:
+- company: Required, non-empty string
+- role: Required, non-empty string
+- salary_min: Optional, must be >= 0
+- salary_max: Optional, must be >= salary_min
+- url: Optional, must be valid HTTP/HTTPS URL
+- status: Required, must be valid JobStatus
+- date_applied: Optional, must be valid date
+- notes: Optional, any string
+
+--------------------------------------------------------------------------------
+3.3 JobStats Interface
+--------------------------------------------------------------------------------
+
+TYPE: Interface
+FILE: src/types/index.ts
+
+Represents aggregated statistics calculated from job data. Used in the analytics
+dashboard to display metrics and KPIs.
+
+```typescript
+interface JobStats {
+  totalJobs: number                              // Total number of tracked jobs
+  totalApplications: number                      // Jobs applied to (excl. wishlist)
+  interviews: number                             // Jobs in interview stage or offered
+  offers: number                                 // Jobs with offers received
+  rejections: number                             // Jobs that were rejected
+  conversionRate: number                         // (interviews / applications) * 100
+  offerRate: number                              // (offers / applications) * 100
+  statusDistribution: Record<JobStatus, number>  // Count per status
+}
+```
+
+CALCULATED FIELDS:
+- totalApplications = count(jobs WHERE status != 'wishlist')
+- interviews = count(jobs WHERE status IN ('interviewing', 'offer'))
+- offers = count(jobs WHERE status = 'offer')
+- rejections = count(jobs WHERE status = 'rejected')
+- conversionRate = (interviews / totalApplications) * 100
+- offerRate = (offers / totalApplications) * 100
+
+================================================================================
+4. CHART DATA TYPES
+================================================================================
+
+--------------------------------------------------------------------------------
+4.1 TimeSeriesDataPoint
+--------------------------------------------------------------------------------
+
+TYPE: Interface
+FILE: src/types/index.ts
+
+Represents a single data point in the applications-over-time chart. Used to
+visualize application submission patterns.
+
+```typescript
+interface TimeSeriesDataPoint {
+  date: string        // ISO date string (YYYY-MM-DD)
+  count: number       // Number of applications on this date/week
+}
+```
+
+USAGE:
+- Grouped by week (Sunday start)
+- Sorted chronologically
+- Powers the bar chart on dashboard
+
+--------------------------------------------------------------------------------
+4.2 StatusDataPoint
+--------------------------------------------------------------------------------
+
+TYPE: Interface
+FILE: src/types/index.ts
+
+Represents a single segment in the status distribution pie chart. Associates
+a status with its count and visual color.
+
+```typescript
+interface StatusDataPoint {
+  status: JobStatus   // Status category
+  count: number       // Number of jobs in this status
+  color: string       // Hex color code for visualization
+}
+```
+
+USAGE:
+- Powers the pie chart on dashboard
+- Filters out statuses with zero count
+- Colors match STATUS_CONFIG definitions
+
+================================================================================
+5. CONFIGURATION CONSTANTS
+================================================================================
+
+--------------------------------------------------------------------------------
+5.1 STATUS_CONFIG
+--------------------------------------------------------------------------------
+
+TYPE: Constant object
+FILE: src/types/index.ts
+
+Maps each JobStatus to its display configuration including label, colors, and
+styling. Used throughout the UI for consistent status representation.
+
+```typescript
+const STATUS_CONFIG: Record<JobStatus, {
+  label: string       // Human-readable status name
+  color: string       // Hex color for charts/badges
+  bgColor: string     // Tailwind CSS class for backgrounds
+}>
+```
+
+VALUES:
+- wishlist: { label: 'Wishlist', color: '#71717a', bgColor: 'bg-zinc-500' }
+- applied: { label: 'Applied', color: '#3b82f6', bgColor: 'bg-blue-500' }
+- interviewing: { label: 'Interviewing', color: '#eab308', bgColor: 'bg-yellow-500' }
+- offer: { label: 'Offer', color: '#22c55e', bgColor: 'bg-green-500' }
+- rejected: { label: 'Rejected', color: '#ef4444', bgColor: 'bg-red-500' }
+
+================================================================================
+6. API RESPONSE FORMATS
+================================================================================
+
+--------------------------------------------------------------------------------
+6.1 Supabase Query Response
+--------------------------------------------------------------------------------
+
+All Supabase queries return a standardized response structure:
+
+```typescript
+{
+  data: T | T[] | null       // Query result or null
+  error: PostgrestError | null  // Error object or null
+}
+```
+
+ERROR STRUCTURE:
+```typescript
+interface PostgrestError {
+  message: string      // Human-readable error message
+  details: string      // Detailed error information
+  hint: string         // Suggested resolution
+  code: string         // PostgreSQL error code
+}
+```
+
+COMMON ERROR CODES:
+- 23505: Unique constraint violation
+- 23503: Foreign key constraint violation
+- 42501: Insufficient privileges (RLS violation)
+- PGRST116: Row not found
+
+--------------------------------------------------------------------------------
+6.2 TanStack Query Response
+--------------------------------------------------------------------------------
+
+React Query hooks return a standardized query result:
+
+```typescript
+{
+  data: T | undefined           // Query data (undefined while loading)
+  isLoading: boolean            // Initial load state
+  isFetching: boolean           // Background fetch state
+  isError: boolean              // Error state
+  error: Error | null           // Error object
+  refetch: () => void           // Manual refetch function
+}
+```
+
+MUTATION RESULT:
+```typescript
+{
+  mutate: (variables: T) => void             // Fire-and-forget mutation
+  mutateAsync: (variables: T) => Promise<T>  // Promise-based mutation
+  isPending: boolean                         // Loading state
+  isError: boolean                           // Error state
+  error: Error | null                        // Error object
+}
+```
+
+================================================================================
+7. CSV EXPORT FORMAT
+================================================================================
+
+The application exports job data to CSV with the following schema:
+
+COLUMNS (in order):
+1. Company       - VARCHAR    - Company name
+2. Role          - VARCHAR    - Job title
+3. Status        - VARCHAR    - Current status
+4. Salary Min    - INTEGER    - Minimum salary (or empty)
+5. Salary Max    - INTEGER    - Maximum salary (or empty)
+6. Date Applied  - DATE       - Application date (YYYY-MM-DD or empty)
+7. URL           - TEXT       - Job posting URL (or empty)
+8. Notes         - TEXT       - User notes (quoted, escaped)
+9. Created At    - TIMESTAMP  - Record creation time (ISO 8601)
+
+FORMATTING RULES:
+- All fields are double-quoted
+- Internal quotes are escaped as ""
+- Empty/null values appear as empty strings
+- Dates in ISO 8601 format
+- File encoding: UTF-8
+- Line endings: CRLF (\r\n)
+
+FILENAME CONVENTION:
+job-applications-YYYY-MM-DD.csv
+
+USAGE:
+- Compatible with Excel, Google Sheets, Pandas
+- Can be imported into the Python analysis script
+- Preserves all data for backup/analysis
+
+================================================================================
+8. PYTHON DATA ANALYSIS TYPES
+================================================================================
+
+When imported into Pandas, the CSV data uses the following dtypes:
+
+```python
+{
+    'Company': 'object',          # pandas string
+    'Role': 'object',             # pandas string
+    'Status': 'object',           # pandas string
+    'Salary Min': 'float64',      # numeric (handles NaN)
+    'Salary Max': 'float64',      # numeric (handles NaN)
+    'Date Applied': 'datetime64', # parsed datetime
+    'URL': 'object',              # pandas string
+    'Notes': 'object',            # pandas string
+    'Created At': 'datetime64'    # parsed datetime
+}
+```
+
+COMPUTED COLUMNS (in analysis script):
+- week: datetime64       - Week start date (Sunday)
+- avg_salary: float64    - Average of min and max salary
+
+================================================================================
+9. FIELD VALIDATION RULES
+================================================================================
+
+FRONTEND VALIDATION:
+
+| Field         | Required | Min Length | Max Length | Pattern/Range        |
+|---------------|----------|------------|------------|----------------------|
+| company       | Yes      | 1          | 255        | Any                  |
+| role          | Yes      | 1          | 255        | Any                  |
+| salary_min    | No       | -          | -          | >= 0                 |
+| salary_max    | No       | -          | -          | >= salary_min        |
+| url           | No       | -          | -          | Valid HTTP(S) URL    |
+| status        | Yes      | -          | -          | Must be JobStatus    |
+| date_applied  | No       | -          | -          | Valid date           |
+| notes         | No       | 0          | Unlimited  | Any                  |
+| email         | Yes      | -          | -          | Valid email format   |
+| password      | Yes      | 6          | -          | Any                  |
+
+DATABASE CONSTRAINTS:
+- All VARCHAR fields have max length enforced
+- INTEGER fields reject non-numeric input
+- DATE fields reject invalid dates
+- ENUM fields (status) reject invalid values
+- Foreign keys enforce referential integrity
+- CHECK constraints validate ranges (salary >= 0)
+
+================================================================================
+10. DATA RETENTION & PRIVACY
+================================================================================
+
+USER DATA:
+- User account data managed by Supabase Auth
+- Jobs are permanently deleted when user deletes account (CASCADE)
+- No automatic data retention or backup by default
+
+SESSION DATA:
+- Auth sessions stored in browser localStorage
+- Session tokens auto-refresh
+- Logout clears all local session data
+
+EXPORTED DATA:
+- CSV exports saved locally on user's device
+- Not stored on server
+- User responsible for managing exported files
+
+ROW LEVEL SECURITY:
+- Users can ONLY access their own job data
+- Database-level enforcement (cannot be bypassed)
+- Impossible to query other users' data even with valid session
+
+================================================================================
+END OF DATA DICTIONARY
+================================================================================

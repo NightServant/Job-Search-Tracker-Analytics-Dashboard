@@ -1,0 +1,259 @@
+================================================================================
+                    JOB SEARCH TRACKER - DATABASE SCHEMA
+================================================================================
+
+This document contains the complete SQL commands for setting up the Supabase
+PostgreSQL database, including tables, indexes, Row Level Security policies,
+and triggers.
+
+================================================================================
+ENTITY RELATIONSHIP DIAGRAM (Text Representation)
+================================================================================
+
+    ┌─────────────────────┐
+    │    auth.users       │     (Managed by Supabase Auth)
+    │─────────────────────│
+    │  id (UUID) PK       │
+    │  email              │
+    │  created_at         │
+    └──────────┬──────────┘
+               │
+               │ 1:N
+               ▼
+    ┌─────────────────────┐
+    │       jobs          │
+    │─────────────────────│
+    │  id (UUID) PK       │
+    │  user_id (UUID) FK  │───► References auth.users(id)
+    │  company            │
+    │  role               │
+    │  salary_min         │
+    │  salary_max         │
+    │  url                │
+    │  status             │
+    │  date_applied       │
+    │  notes              │
+    │  created_at         │
+    │  updated_at         │
+    └─────────────────────┘
+
+================================================================================
+1. ENABLE EXTENSIONS
+================================================================================
+
+-- Enable UUID generation (usually enabled by default in Supabase)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+
+================================================================================
+2. JOBS TABLE
+================================================================================
+
+-- Main table for storing job applications
+CREATE TABLE jobs (
+    -- Primary key: UUID auto-generated
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    
+    -- Foreign key: links to authenticated user
+    -- ON DELETE CASCADE ensures jobs are deleted when user is deleted
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    
+    -- Required fields
+    company VARCHAR(255) NOT NULL,
+    role VARCHAR(255) NOT NULL,
+    
+    -- Optional salary range (stored as integers, in thousands or annual)
+    salary_min INTEGER CHECK (salary_min >= 0),
+    salary_max INTEGER CHECK (salary_max >= 0),
+    
+    -- Optional job posting URL
+    url TEXT,
+    
+    -- Status with enum constraint
+    -- DEFAULT 'wishlist' for new entries
+    status VARCHAR(50) DEFAULT 'wishlist' CHECK (
+        status IN ('wishlist', 'applied', 'interviewing', 'offer', 'rejected')
+    ),
+    
+    -- Date when application was submitted (NULL if not yet applied)
+    date_applied DATE,
+    
+    -- Free-form notes field
+    notes TEXT,
+    
+    -- Timestamps
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    
+    -- Constraint: salary_max should be >= salary_min when both are provided
+    CONSTRAINT valid_salary_range CHECK (
+        salary_min IS NULL OR salary_max IS NULL OR salary_max >= salary_min
+    )
+);
+
+-- Add comments for documentation
+COMMENT ON TABLE jobs IS 'Stores job applications tracked by users';
+COMMENT ON COLUMN jobs.status IS 'Application status: wishlist, applied, interviewing, offer, rejected';
+COMMENT ON COLUMN jobs.salary_min IS 'Minimum salary (annual, in user preferred currency)';
+COMMENT ON COLUMN jobs.salary_max IS 'Maximum salary (annual, in user preferred currency)';
+
+================================================================================
+3. INDEXES FOR PERFORMANCE
+================================================================================
+
+-- Index on user_id for filtering by user (most common query pattern)
+CREATE INDEX idx_jobs_user_id ON jobs(user_id);
+
+-- Index on status for filtering by status
+CREATE INDEX idx_jobs_status ON jobs(status);
+
+-- Index on date_applied for time-based queries and sorting
+CREATE INDEX idx_jobs_date_applied ON jobs(date_applied);
+
+-- Composite index for common query: user's jobs by status
+CREATE INDEX idx_jobs_user_status ON jobs(user_id, status);
+
+-- Index for company search (case-insensitive)
+CREATE INDEX idx_jobs_company_lower ON jobs(LOWER(company));
+
+================================================================================
+4. ROW LEVEL SECURITY (RLS)
+================================================================================
+
+-- Enable RLS on the jobs table
+ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Users can only SELECT their own jobs
+CREATE POLICY "Users can view own jobs" 
+    ON jobs
+    FOR SELECT 
+    USING (auth.uid() = user_id);
+
+-- Policy: Users can only INSERT jobs for themselves
+CREATE POLICY "Users can insert own jobs" 
+    ON jobs
+    FOR INSERT 
+    WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Users can only UPDATE their own jobs
+CREATE POLICY "Users can update own jobs" 
+    ON jobs
+    FOR UPDATE 
+    USING (auth.uid() = user_id)
+    WITH CHECK (auth.uid() = user_id);
+
+-- Policy: Users can only DELETE their own jobs
+CREATE POLICY "Users can delete own jobs" 
+    ON jobs
+    FOR DELETE 
+    USING (auth.uid() = user_id);
+
+================================================================================
+5. TRIGGERS
+================================================================================
+
+-- Function to automatically update the updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to call the function before each UPDATE
+CREATE TRIGGER set_updated_at
+    BEFORE UPDATE ON jobs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
+================================================================================
+6. SAMPLE DATA (For Testing)
+================================================================================
+
+-- Note: Replace 'your-user-uuid' with an actual authenticated user's UUID
+-- This is for development/testing only
+
+-- INSERT INTO jobs (user_id, company, role, salary_min, salary_max, url, status, date_applied, notes)
+-- VALUES
+--     ('your-user-uuid', 'Google', 'Senior Frontend Engineer', 180000, 250000, 'https://careers.google.com/jobs/123', 'applied', '2026-03-01', 'Applied through referral'),
+--     ('your-user-uuid', 'Meta', 'Staff Software Engineer', 200000, 300000, 'https://metacareers.com/jobs/456', 'interviewing', '2026-02-15', 'Phone screen scheduled for next week'),
+--     ('your-user-uuid', 'Stripe', 'Full Stack Developer', 150000, 200000, 'https://stripe.com/jobs/789', 'wishlist', NULL, 'Interesting role, need to prepare'),
+--     ('your-user-uuid', 'Netflix', 'UI Engineer', 170000, 220000, NULL, 'rejected', '2026-01-20', 'Rejected after technical round'),
+--     ('your-user-uuid', 'Airbnb', 'Frontend Developer', 160000, 210000, 'https://careers.airbnb.com/positions/101', 'offer', '2026-02-01', 'Offer received! 185k + equity');
+
+================================================================================
+7. USEFUL QUERIES
+================================================================================
+
+-- Get all jobs for a user, sorted by most recent first
+-- SELECT * FROM jobs WHERE user_id = auth.uid() ORDER BY created_at DESC;
+
+-- Get jobs by status
+-- SELECT * FROM jobs WHERE user_id = auth.uid() AND status = 'applied';
+
+-- Get application statistics
+-- SELECT 
+--     status,
+--     COUNT(*) as count,
+--     ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) as percentage
+-- FROM jobs 
+-- WHERE user_id = auth.uid()
+-- GROUP BY status;
+
+-- Get applications per week
+-- SELECT 
+--     DATE_TRUNC('week', date_applied) as week,
+--     COUNT(*) as applications
+-- FROM jobs 
+-- WHERE user_id = auth.uid() AND date_applied IS NOT NULL
+-- GROUP BY week
+-- ORDER BY week;
+
+-- Calculate conversion rate (interviews / applications)
+-- SELECT 
+--     COUNT(*) FILTER (WHERE status IN ('applied', 'interviewing', 'offer', 'rejected')) as total_applied,
+--     COUNT(*) FILTER (WHERE status IN ('interviewing', 'offer')) as got_interviews,
+--     ROUND(
+--         COUNT(*) FILTER (WHERE status IN ('interviewing', 'offer')) * 100.0 /
+--         NULLIF(COUNT(*) FILTER (WHERE status IN ('applied', 'interviewing', 'offer', 'rejected')), 0),
+--         2
+--     ) as conversion_rate
+-- FROM jobs 
+-- WHERE user_id = auth.uid();
+
+================================================================================
+8. FIELD DESCRIPTIONS
+================================================================================
+
+| Field        | Type         | Required | Description                        |
+|--------------|--------------|----------|------------------------------------|
+| id           | UUID         | Auto     | Unique identifier                  |
+| user_id      | UUID         | Yes      | Owner of the job entry             |
+| company      | VARCHAR(255) | Yes      | Company name                       |
+| role         | VARCHAR(255) | Yes      | Job title/position                 |
+| salary_min   | INTEGER      | No       | Minimum salary (annual)            |
+| salary_max   | INTEGER      | No       | Maximum salary (annual)            |
+| url          | TEXT         | No       | Link to job posting                |
+| status       | VARCHAR(50)  | Yes*     | Current application status         |
+| date_applied | DATE         | No       | When application was submitted     |
+| notes        | TEXT         | No       | Additional notes                   |
+| created_at   | TIMESTAMPTZ  | Auto     | When record was created            |
+| updated_at   | TIMESTAMPTZ  | Auto     | When record was last modified      |
+
+* status defaults to 'wishlist' if not provided
+
+================================================================================
+9. STATUS DEFINITIONS
+================================================================================
+
+| Status       | Description                                    | Color   |
+|--------------|------------------------------------------------|---------|
+| wishlist     | Interested, haven't applied yet                | Gray    |
+| applied      | Application submitted, waiting to hear back   | Blue    |
+| interviewing | In active interview process                    | Yellow  |
+| offer        | Received an offer                              | Green   |
+| rejected     | Application rejected at any stage              | Red     |
+
+================================================================================
+END OF SCHEMA DOCUMENTATION
+================================================================================

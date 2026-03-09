@@ -1,0 +1,585 @@
+================================================================================
+                    JOB SEARCH TRACKER - API LOGIC
+================================================================================
+
+This document describes how the frontend communicates with Supabase, including
+client setup, authentication flow, CRUD operations, and error handling.
+
+================================================================================
+1. SUPABASE CLIENT SETUP
+================================================================================
+
+FILE: src/lib/supabase.ts
+
+The Supabase client is initialized once and exported for use throughout the app.
+Environment variables are used for configuration.
+
+--------------------------------------------------------------------------------
+Configuration:
+--------------------------------------------------------------------------------
+
+import { createClient } from '@supabase/supabase-js'
+import type { Database } from '@/types/database'
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey)
+
+--------------------------------------------------------------------------------
+Environment Variables:
+--------------------------------------------------------------------------------
+
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-anon-key
+
+Note: The anon key is safe to expose in the frontend because:
+1. Row Level Security (RLS) protects data
+2. Users can only access their own data
+3. Authentication is required for most operations
+
+================================================================================
+2. AUTHENTICATION FLOW
+================================================================================
+
+FILE: src/contexts/AuthContext.tsx
+FILE: src/services/authService.ts
+
+--------------------------------------------------------------------------------
+2.1 Sign Up (Registration)
+--------------------------------------------------------------------------------
+
+async function signUp(email: string, password: string) {
+  const { data, error } = await supabase.auth.signUp({
+    email,
+    password,
+  })
+  
+  if (error) throw error
+  return data.user
+}
+
+Flow:
+1. User enters email and password
+2. Call supabase.auth.signUp()
+3. Supabase creates user in auth.users
+4. Confirmation email sent (if enabled)
+5. User redirected to login or dashboard
+
+--------------------------------------------------------------------------------
+2.2 Sign In (Login)
+--------------------------------------------------------------------------------
+
+async function signIn(email: string, password: string) {
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+  
+  if (error) throw error
+  return data.user
+}
+
+Flow:
+1. User enters credentials
+2. Call supabase.auth.signInWithPassword()
+3. Supabase validates and returns session
+4. Session stored in localStorage automatically
+5. User redirected to dashboard
+
+--------------------------------------------------------------------------------
+2.3 Sign Out
+--------------------------------------------------------------------------------
+
+async function signOut() {
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
+}
+
+Flow:
+1. Call supabase.auth.signOut()
+2. Session cleared from localStorage
+3. User redirected to login page
+
+--------------------------------------------------------------------------------
+2.4 Session Persistence
+--------------------------------------------------------------------------------
+
+The AuthContext listens for auth state changes:
+
+useEffect(() => {
+  // Get initial session
+  supabase.auth.getSession().then(({ data: { session } }) => {
+    setUser(session?.user ?? null)
+    setLoading(false)
+  })
+
+  // Listen for changes
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (_event, session) => {
+      setUser(session?.user ?? null)
+    }
+  )
+
+  return () => subscription.unsubscribe()
+}, [])
+
+================================================================================
+3. JOB SERVICE (CRUD OPERATIONS)
+================================================================================
+
+FILE: src/services/jobService.ts
+
+--------------------------------------------------------------------------------
+3.1 Type Definitions
+--------------------------------------------------------------------------------
+
+interface Job {
+  id: string
+  user_id: string
+  company: string
+  role: string
+  salary_min: number | null
+  salary_max: number | null
+  url: string | null
+  status: 'wishlist' | 'applied' | 'interviewing' | 'offer' | 'rejected'
+  date_applied: string | null
+  notes: string | null
+  created_at: string
+  updated_at: string
+}
+
+interface CreateJobData {
+  company: string
+  role: string
+  salary_min?: number
+  salary_max?: number
+  url?: string
+  status?: JobStatus
+  date_applied?: string
+  notes?: string
+}
+
+interface UpdateJobData extends Partial<CreateJobData> {}
+
+--------------------------------------------------------------------------------
+3.2 Get All Jobs
+--------------------------------------------------------------------------------
+
+async function getJobs(): Promise<Job[]> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .order('created_at', { ascending: false })
+
+  if (error) throw error
+  return data
+}
+
+Notes:
+- RLS automatically filters to current user's jobs
+- Ordered by most recent first
+- Returns empty array if no jobs
+
+--------------------------------------------------------------------------------
+3.3 Get Single Job
+--------------------------------------------------------------------------------
+
+async function getJob(id: string): Promise<Job> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+Notes:
+- .single() returns one row or throws error
+- RLS ensures user can only fetch their own jobs
+
+--------------------------------------------------------------------------------
+3.4 Create Job
+--------------------------------------------------------------------------------
+
+async function createJob(jobData: CreateJobData): Promise<Job> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Not authenticated')
+
+  const { data, error } = await supabase
+    .from('jobs')
+    .insert({
+      ...jobData,
+      user_id: user.id,
+    })
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+Notes:
+- Must include user_id from current session
+- .select().single() returns the created row
+- RLS validates user_id matches auth.uid()
+
+--------------------------------------------------------------------------------
+3.5 Update Job
+--------------------------------------------------------------------------------
+
+async function updateJob(id: string, updates: UpdateJobData): Promise<Job> {
+  const { data, error } = await supabase
+    .from('jobs')
+    .update(updates)
+    .eq('id', id)
+    .select()
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+Notes:
+- updated_at is set automatically by trigger
+- RLS ensures user can only update their own jobs
+
+--------------------------------------------------------------------------------
+3.6 Delete Job
+--------------------------------------------------------------------------------
+
+async function deleteJob(id: string): Promise<void> {
+  const { error } = await supabase
+    .from('jobs')
+    .delete()
+    .eq('id', id)
+
+  if (error) throw error
+}
+
+Notes:
+- RLS ensures user can only delete their own jobs
+- No return value on success
+
+--------------------------------------------------------------------------------
+3.7 Update Status (Quick Action)
+--------------------------------------------------------------------------------
+
+async function updateJobStatus(id: string, status: JobStatus): Promise<Job> {
+  return updateJob(id, { status })
+}
+
+Notes:
+- Convenience wrapper for status-only updates
+- Used by Kanban drag-and-drop
+
+================================================================================
+4. TANSTACK QUERY HOOKS
+================================================================================
+
+FILE: src/hooks/useJobs.ts
+
+--------------------------------------------------------------------------------
+4.1 useJobs Hook
+--------------------------------------------------------------------------------
+
+export function useJobs() {
+  return useQuery({
+    queryKey: ['jobs'],
+    queryFn: jobService.getJobs,
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  })
+}
+
+Returns:
+- data: Job[] | undefined
+- isLoading: boolean
+- error: Error | null
+- refetch: () => void
+
+--------------------------------------------------------------------------------
+4.2 useCreateJob Hook
+--------------------------------------------------------------------------------
+
+export function useCreateJob() {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: jobService.createJob,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    },
+  })
+}
+
+Returns:
+- mutate: (data: CreateJobData) => void
+- mutateAsync: (data: CreateJobData) => Promise<Job>
+- isPending: boolean
+- error: Error | null
+
+--------------------------------------------------------------------------------
+4.3 useUpdateJob Hook
+--------------------------------------------------------------------------------
+
+export function useUpdateJob() {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateJobData }) =>
+      jobService.updateJob(id, data),
+    onMutate: async ({ id, data }) => {
+      // Optimistic update
+      await queryClient.cancelQueries({ queryKey: ['jobs'] })
+      const previousJobs = queryClient.getQueryData(['jobs'])
+      
+      queryClient.setQueryData(['jobs'], (old: Job[]) =>
+        old.map(job => job.id === id ? { ...job, ...data } : job)
+      )
+      
+      return { previousJobs }
+    },
+    onError: (err, variables, context) => {
+      // Rollback on error
+      queryClient.setQueryData(['jobs'], context?.previousJobs)
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    },
+  })
+}
+
+Notes:
+- Optimistic updates for instant UI feedback
+- Rollback on error
+- Invalidates cache on settle
+
+--------------------------------------------------------------------------------
+4.4 useDeleteJob Hook
+--------------------------------------------------------------------------------
+
+export function useDeleteJob() {
+  const queryClient = useQueryClient()
+  
+  return useMutation({
+    mutationFn: jobService.deleteJob,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    },
+  })
+}
+
+================================================================================
+5. STATISTICS & ANALYTICS
+================================================================================
+
+FILE: src/hooks/useJobStats.ts
+
+--------------------------------------------------------------------------------
+5.1 Calculate Statistics
+--------------------------------------------------------------------------------
+
+export function useJobStats() {
+  const { data: jobs = [] } = useJobs()
+  
+  return useMemo(() => {
+    const totalApplications = jobs.filter(
+      j => j.status !== 'wishlist'
+    ).length
+    
+    const interviews = jobs.filter(
+      j => j.status === 'interviewing' || j.status === 'offer'
+    ).length
+    
+    const offers = jobs.filter(j => j.status === 'offer').length
+    
+    const conversionRate = totalApplications > 0
+      ? (interviews / totalApplications) * 100
+      : 0
+    
+    const offerRate = totalApplications > 0
+      ? (offers / totalApplications) * 100
+      : 0
+    
+    const statusDistribution = {
+      wishlist: jobs.filter(j => j.status === 'wishlist').length,
+      applied: jobs.filter(j => j.status === 'applied').length,
+      interviewing: jobs.filter(j => j.status === 'interviewing').length,
+      offer: jobs.filter(j => j.status === 'offer').length,
+      rejected: jobs.filter(j => j.status === 'rejected').length,
+    }
+    
+    return {
+      totalJobs: jobs.length,
+      totalApplications,
+      interviews,
+      offers,
+      conversionRate,
+      offerRate,
+      statusDistribution,
+    }
+  }, [jobs])
+}
+
+--------------------------------------------------------------------------------
+5.2 Applications Over Time
+--------------------------------------------------------------------------------
+
+export function useApplicationsOverTime() {
+  const { data: jobs = [] } = useJobs()
+  
+  return useMemo(() => {
+    const appliedJobs = jobs.filter(j => j.date_applied)
+    
+    // Group by week
+    const grouped = appliedJobs.reduce((acc, job) => {
+      const week = startOfWeek(new Date(job.date_applied!))
+      const key = format(week, 'yyyy-MM-dd')
+      acc[key] = (acc[key] || 0) + 1
+      return acc
+    }, {} as Record<string, number>)
+    
+    // Convert to array for Recharts
+    return Object.entries(grouped)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [jobs])
+}
+
+================================================================================
+6. ERROR HANDLING
+================================================================================
+
+--------------------------------------------------------------------------------
+6.1 API Error Types
+--------------------------------------------------------------------------------
+
+interface SupabaseError {
+  message: string
+  code: string
+  details: string | null
+  hint: string | null
+}
+
+Common error codes:
+- PGRST116: Row not found (single query returned no results)
+- 23505: Unique constraint violation
+- 42501: RLS policy violation (insufficient privilege)
+- 23503: Foreign key violation
+
+--------------------------------------------------------------------------------
+6.2 Error Handling in Components
+--------------------------------------------------------------------------------
+
+function JobsPage() {
+  const { data: jobs, isLoading, error } = useJobs()
+  
+  if (error) {
+    return <ErrorMessage message="Failed to load jobs" />
+  }
+  
+  if (isLoading) {
+    return <LoadingSpinner />
+  }
+  
+  return <JobList jobs={jobs} />
+}
+
+--------------------------------------------------------------------------------
+6.3 Mutation Error Handling
+--------------------------------------------------------------------------------
+
+function JobForm() {
+  const createJob = useCreateJob()
+  
+  const handleSubmit = async (data: CreateJobData) => {
+    try {
+      await createJob.mutateAsync(data)
+      toast.success('Job created successfully')
+      onClose()
+    } catch (error) {
+      toast.error('Failed to create job')
+      console.error(error)
+    }
+  }
+}
+
+================================================================================
+7. DATA EXPORT
+================================================================================
+
+FILE: src/services/exportService.ts
+
+--------------------------------------------------------------------------------
+Export to CSV
+--------------------------------------------------------------------------------
+
+export function exportJobsToCSV(jobs: Job[]): void {
+  const headers = [
+    'Company',
+    'Role',
+    'Status',
+    'Salary Min',
+    'Salary Max',
+    'Date Applied',
+    'URL',
+    'Notes',
+    'Created At',
+  ]
+  
+  const rows = jobs.map(job => [
+    job.company,
+    job.role,
+    job.status,
+    job.salary_min || '',
+    job.salary_max || '',
+    job.date_applied || '',
+    job.url || '',
+    job.notes || '',
+    job.created_at,
+  ])
+  
+  const csv = [
+    headers.join(','),
+    ...rows.map(row => row.map(cell => 
+      `"${String(cell).replace(/"/g, '""')}"`
+    ).join(','))
+  ].join('\n')
+  
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `job-applications-${format(new Date(), 'yyyy-MM-dd')}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+================================================================================
+8. SECURITY CONSIDERATIONS
+================================================================================
+
+1. ROW LEVEL SECURITY
+   - All data access filtered by user_id
+   - Cannot access other users' data even with valid session
+
+2. ENVIRONMENT VARIABLES
+   - Supabase URL and anon key in .env.local
+   - Never commit .env.local to version control
+   - Use Vercel/hosting provider's env var system
+
+3. INPUT VALIDATION
+   - Validate on frontend before API calls
+   - Database constraints as last line of defense
+   - Sanitize user input to prevent XSS
+
+4. SESSION MANAGEMENT
+   - Sessions auto-refresh
+   - Logout clears all session data
+   - Protected routes check auth state
+
+================================================================================
+END OF API LOGIC DOCUMENTATION
+================================================================================

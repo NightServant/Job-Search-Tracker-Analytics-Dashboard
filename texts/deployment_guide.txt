@@ -1,0 +1,569 @@
+================================================================================
+                    DEPLOYMENT GUIDE
+================================================================================
+
+This guide provides step-by-step instructions for deploying the Job Search
+Tracker application to various hosting platforms.
+
+================================================================================
+PREREQUISITES
+================================================================================
+
+Before deploying, ensure the following are completed:
+
+1. ✓ Application builds successfully locally:
+   ```
+   npm run build
+   ```
+
+2. ✓ All environment variables are identified:
+   - VITE_SUPABASE_URL
+   - VITE_SUPABASE_ANON_KEY
+
+3. ✓ Supabase project is set up with:
+   - Database schema applied
+   - Row Level Security enabled
+   - Authentication configured
+
+4. ✓ Code is pushed to a Git repository (GitHub, GitLab, Bitbucket)
+
+5. ✓ Production Supabase project created (or using the same one for dev)
+
+================================================================================
+OPTION 1: VERCEL (RECOMMENDED)
+================================================================================
+
+Vercel provides zero-configuration deployment for Vite applications with
+automatic SSL, global CDN, and environment variable management.
+
+--------------------------------------------------------------------------------
+Step 1: Prepare the Project
+--------------------------------------------------------------------------------
+
+1. Ensure the project has a valid package.json with build script:
+   ```json
+   "scripts": {
+     "build": "tsc -b && vite build"
+   }
+   ```
+
+2. Create vercel.json in the project root for SPA routing:
+   ```json
+   {
+     "rewrites": [
+       { "source": "/(.*)", "destination": "/index.html" }
+     ]
+   }
+   ```
+
+--------------------------------------------------------------------------------
+Step 2: Deploy via Vercel Dashboard
+--------------------------------------------------------------------------------
+
+1. Go to https://vercel.com and sign in with GitHub
+
+2. Click "Add New Project"
+
+3. Import the Git repository
+
+4. Configure the project:
+   - Framework Preset: Vite
+   - Build Command: npm run build
+   - Output Directory: dist
+   - Install Command: npm install
+
+5. Add Environment Variables:
+   - Name: VITE_SUPABASE_URL
+   - Value: [Supabase project URL]
+   
+   - Name: VITE_SUPABASE_ANON_KEY
+   - Value: [Supabase anon key]
+
+6. Click "Deploy"
+
+7. Wait for deployment to complete (typically 1-2 minutes)
+
+8. Access the deployed application at the provided URL
+
+--------------------------------------------------------------------------------
+Step 3: Configure Custom Domain (Optional)
+--------------------------------------------------------------------------------
+
+1. In Vercel project settings, go to "Domains"
+
+2. Add the custom domain
+
+3. Configure DNS records as instructed by Vercel:
+   - Type: A
+   - Name: @
+   - Value: 76.76.21.21
+   
+   - Type: CNAME
+   - Name: www
+   - Value: cname.vercel-dns.com
+
+4. Wait for DNS propagation (up to 48 hours)
+
+--------------------------------------------------------------------------------
+Step 4: Vercel CLI Deployment (Alternative)
+--------------------------------------------------------------------------------
+
+For deploying from the command line:
+
+1. Install Vercel CLI:
+   ```
+   npm install -g vercel
+   ```
+
+2. Login to Vercel:
+   ```
+   vercel login
+   ```
+
+3. Deploy to production:
+   ```
+   vercel --prod
+   ```
+
+4. Follow prompts to configure the project
+
+================================================================================
+OPTION 2: NETLIFY
+================================================================================
+
+Netlify offers similar features to Vercel with excellent CI/CD integration.
+
+--------------------------------------------------------------------------------
+Step 1: Prepare the Project
+--------------------------------------------------------------------------------
+
+1. Create netlify.toml in the project root:
+   ```toml
+   [build]
+     command = "npm run build"
+     publish = "dist"
+   
+   [[redirects]]
+     from = "/*"
+     to = "/index.html"
+     status = 200
+   ```
+
+--------------------------------------------------------------------------------
+Step 2: Deploy via Netlify Dashboard
+--------------------------------------------------------------------------------
+
+1. Go to https://netlify.com and sign in
+
+2. Click "Add new site" > "Import an existing project"
+
+3. Connect to the Git provider and select the repository
+
+4. Configure build settings:
+   - Build command: npm run build
+   - Publish directory: dist
+   - Node version: 18 (in Build & Deploy > Environment)
+
+5. Add Environment Variables:
+   - VITE_SUPABASE_URL = [value]
+   - VITE_SUPABASE_ANON_KEY = [value]
+
+6. Click "Deploy site"
+
+7. Access the deployed application at the generated URL
+
+--------------------------------------------------------------------------------
+Step 3: Netlify CLI Deployment (Alternative)
+--------------------------------------------------------------------------------
+
+1. Install Netlify CLI:
+   ```
+   npm install -g netlify-cli
+   ```
+
+2. Login:
+   ```
+   netlify login
+   ```
+
+3. Initialize and deploy:
+   ```
+   netlify init
+   netlify deploy --prod
+   ```
+
+================================================================================
+OPTION 3: GITHUB PAGES
+================================================================================
+
+GitHub Pages provides free static hosting, but requires additional configuration
+for SPA routing.
+
+--------------------------------------------------------------------------------
+Step 1: Install gh-pages Package
+--------------------------------------------------------------------------------
+
+```
+npm install --save-dev gh-pages
+```
+
+--------------------------------------------------------------------------------
+Step 2: Update package.json
+--------------------------------------------------------------------------------
+
+Add homepage and deploy scripts:
+```json
+{
+  "homepage": "https://username.github.io/repo-name",
+  "scripts": {
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
+  }
+}
+```
+
+--------------------------------------------------------------------------------
+Step 3: Update vite.config.ts
+--------------------------------------------------------------------------------
+
+Add base path for GitHub Pages:
+```typescript
+export default defineConfig({
+  base: '/repo-name/',
+  plugins: [react()],
+  // ... rest of config
+})
+```
+
+--------------------------------------------------------------------------------
+Step 4: Create 404.html for SPA Routing
+--------------------------------------------------------------------------------
+
+Copy index.html to public/404.html (index.html will redirect to proper route)
+
+--------------------------------------------------------------------------------
+Step 5: Deploy
+--------------------------------------------------------------------------------
+
+```
+npm run deploy
+```
+
+--------------------------------------------------------------------------------
+Step 6: Configure GitHub Repository
+--------------------------------------------------------------------------------
+
+1. Go to repository Settings > Pages
+
+2. Set source to "gh-pages" branch
+
+3. Wait for deployment to complete
+
+4. Access at https://username.github.io/repo-name
+
+LIMITATIONS:
+- Environment variables cannot be set securely
+- The Supabase keys will be exposed in the frontend code
+- Consider using Vercel or Netlify for production
+
+================================================================================
+OPTION 4: SELF-HOSTED (VPS/Cloud Server)
+================================================================================
+
+For deploying to a custom server (DigitalOcean, AWS EC2, etc.)
+
+--------------------------------------------------------------------------------
+Step 1: Build the Application
+--------------------------------------------------------------------------------
+
+On the local machine:
+```
+npm run build
+```
+
+This creates a dist/ folder with static files.
+
+--------------------------------------------------------------------------------
+Step 2: Set Up the Server
+--------------------------------------------------------------------------------
+
+1. Install Node.js and npm on the server
+
+2. Install a web server (Nginx or Apache)
+
+3. Install PM2 for process management (optional):
+   ```
+   npm install -g pm2
+   ```
+
+--------------------------------------------------------------------------------
+Step 3: Configure Nginx
+--------------------------------------------------------------------------------
+
+Create /etc/nginx/sites-available/job-tracker:
+```nginx
+server {
+    listen 80;
+    server_name example.com;
+    root /var/www/job-tracker/dist;
+    index index.html;
+
+    # SPA routing
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_proxied any;
+    gzip_comp_level 6;
+    gzip_types text/plain text/css text/xml text/javascript 
+               application/json application/javascript application/xml+rss;
+}
+```
+
+Enable the site:
+```
+ln -s /etc/nginx/sites-available/job-tracker /etc/nginx/sites-enabled/
+nginx -t
+systemctl reload nginx
+```
+
+--------------------------------------------------------------------------------
+Step 4: Deploy Files
+--------------------------------------------------------------------------------
+
+1. Upload dist/ contents to /var/www/job-tracker/dist:
+   ```
+   rsync -avz dist/ user@server:/var/www/job-tracker/dist/
+   ```
+
+2. Set proper permissions:
+   ```
+   chown -R www-data:www-data /var/www/job-tracker
+   ```
+
+--------------------------------------------------------------------------------
+Step 5: Configure SSL with Let's Encrypt
+--------------------------------------------------------------------------------
+
+```
+apt install certbot python3-certbot-nginx
+certbot --nginx -d example.com
+```
+
+--------------------------------------------------------------------------------
+Step 6: Environment Variables
+--------------------------------------------------------------------------------
+
+For self-hosted deployments, environment variables are baked into the build.
+Ensure they are set before running `npm run build`:
+
+```
+VITE_SUPABASE_URL=https://xxx.supabase.co
+VITE_SUPABASE_ANON_KEY=xxx
+npm run build
+```
+
+Or use a .env.production file.
+
+================================================================================
+OPTION 5: DOCKER DEPLOYMENT
+================================================================================
+
+For containerized deployments.
+
+--------------------------------------------------------------------------------
+Step 1: Create Dockerfile
+--------------------------------------------------------------------------------
+
+Create Dockerfile in the project root:
+```dockerfile
+# Build stage
+FROM node:18-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
+```
+
+--------------------------------------------------------------------------------
+Step 2: Create nginx.conf
+--------------------------------------------------------------------------------
+
+```nginx
+server {
+    listen 80;
+    location / {
+        root /usr/share/nginx/html;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}
+```
+
+--------------------------------------------------------------------------------
+Step 3: Build and Run
+--------------------------------------------------------------------------------
+
+```
+docker build -t job-tracker .
+docker run -p 8080:80 job-tracker
+```
+
+--------------------------------------------------------------------------------
+Step 4: Docker Compose (with Environment Variables)
+--------------------------------------------------------------------------------
+
+Create docker-compose.yml:
+```yaml
+version: '3.8'
+services:
+  web:
+    build: .
+    ports:
+      - "8080:80"
+    environment:
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY}
+```
+
+Run:
+```
+docker-compose up -d
+```
+
+================================================================================
+POST-DEPLOYMENT CHECKLIST
+================================================================================
+
+After deploying to any platform, verify the following:
+
+□ Application loads at the production URL
+□ Authentication (sign up/sign in) works correctly
+□ Jobs can be created, edited, and deleted
+□ Dashboard displays charts and statistics
+□ Kanban board renders and status changes work
+□ Dark mode toggle functions properly
+□ CSV export downloads correctly
+□ All navigation links work
+□ Mobile responsive design functions
+□ HTTPS/SSL is enabled
+□ Environment variables are set correctly
+□ Database connections are secure
+□ Error tracking is configured (optional: Sentry)
+□ Analytics are set up (optional: Google Analytics)
+
+================================================================================
+CONTINUOUS DEPLOYMENT
+================================================================================
+
+For automatic deployments on every Git push:
+
+Vercel:
+  - Automatic by default for connected GitHub repositories
+  - Each push to main/master triggers a production deployment
+  - Pull request previews are automatically generated
+
+Netlify:
+  - Enable continuous deployment in Site settings > Build & deploy
+  - Configure branch to deploy (usually main or master)
+  - Pull request previews available
+
+GitHub Actions:
+  - Create .github/workflows/deploy.yml
+  - Configure build and deploy steps
+  - Set secrets for environment variables
+
+Example GitHub Actions workflow:
+```yaml
+name: Deploy
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      - uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+```
+
+================================================================================
+MONITORING & MAINTENANCE
+================================================================================
+
+After deployment:
+
+1. Set up error monitoring (e.g., Sentry)
+2. Configure uptime monitoring (e.g., UptimeRobot)
+3. Enable logging and analytics
+4. Set up backup strategy for Supabase data
+5. Plan for regular dependency updates
+6. Monitor bundle size and performance metrics
+7. Set up staging environment for testing
+
+================================================================================
+ROLLBACK PROCEDURE
+================================================================================
+
+If a deployment causes issues:
+
+Vercel:
+  1. Go to project dashboard
+  2. Click "Deployments"
+  3. Find the last working deployment
+  4. Click "..." > "Promote to Production"
+
+Netlify:
+  1. Go to "Deploys" tab
+  2. Find the last successful deploy
+  3. Click "Publish deploy"
+
+Docker:
+  1. Pull the previous image version
+  2. Stop current container
+  3. Run the previous version
+
+Git-based:
+  1. Revert the commit locally
+  2. Push to trigger redeployment
+
+================================================================================
+SECURITY CONSIDERATIONS
+================================================================================
+
+1. Never commit .env files or expose API keys in client-side code
+2. Use environment variables for all sensitive data
+3. Enable HTTPS/SSL for production
+4. Configure CORS properly in Supabase
+5. Regularly update dependencies (npm audit)
+6. Enable Row Level Security in Supabase
+7. Use strong password requirements
+8. Implement rate limiting if needed
+9. Consider adding a WAF (Web Application Firewall)
+10. Regular security audits
+
+================================================================================
+END OF DEPLOYMENT GUIDE
+================================================================================
