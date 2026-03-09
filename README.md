@@ -2,10 +2,10 @@
 
 A professional portfolio piece demonstrating full-stack web development and data science skills. The application allows users to track their job applications, visualize progress with an analytics dashboard, and export data for Python analysis.
 
-![React](https://img.shields.io/badge/React-18-61DAFB?logo=react)
-![TypeScript](https://img.shields.io/badge/TypeScript-5.5-3178C6?logo=typescript)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3.4-06B6D4?logo=tailwindcss)
-![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?logo=supabase)
+![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss)
+![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase)
 
 ## Features
 
