@@ -184,10 +184,32 @@ If build fails:
 
 Use this only if you want free static hosting and can handle SPA config.
 
-Requirements:
-- Configure Vite base path for repo-name.
-- Add gh-pages deploy script.
-- Add route fallback handling (404 redirect pattern).
+This repository is now configured for GitHub Pages with:
+- A GitHub Pages build command that sets Vite base path to
+   /Job-Search-Tracker-Analytics-Dashboard/
+- A deploy command that publishes dist to gh-pages branch
+- A post-build script that creates dist/404.html for SPA route fallback
+
+Run these commands:
+1. npm run build:gh-pages
+2. npm run deploy
+
+Then configure repository settings:
+1. GitHub -> Settings -> Pages
+2. Source: Deploy from a branch
+3. Branch: gh-pages
+4. Folder: /(root)
+5. Save
+
+Expected live URL:
+- https://ensues.github.io/Job-Search-Tracker-Analytics-Dashboard/
+
+Verification checks for Pages:
+1. Open the live URL and verify login page loads
+2. Log in and verify dashboard data renders
+3. Navigate to Jobs page and test create/edit/delete
+4. Hard refresh on /dashboard and /jobs to confirm 404 fallback works
+5. Check browser console for runtime errors
 
 Note:
 GitHub Pages is less convenient than Vercel/Netlify for SPA apps with auth.

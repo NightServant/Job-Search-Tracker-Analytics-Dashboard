@@ -2,10 +2,14 @@
   "name": "job-search-tracker",
   "private": true,
   "version": "1.0.0",
+  "homepage": "https://ensues.github.io/Job-Search-Tracker-Analytics-Dashboard",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:gh-pages": "tsc -b && vite build --base=/Job-Search-Tracker-Analytics-Dashboard/ && node scripts/create-gh-pages-404.cjs",
+    "predeploy": "npm run build:gh-pages",
+    "deploy": "gh-pages -d dist",
     "lint": "eslint .",
     "preview": "vite preview"
   },
@@ -27,6 +31,7 @@
     "eslint": "^9.6.0",
     "eslint-plugin-react-hooks": "^5.1.0",
     "eslint-plugin-react-refresh": "^0.4.7",
+    "gh-pages": "^6.3.0",
     "globals": "^15.8.0",
     "postcss": "^8.4.39",
     "tailwindcss": "^3.4.4",
