@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import { Job, JobFormData, JobStatus } from '@/types'
+import { Job, JobFormData, JobStatus, JobStatusHistoryEntry } from '@/types'
 
 export const jobService = {
   /**
@@ -81,5 +81,20 @@ export const jobService = {
    */
   async updateJobStatus(id: string, status: JobStatus): Promise<Job> {
     return this.updateJob(id, { status })
+  },
+
+  /**
+   * Get status history for a job
+   */
+  async getJobStatusHistory(jobId: string): Promise<JobStatusHistoryEntry[]> {
+    const { data, error } = await supabase
+      .from('job_status_history')
+      .select('*')
+      .eq('job_id', jobId)
+      .order('changed_at', { ascending: false })
+      .limit(50)
+
+    if (error) throw error
+    return data || []
   },
 }

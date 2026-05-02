@@ -153,6 +153,38 @@ export default function Layout() {
         {/* Page content */}
         <main className="p-4 md:p-6 lg:p-8">
           <Outlet />
+
+          <footer className="mt-8 text-center text-xs text-zinc-500 dark:text-zinc-500">
+            Made by{' '}
+            <a
+              href="https://github.com/Ensues"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+            >
+              @Ensues
+            </a>
+            <span className="mx-2">·</span>
+            <a
+              href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+            >
+              Source
+            </a>
+            <span className="mx-2">·</span>
+            <a
+              href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard/issues"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+            >
+              Report a bug
+            </a>
+            <span className="mx-2">·</span>
+            <span>v{__APP_VERSION__}</span>
+          </footer>
         </main>
       </div>
     </div>

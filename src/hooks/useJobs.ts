@@ -24,6 +24,17 @@ export function useJob(id: string) {
 }
 
 /**
+ * Hook to fetch status history for a job
+ */
+export function useJobStatusHistory(jobId?: string) {
+  return useQuery({
+    queryKey: ['job-status-history', jobId],
+    queryFn: () => jobService.getJobStatusHistory(jobId!),
+    enabled: !!jobId,
+  })
+}
+
+/**
  * Hook to create a new job
  */
 export function useCreateJob() {
@@ -66,8 +77,11 @@ export function useUpdateJob() {
         queryClient.setQueryData(['jobs'], context.previousJobs)
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({
+        queryKey: ['job-status-history', variables.id],
+      })
     },
   })
 }
@@ -96,8 +110,11 @@ export function useUpdateJobStatus() {
         queryClient.setQueryData(['jobs'], context.previousJobs)
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
       queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({
+        queryKey: ['job-status-history', variables.id],
+      })
     },
   })
 }

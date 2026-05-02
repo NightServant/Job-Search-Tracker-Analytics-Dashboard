@@ -8,7 +8,7 @@ import {
   Briefcase,
 } from 'lucide-react'
 import { useJobs, useCreateJob, useUpdateJob, useDeleteJob, useUpdateJobStatus } from '@/hooks/useJobs'
-import { Job, JobStatus, JobFormData, STATUS_CONFIG, ViewMode } from '@/types'
+import { Job, JobStatus, JobFormData, STATUS_CONFIG, ViewMode, WorkMode } from '@/types'
 import JobCard from '@/components/jobs/JobCard'
 import JobForm from '@/components/jobs/JobForm'
 import KanbanBoard from '@/components/jobs/KanbanBoard'
@@ -23,20 +23,83 @@ export default function JobsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState<JobStatus | 'all'>('all')
+  const [locationFilter, setLocationFilter] = useState('')
+  const [workModeFilter, setWorkModeFilter] = useState<'all' | WorkMode>('all')
+  const [sourceFilter, setSourceFilter] = useState<'all' | string>('all')
+  const [referralOnly, setReferralOnly] = useState(false)
+  const [tagFilter, setTagFilter] = useState('')
+  const [techStackFilter, setTechStackFilter] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingJob, setEditingJob] = useState<Job | null>(null)
 
+  const availableSources = useMemo(() => {
+    const sources = new Set<string>()
+    jobs.forEach((job) => {
+      const source = (job.source || '').trim()
+      if (source) sources.add(source)
+    })
+    return Array.from(sources).sort((a, b) => a.localeCompare(b))
+  }, [jobs])
+
   // Filter jobs
   const filteredJobs = useMemo(() => {
+    const search = searchQuery.trim().toLowerCase()
+    const location = locationFilter.trim().toLowerCase()
+    const tag = tagFilter.trim().toLowerCase()
+    const tech = techStackFilter.trim().toLowerCase()
+
     return jobs.filter((job) => {
       const matchesSearch =
-        job.company.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        job.role.toLowerCase().includes(searchQuery.toLowerCase())
+        !search ||
+        job.company.toLowerCase().includes(search) ||
+        job.role.toLowerCase().includes(search)
       const matchesStatus =
         statusFilter === 'all' || job.status === statusFilter
-      return matchesSearch && matchesStatus
+      const matchesLocation =
+        !location || (job.location || '').toLowerCase().includes(location)
+      const matchesWorkMode =
+        workModeFilter === 'all' || job.work_mode === workModeFilter
+      const matchesSource =
+        sourceFilter === 'all' || (job.source || '').trim() === sourceFilter
+      const matchesReferral = !referralOnly || !!job.is_referral
+      const matchesTag =
+        !tag || (job.tags || []).some((t) => t.toLowerCase().includes(tag))
+      const matchesTech =
+        !tech ||
+        (job.tech_stack || []).some((t) => t.toLowerCase().includes(tech))
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesLocation &&
+        matchesWorkMode &&
+        matchesSource &&
+        matchesReferral &&
+        matchesTag &&
+        matchesTech
+      )
     })
-  }, [jobs, searchQuery, statusFilter])
+  }, [
+    jobs,
+    searchQuery,
+    statusFilter,
+    locationFilter,
+    workModeFilter,
+    sourceFilter,
+    referralOnly,
+    tagFilter,
+    techStackFilter,
+  ])
+
+  const hasActiveFilters =
+    !!searchQuery.trim() ||
+    statusFilter !== 'all' ||
+    !!locationFilter.trim() ||
+    workModeFilter !== 'all' ||
+    sourceFilter !== 'all' ||
+    referralOnly ||
+    !!tagFilter.trim() ||
+    !!techStackFilter.trim()
 
   // Handlers
   const handleCreateJob = async (data: JobFormData) => {
@@ -158,6 +221,72 @@ export default function JobsPage() {
         </div>
       </div>
 
+      {/* Advanced Filters */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <input
+          type="text"
+          placeholder="Location"
+          value={locationFilter}
+          onChange={(e) => setLocationFilter(e.target.value)}
+          className="input"
+        />
+
+        <select
+          value={workModeFilter}
+          onChange={(e) =>
+            setWorkModeFilter(
+              e.target.value === 'all'
+                ? 'all'
+                : (e.target.value as WorkMode)
+            )
+          }
+          className="input"
+        >
+          <option value="all">All work modes</option>
+          <option value="remote">Remote</option>
+          <option value="hybrid">Hybrid</option>
+        </select>
+
+        <select
+          value={sourceFilter}
+          onChange={(e) => setSourceFilter(e.target.value)}
+          className="input"
+        >
+          <option value="all">All sources</option>
+          {availableSources.map((source) => (
+            <option key={source} value={source}>
+              {source}
+            </option>
+          ))}
+        </select>
+
+        <label className="input flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={referralOnly}
+            onChange={(e) => setReferralOnly(e.target.checked)}
+            className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700"
+          />
+          <span className="text-sm">Referral only</span>
+        </label>
+
+        <input
+          type="text"
+          placeholder="Tag"
+          value={tagFilter}
+          onChange={(e) => setTagFilter(e.target.value)}
+          className="input"
+        />
+
+        <input
+          type="text"
+          placeholder="Tech stack"
+          value={techStackFilter}
+          onChange={(e) => setTechStackFilter(e.target.value)}
+          className="input"
+        />
+      </div>
+
       {/* Content */}
       {filteredJobs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
@@ -165,16 +294,16 @@ export default function JobsPage() {
             <Briefcase className="w-8 h-8 text-zinc-400" />
           </div>
           <h3 className="text-lg font-semibold text-zinc-900 dark:text-white">
-            {searchQuery || statusFilter !== 'all'
+            {hasActiveFilters
               ? 'No jobs match your filters'
               : 'No jobs yet'}
           </h3>
           <p className="mt-1 text-zinc-500 dark:text-zinc-400 max-w-sm">
-            {searchQuery || statusFilter !== 'all'
+            {hasActiveFilters
               ? 'Try adjusting your search or filters'
               : 'Start tracking your job applications by adding your first job.'}
           </p>
-          {!searchQuery && statusFilter === 'all' && (
+          {!hasActiveFilters && (
             <button
               onClick={() => setIsFormOpen(true)}
               className="btn-primary mt-4"

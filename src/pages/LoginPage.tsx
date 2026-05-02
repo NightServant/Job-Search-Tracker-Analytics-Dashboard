@@ -16,6 +16,9 @@ export default function LoginPage() {
   const { theme } = useTheme()
   const navigate = useNavigate()
 
+  const hasSupabaseConfig =
+    !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -198,16 +201,49 @@ export default function LoginPage() {
             </button>
           </p>
 
-          {/* Demo note */}
-          <div className="mt-8 p-4 bg-zinc-100 dark:bg-zinc-900 rounded-lg">
-            <p className="text-xs text-zinc-500 dark:text-zinc-500 text-center">
-              <strong>Demo Mode:</strong> Configure Supabase credentials in{' '}
-              <code className="px-1 py-0.5 bg-zinc-200 dark:bg-zinc-800 rounded">
-                .env.local
-              </code>{' '}
-              to enable authentication.
-            </p>
-          </div>
+          {import.meta.env.DEV && !hasSupabaseConfig && (
+            <div className="mt-8 p-4 bg-zinc-100 dark:bg-zinc-900 rounded-lg">
+              <p className="text-xs text-zinc-500 dark:text-zinc-500 text-center">
+                <strong>Demo Mode:</strong> Configure Supabase credentials in{' '}
+                <code className="px-1 py-0.5 bg-zinc-200 dark:bg-zinc-800 rounded">
+                  .env.local
+                </code>{' '}
+                to enable authentication.
+              </p>
+            </div>
+          )}
+
+          <p className="mt-8 text-center text-xs text-zinc-500 dark:text-zinc-500">
+            Made by{' '}
+            <a
+              href="https://github.com/Ensues"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+            >
+              @Ensues
+            </a>
+            <span className="mx-2">·</span>
+            <a
+              href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+            >
+              Source
+            </a>
+            <span className="mx-2">·</span>
+            <a
+              href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard/issues"
+              target="_blank"
+              rel="noreferrer"
+              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+            >
+              Report a bug
+            </a>
+            <span className="mx-2">·</span>
+            <span>v{__APP_VERSION__}</span>
+          </p>
         </div>
       </div>
     </div>

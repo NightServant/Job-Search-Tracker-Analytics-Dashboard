@@ -5,6 +5,10 @@ import {
   DollarSign,
   Calendar,
   MoreVertical,
+  MapPin,
+  Wifi,
+  Clock,
+  User,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Job, JobStatus, STATUS_CONFIG } from '@/types'
@@ -65,9 +69,22 @@ export default function JobCard({
     })
   }
 
+  const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   const statusConfig = STATUS_CONFIG[job.status]
   const salary = formatSalary(job.salary_min, job.salary_max)
   const appliedDate = formatDate(job.date_applied)
+  const lastTouched = formatDateTime(job.updated_at)
+  const tags = job.tags ?? []
+  const techStack = job.tech_stack ?? []
 
   if (compact) {
     // Compact version for Kanban board
@@ -197,6 +214,29 @@ export default function JobCard({
                 {appliedDate}
               </div>
             )}
+            {job.location && (
+              <div className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                {job.location}
+              </div>
+            )}
+            {job.work_mode && (
+              <div className="flex items-center gap-1">
+                <Wifi className="w-4 h-4" />
+                {job.work_mode === 'remote' ? 'Remote' : 'Hybrid'}
+              </div>
+            )}
+            {job.source && (
+              <div className="flex items-center gap-1">
+                <span className="font-medium">Source:</span>
+                {job.source}
+              </div>
+            )}
+            {job.is_referral && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                Referral
+              </span>
+            )}
             {job.url && (
               <a
                 href={job.url}
@@ -210,12 +250,68 @@ export default function JobCard({
             )}
           </div>
 
+          {/* Tags / Tech */}
+          {(tags.length > 0 || techStack.length > 0) && (
+            <div className="mt-3 flex flex-wrap gap-1">
+              {tags.slice(0, 8).map((tag) => (
+                <span
+                  key={`tag-${tag}`}
+                  className="px-2 py-0.5 rounded-full text-xs bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  {tag}
+                </span>
+              ))}
+              {techStack.slice(0, 8).map((tech) => (
+                <span
+                  key={`tech-${tech}`}
+                  className="px-2 py-0.5 rounded-full text-xs bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  {tech}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Contact */}
+          {(job.contact_name || job.contact_email || job.contact_linkedin) && (
+            <div className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1">
+                <User className="w-4 h-4" />
+                {job.contact_name || 'Contact'}
+              </span>
+              {job.contact_email && (
+                <a
+                  href={`mailto:${job.contact_email}`}
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  {job.contact_email}
+                </a>
+              )}
+              {job.contact_linkedin && (
+                <a
+                  href={job.contact_linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  LinkedIn
+                </a>
+              )}
+            </div>
+          )}
+
           {/* Notes */}
           {job.notes && (
             <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
               {job.notes}
             </p>
           )}
+
+          {/* Last touched */}
+          <div className="mt-3 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <Clock className="w-3 h-3" />
+            Last touched {lastTouched}
+          </div>
         </div>
 
         {/* Actions */}

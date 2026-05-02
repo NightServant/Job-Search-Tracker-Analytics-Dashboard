@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { X, Loader2 } from 'lucide-react'
-import { Job, JobFormData, JobStatus, STATUS_CONFIG } from '@/types'
+import { useJobStatusHistory } from '@/hooks/useJobs'
+import { Job, JobFormData, JobStatus, STATUS_CONFIG, WorkMode } from '@/types'
 
 interface JobFormProps {
   isOpen: boolean
@@ -26,8 +27,21 @@ export default function JobForm({
     status: 'wishlist',
     date_applied: '',
     notes: '',
+    contact_name: '',
+    contact_email: '',
+    contact_linkedin: '',
+    contact_notes: '',
+    location: '',
+    work_mode: undefined,
+    source: '',
+    is_referral: false,
   })
+  const [tagsInput, setTagsInput] = useState('')
+  const [techStackInput, setTechStackInput] = useState('')
   const [errors, setErrors] = useState<Partial<Record<keyof JobFormData, string>>>({})
+
+  const { data: statusHistory = [], isLoading: isHistoryLoading } =
+    useJobStatusHistory(job?.id)
 
   // Populate form when editing
   useEffect(() => {
@@ -41,7 +55,17 @@ export default function JobForm({
         status: job.status,
         date_applied: job.date_applied ?? '',
         notes: job.notes ?? '',
+        contact_name: job.contact_name ?? '',
+        contact_email: job.contact_email ?? '',
+        contact_linkedin: job.contact_linkedin ?? '',
+        contact_notes: job.contact_notes ?? '',
+        location: job.location ?? '',
+        work_mode: job.work_mode ?? undefined,
+        source: job.source ?? '',
+        is_referral: job.is_referral ?? false,
       })
+      setTagsInput((job.tags ?? []).join(', '))
+      setTechStackInput((job.tech_stack ?? []).join(', '))
     } else {
       setFormData({
         company: '',
@@ -52,10 +76,48 @@ export default function JobForm({
         status: 'wishlist',
         date_applied: '',
         notes: '',
+        contact_name: '',
+        contact_email: '',
+        contact_linkedin: '',
+        contact_notes: '',
+        location: '',
+        work_mode: undefined,
+        source: '',
+        is_referral: false,
       })
+      setTagsInput('')
+      setTechStackInput('')
     }
     setErrors({})
   }, [job, isOpen])
+
+  const toNullableString = (value: string | null | undefined): string | null => {
+    const trimmed = (value ?? '').trim()
+    return trimmed ? trimmed : null
+  }
+
+  const parseCommaList = (value: string): string[] => {
+    const items = value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    return Array.from(new Set(items))
+  }
+
+  const formatDateTime = (value?: string | null): string => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
 
   const validate = (): boolean => {
     const newErrors: Partial<Record<keyof JobFormData, string>> = {}
@@ -72,6 +134,12 @@ export default function JobForm({
     if (formData.url && !/^https?:\/\/.+/.test(formData.url)) {
       newErrors.url = 'Please enter a valid URL'
     }
+    if (formData.contact_email && !/^\S+@\S+\.\S+$/.test(formData.contact_email)) {
+      newErrors.contact_email = 'Please enter a valid email'
+    }
+    if (formData.contact_linkedin && !/^https?:\/\/.+/.test(formData.contact_linkedin)) {
+      newErrors.contact_linkedin = 'Please enter a valid URL'
+    }
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -83,11 +151,21 @@ export default function JobForm({
 
     await onSubmit({
       ...formData,
-      salary_min: formData.salary_min || undefined,
-      salary_max: formData.salary_max || undefined,
-      url: formData.url || undefined,
-      date_applied: formData.date_applied || undefined,
-      notes: formData.notes || undefined,
+      salary_min: formData.salary_min ?? null,
+      salary_max: formData.salary_max ?? null,
+      url: toNullableString(formData.url),
+      date_applied: toNullableString(formData.date_applied),
+      notes: toNullableString(formData.notes),
+      contact_name: toNullableString(formData.contact_name),
+      contact_email: toNullableString(formData.contact_email),
+      contact_linkedin: toNullableString(formData.contact_linkedin),
+      contact_notes: toNullableString(formData.contact_notes),
+      location: toNullableString(formData.location),
+      work_mode: formData.work_mode ?? null,
+      source: toNullableString(formData.source),
+      is_referral: !!formData.is_referral,
+      tags: parseCommaList(tagsInput),
+      tech_stack: parseCommaList(techStackInput),
     })
   }
 
@@ -209,7 +287,7 @@ export default function JobForm({
             <input
               type="text"
               id="url"
-              value={formData.url}
+              value={formData.url ?? ''}
               onChange={(e) => setFormData({ ...formData, url: e.target.value })}
               className={`input ${errors.url ? 'border-red-500' : ''}`}
               placeholder="https://careers.company.com/job/123"
@@ -247,12 +325,195 @@ export default function JobForm({
               <input
                 type="date"
                 id="date_applied"
-                value={formData.date_applied}
+                value={formData.date_applied ?? ''}
                 onChange={(e) =>
                   setFormData({ ...formData, date_applied: e.target.value })
                 }
                 className="input"
               />
+            </div>
+          </div>
+
+          {/* Location & Work Mode */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="location" className="label">
+                Location
+              </label>
+              <input
+                type="text"
+                id="location"
+                value={formData.location ?? ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
+                className="input"
+                placeholder="City, State / Remote"
+              />
+            </div>
+            <div>
+              <label htmlFor="work_mode" className="label">
+                Work Mode
+              </label>
+              <select
+                id="work_mode"
+                value={formData.work_mode ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    work_mode: e.target.value
+                      ? (e.target.value as WorkMode)
+                      : undefined,
+                  })
+                }
+                className="input"
+              >
+                <option value="">Not set</option>
+                <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Source & Referral */}
+          <div className="grid grid-cols-2 gap-4 items-end">
+            <div>
+              <label htmlFor="source" className="label">
+                Source
+              </label>
+              <input
+                type="text"
+                id="source"
+                value={formData.source ?? ''}
+                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                className="input"
+                placeholder="LinkedIn, company site, etc."
+              />
+            </div>
+            <div>
+              <label className="label">Referral</label>
+              <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 h-10">
+                <input
+                  type="checkbox"
+                  checked={!!formData.is_referral}
+                  onChange={(e) =>
+                    setFormData({ ...formData, is_referral: e.target.checked })
+                  }
+                  className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700"
+                />
+                Referral
+              </label>
+            </div>
+          </div>
+
+          {/* Tags & Tech Stack */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="tags" className="label">
+                Tags
+              </label>
+              <input
+                type="text"
+                id="tags"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                className="input"
+                placeholder="comma-separated (e.g. new-grad, fintech)"
+              />
+            </div>
+            <div>
+              <label htmlFor="tech_stack" className="label">
+                Tech Stack
+              </label>
+              <input
+                type="text"
+                id="tech_stack"
+                value={techStackInput}
+                onChange={(e) => setTechStackInput(e.target.value)}
+                className="input"
+                placeholder="comma-separated (e.g. react, node)"
+              />
+            </div>
+          </div>
+
+          {/* Contact */}
+          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <p className="text-sm font-medium text-zinc-900 dark:text-white">
+              Contact
+            </p>
+            <div className="mt-3 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="contact_name" className="label">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    id="contact_name"
+                    value={formData.contact_name ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, contact_name: e.target.value })
+                    }
+                    className="input"
+                    placeholder="Recruiter / Hiring manager"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="contact_email" className="label">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    id="contact_email"
+                    value={formData.contact_email ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, contact_email: e.target.value })
+                    }
+                    className={`input ${errors.contact_email ? 'border-red-500' : ''}`}
+                    placeholder="name@company.com"
+                  />
+                  {errors.contact_email && (
+                    <p className="mt-1 text-xs text-red-500">{errors.contact_email}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="contact_linkedin" className="label">
+                  LinkedIn
+                </label>
+                <input
+                  type="text"
+                  id="contact_linkedin"
+                  value={formData.contact_linkedin ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      contact_linkedin: e.target.value,
+                    })
+                  }
+                  className={`input ${errors.contact_linkedin ? 'border-red-500' : ''}`}
+                  placeholder="https://www.linkedin.com/in/..."
+                />
+                {errors.contact_linkedin && (
+                  <p className="mt-1 text-xs text-red-500">{errors.contact_linkedin}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="contact_notes" className="label">
+                  Notes
+                </label>
+                <textarea
+                  id="contact_notes"
+                  value={formData.contact_notes ?? ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, contact_notes: e.target.value })
+                  }
+                  className="input min-h-[80px] resize-y"
+                  placeholder="Any context (e.g. reached out on LinkedIn, follow-up date, etc.)"
+                />
+              </div>
             </div>
           </div>
 
@@ -263,7 +524,7 @@ export default function JobForm({
             </label>
             <textarea
               id="notes"
-              value={formData.notes}
+              value={formData.notes ?? ''}
               onChange={(e) =>
                 setFormData({ ...formData, notes: e.target.value })
               }
@@ -271,6 +532,47 @@ export default function JobForm({
               placeholder="Add any notes about this job..."
             />
           </div>
+
+          {/* Status history */}
+          {job && (
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                  Status history
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Last touched {formatDateTime(job.updated_at)}
+                </p>
+              </div>
+
+              <div className="mt-3">
+                {isHistoryLoading ? (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+                ) : statusHistory.length === 0 ? (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    No status changes yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {statusHistory.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="text-sm text-zinc-700 dark:text-zinc-300 flex items-start justify-between gap-4"
+                      >
+                        <span>
+                          {STATUS_CONFIG[entry.from_status].label} →{' '}
+                          {STATUS_CONFIG[entry.to_status].label}
+                        </span>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                          {formatDateTime(entry.changed_at)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">

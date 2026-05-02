@@ -1,6 +1,8 @@
 // Job status type
 export type JobStatus = 'wishlist' | 'applied' | 'interviewing' | 'offer' | 'rejected';
 
+export type WorkMode = 'remote' | 'hybrid';
+
 // Job interface matching database schema
 export interface Job {
   id: string;
@@ -13,6 +15,16 @@ export interface Job {
   status: JobStatus;
   date_applied: string | null;
   notes: string | null;
+  contact_name: string | null;
+  contact_email: string | null;
+  contact_linkedin: string | null;
+  contact_notes: string | null;
+  location: string | null;
+  work_mode: WorkMode | null;
+  source: string | null;
+  is_referral: boolean;
+  tags: string[];
+  tech_stack: string[];
   created_at: string;
   updated_at: string;
 }
@@ -21,12 +33,31 @@ export interface Job {
 export interface JobFormData {
   company: string;
   role: string;
-  salary_min?: number;
-  salary_max?: number;
-  url?: string;
+  salary_min?: number | null;
+  salary_max?: number | null;
+  url?: string | null;
   status: JobStatus;
-  date_applied?: string;
-  notes?: string;
+  date_applied?: string | null;
+  notes?: string | null;
+  contact_name?: string | null;
+  contact_email?: string | null;
+  contact_linkedin?: string | null;
+  contact_notes?: string | null;
+  location?: string | null;
+  work_mode?: WorkMode | null;
+  source?: string | null;
+  is_referral?: boolean;
+  tags?: string[];
+  tech_stack?: string[];
+}
+
+export interface JobStatusHistoryEntry {
+  id: string;
+  job_id: string;
+  user_id: string;
+  from_status: JobStatus;
+  to_status: JobStatus;
+  changed_at: string;
 }
 
 // User from Supabase auth
