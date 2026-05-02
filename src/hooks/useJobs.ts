@@ -35,6 +35,16 @@ export function useJobStatusHistory(jobId?: string) {
 }
 
 /**
+ * Hook to fetch status history across all jobs
+ */
+export function useAllJobStatusHistory() {
+  return useQuery({
+    queryKey: ['job-status-history'],
+    queryFn: jobService.getAllJobStatusHistory,
+  })
+}
+
+/**
  * Hook to create a new job
  */
 export function useCreateJob() {
@@ -82,6 +92,7 @@ export function useUpdateJob() {
       queryClient.invalidateQueries({
         queryKey: ['job-status-history', variables.id],
       })
+      queryClient.invalidateQueries({ queryKey: ['job-status-history'] })
     },
   })
 }
@@ -115,6 +126,7 @@ export function useUpdateJobStatus() {
       queryClient.invalidateQueries({
         queryKey: ['job-status-history', variables.id],
       })
+      queryClient.invalidateQueries({ queryKey: ['job-status-history'] })
     },
   })
 }

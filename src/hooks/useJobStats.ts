@@ -65,6 +65,18 @@ export function useApplicationsOverTime(): {
   const { data: jobs = [], isLoading } = useJobs()
 
   const data = useMemo(() => {
+    const parseISODateLocal = (value: string): Date => {
+      const [year, month, day] = value.split('-').map(Number)
+      return new Date(year, (month ?? 1) - 1, day ?? 1)
+    }
+
+    const formatDateKey = (date: Date): string => {
+      const y = date.getFullYear()
+      const m = String(date.getMonth() + 1).padStart(2, '0')
+      const d = String(date.getDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+
     // Filter jobs with date_applied
     const appliedJobs = jobs.filter((j) => j.date_applied)
 
@@ -73,11 +85,11 @@ export function useApplicationsOverTime(): {
     // Group by week
     const grouped = appliedJobs.reduce(
       (acc, job) => {
-        const date = new Date(job.date_applied!)
+        const date = parseISODateLocal(job.date_applied!)
         // Get start of week (Sunday)
         const startOfWeek = new Date(date)
         startOfWeek.setDate(date.getDate() - date.getDay())
-        const key = startOfWeek.toISOString().split('T')[0]
+        const key = formatDateKey(startOfWeek)
 
         acc[key] = (acc[key] || 0) + 1
         return acc

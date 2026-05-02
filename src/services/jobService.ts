@@ -97,4 +97,18 @@ export const jobService = {
     if (error) throw error
     return data || []
   },
+
+  /**
+   * Get status history across all jobs for the current user
+   */
+  async getAllJobStatusHistory(): Promise<JobStatusHistoryEntry[]> {
+    const { data, error } = await supabase
+      .from('job_status_history')
+      .select('*')
+      .order('changed_at', { ascending: true })
+      .limit(5000)
+
+    if (error) throw error
+    return data || []
+  },
 }
