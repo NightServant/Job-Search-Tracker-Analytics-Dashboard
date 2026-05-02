@@ -9,6 +9,7 @@ import {
   Wifi,
   Clock,
   User,
+  GripVertical,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Job, JobStatus, STATUS_CONFIG } from '@/types'
@@ -19,6 +20,7 @@ interface JobCardProps {
   onDelete: (id: string) => void
   onStatusChange: (id: string, status: JobStatus) => void
   compact?: boolean
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>
 }
 
 export default function JobCard({
@@ -27,6 +29,7 @@ export default function JobCard({
   onDelete,
   onStatusChange,
   compact = false,
+  dragHandleProps,
 }: JobCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showStatusMenu, setShowStatusMenu] = useState(false)
@@ -90,7 +93,17 @@ export default function JobCard({
     // Compact version for Kanban board
     return (
       <div className="card-hover p-3 space-y-2">
-        <div className="flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2">
+          {dragHandleProps ? (
+            <button
+              type="button"
+              aria-label="Drag job"
+              className="p-1 -ml-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-grab active:cursor-grabbing"
+              {...dragHandleProps}
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+          ) : null}
           <div className="min-w-0 flex-1">
             <h4 className="font-medium text-sm text-zinc-900 dark:text-white truncate">
               {job.role}
@@ -99,10 +112,11 @@ export default function JobCard({
               {job.company}
             </p>
           </div>
-          <div className="relative" ref={menuRef}>
+          <div className="relative ml-auto" ref={menuRef}>
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              aria-label="More actions"
             >
               <MoreVertical className="w-4 h-4 text-zinc-400" />
             </button>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   Briefcase,
@@ -7,20 +7,6 @@ import {
   Target,
   Download,
 } from 'lucide-react'
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
-  Legend,
-  Sankey,
-} from 'recharts'
 import { useJobStats, useApplicationsOverTime, useStatusDistribution } from '@/hooks/useJobStats'
 import { useAllJobStatusHistory, useJobs } from '@/hooks/useJobs'
 import { Job, JobStatus, STATUS_CONFIG } from '@/types'
@@ -28,6 +14,11 @@ import { Job, JobStatus, STATUS_CONFIG } from '@/types'
 type GoalPeriod = 'weekly' | 'daily'
 
 const GOAL_STORAGE_KEY = 'job-search-goal-v1'
+
+const DashboardChartsTop = lazy(() => import('@/components/dashboard/DashboardChartsTop'))
+const DashboardChartsBottom = lazy(
+  () => import('@/components/dashboard/DashboardChartsBottom')
+)
 
 const currencyFormatter = new Intl.NumberFormat('en-US', {
   style: 'currency',
@@ -547,98 +538,30 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Applications Over Time */}
-        <div className="card p-5">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-            Applications Over Time
-          </h2>
-          {chartData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  stroke="#e4e4e7"
-                  className="dark:stroke-zinc-700"
-                />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 12 }}
-                  stroke="#71717a"
-                />
-                <YAxis
-                  tick={{ fontSize: 12 }}
-                  stroke="#71717a"
-                  allowDecimals={false}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e4e4e7',
-                    borderRadius: '8px',
-                  }}
-                />
-                <Bar
-                  dataKey="count"
-                  fill="#6366f1"
-                  radius={[4, 4, 0, 0]}
-                  name="Applications"
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-zinc-400">
-              <p>No application data yet</p>
+      <Suspense
+        fallback={
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="card p-5">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                Applications Over Time
+              </h2>
+              <div className="h-[300px] flex items-center justify-center text-zinc-400">
+                <p>Loading chart…</p>
+              </div>
             </div>
-          )}
-        </div>
-
-        {/* Status Distribution */}
-        <div className="card p-5">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-            Status Distribution
-          </h2>
-          {statusData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={statusData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={100}
-                  paddingAngle={2}
-                  dataKey="count"
-                  nameKey="status"
-                  label={({ status, count }) =>
-                    `${STATUS_CONFIG[status as keyof typeof STATUS_CONFIG].label}: ${count}`
-                  }
-                  labelLine={false}
-                >
-                  {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  formatter={(value: number, name: string) => [
-                    value,
-                    STATUS_CONFIG[name as keyof typeof STATUS_CONFIG].label,
-                  ]}
-                />
-                <Legend
-                  formatter={(value: string) =>
-                    STATUS_CONFIG[value as keyof typeof STATUS_CONFIG].label
-                  }
-                />
-              </PieChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-zinc-400">
-              <p>No jobs tracked yet</p>
+            <div className="card p-5">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                Status Distribution
+              </h2>
+              <div className="h-[300px] flex items-center justify-center text-zinc-400">
+                <p>Loading chart…</p>
+              </div>
             </div>
-          )}
-        </div>
-      </div>
+          </div>
+        }
+      >
+        <DashboardChartsTop chartData={chartData} statusData={statusData} />
+      </Suspense>
 
       {/* Goals + Source Funnel */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -788,209 +711,38 @@ export default function DashboardPage() {
       </div>
 
       {/* Salary + Sankey */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Salary Insights */}
-        <div className="card p-5">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-            Salary Insights
-          </h2>
-
-          {salaryInsights.sampleCount > 0 ? (
-            <div className="space-y-5">
-              <div className="flex items-start justify-between gap-6">
-                <div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Jobs with salary</p>
-                  <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">
-                    {salaryInsights.sampleCount}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Avg midpoint</p>
-                  <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">
-                    {currencyFormatter.format(salaryInsights.overallAverage)}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-2">
-                  Range Distribution
-                </h3>
-                {salaryInsights.distribution.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={salaryInsights.distribution}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#e4e4e7"
-                        className="dark:stroke-zinc-700"
-                      />
-                      <XAxis
-                        dataKey="range"
-                        tick={{ fontSize: 10 }}
-                        stroke="#71717a"
-                        angle={-35}
-                        textAnchor="end"
-                        interval={0}
-                        height={70}
-                      />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        stroke="#71717a"
-                        allowDecimals={false}
-                      />
-                      <Tooltip
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e4e4e7',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[220px] flex items-center justify-center text-zinc-400">
-                    <p>No salary distribution data</p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-2">
-                  Average by Stage
-                </h3>
-                {salaryInsights.averageByStatus.length > 0 ? (
-                  <ResponsiveContainer width="100%" height={220}>
-                    <BarChart data={salaryInsights.averageByStatus}>
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        stroke="#e4e4e7"
-                        className="dark:stroke-zinc-700"
-                      />
-                      <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#71717a" />
-                      <YAxis
-                        tick={{ fontSize: 12 }}
-                        stroke="#71717a"
-                        tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
-                      />
-                      <Tooltip
-                        formatter={(value: number) => currencyFormatter.format(value)}
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e4e4e7',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
-                        {salaryInsights.averageByStatus.map((entry) => (
-                          <Cell key={entry.status} fill={entry.color} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-[220px] flex items-center justify-center text-zinc-400">
-                    <p>No stage averages yet</p>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-white mb-2">
-                  Average by Company
-                </h3>
-                {salaryInsights.topCompanies.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
-                          <th className="text-left py-2 pr-4">Company</th>
-                          <th className="text-right py-2 px-2">Avg</th>
-                          <th className="text-right py-2 pl-2">Jobs</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {salaryInsights.topCompanies.map((row) => (
-                          <tr
-                            key={row.company}
-                            className="border-t border-zinc-200 dark:border-zinc-800"
-                          >
-                            <td className="py-2 pr-4 font-medium text-zinc-900 dark:text-white whitespace-nowrap">
-                              {row.company}
-                            </td>
-                            <td className="py-2 px-2 text-right text-zinc-600 dark:text-zinc-300">
-                              {currencyFormatter.format(row.avg)}
-                            </td>
-                            <td className="py-2 pl-2 text-right text-zinc-600 dark:text-zinc-300">
-                              {row.count}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
-                    No company salary data yet
-                  </p>
-                )}
+      <Suspense
+        fallback={
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="card p-5">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+                Salary Insights
+              </h2>
+              <div className="h-[300px] flex items-center justify-center text-zinc-400">
+                <p>Loading chart…</p>
               </div>
             </div>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-zinc-400">
-              <p>Add salary min/max to jobs to see insights</p>
-            </div>
-          )}
-        </div>
-
-        {/* Sankey */}
-        <div className="card p-5">
-          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
-            Pipeline Flow (Sankey)
-          </h2>
-          <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
-            Shows forward status transitions that were logged when you changed a job’s status.
-          </p>
-
-          {statusHistoryError ? (
-            <div className="h-[300px] flex flex-col items-center justify-center text-zinc-400 text-center px-6">
-              <p>Couldn’t load status history</p>
-              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-                If your database doesn’t have the status history table yet, run the V3 migration.
+            <div className="card p-5">
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-1">
+                Pipeline Flow (Sankey)
+              </h2>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mb-4">
+                Shows forward status transitions that were logged when you changed a job’s status.
               </p>
+              <div className="h-[300px] flex items-center justify-center text-zinc-400">
+                <p>Loading chart…</p>
+              </div>
             </div>
-          ) : isStatusHistoryLoading ? (
-            <div className="h-[300px] flex items-center justify-center text-zinc-400">
-              <p>Loading status history…</p>
-            </div>
-          ) : sankeyData.links.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <Sankey
-                data={sankeyData}
-                nodePadding={20}
-                nodeWidth={12}
-                linkCurvature={0.5}
-              >
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'white',
-                    border: '1px solid #e4e4e7',
-                    borderRadius: '8px',
-                  }}
-                />
-              </Sankey>
-            </ResponsiveContainer>
-          ) : (
-            <div className="h-[300px] flex items-center justify-center text-zinc-400">
-              <p>No status changes yet</p>
-            </div>
-          )}
-
-          <p className="mt-3 text-xs text-zinc-500 dark:text-zinc-400">
-            Note: Backward transitions (e.g. Interviewing → Applied) are ignored to keep the flow readable.
-          </p>
-        </div>
-      </div>
+          </div>
+        }
+      >
+        <DashboardChartsBottom
+          salaryInsights={salaryInsights}
+          sankeyData={sankeyData}
+          isStatusHistoryLoading={isStatusHistoryLoading}
+          hasStatusHistoryError={!!statusHistoryError}
+        />
+      </Suspense>
 
       {/* Quick Stats */}
       <div className="card p-5">

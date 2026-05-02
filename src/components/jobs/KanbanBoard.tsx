@@ -49,6 +49,8 @@ function DraggableJobCard({
       data: { jobId: job.id, status: job.status },
     })
 
+  const dragHandleProps = { ...attributes, ...listeners }
+
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
   }
@@ -58,8 +60,6 @@ function DraggableJobCard({
       ref={setNodeRef}
       style={style}
       className={isDragging ? 'opacity-50' : undefined}
-      {...attributes}
-      {...listeners}
     >
       <JobCard
         job={job}
@@ -67,6 +67,7 @@ function DraggableJobCard({
         onDelete={onDelete}
         onStatusChange={onStatusChange}
         compact
+        dragHandleProps={dragHandleProps}
       />
     </div>
   )

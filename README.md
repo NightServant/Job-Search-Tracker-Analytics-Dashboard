@@ -5,7 +5,12 @@ A professional portfolio piece demonstrating full-stack web development and data
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![Vitest](https://img.shields.io/badge/Vitest-6E9F18?style=for-the-badge&logo=vitest&logoColor=white)
+![React Testing Library](https://img.shields.io/badge/Testing_Library-E33332?style=for-the-badge&logo=testinglibrary&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase)
+![Sentry](https://img.shields.io/badge/Sentry-362D59?style=for-the-badge&logo=sentry&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=githubactions&logoColor=white)
 
 ## Features
 
@@ -16,9 +21,13 @@ A professional portfolio piece demonstrating full-stack web development and data
   - Total applications and conversion rates
   - Bar chart of applications over time
   - Pie chart of status distribution
+- **Build Metadata**: Version, commit SHA, and build time displayed in the footer for debugging
+- **Error Monitoring**: Optional Sentry reporting with a friendly error boundary fallback screen
+- **Performance**: Lazy-loaded pages and charts to reduce initial bundle size
 - **Search & Filter**: Filter by status or search by company/role name
 - **Dark Mode**: Professional dark theme with toggle
 - **CSV Export**: Export data for Python analysis
+- **Testing**: Vitest + React Testing Library with CI on pull requests
 - **Python Analysis Script**: Pandas-based data analysis with visualizations
 
 ## Tech Stack
@@ -29,7 +38,11 @@ A professional portfolio piece demonstrating full-stack web development and data
 | Styling | Tailwind CSS v3 (dark mode) |
 | State | TanStack Query + React hooks |
 | Database/Auth | Supabase (PostgreSQL) |
-| Charts | Recharts |
+| Charts | Recharts (lazy-loaded) |
+| UX | dnd-kit, React Router |
+| Observability | Sentry (optional) |
+| Testing | Vitest + React Testing Library |
+| CI | GitHub Actions |
 | Icons | Lucide React |
 | Data Science | Python + Pandas + Matplotlib |
 
@@ -76,6 +89,18 @@ A professional portfolio piece demonstrating full-stack web development and data
 
 6. **Open the app**
    Navigate to `http://localhost:5173`
+
+### Testing
+
+- Run unit tests:
+   ```bash
+   npm test
+   ```
+- Run tests in watch mode:
+   ```bash
+   npm run test:watch
+   ```
+- The CI workflow runs tests and a production build on every pull request.
 
 ## Project Structure
 
@@ -137,7 +162,11 @@ The script generates:
 ```
 VITE_SUPABASE_URL=production_url
 VITE_SUPABASE_ANON_KEY=production_anon_key
+VITE_SENTRY_DSN=optional_sentry_dsn
+VITE_SENTRY_ENVIRONMENT=production
 ```
+
+The build also embeds the app version, commit SHA, and build time in the footer for support/debugging.
 
 ## Analytics Formulas
 

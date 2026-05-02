@@ -144,6 +144,17 @@ export default function JobsPage() {
     !!tagFilter.trim() ||
     !!techStackFilter.trim()
 
+  const clearFilters = () => {
+    setSearchQuery('')
+    setStatusFilter('all')
+    setLocationFilter('')
+    setWorkModeFilter('all')
+    setSourceFilter('all')
+    setReferralOnly(false)
+    setTagFilter('')
+    setTechStackFilter('')
+  }
+
   // Handlers
   const handleCreateJob = async (data: JobFormData) => {
     try {
@@ -308,7 +319,7 @@ export default function JobsPage() {
           </button>
           <button onClick={() => setIsFormOpen(true)} className="btn-primary">
             <Plus className="w-4 h-4" />
-            Add Job
+            Add New Job
           </button>
         </div>
       </div>
@@ -422,70 +433,91 @@ export default function JobsPage() {
       ) : null}
 
       {/* Filters & View Toggle */}
-      <div className="flex flex-col md:flex-row md:items-center gap-4">
-        {/* Search */}
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search companies or roles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="input pl-10"
-          />
+      <div className="card p-4 space-y-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-zinc-900 dark:text-white">
+              Filters
+            </h2>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Narrow by search, status, source, or tags.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="text-sm text-zinc-500 dark:text-zinc-400">
+              {filteredJobs.length} of {jobs.length} shown
+            </div>
+            {hasActiveFilters ? (
+              <button onClick={clearFilters} className="btn-ghost px-3 py-2">
+                Clear filters
+              </button>
+            ) : null}
+            <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'list'
+                    ? 'bg-white dark:bg-zinc-700 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
+                title="List view"
+              >
+                <List className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'kanban'
+                    ? 'bg-white dark:bg-zinc-700 shadow-sm'
+                    : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                }`}
+                title="Kanban view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
         </div>
 
-        {/* Status Filter */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
-          <button
-            onClick={() => setStatusFilter('all')}
-            className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-              statusFilter === 'all'
-                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
-                : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
-            }`}
-          >
-            All
-          </button>
-          {(Object.keys(STATUS_CONFIG) as JobStatus[]).map((status) => (
+        {/* Search + quick status filters */}
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search companies or roles..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="input pl-10"
+            />
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0">
             <button
-              key={status}
-              onClick={() => setStatusFilter(status)}
+              onClick={() => setStatusFilter('all')}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                statusFilter === status
+                statusFilter === 'all'
                   ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
                   : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
               }`}
             >
-              {STATUS_CONFIG[status].label}
+              All
             </button>
-          ))}
-        </div>
-
-        {/* View Toggle */}
-        <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
-          <button
-            onClick={() => setViewMode('list')}
-            className={`p-2 rounded-md transition-colors ${
-              viewMode === 'list'
-                ? 'bg-white dark:bg-zinc-700 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-            }`}
-            title="List view"
-          >
-            <List className="w-4 h-4" />
-          </button>
-          <button
-            onClick={() => setViewMode('kanban')}
-            className={`p-2 rounded-md transition-colors ${
-              viewMode === 'kanban'
-                ? 'bg-white dark:bg-zinc-700 shadow-sm'
-                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
-            }`}
-            title="Kanban view"
-          >
-            <LayoutGrid className="w-4 h-4" />
-          </button>
+            {(Object.keys(STATUS_CONFIG) as JobStatus[]).map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
+                  statusFilter === status
+                    ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
+                    : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
+                }`}
+              >
+                {STATUS_CONFIG[status].label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

@@ -18,6 +18,18 @@ const navigation = [
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
 ]
 
+function formatBuildTime(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const { user, signOut } = useAuth()
@@ -184,6 +196,10 @@ export default function Layout() {
             </a>
             <span className="mx-2">·</span>
             <span>v{__APP_VERSION__}</span>
+            <span className="mx-2">·</span>
+            <span>sha {__BUILD_SHA__.slice(0, 8)}</span>
+            <span className="mx-2">·</span>
+            <span>{formatBuildTime(__BUILD_TIME__)}</span>
           </footer>
         </main>
       </div>

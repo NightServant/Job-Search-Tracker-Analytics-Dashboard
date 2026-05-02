@@ -203,7 +203,7 @@ export default function JobForm({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl animate-slide-up max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl animate-slide-up max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">
