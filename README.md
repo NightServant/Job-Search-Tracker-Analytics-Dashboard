@@ -82,23 +82,23 @@ A professional portfolio piece demonstrating full-stack web development and data
 ```
 ├── src/
 │   ├── components/       # React components
-│   │   ├── jobs/        # Job-related components
-│   │   └── Layout.tsx   # App shell
-│   ├── contexts/        # React contexts (auth, theme)
-│   ├── hooks/           # Custom hooks (useJobs, useJobStats)
-│   ├── lib/             # Utilities (Supabase client)
-│   ├── pages/           # Page components
-│   ├── services/        # API service layer
-│   ├── types/           # TypeScript definitions
-│   └── App.tsx          # Root component
+│   │   ├── jobs/         # Job-related components
+│   │   └── Layout.tsx    # App shell
+│   ├── contexts/         # React contexts (auth, theme)
+│   ├── hooks/            # Custom hooks (useJobs, useJobStats)
+│   ├── lib/              # Utilities (Supabase client)
+│   ├── pages/            # Page components
+│   ├── services/         # API service layer
+│   ├── types/            # TypeScript definitions
+│   └── App.tsx           # Root component
 ├── scripts/
-│   └── data_analysis.py # Python analysis script
-├── texts/               # Documentation
+│   └── data_analysis.py  # Python analysis script
+├── texts/                # Documentation
 │   ├── project_roadmap.txt
 │   ├── database_schema.txt
 │   ├── component_architecture.txt
 │   └── api_logic.txt
-└── public/              # Static assets
+└── public/               # Static assets
 ```
 
 ## Data Analysis (Python)
