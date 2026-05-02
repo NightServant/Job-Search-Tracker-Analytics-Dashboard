@@ -53,6 +53,29 @@ export const jobService = {
   },
 
   /**
+   * Create multiple job entries (bulk insert)
+   */
+  async createJobsBulk(jobDatas: JobFormData[]): Promise<Job[]> {
+    if (jobDatas.length === 0) return []
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Not authenticated')
+
+    const rows = jobDatas.map((jobData) => ({
+      ...jobData,
+      user_id: user.id,
+    }))
+
+    const { data, error } = await supabase.from('jobs').insert(rows).select('*')
+
+    if (error) throw error
+    return data || []
+  },
+
+  /**
    * Update an existing job
    */
   async updateJob(id: string, updates: Partial<JobFormData>): Promise<Job> {

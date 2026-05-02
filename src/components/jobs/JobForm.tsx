@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { X, Loader2 } from 'lucide-react'
 import { useJobStatusHistory } from '@/hooks/useJobs'
 import { Job, JobFormData, JobStatus, STATUS_CONFIG, WorkMode } from '@/types'
@@ -38,7 +38,8 @@ export default function JobForm({
   })
   const [tagsInput, setTagsInput] = useState('')
   const [techStackInput, setTechStackInput] = useState('')
-  const [errors, setErrors] = useState<Partial<Record<keyof JobFormData, string>>>({})
+  const [touched, setTouched] = useState<Partial<Record<keyof JobFormData, boolean>>>({})
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
 
   const { data: statusHistory = [], isLoading: isHistoryLoading } =
     useJobStatusHistory(job?.id)
@@ -88,7 +89,8 @@ export default function JobForm({
       setTagsInput('')
       setTechStackInput('')
     }
-    setErrors({})
+    setTouched({})
+    setAttemptedSubmit(false)
   }, [job, isOpen])
 
   const toNullableString = (value: string | null | undefined): string | null => {
@@ -119,7 +121,7 @@ export default function JobForm({
     })
   }
 
-  const validate = (): boolean => {
+  const computeErrors = useMemo(() => {
     const newErrors: Partial<Record<keyof JobFormData, string>> = {}
 
     if (!formData.company.trim()) {
@@ -128,9 +130,16 @@ export default function JobForm({
     if (!formData.role.trim()) {
       newErrors.role = 'Role is required'
     }
-    if (formData.salary_min && formData.salary_max && formData.salary_min > formData.salary_max) {
+
+    const min = formData.salary_min
+    const max = formData.salary_max
+    const hasMin = typeof min === 'number' && Number.isFinite(min)
+    const hasMax = typeof max === 'number' && Number.isFinite(max)
+
+    if (hasMin && hasMax && min! > max!) {
       newErrors.salary_max = 'Max salary must be greater than min'
     }
+
     if (formData.url && !/^https?:\/\/.+/.test(formData.url)) {
       newErrors.url = 'Please enter a valid URL'
     }
@@ -141,13 +150,27 @@ export default function JobForm({
       newErrors.contact_linkedin = 'Please enter a valid URL'
     }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    return newErrors
+  }, [formData])
+
+  const errors = useMemo(() => {
+    if (attemptedSubmit) return computeErrors
+
+    const filtered: Partial<Record<keyof JobFormData, string>> = {}
+    ;(Object.keys(computeErrors) as Array<keyof JobFormData>).forEach((key) => {
+      if (touched[key]) filtered[key] = computeErrors[key]
+    })
+    return filtered
+  }, [attemptedSubmit, computeErrors, touched])
+
+  const markTouched = (field: keyof JobFormData) => {
+    setTouched((prev) => ({ ...prev, [field]: true }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validate()) return
+    setAttemptedSubmit(true)
+    if (Object.keys(computeErrors).length > 0) return
 
     await onSubmit({
       ...formData,
@@ -208,8 +231,10 @@ export default function JobForm({
               onChange={(e) =>
                 setFormData({ ...formData, company: e.target.value })
               }
+              onBlur={() => markTouched('company')}
               className={`input ${errors.company ? 'border-red-500' : ''}`}
               placeholder="Google, Meta, etc."
+              aria-invalid={!!errors.company}
             />
             {errors.company && (
               <p className="mt-1 text-xs text-red-500">{errors.company}</p>
@@ -228,8 +253,10 @@ export default function JobForm({
               onChange={(e) =>
                 setFormData({ ...formData, role: e.target.value })
               }
+              onBlur={() => markTouched('role')}
               className={`input ${errors.role ? 'border-red-500' : ''}`}
               placeholder="Software Engineer, Product Manager, etc."
+              aria-invalid={!!errors.role}
             />
             {errors.role && (
               <p className="mt-1 text-xs text-red-500">{errors.role}</p>
@@ -252,6 +279,7 @@ export default function JobForm({
                     salary_min: e.target.value ? Number(e.target.value) : undefined,
                   })
                 }
+                onBlur={() => markTouched('salary_max')}
                 className="input"
                 placeholder="100000"
               />
@@ -270,8 +298,10 @@ export default function JobForm({
                     salary_max: e.target.value ? Number(e.target.value) : undefined,
                   })
                 }
+                onBlur={() => markTouched('salary_max')}
                 className={`input ${errors.salary_max ? 'border-red-500' : ''}`}
                 placeholder="150000"
+                aria-invalid={!!errors.salary_max}
               />
               {errors.salary_max && (
                 <p className="mt-1 text-xs text-red-500">{errors.salary_max}</p>
@@ -289,8 +319,10 @@ export default function JobForm({
               id="url"
               value={formData.url ?? ''}
               onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+              onBlur={() => markTouched('url')}
               className={`input ${errors.url ? 'border-red-500' : ''}`}
               placeholder="https://careers.company.com/job/123"
+              aria-invalid={!!errors.url}
             />
             {errors.url && (
               <p className="mt-1 text-xs text-red-500">{errors.url}</p>
@@ -469,8 +501,10 @@ export default function JobForm({
                     onChange={(e) =>
                       setFormData({ ...formData, contact_email: e.target.value })
                     }
+                    onBlur={() => markTouched('contact_email')}
                     className={`input ${errors.contact_email ? 'border-red-500' : ''}`}
                     placeholder="name@company.com"
+                    aria-invalid={!!errors.contact_email}
                   />
                   {errors.contact_email && (
                     <p className="mt-1 text-xs text-red-500">{errors.contact_email}</p>
@@ -492,8 +526,10 @@ export default function JobForm({
                       contact_linkedin: e.target.value,
                     })
                   }
+                  onBlur={() => markTouched('contact_linkedin')}
                   className={`input ${errors.contact_linkedin ? 'border-red-500' : ''}`}
                   placeholder="https://www.linkedin.com/in/..."
+                  aria-invalid={!!errors.contact_linkedin}
                 />
                 {errors.contact_linkedin && (
                   <p className="mt-1 text-xs text-red-500">{errors.contact_linkedin}</p>

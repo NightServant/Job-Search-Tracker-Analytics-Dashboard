@@ -59,6 +59,20 @@ export function useCreateJob() {
 }
 
 /**
+ * Hook to create multiple jobs (bulk import)
+ */
+export function useCreateJobsBulk() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (datas: JobFormData[]) => jobService.createJobsBulk(datas),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    },
+  })
+}
+
+/**
  * Hook to update a job
  */
 export function useUpdateJob() {

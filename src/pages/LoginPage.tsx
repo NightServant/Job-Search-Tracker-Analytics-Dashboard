@@ -59,7 +59,7 @@ export default function LoginPage() {
   return (
     <div className={`min-h-screen flex ${theme === 'dark' ? 'dark' : ''}`}>
       {/* Left side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-indigo-600 dark:bg-indigo-900 p-12 flex-col justify-between">
+      <div className="hidden lg:flex lg:w-1/2 bg-primary-600 dark:bg-primary-900 p-12 flex-col justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
             <Briefcase className="w-6 h-6 text-white" />
@@ -71,7 +71,7 @@ export default function LoginPage() {
           <h1 className="text-4xl font-bold text-white mb-4">
             Track Your Job Search Journey
           </h1>
-          <p className="text-lg text-indigo-100">
+          <p className="text-lg text-primary-100">
             Organize applications, visualize your progress, and land your dream job
             with data-driven insights.
           </p>
@@ -80,11 +80,11 @@ export default function LoginPage() {
         <div className="grid grid-cols-2 gap-4">
           <div className="bg-white/10 rounded-xl p-4">
             <div className="text-3xl font-bold text-white">100%</div>
-            <div className="text-sm text-indigo-200">Free to use</div>
+            <div className="text-sm text-primary-200">Free to use</div>
           </div>
           <div className="bg-white/10 rounded-xl p-4">
             <div className="text-3xl font-bold text-white">∞</div>
-            <div className="text-sm text-indigo-200">Unlimited jobs</div>
+            <div className="text-sm text-primary-200">Unlimited jobs</div>
           </div>
         </div>
       </div>
@@ -94,7 +94,7 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center">
               <Briefcase className="w-6 h-6 text-white" />
             </div>
             <span className="text-xl font-bold text-zinc-900 dark:text-white">
@@ -195,7 +195,7 @@ export default function LoginPage() {
                 setIsLogin(!isLogin)
                 setError(null)
               }}
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
             >
               {isLogin ? 'Sign up' : 'Sign in'}
             </button>
@@ -219,7 +219,7 @@ export default function LoginPage() {
               href="https://github.com/Ensues"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
             >
               @Ensues
             </a>
@@ -228,7 +228,7 @@ export default function LoginPage() {
               href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
             >
               Source
             </a>
@@ -237,7 +237,7 @@ export default function LoginPage() {
               href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard/issues"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
             >
               Report a bug
             </a>

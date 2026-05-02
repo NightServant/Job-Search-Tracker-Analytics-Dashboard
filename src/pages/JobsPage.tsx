@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import {
   Plus,
   Search,
@@ -6,19 +6,49 @@ import {
   List,
   Loader2,
   Briefcase,
+  Upload,
 } from 'lucide-react'
-import { useJobs, useCreateJob, useUpdateJob, useDeleteJob, useUpdateJobStatus } from '@/hooks/useJobs'
+import {
+  useJobs,
+  useCreateJob,
+  useCreateJobsBulk,
+  useUpdateJob,
+  useDeleteJob,
+  useUpdateJobStatus,
+} from '@/hooks/useJobs'
+import { useToast } from '@/contexts/ToastContext'
 import { Job, JobStatus, JobFormData, STATUS_CONFIG, ViewMode, WorkMode } from '@/types'
 import JobCard from '@/components/jobs/JobCard'
 import JobForm from '@/components/jobs/JobForm'
 import KanbanBoard from '@/components/jobs/KanbanBoard'
+import { buildJobDedupKey, parseJobsCsvText, ParsedJobRow } from '@/lib/jobCsv'
+
+type DuplicateReason = 'existing' | 'file'
+
+type DuplicateRow = ParsedJobRow & { reason: DuplicateReason }
+
+interface CsvImportState {
+  fileName: string
+  rows: ParsedJobRow[]
+  issuesCount: number
+  duplicates: DuplicateRow[]
+  importable: ParsedJobRow[]
+}
 
 export default function JobsPage() {
   const { data: jobs = [], isLoading } = useJobs()
   const createJob = useCreateJob()
+  const createJobsBulk = useCreateJobsBulk()
   const updateJob = useUpdateJob()
   const deleteJob = useDeleteJob()
   const updateStatus = useUpdateJobStatus()
+
+  const { success, error: showError, info } = useToast()
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [csvImport, setCsvImport] = useState<CsvImportState | null>(null)
+  const [skipDuplicates, setSkipDuplicates] = useState(true)
+  const [isParsingCsv, setIsParsingCsv] = useState(false)
 
   const [viewMode, setViewMode] = useState<ViewMode>('list')
   const [searchQuery, setSearchQuery] = useState('')
@@ -31,6 +61,19 @@ export default function JobsPage() {
   const [techStackFilter, setTechStackFilter] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingJob, setEditingJob] = useState<Job | null>(null)
+
+  const existingDedupKeys = useMemo(() => {
+    return new Set(
+      jobs.map((job) =>
+        buildJobDedupKey({
+          company: job.company,
+          role: job.role,
+          date_applied: job.date_applied ?? null,
+          url: job.url ?? null,
+        })
+      )
+    )
+  }, [jobs])
 
   const availableSources = useMemo(() => {
     const sources = new Set<string>()
@@ -103,34 +146,134 @@ export default function JobsPage() {
 
   // Handlers
   const handleCreateJob = async (data: JobFormData) => {
-    await createJob.mutateAsync(data)
-    setIsFormOpen(false)
+    try {
+      await createJob.mutateAsync(data)
+      success('Job added')
+      setIsFormOpen(false)
+    } catch (err) {
+      showError('Could not add job', err instanceof Error ? err.message : 'Unknown error')
+    }
   }
 
   const handleUpdateJob = async (data: JobFormData) => {
     if (!editingJob) return
-    await updateJob.mutateAsync({ id: editingJob.id, data })
-    setEditingJob(null)
+    try {
+      await updateJob.mutateAsync({ id: editingJob.id, data })
+      success('Job updated')
+      setEditingJob(null)
+    } catch (err) {
+      showError('Could not update job', err instanceof Error ? err.message : 'Unknown error')
+    }
   }
 
   const handleDeleteJob = async (id: string) => {
     if (window.confirm('Are you sure you want to delete this job?')) {
-      await deleteJob.mutateAsync(id)
+      try {
+        await deleteJob.mutateAsync(id)
+        success('Job deleted')
+      } catch (err) {
+        showError('Could not delete job', err instanceof Error ? err.message : 'Unknown error')
+      }
     }
   }
 
   const handleStatusChange = async (id: string, status: JobStatus) => {
-    await updateStatus.mutateAsync({ id, status })
+    try {
+      await updateStatus.mutateAsync({ id, status })
+      success('Status updated')
+    } catch (err) {
+      showError('Could not update status', err instanceof Error ? err.message : 'Unknown error')
+    }
   }
 
   const handleEdit = (job: Job) => {
     setEditingJob(job)
   }
 
+  const openCsvPicker = () => {
+    fileInputRef.current?.click()
+  }
+
+  const handleCsvSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    // allow selecting the same file twice
+    e.target.value = ''
+    if (!file) return
+
+    setIsParsingCsv(true)
+    try {
+      const text = await file.text()
+      const result = parseJobsCsvText(text)
+
+      if (result.fatalError) {
+        showError('CSV import failed', result.fatalError)
+        setCsvImport(null)
+        return
+      }
+
+      const seenInFile = new Set<string>()
+      const duplicates: DuplicateRow[] = []
+      const importable: ParsedJobRow[] = []
+
+      for (const row of result.rows) {
+        if (existingDedupKeys.has(row.dedupKey)) {
+          duplicates.push({ ...row, reason: 'existing' })
+          continue
+        }
+        if (seenInFile.has(row.dedupKey)) {
+          duplicates.push({ ...row, reason: 'file' })
+          continue
+        }
+        seenInFile.add(row.dedupKey)
+        importable.push(row)
+      }
+
+      setCsvImport({
+        fileName: file.name,
+        rows: result.rows,
+        issuesCount: result.issues.length,
+        duplicates,
+        importable,
+      })
+      setSkipDuplicates(true)
+
+      if (result.issues.length > 0) {
+        info('Some rows were skipped', `${result.issues.length} invalid row(s)`)
+      }
+    } catch (err) {
+      showError('CSV import failed', err instanceof Error ? err.message : 'Unknown error')
+      setCsvImport(null)
+    } finally {
+      setIsParsingCsv(false)
+    }
+  }
+
+  const handleImportCsv = async () => {
+    if (!csvImport) return
+
+    const rowsToImport = skipDuplicates ? csvImport.importable : csvImport.rows
+    const payload = rowsToImport.map((row) => row.data)
+
+    if (payload.length === 0) {
+      info('Nothing to import', 'No new rows to import')
+      return
+    }
+
+    try {
+      await createJobsBulk.mutateAsync(payload)
+      const skipped = skipDuplicates ? csvImport.duplicates.length : 0
+      const message = skipped > 0 ? `${payload.length} imported, ${skipped} duplicate(s) skipped` : `${payload.length} imported`
+      success('CSV imported', message)
+      setCsvImport(null)
+    } catch (err) {
+      showError('Import failed', err instanceof Error ? err.message : 'Unknown error')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
+        <Loader2 className="w-8 h-8 text-primary-600 animate-spin" />
       </div>
     )
   }
@@ -147,11 +290,136 @@ export default function JobsPage() {
             {jobs.length} jobs tracked
           </p>
         </div>
-        <button onClick={() => setIsFormOpen(true)} className="btn-primary">
-          <Plus className="w-4 h-4" />
-          Add Job
-        </button>
+        <div className="flex items-center gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            className="hidden"
+            onChange={handleCsvSelected}
+          />
+          <button
+            onClick={openCsvPicker}
+            className="btn-secondary"
+            disabled={isParsingCsv || createJobsBulk.isPending}
+          >
+            <Upload className="w-4 h-4" />
+            Import CSV
+          </button>
+          <button onClick={() => setIsFormOpen(true)} className="btn-primary">
+            <Plus className="w-4 h-4" />
+            Add Job
+          </button>
+        </div>
       </div>
+
+      {/* CSV Import Summary */}
+      {csvImport ? (
+        <div className="card p-5">
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+                CSV ready to import
+              </h2>
+              <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+                File: <span className="font-medium text-zinc-700 dark:text-zinc-200">{csvImport.fileName}</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCsvImport(null)}
+                className="btn-ghost"
+                disabled={createJobsBulk.isPending}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleImportCsv}
+                className="btn-primary"
+                disabled={createJobsBulk.isPending}
+              >
+                {createJobsBulk.isPending ? 'Importing…' : 'Import'}
+              </button>
+            </div>
+          </div>
+
+          <div className="mt-4 grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Parsed rows</p>
+              <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">{csvImport.rows.length}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Importable</p>
+              <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">
+                {skipDuplicates ? csvImport.importable.length : csvImport.rows.length}
+              </p>
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Duplicates</p>
+              <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">{csvImport.duplicates.length}</p>
+            </div>
+            <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800">
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Invalid</p>
+              <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-white">{csvImport.issuesCount}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 flex items-center gap-2">
+            <input
+              id="skip-duplicates"
+              type="checkbox"
+              checked={skipDuplicates}
+              onChange={(e) => setSkipDuplicates(e.target.checked)}
+              className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700"
+            />
+            <label htmlFor="skip-duplicates" className="text-sm text-zinc-700 dark:text-zinc-300">
+              Skip duplicates (recommended)
+            </label>
+          </div>
+
+          {csvImport.importable.length > 0 ? (
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
+                    <th className="text-left py-2 pr-4">Company</th>
+                    <th className="text-left py-2 pr-4">Role</th>
+                    <th className="text-left py-2 pr-4">Status</th>
+                    <th className="text-left py-2 pr-4">Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {csvImport.importable.slice(0, 8).map((row) => (
+                    <tr key={row.rowNumber} className="border-t border-zinc-200 dark:border-zinc-800">
+                      <td className="py-2 pr-4 font-medium text-zinc-900 dark:text-white whitespace-nowrap">
+                        {row.data.company}
+                      </td>
+                      <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-300 whitespace-nowrap">
+                        {row.data.role}
+                      </td>
+                      <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-300 whitespace-nowrap">
+                        {STATUS_CONFIG[row.data.status].label}
+                      </td>
+                      <td className="py-2 pr-4 text-zinc-600 dark:text-zinc-300 whitespace-nowrap">
+                        {row.data.is_referral ? 'Referral' : row.data.source || '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {csvImport.importable.length > 8 ? (
+                <p className="mt-2 text-xs text-zinc-500 dark:text-zinc-400">
+                  Showing first 8 rows.
+                </p>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-zinc-500 dark:text-zinc-400">
+              No importable rows found.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       {/* Filters & View Toggle */}
       <div className="flex flex-col md:flex-row md:items-center gap-4">
@@ -173,7 +441,7 @@ export default function JobsPage() {
             onClick={() => setStatusFilter('all')}
             className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
               statusFilter === 'all'
-                ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
                 : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
             }`}
           >
@@ -185,7 +453,7 @@ export default function JobsPage() {
               onClick={() => setStatusFilter(status)}
               className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
                 statusFilter === status
-                  ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300'
+                  ? 'bg-primary-100 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
                   : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
               }`}
             >
@@ -301,17 +569,43 @@ export default function JobsPage() {
           <p className="mt-1 text-zinc-500 dark:text-zinc-400 max-w-sm">
             {hasActiveFilters
               ? 'Try adjusting your search or filters'
-              : 'Start tracking your job applications by adding your first job.'}
+              : 'Start tracking your job applications by adding your first job or importing a CSV from a spreadsheet.'}
           </p>
           {!hasActiveFilters && (
-            <button
-              onClick={() => setIsFormOpen(true)}
-              className="btn-primary mt-4"
-            >
-              <Plus className="w-4 h-4" />
-              Add Your First Job
-            </button>
+            <div className="mt-4 flex flex-col sm:flex-row items-stretch gap-2">
+              <button
+                onClick={() => setIsFormOpen(true)}
+                className="btn-primary"
+              >
+                <Plus className="w-4 h-4" />
+                Add Your First Job
+              </button>
+              <button
+                onClick={openCsvPicker}
+                className="btn-secondary"
+                disabled={isParsingCsv || createJobsBulk.isPending}
+              >
+                <Upload className="w-4 h-4" />
+                Import CSV
+              </button>
+            </div>
           )}
+
+          {!hasActiveFilters ? (
+            <div className="mt-6 max-w-lg text-left w-full">
+              <div className="card p-4">
+                <h4 className="text-sm font-semibold text-zinc-900 dark:text-white">
+                  Quick onboarding
+                </h4>
+                <ol className="mt-2 space-y-1 text-sm text-zinc-600 dark:text-zinc-300 list-decimal list-inside">
+                  <li>Add or import jobs</li>
+                  <li>Update statuses as you progress</li>
+                  <li>Fill in Source + Salary for better analytics</li>
+                  <li>Check the Dashboard for trends</li>
+                </ol>
+              </div>
+            </div>
+          ) : null}
         </div>
       ) : viewMode === 'list' ? (
         <div className="space-y-3">

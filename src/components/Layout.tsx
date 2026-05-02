@@ -52,7 +52,7 @@ export default function Layout() {
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-zinc-200 dark:border-zinc-800">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
+              <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
                 <Briefcase className="w-5 h-5 text-white" />
               </div>
               <span className="font-semibold text-zinc-900 dark:text-white">
@@ -77,7 +77,7 @@ export default function Layout() {
                   to={item.href}
                   className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
                     isActive
-                      ? 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400'
+                      ? 'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400'
                       : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
                   }`}
                   onClick={() => setSidebarOpen(false)}
@@ -95,8 +95,8 @@ export default function Layout() {
           {/* User section */}
           <div className="p-3 border-t border-zinc-200 dark:border-zinc-800">
             <div className="flex items-center gap-3 px-3 py-2">
-              <div className="w-8 h-8 rounded-full bg-indigo-100 dark:bg-indigo-900 flex items-center justify-center">
-                <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400">
+              <div className="w-8 h-8 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
+                <span className="text-sm font-medium text-primary-600 dark:text-primary-400">
                   {user?.email?.charAt(0).toUpperCase()}
                 </span>
               </div>
@@ -141,7 +141,7 @@ export default function Layout() {
             <Menu className="w-5 h-5 text-zinc-500" />
           </button>
           <div className="flex items-center gap-2 ml-3">
-            <div className="w-7 h-7 rounded-lg bg-indigo-600 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-lg bg-primary-600 flex items-center justify-center">
               <Briefcase className="w-4 h-4 text-white" />
             </div>
             <span className="font-semibold text-zinc-900 dark:text-white">
@@ -160,7 +160,7 @@ export default function Layout() {
               href="https://github.com/Ensues"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
             >
               @Ensues
             </a>
@@ -169,7 +169,7 @@ export default function Layout() {
               href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
             >
               Source
             </a>
@@ -178,7 +178,7 @@ export default function Layout() {
               href="https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard/issues"
               target="_blank"
               rel="noreferrer"
-              className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline"
+              className="text-primary-600 dark:text-primary-400 font-medium hover:underline"
             >
               Report a bug
             </a>

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Briefcase,
   TrendingUp,
@@ -493,6 +494,26 @@ export default function DashboardPage() {
         </button>
       </div>
 
+      {/* Onboarding */}
+      {jobs.length === 0 ? (
+        <div className="card p-5">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+            Get started
+          </h2>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Add your first job to unlock analytics, or import a CSV from a spreadsheet.
+          </p>
+          <div className="mt-4 flex flex-col sm:flex-row gap-2">
+            <Link to="/jobs" className="btn-primary w-fit">
+              Go to Jobs
+            </Link>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 self-center">
+              Tip: Use “Import CSV” on the Jobs page.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatsCard
@@ -679,7 +700,7 @@ export default function DashboardPage() {
 
             <div className="mt-2 h-2 rounded-full bg-zinc-200 dark:bg-zinc-800 overflow-hidden">
               <div
-                className="h-full bg-indigo-600 dark:bg-indigo-500"
+                className="h-full bg-primary-600 dark:bg-primary-500"
                 style={{ width: `${goalMetrics.progressPct}%` }}
               />
             </div>
@@ -1000,19 +1021,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Conversion Formula */}
-      <div className="card p-5 bg-indigo-50 dark:bg-indigo-950 border-indigo-200 dark:border-indigo-900">
+      <div className="card p-5 bg-primary-50 dark:bg-primary-950 border-primary-200 dark:border-primary-900">
         <div className="flex items-start gap-4">
-          <div className="p-2 rounded-lg bg-indigo-100 dark:bg-indigo-900">
-            <TrendingUp className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+          <div className="p-2 rounded-lg bg-primary-100 dark:bg-primary-900">
+            <TrendingUp className="w-5 h-5 text-primary-600 dark:text-primary-400" />
           </div>
           <div>
-            <h3 className="font-semibold text-indigo-900 dark:text-indigo-100">
+            <h3 className="font-semibold text-primary-900 dark:text-primary-100">
               How Conversion Rate is Calculated
             </h3>
-            <p className="mt-1 text-sm text-indigo-700 dark:text-indigo-300">
+            <p className="mt-1 text-sm text-primary-700 dark:text-primary-300">
               Conversion % = (Interviews ÷ Applications) × 100
             </p>
-            <p className="mt-2 text-sm text-indigo-600 dark:text-indigo-400">
+            <p className="mt-2 text-sm text-primary-600 dark:text-primary-400">
               Your rate: ({stats.interviews} ÷ {stats.totalApplications}) × 100 ={' '}
               <strong>{stats.conversionRate}%</strong>
             </p>

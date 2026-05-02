@@ -184,7 +184,7 @@ export default function JobCard({
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 ${
                         status === job.status
-                          ? 'text-indigo-600 dark:text-indigo-400 font-medium'
+                          ? 'text-primary-600 dark:text-primary-400 font-medium'
                           : 'text-zinc-600 dark:text-zinc-300'
                       }`}
                     >
@@ -242,7 +242,7 @@ export default function JobCard({
                 href={job.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                className="flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
               >
                 <ExternalLink className="w-4 h-4" />
                 View Posting
@@ -282,7 +282,7 @@ export default function JobCard({
               {job.contact_email && (
                 <a
                   href={`mailto:${job.contact_email}`}
-                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-primary-600 dark:text-primary-400 hover:underline"
                 >
                   {job.contact_email}
                 </a>
@@ -292,7 +292,7 @@ export default function JobCard({
                   href={job.contact_linkedin}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                  className="text-primary-600 dark:text-primary-400 hover:underline"
                 >
                   LinkedIn
                 </a>
