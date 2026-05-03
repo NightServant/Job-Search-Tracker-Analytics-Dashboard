@@ -106,6 +106,29 @@ function buildLatexPreviewHtml(latexCode: string): string {
         const code = ${JSON.stringify(safeCode)};
         const root = document.getElementById('root');
 
+        function normalizeForPreview(input) {
+          const text = String(input || '');
+
+          let body = text;
+          const beginTag = /\\begin\{document\}/i;
+          const endTag = /\\end\{document\}/i;
+          const beginMatch = beginTag.exec(text);
+          const endMatch = endTag.exec(text);
+
+          if (beginMatch && endMatch && beginMatch.index < endMatch.index) {
+            body = text.slice(beginMatch.index + beginMatch[0].length, endMatch.index);
+          }
+
+          // latex.js has limited support for full preambles/packages in-browser.
+          body = body
+            .replace(/^\\documentclass[^\n]*$/gim, '')
+            .replace(/^\\usepackage[^\n]*$/gim, '')
+            .replace(/^\\pagenumbering[^\n]*$/gim, '')
+            .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1');
+
+          return '\\begin{document}\n' + body.trim() + '\n\\end{document}';
+        }
+
         function showFallback(message) {
           const safeMessage = String(message)
             .replace(/&/g, '&amp;')
@@ -123,8 +146,9 @@ function buildLatexPreviewHtml(latexCode: string): string {
             return;
           }
 
+          const previewCode = normalizeForPreview(code);
           const generator = new window.latexjs.HtmlGenerator({ hyphenate: false });
-          const parsed = window.latexjs.parse(code, { generator: generator });
+          const parsed = window.latexjs.parse(previewCode, { generator: generator });
           const fragment = parsed && parsed.domFragment ? parsed.domFragment : null;
           if (!fragment) {
             showFallback('Could not parse this LaTeX. Showing source.');
