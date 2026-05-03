@@ -122,3 +122,23 @@ export const STATUS_CONFIG: Record<JobStatus, { label: string; color: string; bg
 
 // View mode for jobs page
 export type ViewMode = 'list' | 'kanban';
+
+export type JobAutofillField =
+  | 'company'
+  | 'role'
+  | 'location'
+  | 'source'
+  | 'salary_min'
+  | 'salary_max'
+  | 'url';
+
+export interface JobAutofillResult {
+  values: Partial<
+    Pick<
+      JobFormData,
+      'company' | 'role' | 'location' | 'source' | 'salary_min' | 'salary_max' | 'url'
+    >
+  >;
+  confidence: Partial<Record<JobAutofillField, number>>;
+  warnings: string[];
+}

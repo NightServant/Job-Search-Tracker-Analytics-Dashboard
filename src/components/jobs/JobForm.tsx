@@ -1,7 +1,14 @@
 import { useMemo, useState, useEffect } from 'react'
 import { X, Loader2 } from 'lucide-react'
-import { useJobStatusHistory } from '@/hooks/useJobs'
-import { Job, JobFormData, JobStatus, STATUS_CONFIG, WorkMode } from '@/types'
+import { useAutofillJobFromUrl, useJobStatusHistory } from '@/hooks/useJobs'
+import {
+  Job,
+  JobAutofillResult,
+  JobFormData,
+  JobStatus,
+  STATUS_CONFIG,
+  WorkMode,
+} from '@/types'
 
 interface JobFormProps {
   isOpen: boolean
@@ -40,6 +47,10 @@ export default function JobForm({
   const [techStackInput, setTechStackInput] = useState('')
   const [touched, setTouched] = useState<Partial<Record<keyof JobFormData, boolean>>>({})
   const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const [autofillSummary, setAutofillSummary] = useState<string>('')
+  const [autofillWarnings, setAutofillWarnings] = useState<string[]>([])
+
+  const autofillFromUrl = useAutofillJobFromUrl()
 
   const { data: statusHistory = [], isLoading: isHistoryLoading } =
     useJobStatusHistory(job?.id)
@@ -91,7 +102,86 @@ export default function JobForm({
     }
     setTouched({})
     setAttemptedSubmit(false)
+    setAutofillSummary('')
+    setAutofillWarnings([])
   }, [job, isOpen])
+
+  const applyAutofillResult = (result: JobAutofillResult) => {
+    const fieldLabels: Record<string, string> = {
+      company: 'Company',
+      role: 'Role',
+      location: 'Location',
+      source: 'Source',
+      salary_min: 'Min Salary',
+      salary_max: 'Max Salary',
+      url: 'Job URL',
+    }
+
+    const incoming = result.values
+    const changedLabels: string[] = []
+
+    setFormData((prev) => {
+      const next = { ...prev }
+      const keys = Object.keys(fieldLabels) as Array<keyof typeof fieldLabels>
+
+      for (const key of keys) {
+        const incomingValue = incoming[key as keyof typeof incoming]
+        if (incomingValue === undefined || incomingValue === null || incomingValue === '') {
+          continue
+        }
+
+        const currentValue = prev[key as keyof JobFormData]
+        const isCurrentEmpty =
+          currentValue === undefined ||
+          currentValue === null ||
+          (typeof currentValue === 'string' && currentValue.trim() === '')
+
+        if (isCurrentEmpty) {
+          ;(next as Record<string, unknown>)[key] = incomingValue
+          changedLabels.push(fieldLabels[key])
+        }
+      }
+
+      return next
+    })
+
+    if (changedLabels.length > 0) {
+      setAutofillSummary(
+        `Auto-filled ${changedLabels.length} field(s): ${changedLabels.join(', ')}. Review everything before saving.`
+      )
+    } else {
+      setAutofillSummary('No empty fields were updated. You can still edit values manually.')
+    }
+
+    setAutofillWarnings(result.warnings || [])
+  }
+
+  const handleAutofill = async () => {
+    const url = (formData.url || '').trim()
+    if (!url) {
+      setAutofillSummary('Enter a job URL first, then click Auto-fill.')
+      setAutofillWarnings([])
+      return
+    }
+
+    if (!/^https?:\/\/.+/i.test(url)) {
+      setAutofillSummary('Please enter a valid URL (must start with http:// or https://).')
+      setAutofillWarnings([])
+      return
+    }
+
+    try {
+      const result = await autofillFromUrl.mutateAsync(url)
+      applyAutofillResult(result)
+    } catch (err) {
+      setAutofillWarnings([])
+      setAutofillSummary(
+        err instanceof Error
+          ? err.message
+          : 'Could not auto-fill this URL. You can still complete the form manually.'
+      )
+    }
+  }
 
   const toNullableString = (value: string | null | undefined): string | null => {
     const trimmed = (value ?? '').trim()
@@ -314,18 +404,50 @@ export default function JobForm({
             <label htmlFor="url" className="label">
               Job URL
             </label>
-            <input
-              type="text"
-              id="url"
-              value={formData.url ?? ''}
-              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-              onBlur={() => markTouched('url')}
-              className={`input ${errors.url ? 'border-red-500' : ''}`}
-              placeholder="https://careers.company.com/job/123"
-              aria-invalid={!!errors.url}
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                id="url"
+                value={formData.url ?? ''}
+                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                onBlur={() => markTouched('url')}
+                className={`input ${errors.url ? 'border-red-500' : ''}`}
+                placeholder="https://careers.company.com/job/123"
+                aria-invalid={!!errors.url}
+              />
+              <button
+                type="button"
+                onClick={handleAutofill}
+                className="btn-secondary whitespace-nowrap"
+                disabled={autofillFromUrl.isPending}
+              >
+                {autofillFromUrl.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Auto-filling...
+                  </>
+                ) : (
+                  'Auto-fill from URL'
+                )}
+              </button>
+            </div>
             {errors.url && (
               <p className="mt-1 text-xs text-red-500">{errors.url}</p>
+            )}
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Auto-fill is best effort. Always review fields before saving.
+            </p>
+            {autofillSummary && (
+              <p className="mt-1 text-xs text-primary-600 dark:text-primary-400">{autofillSummary}</p>
+            )}
+            {autofillWarnings.length > 0 && (
+              <ul className="mt-1 space-y-1">
+                {autofillWarnings.map((warning, idx) => (
+                  <li key={`${warning}-${idx}`} className="text-xs text-amber-600 dark:text-amber-400">
+                    {warning}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
