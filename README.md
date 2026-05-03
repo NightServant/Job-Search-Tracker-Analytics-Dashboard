@@ -27,9 +27,7 @@ A professional portfolio piece demonstrating full-stack web development and data
 - **Search & Filter**: Filter by status or search by company/role name
 - **Dark Mode**: Professional dark theme with toggle
 - **CSV Export**: Export data for Python analysis
-- **Resume Maker**: New LaTeX editor + side-by-side live preview for resume drafting
-- **Resume/CV Library**: Upload, organize, download, and delete resume/CV versions in-app
-- **LaTeX PDF Export**: Export the current LaTeX editor content to PDF in-app, auto-save it to the Resume/CV Library, and download instantly
+- **Resume Maker**: LaTeX editor + side-by-side live preview for resume drafting
 - **Testing**: Vitest + React Testing Library with CI on pull requests
 - **Python Analysis Script**: Pandas-based data analysis with visualizations
 
@@ -73,9 +71,7 @@ A professional portfolio piece demonstrating full-stack web development and data
 3. **Set up Supabase**
    - Create a new project at [supabase.com](https://supabase.com)
    - Navigate to SQL Editor and run the schema from `texts/database_schema.txt`
-   - Run `texts/database_schema_v3_migration.txt` and `texts/database_schema_v4_resume_migration.txt`
-   - Deploy edge function `export-resume-pdf` from `supabase/functions/export-resume-pdf`
-   - Add function secrets listed in `supabase/functions/README.md`
+   - Run `texts/database_schema_v3_migration.txt`
    - Copy the project URL and anon key from Settings > API
 
 4. **Configure environment variables**
@@ -170,16 +166,6 @@ VITE_SUPABASE_URL=production_url
 VITE_SUPABASE_ANON_KEY=production_anon_key
 VITE_SENTRY_DSN=optional_sentry_dsn
 VITE_SENTRY_ENVIRONMENT=production
-```
-
-For edge function runtime (configured in Supabase, not Vercel frontend env):
-
-```
-SUPABASE_URL=your_project_url
-SUPABASE_ANON_KEY=your_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
-COMPILER_SERVICE_URL=https://your-private-compiler-service/compile
-COMPILER_SERVICE_SECRET=your_compiler_shared_secret
 ```
 
 The build also embeds the app version, commit SHA, and build time in the footer for support/debugging.

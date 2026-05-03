@@ -69,23 +69,16 @@ From project root:
 3. Apply DB schema in Supabase
    - Open texts/database_schema.txt
    - Run it in Supabase SQL Editor
-   - Also run texts/database_schema_v3_migration.txt and texts/database_schema_v4_resume_migration.txt
+   - Also run texts/database_schema_v3_migration.txt
 
-4. Deploy edge function for PDF export
-   - Create function secrets in Supabase:
-     COMPILER_SERVICE_URL
-     COMPILER_SERVICE_SECRET
-   - Deploy function:
-     supabase functions deploy export-resume-pdf
-
-5. Auth setup checks in Supabase
+4. Auth setup checks in Supabase
    - Authentication -> Providers -> Email enabled
    - For easier dev testing: disable "Confirm email" (optional)
 
-6. Start app
+5. Start app
    npm run dev
 
-7. Open local URL
+6. Open local URL
    http://localhost:5173
 
 
@@ -122,7 +115,6 @@ Run through this every time before deployment:
 
 6. Export and script handoff
    - CSV export works
-   - Resume Maker PDF export works and generated PDF appears in Resume/CV Library
    - (Optional) Python script run:
      cd scripts
      python data_analysis.py
