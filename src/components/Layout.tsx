@@ -3,6 +3,7 @@ import { useState } from 'react'
 import {
   LayoutDashboard,
   Briefcase,
+  FileText,
   Menu,
   X,
   LogOut,
@@ -16,6 +17,7 @@ import { useTheme } from '@/contexts/ThemeContext'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
+  { name: 'Resume Maker', href: '/resume', icon: FileText },
 ]
 
 function formatBuildTime(value: string): string {

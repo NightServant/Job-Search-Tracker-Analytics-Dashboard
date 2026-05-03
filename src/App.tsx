@@ -8,6 +8,7 @@ import Layout from '@/components/Layout'
 const LoginPage = lazy(() => import('@/pages/LoginPage'))
 const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
 const JobsPage = lazy(() => import('@/pages/JobsPage'))
+const ResumePage = lazy(() => import('@/pages/ResumePage'))
 
 function RouteLoader() {
   return (
@@ -90,6 +91,14 @@ function AppRoutes() {
           element={
             <Suspense fallback={<RouteLoader />}>
               <JobsPage />
+            </Suspense>
+          }
+        />
+        <Route
+          path="resume"
+          element={
+            <Suspense fallback={<RouteLoader />}>
+              <ResumePage />
             </Suspense>
           }
         />

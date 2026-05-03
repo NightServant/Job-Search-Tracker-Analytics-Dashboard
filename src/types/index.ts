@@ -122,3 +122,35 @@ export const STATUS_CONFIG: Record<JobStatus, { label: string; color: string; bg
 
 // View mode for jobs page
 export type ViewMode = 'list' | 'kanban';
+
+export type ResumeDocType = 'resume' | 'cv';
+
+export interface ResumeDocument {
+  id: string;
+  user_id: string;
+  title: string;
+  doc_type: ResumeDocType;
+  file_name: string;
+  file_path: string;
+  mime_type: string | null;
+  file_size: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateResumeDocumentInput {
+  title: string;
+  docType: ResumeDocType;
+  file: File;
+}
+
+export interface ExportResumePdfInput {
+  latex: string;
+  title: string;
+  docType: ResumeDocType;
+}
+
+export interface ExportResumePdfResult {
+  document: ResumeDocument;
+  signedUrl: string;
+}
