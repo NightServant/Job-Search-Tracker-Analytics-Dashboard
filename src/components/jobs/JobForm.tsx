@@ -119,35 +119,75 @@ export default function JobForm({
 
     const incoming = result.values
     const changedLabels: string[] = []
+    const overwrittenLabels: string[] = []
+    const conflictingLabels: string[] = []
+    const keys = Object.keys(fieldLabels) as Array<keyof typeof fieldLabels>
 
-    setFormData((prev) => {
-      const next = { ...prev }
-      const keys = Object.keys(fieldLabels) as Array<keyof typeof fieldLabels>
-
-      for (const key of keys) {
-        const incomingValue = incoming[key as keyof typeof incoming]
-        if (incomingValue === undefined || incomingValue === null || incomingValue === '') {
-          continue
-        }
-
-        const currentValue = prev[key as keyof JobFormData]
-        const isCurrentEmpty =
-          currentValue === undefined ||
-          currentValue === null ||
-          (typeof currentValue === 'string' && currentValue.trim() === '')
-
-        if (isCurrentEmpty) {
-          ;(next as Record<string, unknown>)[key] = incomingValue
-          changedLabels.push(fieldLabels[key])
-        }
+    for (const key of keys) {
+      const incomingValue = incoming[key as keyof typeof incoming]
+      if (incomingValue === undefined || incomingValue === null || incomingValue === '') {
+        continue
       }
 
-      return next
-    })
+      const currentValue = formData[key as keyof JobFormData]
+      const isCurrentEmpty =
+        currentValue === undefined ||
+        currentValue === null ||
+        (typeof currentValue === 'string' && currentValue.trim() === '')
 
-    if (changedLabels.length > 0) {
+      if (!isCurrentEmpty && String(currentValue).trim() !== String(incomingValue).trim()) {
+        conflictingLabels.push(fieldLabels[key])
+      }
+    }
+
+    let shouldOverwriteConflicts = false
+    if (conflictingLabels.length > 0) {
+      shouldOverwriteConflicts = window.confirm(
+        `Auto-fill found different values for: ${conflictingLabels.join(', ')}. Overwrite your current entries for those fields?`
+      )
+    }
+
+    const next = { ...formData }
+
+    for (const key of keys) {
+      const incomingValue = incoming[key as keyof typeof incoming]
+      if (incomingValue === undefined || incomingValue === null || incomingValue === '') {
+        continue
+      }
+
+      const currentValue = formData[key as keyof JobFormData]
+      const isCurrentEmpty =
+        currentValue === undefined ||
+        currentValue === null ||
+        (typeof currentValue === 'string' && currentValue.trim() === '')
+
+      if (isCurrentEmpty) {
+        ;(next as Record<string, unknown>)[key] = incomingValue
+        changedLabels.push(fieldLabels[key])
+        continue
+      }
+
+      if (
+        shouldOverwriteConflicts &&
+        String(currentValue).trim() !== String(incomingValue).trim()
+      ) {
+        ;(next as Record<string, unknown>)[key] = incomingValue
+        overwrittenLabels.push(fieldLabels[key])
+      }
+    }
+
+    setFormData(next)
+
+    if (changedLabels.length > 0 || overwrittenLabels.length > 0) {
+      const changedText = changedLabels.length > 0 ? `Filled: ${changedLabels.join(', ')}` : ''
+      const overwrittenText =
+        overwrittenLabels.length > 0
+          ? `Overwrote: ${overwrittenLabels.join(', ')}`
+          : ''
+      const summaryText = [changedText, overwrittenText].filter(Boolean).join('. ')
+
       setAutofillSummary(
-        `Auto-filled ${changedLabels.length} field(s): ${changedLabels.join(', ')}. Review everything before saving.`
+        `${summaryText}. Review everything before saving.`
       )
     } else {
       setAutofillSummary('No empty fields were updated. You can still edit values manually.')
