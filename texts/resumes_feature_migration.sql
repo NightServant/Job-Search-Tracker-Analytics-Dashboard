@@ -15,10 +15,27 @@ CREATE TABLE IF NOT EXISTS public.resumes (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   title TEXT NOT NULL DEFAULT 'Untitled Resume',
+  mode TEXT NOT NULL DEFAULT 'word',
   content JSONB NOT NULL DEFAULT '{"type":"doc","content":[]}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE public.resumes
+  ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'word';
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'resumes_mode_check'
+  ) THEN
+    ALTER TABLE public.resumes
+      ADD CONSTRAINT resumes_mode_check
+      CHECK (mode IN ('word', 'latex'));
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_resumes_user_id ON public.resumes(user_id);
 CREATE INDEX IF NOT EXISTS idx_resumes_updated_at ON public.resumes(updated_at DESC);
