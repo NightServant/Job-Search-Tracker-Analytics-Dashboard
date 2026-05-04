@@ -233,12 +233,8 @@ export default function DashboardChartsBottom({
           <div className="h-[300px] flex flex-col items-center justify-center text-zinc-400 text-center px-6">
             <p>Couldn’t load status history</p>
             <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-500">
-<<<<<<< Updated upstream
-              Status history isn’t available yet. Check the app documentation or contact support
-              to enable this feature.
-=======
-              Status history isn’t available right now. Please try again later.
->>>>>>> Stashed changes
+              Status history isn’t available right now. Please try again later — or consult the app
+              documentation or contact support to enable this feature.
             </p>
           </div>
         ) : isStatusHistoryLoading ? (
