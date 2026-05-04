@@ -24,6 +24,7 @@ A professional portfolio piece demonstrating full-stack web development and data
 - **Dark Mode**: Professional dark theme with toggle
 - **CSV Export**: Export data for Python analysis
 - **Resume Maker**: LaTeX editor + side-by-side live preview for resume drafting
+- **Resume Builder**: Tiptap Word-like editor with autosaved drafts and PDF export
 - **Testing**: Vitest + React Testing Library with CI on pull requests
 - **Python Analysis Script**: Pandas-based data analysis with visualizations
 
@@ -68,14 +69,18 @@ A professional portfolio piece demonstrating full-stack web development and data
    - Create a new project at [supabase.com](https://supabase.com)
    - Navigate to SQL Editor and run the schema from `texts/database_schema.txt`
    - Run `texts/database_schema_v3_migration.txt`
+   - Run `texts/resumes_feature_migration.sql` to enable Resume Builder draft storage
     - Deploy edge function `job-url-autofill` from `supabase/functions/job-url-autofill`
+    - Deploy edge function `resume-export-pdf` from `supabase/functions/resume-export-pdf`
        - This is required for the **“Auto-fill from URL”** button. If you skip this step, the rest of the app still works, but auto-fill will show an error at runtime.
+       - This is also required for the **“Export PDF”** button in Resume Builder.
        - Using the Supabase CLI (recommended):
           ```bash
           # Install the Supabase CLI first (see Supabase docs)
           supabase login
           supabase link --project-ref <your-project-ref>
           supabase functions deploy job-url-autofill
+          supabase functions deploy resume-export-pdf
           ```
    - Copy the project URL and anon key from Settings > API
 

@@ -1,380 +1,547 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import type { JSONContent } from '@tiptap/core'
 import {
-  Eye,
-  FileCode2,
-  RefreshCw,
+  Bold,
+  Download,
+  FileText,
+  Heading1,
+  Heading2,
+  Italic,
+  List,
+  Save,
+  RotateCcw,
 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { supabase } from '@/lib/supabase'
 
-const LATEX_STORAGE_KEY = 'resume-maker-latex-v1'
-
-const DEFAULT_RESUME_TEX = String.raw`\documentclass[11pt]{article}
-\usepackage[margin=0.8in]{geometry}
-\usepackage{enumitem}
-\usepackage[hidelinks]{hyperref}
-\pagenumbering{gobble}
-
-\begin{document}
-
-\begin{center}
-  {\LARGE \textbf{Your Name}} \\
-  City, ST \quad|\quad your.email@example.com \quad|\quad (555) 123-4567 \\
-  \href{https://linkedin.com/in/yourname}{linkedin.com/in/yourname} \quad|\quad \href{https://github.com/yourname}{github.com/yourname}
-\end{center}
-
-\vspace{0.3em}
-\textbf{SUMMARY}
-\hrule
-Results-driven software engineer with experience building production web applications with React, TypeScript, and SQL.
-
-\vspace{0.5em}
-\textbf{EXPERIENCE}
-\hrule
-\textbf{Software Engineer} \hfill 2024 -- Present \\
-Acme Corp, Remote
-\begin{itemize}[leftmargin=1.2em]
-  \item Built analytics dashboards that improved job tracking workflows for end users.
-  \item Reduced page load times through lazy loading and optimized data-fetching patterns.
-\end{itemize}
-
-\vspace{0.5em}
-\textbf{PROJECTS}
-\hrule
-\textbf{Job Search Tracker Dashboard}
-\begin{itemize}[leftmargin=1.2em]
-  \item Created a full-stack app with React, Tailwind, Supabase, and data visualizations.
-  \item Added CSV import/export and robust filtering for high-volume application tracking.
-\end{itemize}
-
-\vspace{0.5em}
-\textbf{SKILLS}
-\hrule
-React, TypeScript, JavaScript, Node.js, SQL, Python, Git, CI/CD
-
-\end{document}
-`
-
-function escapeForScript(str: string): string {
-  return str.replace(/<\//g, '<\\/')
+type ResumeRow = {
+  id: string
+  title: string
+  content: JSONContent
+  updated_at: string
 }
 
-function escapeHtml(input: string): string {
-  return input
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
+const DEFAULT_CONTENT: JSONContent = {
+  type: 'doc',
+  content: [
+    {
+      type: 'heading',
+      attrs: { level: 1 },
+      content: [{ type: 'text', text: 'Resume Title' }],
+    },
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'email@example.com | (000) 000-0000 | portfolio.example',
+        },
+      ],
+    },
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'linkedin.example | github.example',
+        },
+      ],
+    },
+    {
+      type: 'heading',
+      attrs: { level: 2 },
+      content: [{ type: 'text', text: 'Summary' }],
+    },
+    {
+      type: 'paragraph',
+      content: [
+        {
+          type: 'text',
+          text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+        },
+      ],
+    },
+    {
+      type: 'heading',
+      attrs: { level: 2 },
+      content: [{ type: 'text', text: 'Experience' }],
+    },
+    {
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Role Title | Date Range | Organization Name' }],
+    },
+    {
+      type: 'bulletList',
+      content: [
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: 'heading',
+      attrs: { level: 2 },
+      content: [{ type: 'text', text: 'Projects' }],
+    },
+    {
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Project Title | Technology Stack' }],
+    },
+    {
+      type: 'bulletList',
+      content: [
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.',
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                {
+                  type: 'text',
+                  text: 'Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.',
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      type: 'heading',
+      attrs: { level: 2 },
+      content: [{ type: 'text', text: 'Education' }],
+    },
+    {
+      type: 'paragraph',
+      content: [{ type: 'text', text: 'Degree Name | Institution Name | Graduation Year' }],
+    },
+    {
+      type: 'heading',
+      attrs: { level: 2 },
+      content: [{ type: 'text', text: 'Courses and Certifications' }],
+    },
+    {
+      type: 'bulletList',
+      content: [
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Certification Placeholder 1' }],
+            },
+          ],
+        },
+        {
+          type: 'listItem',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'text', text: 'Certification Placeholder 2' }],
+            },
+          ],
+        },
+      ],
+    },
+  ],
 }
 
-function toFriendlyLatexPreviewText(input: string): string {
-  const source = String(input || '')
-  const beginTag = /\\begin\{document\}/i
-  const endTag = /\\end\{document\}/i
-  const beginMatch = beginTag.exec(source)
-  const endMatch = endTag.exec(source)
-
-  const body =
-    beginMatch && endMatch && beginMatch.index < endMatch.index
-      ? source.slice(beginMatch.index + beginMatch[0].length, endMatch.index)
-      : source
-
-  return body
-    .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1')
-    .replace(/\\textbf\{([^}]*)\}/g, '$1')
-    .replace(/\\emph\{([^}]*)\}/g, '$1')
-    .replace(/\\vspace\{[^}]*\}/g, '')
-    .replace(/\\hrule/g, '----------------------------------------')
-    .replace(/\\begin\{itemize\}(?:\[[^\]]*\])?/g, '')
-    .replace(/\\end\{itemize\}/g, '')
-    .replace(/^\s*\\item\s+/gm, '• ')
-    .replace(/\\quad/g, ' ')
-    .replace(/\\hfill/g, ' ')
-    .replace(/\\\\/g, '\n')
-    .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, '')
-    .replace(/[{}]/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+function formatSaveTime(timestamp: string | null): string {
+  if (!timestamp) return 'Not saved yet'
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return 'Not saved yet'
+  return `Saved ${date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
 }
 
-function buildLatexPreviewHtml(latexCode: string, cdnScript?: string | null): string {
-  const safeCode = escapeForScript(latexCode)
-  const safeFallbackText = escapeHtml(toFriendlyLatexPreviewText(latexCode))
-  const initialInner =
-    '<p class="info">Preparing live renderer. If unavailable, a readable text preview is shown below.</p><pre class="fallback">' +
-    safeFallbackText +
-    '</pre>'
-
-  return `<!doctype html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    ${cdnScript ? `<script>${cdnScript}</script>` : '<script src="https://cdn.jsdelivr.net/npm/latex.js/dist/latex.min.js"></script>'}
-    <style>
-      body {
-        margin: 0;
-        padding: 1rem;
-        font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-        background: #fafafa;
-        color: #111827;
-      }
-      #root {
-        background: white;
-        border: 1px solid #e5e7eb;
-        border-radius: 0.75rem;
-        padding: 1rem;
-        min-height: calc(100vh - 2rem);
-        overflow: auto;
-      }
-      pre {
-        white-space: pre-wrap;
-        word-break: break-word;
-        background: #f4f4f5;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-      }
-      .error {
-        color: #b91c1c;
-        background: #fee2e2;
-        border: 1px solid #fecaca;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-      }
-      .info {
-        color: #1d4ed8;
-        background: #dbeafe;
-        border: 1px solid #bfdbfe;
-        border-radius: 0.5rem;
-        padding: 0.75rem;
-      }
-      .fallback {
-        font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
-        font-size: 0.95rem;
-        line-height: 1.45;
-      }
-    </style>
-  </head>
-    <body>
-    <div id="root">${initialInner}</div>
-    <script>
-      (function () {
-        const code = ${JSON.stringify(safeCode)};
-        const root = document.getElementById('root');
-
-        function normalizeForPreview(input) {
-          const text = String(input || '');
-
-          let body = text;
-          const beginTag = /\\begin{document}/i;
-          const endTag = /\\end{document}/i;
-          const beginMatch = beginTag.exec(text);
-          const endMatch = endTag.exec(text);
-
-          if (beginMatch && endMatch && beginMatch.index < endMatch.index) {
-            body = text.slice(beginMatch.index + beginMatch[0].length, endMatch.index);
-          }
-
-          // latex.js has limited support for full preambles/packages in-browser.
-          body = body
-            .replace(/^\\documentclass[^\n]*$/gim, '')
-            .replace(/^\\usepackage[^\n]*$/gim, '')
-            .replace(/^\\pagenumbering[^\n]*$/gim, '')
-            .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1')
-            .replace(/\\begin\{itemize\}\[[^\]]*\]/g, '\\begin{itemize}')
-            .replace(/\\vspace\{[^}]*\}/g, '')
-            .replace(/\\hrule/g, '')
-            .replace(/\\hfill/g, ' ')
-            .replace(/\\quad/g, ' ');
-
-          return '\\begin{document}\n' + body.trim() + '\n\\end{document}';
-        }
-
-        function toFriendlyText(input) {
-          const text = String(input || '');
-          const beginTag = /\\begin\{document\}/i;
-          const endTag = /\\end\{document\}/i;
-          const beginMatch = beginTag.exec(text);
-          const endMatch = endTag.exec(text);
-
-          const body =
-            beginMatch && endMatch && beginMatch.index < endMatch.index
-              ? text.slice(beginMatch.index + beginMatch[0].length, endMatch.index)
-              : text;
-
-          return body
-            .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1')
-            .replace(/\\textbf\{([^}]*)\}/g, '$1')
-            .replace(/\\emph\{([^}]*)\}/g, '$1')
-            .replace(/\\vspace\{[^}]*\}/g, '')
-            .replace(/\\hrule/g, '----------------------------------------')
-            .replace(/\\begin\{itemize\}(?:\[[^\]]*\])?/g, '')
-            .replace(/\\end\{itemize\}/g, '')
-            .replace(/^\s*\\item\s+/gm, '• ')
-            .replace(/\\quad/g, ' ')
-            .replace(/\\hfill/g, ' ')
-            .replace(/\\\\/g, '\n')
-            .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, '')
-            .replace(/[{}]/g, '')
-            .replace(/\n{3,}/g, '\n\n')
-            .trim();
-        }
-
-        function showFallback(message) {
-          const safeMessage = String(message)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-
-          const friendlyText = toFriendlyText(code)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;');
-
-          root.innerHTML = '<p class="error">' + safeMessage + '</p><h3>Readable preview</h3><pre class="fallback">' +
-            friendlyText +
-            '</pre>';
-        }
-
-        try {
-          var latexLib = window.latexjs || window['latexjs'] || window['LatexJS'] || window['latex'];
-          if (!latexLib || !latexLib.HtmlGenerator || !latexLib.parse) {
-            showFallback('Live renderer unavailable in this browser. Showing source.');
-            return;
-          }
-
-          const previewCode = normalizeForPreview(code);
-          const generator = new latexLib.HtmlGenerator({ hyphenate: false });
-          const parsed = latexLib.parse(previewCode, { generator: generator });
-          const fragment = parsed && parsed.domFragment ? parsed.domFragment : null;
-          if (!fragment) {
-            showFallback('Could not parse this LaTeX. Showing source.');
-            return;
-          }
-
-          root.innerHTML = '';
-          root.appendChild(fragment);
-        } catch (err) {
-          const message = err && err.message ? err.message : 'Unknown parser error';
-          showFallback('LaTeX parse error: ' + message);
-        }
-      })();
-    </script>
-  </body>
-</html>`
+function ToolbarButton({
+  onClick,
+  active,
+  disabled,
+  title,
+  children,
+}: {
+  onClick: () => void
+  active?: boolean
+  disabled?: boolean
+  title: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      className={`rounded-md px-3 py-2 border text-sm transition-colors ${
+        active
+          ? 'bg-primary-600 text-white border-primary-600'
+          : 'bg-white dark:bg-zinc-900 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
+      }`}
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+    >
+      <span className="inline-flex items-center gap-1.5">{children}</span>
+    </button>
+  )
 }
 
 export default function ResumePage() {
+  const { user } = useAuth()
   const { success, error: showError, info } = useToast()
-  const [latexCode, setLatexCode] = useState<string>(() => {
-    try {
-      return localStorage.getItem(LATEX_STORAGE_KEY) || DEFAULT_RESUME_TEX
-    } catch {
-      return DEFAULT_RESUME_TEX
-    }
+  const [resumeId, setResumeId] = useState<string | null>(null)
+  const [title, setTitle] = useState('Untitled Resume')
+  const [isLoadingDraft, setIsLoadingDraft] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null)
+  const [initialized, setInitialized] = useState(false)
+  const autosaveTimerRef = useRef<number | null>(null)
+
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: DEFAULT_CONTENT,
+    editorProps: {
+      attributes: {
+        class:
+          'focus:outline-none min-h-[10in] text-[15px] leading-7 text-zinc-900',
+      },
+    },
   })
 
-  const [cdnScript, setCdnScript] = useState<string | null>(null)
+  useEffect(() => {
+    if (!editor || !user) return
+    let cancelled = false
+
+    const loadDraft = async () => {
+      setIsLoadingDraft(true)
+      try {
+        const { data, error } = await supabase
+          .from('resumes')
+          .select('id, title, content, updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+          .maybeSingle<ResumeRow>()
+
+        if (error) throw error
+        if (cancelled) return
+
+        if (data?.content) {
+          setResumeId(data.id)
+          setTitle(data.title || 'Untitled Resume')
+          editor.commands.setContent(data.content)
+          setLastSavedAt(data.updated_at || null)
+          info('Draft loaded', 'Loaded your latest resume draft from Supabase.')
+        } else {
+          setResumeId(null)
+          setTitle('Untitled Resume')
+          editor.commands.setContent(DEFAULT_CONTENT)
+          setLastSavedAt(null)
+        }
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Could not load draft'
+        showError('Failed to load resume draft', message)
+      } finally {
+        if (!cancelled) {
+          setInitialized(true)
+          setIsLoadingDraft(false)
+          setIsDirty(false)
+        }
+      }
+    }
+
+    void loadDraft()
+
+    return () => {
+      cancelled = true
+    }
+  }, [editor, info, showError, user])
 
   useEffect(() => {
-    let mounted = true
-    ;(async () => {
-      try {
-        const resp = await fetch('https://cdn.jsdelivr.net/npm/latex.js/dist/latex.min.js')
-        if (resp.ok) {
-          const text = await resp.text()
-          if (mounted) setCdnScript(text)
-        }
-      } catch {
-        if (mounted) setCdnScript(null)
-      }
-    })()
-    return () => {
-      mounted = false
+    if (!editor) return
+
+    const onEditorUpdate = () => {
+      if (initialized) setIsDirty(true)
     }
-  }, [])
 
-  const previewHtml = useMemo(() => buildLatexPreviewHtml(latexCode, cdnScript), [latexCode, cdnScript])
+    editor.on('update', onEditorUpdate)
+    return () => {
+      editor.off('update', onEditorUpdate)
+    }
+  }, [editor, initialized])
 
-  const persistLatex = (nextValue: string) => {
-    setLatexCode(nextValue)
+  const saveDraft = async (notify = false) => {
+    if (!editor || !user) return
+
+    setIsSaving(true)
     try {
-      localStorage.setItem(LATEX_STORAGE_KEY, nextValue)
-    } catch {
-      // localStorage can fail in privacy mode
+      const payloadId = resumeId ?? crypto.randomUUID()
+      const payloadTitle = title.trim() || 'Untitled Resume'
+
+      const { data, error } = await supabase
+        .from('resumes')
+        .upsert(
+          {
+            id: payloadId,
+            user_id: user.id,
+            title: payloadTitle,
+            content: editor.getJSON(),
+          },
+          { onConflict: 'id' }
+        )
+        .select('id, updated_at')
+        .single<{ id: string; updated_at: string }>()
+
+      if (error) throw error
+
+      setResumeId(data.id)
+      setLastSavedAt(data.updated_at)
+      setIsDirty(false)
+
+      if (notify) {
+        success('Draft saved', 'Your resume draft is saved to Supabase.')
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Unable to save draft'
+      showError('Save failed', message)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!initialized || !isDirty || !user) return
+
+    if (autosaveTimerRef.current) {
+      window.clearTimeout(autosaveTimerRef.current)
+    }
+
+    autosaveTimerRef.current = window.setTimeout(() => {
+      void saveDraft(false)
+    }, 1200)
+
+    return () => {
+      if (autosaveTimerRef.current) {
+        window.clearTimeout(autosaveTimerRef.current)
+      }
+    }
+  }, [initialized, isDirty, title, user])
+
+  const exportPdf = async () => {
+    if (!editor || !user) {
+      showError('Not signed in', 'Sign in first to export your resume PDF.')
+      return
+    }
+
+    setIsExporting(true)
+    try {
+      await saveDraft(false)
+
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) {
+        throw new Error('No active session found')
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+
+      const response = await fetch(`${supabaseUrl}/functions/v1/resume-export-pdf`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: supabaseAnonKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: title.trim() || 'Untitled Resume',
+          content: editor.getJSON(),
+        }),
+      })
+
+      if (!response.ok) {
+        const detail = await response.text()
+        throw new Error(detail || `Export failed (${response.status})`)
+      }
+
+      const blob = await response.blob()
+      const safeName = (title.trim() || 'resume')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeName || 'resume'}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+
+      success('PDF ready', 'Your resume PDF has been downloaded.')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Could not export PDF'
+      showError('Export failed', message)
+    } finally {
+      setIsExporting(false)
     }
   }
 
   const resetTemplate = () => {
-    persistLatex(DEFAULT_RESUME_TEX)
-    info('Template reset', 'Loaded the starter LaTeX resume template.')
+    if (!editor) return
+    editor.commands.setContent(DEFAULT_CONTENT)
+    setIsDirty(true)
+    info('Template reset', 'The editor has been reset to the starter resume template.')
   }
 
   return (
     <div className="space-y-6">
       <section className="card p-5 md:p-6">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Resume Maker</h1>
-            <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-              Write LaTeX on the left and preview on the right. Keep refining until it looks exactly how
-              you want.
-            </p>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+              <h1 className="text-2xl font-bold text-zinc-900 dark:text-white">Resume Builder</h1>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                Edit like a document, autosave drafts to Supabase, and export a print-ready PDF.
+              </p>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button className="btn-secondary" onClick={resetTemplate} disabled={!editor || isLoadingDraft}>
+                <RotateCcw className="w-4 h-4" />
+                Reset Template
+              </button>
+              <button className="btn-secondary" onClick={() => void saveDraft(true)} disabled={!editor || isSaving || isLoadingDraft}>
+                <Save className="w-4 h-4" />
+                {isSaving ? 'Saving...' : 'Save Draft'}
+              </button>
+              <button className="btn-primary" onClick={exportPdf} disabled={!editor || isExporting || isLoadingDraft}>
+                <Download className="w-4 h-4" />
+                {isExporting ? 'Exporting...' : 'Export PDF'}
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button className="btn-secondary" onClick={resetTemplate}>
-              <RefreshCw className="w-4 h-4" />
-              Reset Template
-            </button>
-            <button
-              className="btn-primary"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(latexCode)
-                  success('Copied', 'LaTeX code copied to clipboard.')
-                } catch {
-                  showError('Copy failed', 'Clipboard is unavailable in this browser context.')
-                }
-              }}
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-center">
+            <label className="block">
+              <span className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Resume title</span>
+              <input
+                value={title}
+                onChange={(e) => {
+                  setTitle(e.target.value)
+                  if (initialized) setIsDirty(true)
+                }}
+                placeholder="Untitled Resume"
+                className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+            </label>
+            <div className="text-sm text-zinc-500 dark:text-zinc-400 md:text-right">
+              {isLoadingDraft ? 'Loading draft...' : formatSaveTime(lastSavedAt)}
+              {isDirty ? <span className="ml-2 text-amber-500">Unsaved changes</span> : null}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 rounded-lg border border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/50 p-2">
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleBold().run()}
+              active={!!editor?.isActive('bold')}
+              disabled={!editor}
+              title="Bold"
             >
-              <FileCode2 className="w-4 h-4" />
-              Copy LaTeX
-            </button>
+              <Bold className="w-4 h-4" />
+              Bold
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleItalic().run()}
+              active={!!editor?.isActive('italic')}
+              disabled={!editor}
+              title="Italic"
+            >
+              <Italic className="w-4 h-4" />
+              Italic
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleBulletList().run()}
+              active={!!editor?.isActive('bulletList')}
+              disabled={!editor}
+              title="Bullet list"
+            >
+              <List className="w-4 h-4" />
+              Bullets
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+              active={!!editor?.isActive('heading', { level: 1 })}
+              disabled={!editor}
+              title="Heading 1"
+            >
+              <Heading1 className="w-4 h-4" />
+              H1
+            </ToolbarButton>
+            <ToolbarButton
+              onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+              active={!!editor?.isActive('heading', { level: 2 })}
+              disabled={!editor}
+              title="Heading 2"
+            >
+              <Heading2 className="w-4 h-4" />
+              H2
+            </ToolbarButton>
           </div>
-        </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">LaTeX Source</p>
-              <span className="text-xs text-zinc-500">{latexCode.length} chars</span>
+          <div className="overflow-x-auto rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-950/40 p-4">
+            <div className="mx-auto w-full max-w-[8.5in] min-h-[11in] bg-white shadow-[0_20px_45px_rgba(0,0,0,0.18)]">
+              <EditorContent
+                editor={editor}
+                className="min-h-[11in] p-[0.8in] [&_.ProseMirror]:min-h-[9.4in] [&_.ProseMirror]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
+              />
             </div>
-            <textarea
-              value={latexCode}
-              onChange={(e) => persistLatex(e.target.value)}
-              className="h-[540px] w-full resize-y rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-primary-500"
-              spellCheck={false}
-              aria-label="LaTeX source"
-            />
           </div>
 
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Preview</p>
-              <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
-                <Eye className="w-3.5 h-3.5" />
-                Live
-              </span>
-            </div>
-            <iframe
-              title="LaTeX preview"
-              srcDoc={previewHtml}
-              className="h-[540px] w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white"
-              sandbox="allow-scripts allow-same-origin"
-            />
-            {cdnScript === null ? (
-              <p className="mt-2 text-xs text-zinc-500">Preview unavailable — the live renderer couldn't run. Open devtools to check console/network or host the renderer locally.</p>
-            ) : null}
-          </div>
+          <p className="inline-flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <FileText className="w-3.5 h-3.5" />
+            Letter layout preview: 8.5in x 11in with 0.8in margins for WYSIWYG-style PDF output.
+          </p>
         </div>
       </section>
     </div>
