@@ -173,3 +173,12 @@ export function useDeleteJob() {
     },
   })
 }
+
+/**
+ * Hook to auto-fill job fields from a posting URL.
+ */
+export function useAutofillJobFromUrl() {
+  return useMutation({
+    mutationFn: (url: string) => jobService.autofillFromUrl(url),
+  })
+}

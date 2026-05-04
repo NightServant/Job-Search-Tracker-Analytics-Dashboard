@@ -1,5 +1,11 @@
 import { supabase } from '@/lib/supabase'
-import { Job, JobFormData, JobStatus, JobStatusHistoryEntry } from '@/types'
+import {
+  Job,
+  JobAutofillResult,
+  JobFormData,
+  JobStatus,
+  JobStatusHistoryEntry,
+} from '@/types'
 
 export const jobService = {
   /**
@@ -133,5 +139,21 @@ export const jobService = {
 
     if (error) throw error
     return data || []
+  },
+
+  /**
+   * Attempt to auto-fill job form fields from a public posting URL.
+   */
+  async autofillFromUrl(url: string): Promise<JobAutofillResult> {
+    const { data, error } = await supabase.functions.invoke('job-url-autofill', {
+      body: { url },
+    })
+
+    if (error) throw error
+    if (!data || typeof data !== 'object' || !('values' in data)) {
+      throw new Error('Auto-fill returned an invalid response')
+    }
+
+    return data as JobAutofillResult
   },
 }
