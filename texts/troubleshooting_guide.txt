@@ -131,6 +131,36 @@ SOLUTIONS:
 
   5. Verify the user is authenticated before making queries
 
+  --------------------------------------------------------------------------------
+  2.4 "Auto-fill from URL" Not Working
+  --------------------------------------------------------------------------------
+
+  SYMPTOM:
+    Clicking the "Auto-fill from URL" button fails or shows an error.
+
+  LIKELY CAUSE:
+    The Supabase Edge Function `job-url-autofill` is not deployed.
+
+  SOLUTIONS:
+    1. Deploy the Edge Function using the Supabase CLI:
+      ```
+      supabase login
+      supabase link --project-ref <your-project-ref>
+      supabase functions deploy job-url-autofill
+      ```
+
+    2. Verify the function exists in Supabase Dashboard:
+      - Edge Functions -> `job-url-autofill`
+
+    3. Check browser Network tab for the function call:
+      - POST /functions/v1/job-url-autofill
+
+    4. If you don't want this feature, you can ignore this error (optional feature)
+
+  NOTE:
+    Supabase Edge Functions verify JWT by default. This feature is intended to
+    be used while signed in.
+
 ================================================================================
 3. UI / COMPONENT ISSUES
 ================================================================================
@@ -195,6 +225,28 @@ SOLUTIONS:
   4. Check network tab for successful PUT/PATCH requests
 
   5. Verify onSuccess callback invalidates the correct query keys
+
+  --------------------------------------------------------------------------------
+  3.4 Pipeline Flow (Sankey) Shows Error / No Data
+  --------------------------------------------------------------------------------
+
+  SYMPTOM:
+    The dashboard Pipeline Flow (Sankey) chart fails to load or shows an error.
+
+  LIKELY CAUSE:
+    The V3 migration has not been applied, so the `job_status_history` table
+    and trigger do not exist.
+
+  SOLUTIONS:
+    1. Apply the V3 migration in Supabase:
+      - Open texts/database_schema_v3_migration.txt
+      - Run it in Supabase SQL Editor
+
+    2. If the chart loads but shows no data:
+      - Change a job's status once (the trigger logs transitions only on changes)
+
+    3. Verify the table exists:
+      - Database -> Tables -> `job_status_history`
 
 ================================================================================
 4. ROUTING ISSUES

@@ -22,6 +22,8 @@ Before deploying, ensure the following are completed:
 
 3. ✓ Supabase project is set up with:
    - Database schema applied
+  - V3 migration applied (job_status_history + trigger) for pipeline analytics
+  - (Optional) Edge Function deployed: job-url-autofill (for Auto-fill from URL)
    - Row Level Security enabled
    - Authentication configured
 
@@ -452,9 +454,11 @@ After deploying to any platform, verify the following:
 □ Authentication (sign up/sign in) works correctly
 □ Jobs can be created, edited, and deleted
 □ Dashboard displays charts and statistics
+□ Pipeline Flow chart renders (requires V3 migration)
 □ Kanban board renders and status changes work
 □ Dark mode toggle functions properly
 □ CSV export downloads correctly
+□ Auto-fill from URL works (optional; requires Edge Function deployment)
 □ All navigation links work
 □ Mobile responsive design functions
 □ HTTPS/SSL is enabled

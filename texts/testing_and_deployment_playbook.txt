@@ -71,6 +71,13 @@ From project root:
    - Run it in Supabase SQL Editor
    - Also run texts/database_schema_v3_migration.txt
 
+3b. (Optional) Deploy the URL auto-fill Edge Function
+   - Needed only for the "Auto-fill from URL" feature
+   - Requires the Supabase CLI:
+     supabase login
+     supabase link --project-ref <your-project-ref>
+   supabase functions deploy job-url-autofill
+
 4. Auth setup checks in Supabase
    - Authentication -> Providers -> Email enabled
    - For easier dev testing: disable "Confirm email" (optional)
@@ -208,6 +215,7 @@ After every production deploy:
 6. Verify hard refresh on /jobs and /dashboard works.
 7. Verify Resume Maker -> Export PDF creates downloadable PDF in library.
 8. Check browser console for runtime errors.
+9. (Optional) Verify Auto-fill from URL works.
 
 
 ================================================================================
@@ -244,6 +252,10 @@ Problem: 404 on refresh in production
 Problem: Works locally but not in production
 - Compare env vars in local vs hosting dashboard
 - Confirm variables are set on the correct environment (preview/prod)
+
+Problem: "Auto-fill from URL" fails
+- Ensure the Edge Function `job-url-autofill` is deployed
+- Ensure you are signed in (Edge Functions verify JWT by default)
 
 
 ================================================================================
