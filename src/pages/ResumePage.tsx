@@ -65,11 +65,42 @@ function escapeHtml(input: string): string {
     .replace(/>/g, '&gt;')
 }
 
+function toFriendlyLatexPreviewText(input: string): string {
+  const source = String(input || '')
+  const beginTag = /\\begin\{document\}/i
+  const endTag = /\\end\{document\}/i
+  const beginMatch = beginTag.exec(source)
+  const endMatch = endTag.exec(source)
+
+  const body =
+    beginMatch && endMatch && beginMatch.index < endMatch.index
+      ? source.slice(beginMatch.index + beginMatch[0].length, endMatch.index)
+      : source
+
+  return body
+    .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1')
+    .replace(/\\textbf\{([^}]*)\}/g, '$1')
+    .replace(/\\emph\{([^}]*)\}/g, '$1')
+    .replace(/\\vspace\{[^}]*\}/g, '')
+    .replace(/\\hrule/g, '----------------------------------------')
+    .replace(/\\begin\{itemize\}(?:\[[^\]]*\])?/g, '')
+    .replace(/\\end\{itemize\}/g, '')
+    .replace(/^\s*\\item\s+/gm, '• ')
+    .replace(/\\quad/g, ' ')
+    .replace(/\\hfill/g, ' ')
+    .replace(/\\\\/g, '\n')
+    .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, '')
+    .replace(/[{}]/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+}
+
 function buildLatexPreviewHtml(latexCode: string, cdnScript?: string | null): string {
   const safeCode = escapeForScript(latexCode)
+  const safeFallbackText = escapeHtml(toFriendlyLatexPreviewText(latexCode))
   const initialInner =
-    '<p class="error">Live preview may take a moment. Showing LaTeX source until rendering is ready.</p><pre>' +
-    escapeHtml(latexCode) +
+    '<p class="info">Preparing live renderer. If unavailable, a readable text preview is shown below.</p><pre class="fallback">' +
+    safeFallbackText +
     '</pre>'
 
   return `<!doctype html>
@@ -108,6 +139,18 @@ function buildLatexPreviewHtml(latexCode: string, cdnScript?: string | null): st
         border-radius: 0.5rem;
         padding: 0.75rem;
       }
+      .info {
+        color: #1d4ed8;
+        background: #dbeafe;
+        border: 1px solid #bfdbfe;
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+      }
+      .fallback {
+        font-family: ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
+        font-size: 0.95rem;
+        line-height: 1.45;
+      }
     </style>
   </head>
     <body>
@@ -135,9 +178,44 @@ function buildLatexPreviewHtml(latexCode: string, cdnScript?: string | null): st
             .replace(/^\\documentclass[^\n]*$/gim, '')
             .replace(/^\\usepackage[^\n]*$/gim, '')
             .replace(/^\\pagenumbering[^\n]*$/gim, '')
-            .replace(/\\href{[^}]*}{([^}]*)}/g, '$1');
+            .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1')
+            .replace(/\\begin\{itemize\}\[[^\]]*\]/g, '\\begin{itemize}')
+            .replace(/\\vspace\{[^}]*\}/g, '')
+            .replace(/\\hrule/g, '')
+            .replace(/\\hfill/g, ' ')
+            .replace(/\\quad/g, ' ');
 
           return '\\begin{document}\n' + body.trim() + '\n\\end{document}';
+        }
+
+        function toFriendlyText(input) {
+          const text = String(input || '');
+          const beginTag = /\\begin\{document\}/i;
+          const endTag = /\\end\{document\}/i;
+          const beginMatch = beginTag.exec(text);
+          const endMatch = endTag.exec(text);
+
+          const body =
+            beginMatch && endMatch && beginMatch.index < endMatch.index
+              ? text.slice(beginMatch.index + beginMatch[0].length, endMatch.index)
+              : text;
+
+          return body
+            .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1')
+            .replace(/\\textbf\{([^}]*)\}/g, '$1')
+            .replace(/\\emph\{([^}]*)\}/g, '$1')
+            .replace(/\\vspace\{[^}]*\}/g, '')
+            .replace(/\\hrule/g, '----------------------------------------')
+            .replace(/\\begin\{itemize\}(?:\[[^\]]*\])?/g, '')
+            .replace(/\\end\{itemize\}/g, '')
+            .replace(/^\s*\\item\s+/gm, '• ')
+            .replace(/\\quad/g, ' ')
+            .replace(/\\hfill/g, ' ')
+            .replace(/\\\\/g, '\n')
+            .replace(/\\[a-zA-Z]+\*?(?:\[[^\]]*\])?/g, '')
+            .replace(/[{}]/g, '')
+            .replace(/\n{3,}/g, '\n\n')
+            .trim();
         }
 
         function showFallback(message) {
@@ -146,8 +224,13 @@ function buildLatexPreviewHtml(latexCode: string, cdnScript?: string | null): st
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
 
-          root.innerHTML = '<p class="error">' + safeMessage + '</p><h3>LaTeX source</h3><pre>' +
-            code.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') +
+          const friendlyText = toFriendlyText(code)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;');
+
+          root.innerHTML = '<p class="error">' + safeMessage + '</p><h3>Readable preview</h3><pre class="fallback">' +
+            friendlyText +
             '</pre>';
         }
 

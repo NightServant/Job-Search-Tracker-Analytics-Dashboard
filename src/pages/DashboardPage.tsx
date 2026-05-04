@@ -111,7 +111,7 @@ const STATUS_ORDER: Record<JobStatus, number> = {
   applied: 1,
   interviewing: 2,
   offer: 3,
-  rejected: 3,
+  rejected: 4,
 }
 
 interface StatsCardProps {
