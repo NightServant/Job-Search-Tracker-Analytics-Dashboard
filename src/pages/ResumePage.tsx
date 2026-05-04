@@ -110,8 +110,8 @@ function buildLatexPreviewHtml(latexCode: string): string {
           const text = String(input || '');
 
           let body = text;
-          const beginTag = /\\begin\{document\}/i;
-          const endTag = /\\end\{document\}/i;
+          const beginTag = /\\begin{document}/i;
+          const endTag = /\\end{document}/i;
           const beginMatch = beginTag.exec(text);
           const endMatch = endTag.exec(text);
 
@@ -124,7 +124,7 @@ function buildLatexPreviewHtml(latexCode: string): string {
             .replace(/^\\documentclass[^\n]*$/gim, '')
             .replace(/^\\usepackage[^\n]*$/gim, '')
             .replace(/^\\pagenumbering[^\n]*$/gim, '')
-            .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1');
+            .replace(/\\href{[^}]*}{([^}]*)}/g, '$1');
 
           return '\\begin{document}\n' + body.trim() + '\n\\end{document}';
         }

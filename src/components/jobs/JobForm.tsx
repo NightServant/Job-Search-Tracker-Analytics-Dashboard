@@ -409,7 +409,7 @@ export default function JobForm({
                     salary_min: e.target.value ? Number(e.target.value) : undefined,
                   })
                 }
-                onBlur={() => markTouched('salary_max')}
+                onBlur={() => markTouched('salary_min')}
                 className="input"
                 placeholder="100000"
               />

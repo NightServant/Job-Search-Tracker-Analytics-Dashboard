@@ -51,7 +51,7 @@ function extractMetaTag(html: string, key: string): string {
 
 function titleToRole(title: string): string {
   if (!title) return ''
-  const withoutSuffix = title.split(/\s[\-|\|]\s/)[0] || title
+  const withoutSuffix = title.split(/\s[-|]\s/)[0] || title
   return cleanText(withoutSuffix)
 }
 
@@ -193,7 +193,7 @@ function applyLinkedInHeuristics(url: URL, html: string, values: AutofillValues,
   }
 
   if (!values.company && ogDescription) {
-    const match = ogDescription.match(/\bat\s+([^\.\,\-\|]+)/i)
+    const match = ogDescription.match(/\bat\s+([^.,|-]+)/i)
     const company = cleanText(match?.[1] || '')
     if (company) {
       values.company = company

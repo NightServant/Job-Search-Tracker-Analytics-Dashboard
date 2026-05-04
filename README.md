@@ -72,7 +72,15 @@ A professional portfolio piece demonstrating full-stack web development and data
    - Create a new project at [supabase.com](https://supabase.com)
    - Navigate to SQL Editor and run the schema from `texts/database_schema.txt`
    - Run `texts/database_schema_v3_migration.txt`
-   - Deploy edge function `job-url-autofill` from `supabase/functions/job-url-autofill`
+    - Deploy edge function `job-url-autofill` from `supabase/functions/job-url-autofill`
+       - This is required for the **“Auto-fill from URL”** button. If you skip this step, the rest of the app still works, but auto-fill will show an error at runtime.
+       - Using the Supabase CLI (recommended):
+          ```bash
+          # Install the Supabase CLI first (see Supabase docs)
+          supabase login
+          supabase link --project-ref <your-project-ref>
+          supabase functions deploy job-url-autofill
+          ```
    - Copy the project URL and anon key from Settings > API
 
 4. **Configure environment variables**
