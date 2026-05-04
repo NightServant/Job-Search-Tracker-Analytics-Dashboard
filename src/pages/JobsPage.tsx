@@ -162,7 +162,11 @@ export default function JobsPage() {
       success('Job added')
       setIsFormOpen(false)
     } catch (err) {
-      showError('Could not add job', err instanceof Error ? err.message : 'Unknown error')
+      const raw = err instanceof Error ? err.message : String(err)
+      const friendly = raw.toLowerCase().includes('permission denied')
+        ? 'Permission denied when saving the job. Check your database permissions or RLS policies.'
+        : raw
+      showError('Could not add job', friendly)
     }
   }
 
@@ -173,7 +177,11 @@ export default function JobsPage() {
       success('Job updated')
       setEditingJob(null)
     } catch (err) {
-      showError('Could not update job', err instanceof Error ? err.message : 'Unknown error')
+      const raw = err instanceof Error ? err.message : String(err)
+      const friendly = raw.toLowerCase().includes('permission denied')
+        ? 'Permission denied when updating the job. Check your database permissions or RLS policies.'
+        : raw
+      showError('Could not update job', friendly)
     }
   }
 
@@ -183,7 +191,11 @@ export default function JobsPage() {
         await deleteJob.mutateAsync(id)
         success('Job deleted')
       } catch (err) {
-        showError('Could not delete job', err instanceof Error ? err.message : 'Unknown error')
+        const raw = err instanceof Error ? err.message : String(err)
+        const friendly = raw.toLowerCase().includes('permission denied')
+          ? 'Permission denied when deleting the job. Check your database permissions or RLS policies.'
+          : raw
+        showError('Could not delete job', friendly)
       }
     }
   }
@@ -193,7 +205,11 @@ export default function JobsPage() {
       await updateStatus.mutateAsync({ id, status })
       success('Status updated')
     } catch (err) {
-      showError('Could not update status', err instanceof Error ? err.message : 'Unknown error')
+      const raw = err instanceof Error ? err.message : String(err)
+      const friendly = raw.toLowerCase().includes('permission denied')
+        ? 'Permission denied when updating status. Check your database permissions or RLS policies.'
+        : raw
+      showError('Could not update status', friendly)
     }
   }
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Mail, Lock, Briefcase, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { hasValidSupabaseConfig } from '@/lib/supabase'
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true)
@@ -16,8 +17,7 @@ export default function LoginPage() {
   const { theme } = useTheme()
   const navigate = useNavigate()
 
-  const hasSupabaseConfig =
-    !!import.meta.env.VITE_SUPABASE_URL && !!import.meta.env.VITE_SUPABASE_ANON_KEY
+  const hasSupabaseConfig = hasValidSupabaseConfig
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -49,8 +49,15 @@ export default function LoginPage() {
       }
       navigate('/dashboard')
     } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'An error occurred'
-      setError(message)
+      const raw = err instanceof Error ? err.message : 'An error occurred'
+      const lowered = raw.toLowerCase()
+      if (lowered.includes('failed to fetch')) {
+        setError('Could not reach the authentication server. Check your internet connection and Supabase URL in .env.local.')
+      } else if (lowered.includes('supabase is not configured') || lowered.includes('set vite_supabase_url')) {
+        setError('Authentication is not configured for localhost yet. Add real Supabase values to .env.local and restart the dev server.')
+      } else {
+        setError(raw)
+      }
     } finally {
       setLoading(false)
     }

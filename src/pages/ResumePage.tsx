@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   Eye,
   FileCode2,
@@ -58,15 +58,26 @@ function escapeForScript(str: string): string {
   return str.replace(/<\//g, '<\\/')
 }
 
-function buildLatexPreviewHtml(latexCode: string): string {
+function escapeHtml(input: string): string {
+  return input
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
+function buildLatexPreviewHtml(latexCode: string, cdnScript?: string | null): string {
   const safeCode = escapeForScript(latexCode)
+  const initialInner =
+    '<p class="error">Live preview may take a moment. Showing LaTeX source until rendering is ready.</p><pre>' +
+    escapeHtml(latexCode) +
+    '</pre>'
 
   return `<!doctype html>
 <html>
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://cdn.jsdelivr.net/npm/latex.js/dist/latex.min.js"></script>
+    ${cdnScript ? `<script>${cdnScript}</script>` : '<script src="https://cdn.jsdelivr.net/npm/latex.js/dist/latex.min.js"></script>'}
     <style>
       body {
         margin: 0;
@@ -99,8 +110,8 @@ function buildLatexPreviewHtml(latexCode: string): string {
       }
     </style>
   </head>
-  <body>
-    <div id="root"></div>
+    <body>
+    <div id="root">${initialInner}</div>
     <script>
       (function () {
         const code = ${JSON.stringify(safeCode)};
@@ -178,7 +189,27 @@ export default function ResumePage() {
     }
   })
 
-  const previewHtml = useMemo(() => buildLatexPreviewHtml(latexCode), [latexCode])
+  const [cdnScript, setCdnScript] = useState<string | null>(null)
+
+  useEffect(() => {
+    let mounted = true
+    ;(async () => {
+      try {
+        const resp = await fetch('https://cdn.jsdelivr.net/npm/latex.js/dist/latex.min.js')
+        if (resp.ok) {
+          const text = await resp.text()
+          if (mounted) setCdnScript(text)
+        }
+      } catch {
+        if (mounted) setCdnScript(null)
+      }
+    })()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const previewHtml = useMemo(() => buildLatexPreviewHtml(latexCode, cdnScript), [latexCode, cdnScript])
 
   const persistLatex = (nextValue: string) => {
     setLatexCode(nextValue)
@@ -257,6 +288,9 @@ export default function ResumePage() {
               className="h-[540px] w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white"
               sandbox="allow-scripts allow-same-origin"
             />
+            {cdnScript === null ? (
+              <p className="mt-2 text-xs text-zinc-500">Preview unavailable — the live renderer couldn't run. Open devtools to check console/network or host the renderer locally.</p>
+            ) : null}
           </div>
         </div>
       </section>
