@@ -19,24 +19,35 @@ and associated metadata.
 
 DATABASE TABLE: jobs
 
-| Field Name    | Data Type      | Constraints              | Description                                    |
-|---------------|----------------|--------------------------|------------------------------------------------|
-| id            | UUID           | PRIMARY KEY              | Unique identifier for the job entry            |
-| user_id       | UUID           | FOREIGN KEY, NOT NULL    | References auth.users(id), owner of the job    |
-| company       | VARCHAR(255)   | NOT NULL                 | Name of the company offering the position      |
-| role          | VARCHAR(255)   | NOT NULL                 | Job title or position name                     |
-| salary_min    | INTEGER        | CHECK (>= 0)             | Minimum annual salary offered (in USD)         |
-| salary_max    | INTEGER        | CHECK (>= 0)             | Maximum annual salary offered (in USD)         |
-| url           | TEXT           | NULL                     | URL to the job posting or application page     |
-| status        | VARCHAR(50)    | CHECK (IN enum), DEFAULT | Current stage of the application process       |
-| date_applied  | DATE           | NULL                     | Date when the application was submitted        |
-| notes         | TEXT           | NULL                     | User's personal notes about the job            |
-| created_at    | TIMESTAMPTZ    | DEFAULT NOW()            | Timestamp when the record was created          |
-| updated_at    | TIMESTAMPTZ    | DEFAULT NOW()            | Timestamp when the record was last updated     |
+| Field Name        | Data Type      | Constraints              | Description                                    |
+|-------------------|----------------|--------------------------|------------------------------------------------|
+| id                | UUID           | PRIMARY KEY              | Unique identifier for the job entry            |
+| user_id           | UUID           | FOREIGN KEY, NOT NULL    | References auth.users(id), owner of the job    |
+| company           | VARCHAR(255)   | NOT NULL                 | Name of the company offering the position      |
+| role              | VARCHAR(255)   | NOT NULL                 | Job title or position name                     |
+| salary_min        | INTEGER        | CHECK (>= 0)             | Minimum annual salary offered (in USD)         |
+| salary_max        | INTEGER        | CHECK (>= 0)             | Maximum annual salary offered (in USD)         |
+| url               | TEXT           | NULL                     | URL to the job posting or application page     |
+| status            | VARCHAR(50)    | CHECK (IN enum), DEFAULT | Current stage of the application process       |
+| date_applied      | DATE           | NULL                     | Date when the application was submitted        |
+| location          | TEXT           | NULL                     | Location text (city/region/remote)             |
+| work_mode         | TEXT           | CHECK (IN enum), NULL    | Work arrangement (remote/hybrid)               |
+| source            | TEXT           | NULL                     | Where the job was found (LinkedIn, etc.)       |
+| contact_name      | TEXT           | NULL                     | Recruiter/hiring manager name                  |
+| contact_email     | TEXT           | NULL                     | Recruiter/hiring manager email                 |
+| contact_linkedin  | TEXT           | NULL                     | Contact LinkedIn profile URL                   |
+| contact_notes     | TEXT           | NULL                     | Notes about the contact                        |
+| is_referral       | BOOLEAN        | NOT NULL, DEFAULT FALSE  | Whether this application was a referral        |
+| tags              | TEXT[]         | NOT NULL, DEFAULT '{}'   | User-defined tags for filtering                |
+| tech_stack        | TEXT[]         | NOT NULL, DEFAULT '{}'   | Technologies associated with the job           |
+| notes             | TEXT           | NULL                     | User's personal notes about the job            |
+| created_at        | TIMESTAMPTZ    | DEFAULT NOW()            | Timestamp when the record was created          |
+| updated_at        | TIMESTAMPTZ    | DEFAULT NOW()            | Timestamp when the record was last updated     |
 
 CONSTRAINTS:
 - salary_max >= salary_min (when both provided)
 - status must be one of: 'wishlist', 'applied', 'interviewing', 'offer', 'rejected'
+- work_mode must be one of: 'remote', 'hybrid' (when provided)
 - Row Level Security (RLS) ensures users can only access their own jobs
 
 INDEXES:
@@ -63,6 +74,31 @@ DATABASE TABLE: auth.users (Supabase managed)
 
 RELATIONSHIP:
 - One user can have many jobs (1:N relationship via jobs.user_id)
+
+--------------------------------------------------------------------------------
+1.3 Job Status History Entity
+--------------------------------------------------------------------------------
+
+The Job Status History entity stores a time-ordered log of status transitions
+for jobs. It powers the dashboard Pipeline Flow (Sankey) visualization and the
+per-job status history view.
+
+DATABASE TABLE: job_status_history
+
+| Field Name   | Data Type      | Constraints               | Description                                    |
+|--------------|----------------|---------------------------|------------------------------------------------|
+| id           | UUID           | PRIMARY KEY               | Unique identifier for the history entry        |
+| job_id       | UUID           | FOREIGN KEY, NOT NULL     | References jobs(id)                            |
+| user_id      | UUID           | FOREIGN KEY, NOT NULL     | References auth.users(id)                      |
+| from_status  | VARCHAR(50)    | CHECK (IN enum), NOT NULL | Previous job status                            |
+| to_status    | VARCHAR(50)    | CHECK (IN enum), NOT NULL | New job status                                 |
+| changed_at   | TIMESTAMPTZ    | DEFAULT NOW(), NOT NULL   | Timestamp of the transition                    |
+
+NOTES:
+- Created in the V3 migration (`texts/database_schema_v3_migration.txt`).
+- A database trigger automatically inserts history rows whenever `jobs.status`
+  changes.
+- Row Level Security (RLS) ensures users can only access their own history.
 
 ================================================================================
 2. ENUMERATIONS
@@ -96,6 +132,21 @@ VALID TRANSITIONS:
 
 Note: The application allows any status transition for user flexibility.
 
+--------------------------------------------------------------------------------
+2.2 WorkMode Enum
+--------------------------------------------------------------------------------
+
+The work_mode field indicates the general work arrangement.
+
+TYPE: String enumeration (stored as TEXT)
+
+VALUES:
+
+| Work Mode     | Description                                     |
+|---------------|-------------------------------------------------|
+| remote        | Fully remote work                               |
+| hybrid        | Mix of remote and on-site work                  |
+
 ================================================================================
 3. FRONTEND DATA TYPES (TypeScript)
 ================================================================================
@@ -122,6 +173,16 @@ interface Job {
   status: JobStatus             // Current status (enum)
   date_applied: string | null   // ISO date string or null
   notes: string | null          // User notes or null
+  contact_name: string | null   // Contact name or null
+  contact_email: string | null  // Contact email or null
+  contact_linkedin: string | null // Contact LinkedIn URL or null
+  contact_notes: string | null  // Notes about the contact or null
+  location: string | null       // Location text or null
+  work_mode: WorkMode | null    // remote/hybrid or null
+  source: string | null         // Source text or null
+  is_referral: boolean          // Referral flag
+  tags: string[]                // Tag list (default empty)
+  tech_stack: string[]          // Tech stack list (default empty)
   created_at: string            // ISO datetime string
   updated_at: string            // ISO datetime string
 }
@@ -142,12 +203,22 @@ omitted.
 interface JobFormData {
   company: string               // Required: Company name
   role: string                  // Required: Job title
-  salary_min?: number           // Optional: Min salary
-  salary_max?: number           // Optional: Max salary
-  url?: string                  // Optional: Job posting URL
+  salary_min?: number | null    // Optional: Min salary
+  salary_max?: number | null    // Optional: Max salary
+  url?: string | null           // Optional: Job posting URL
   status: JobStatus             // Required: Application status
-  date_applied?: string         // Optional: Application date
-  notes?: string                // Optional: User notes
+  date_applied?: string | null  // Optional: Application date
+  notes?: string | null         // Optional: User notes
+  contact_name?: string | null  // Optional: Contact name
+  contact_email?: string | null // Optional: Contact email
+  contact_linkedin?: string | null // Optional: Contact LinkedIn URL
+  contact_notes?: string | null // Optional: Notes about the contact
+  location?: string | null      // Optional: Location
+  work_mode?: WorkMode | null   // Optional: remote/hybrid
+  source?: string | null        // Optional: Source
+  is_referral?: boolean         // Optional: Referral flag
+  tags?: string[]               // Optional: Tags
+  tech_stack?: string[]         // Optional: Tech stack tags
 }
 ```
 
@@ -157,8 +228,11 @@ VALIDATION RULES:
 - salary_min: Optional, must be >= 0
 - salary_max: Optional, must be >= salary_min
 - url: Optional, must be valid HTTP/HTTPS URL
+- contact_email: Optional, must be a valid email if provided
+- contact_linkedin: Optional, must be a valid HTTP/HTTPS URL if provided
 - status: Required, must be valid JobStatus
 - date_applied: Optional, must be valid date
+- work_mode: Optional, must be a valid WorkMode
 - notes: Optional, any string
 
 --------------------------------------------------------------------------------
@@ -191,6 +265,63 @@ CALCULATED FIELDS:
 - rejections = count(jobs WHERE status = 'rejected')
 - conversionRate = (interviews / totalApplications) * 100
 - offerRate = (offers / totalApplications) * 100
+
+--------------------------------------------------------------------------------
+3.4 JobStatusHistoryEntry Interface
+--------------------------------------------------------------------------------
+
+TYPE: Interface
+FILE: src/types/index.ts
+
+Represents a single status transition event for a job.
+
+```typescript
+interface JobStatusHistoryEntry {
+  id: string
+  job_id: string
+  user_id: string
+  from_status: JobStatus
+  to_status: JobStatus
+  changed_at: string
+}
+```
+
+--------------------------------------------------------------------------------
+3.5 JobAutofillResult Interface
+--------------------------------------------------------------------------------
+
+TYPE: Interface
+FILE: src/types/index.ts
+
+Represents a best-effort auto-fill response from a job posting URL.
+
+```typescript
+interface JobAutofillResult {
+  values: Partial<Pick<JobFormData, 'company' | 'role' | 'location' | 'source' | 'salary_min' | 'salary_max' | 'url'>>
+  confidence: Partial<Record<JobAutofillField, number>>
+  warnings: string[]
+}
+```
+
+--------------------------------------------------------------------------------
+3.6 JobAutofillField Type
+--------------------------------------------------------------------------------
+
+TYPE: Union type
+FILE: src/types/index.ts
+
+The set of fields the URL auto-fill system can return confidence values for.
+
+```typescript
+type JobAutofillField =
+  | 'company'
+  | 'role'
+  | 'location'
+  | 'source'
+  | 'salary_min'
+  | 'salary_max'
+  | 'url'
+```
 
 ================================================================================
 4. CHART DATA TYPES
@@ -401,6 +532,16 @@ FRONTEND VALIDATION:
 | salary_min    | No       | -          | -          | >= 0                 |
 | salary_max    | No       | -          | -          | >= salary_min        |
 | url           | No       | -          | -          | Valid HTTP(S) URL    |
+| contact_name  | No       | -          | -          | Any                  |
+| contact_email | No       | -          | -          | Valid email (if set) |
+| contact_li... | No       | -          | -          | Valid HTTP(S) URL    |
+| contact_notes | No       | 0          | Unlimited  | Any                  |
+| location      | No       | -          | -          | Any                  |
+| work_mode     | No       | -          | -          | remote/hybrid        |
+| source        | No       | -          | -          | Any                  |
+| is_referral   | No       | -          | -          | true/false           |
+| tags          | No       | -          | -          | string[]             |
+| tech_stack    | No       | -          | -          | string[]             |
 | status        | Yes      | -          | -          | Must be JobStatus    |
 | date_applied  | No       | -          | -          | Valid date           |
 | notes         | No       | 0          | Unlimited  | Any                  |

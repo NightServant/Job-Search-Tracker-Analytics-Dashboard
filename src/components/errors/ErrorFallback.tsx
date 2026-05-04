@@ -32,8 +32,8 @@ export default function ErrorFallback({ error, eventId, resetError }: FallbackPr
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
           {sentryEnabled
-            ? 'The app hit an unexpected error. If Sentry is configured, an error report was sent.'
-            : 'The app hit an unexpected error. (Sentry is not configured for this environment.)'}
+            ? 'The app encountered an unexpected error. An error report was sent — please try again or contact support if the issue continues.'
+            : 'The app encountered an unexpected error. Please try again or contact support if the issue continues.'}
         </p>
 
         {eventId ? (
@@ -44,7 +44,7 @@ export default function ErrorFallback({ error, eventId, resetError }: FallbackPr
 
         <details className="mt-4">
           <summary className="text-sm text-zinc-600 dark:text-zinc-300 cursor-pointer">
-            Technical details
+            Show technical details (for support)
           </summary>
           <pre className="mt-2 p-3 rounded-lg bg-zinc-100 dark:bg-zinc-800 text-xs text-zinc-700 dark:text-zinc-200 overflow-auto">
             {message}

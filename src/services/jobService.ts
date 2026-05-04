@@ -8,6 +8,25 @@ import {
 } from '@/types'
 
 export const jobService = {
+  // Convert Supabase/Postgrest error-like objects into standard Error
+  _toError(err: unknown): Error {
+    if (!err) return new Error('Unknown error')
+    if (err instanceof Error) return err
+    try {
+      // Supabase/Postgrest errors usually have a `message` property
+      const anyErr = err as any
+      if (typeof anyErr.message === 'string' && anyErr.message.length > 0) {
+        return new Error(anyErr.message)
+      }
+      // Fallback to details or full JSON
+      if (typeof anyErr.details === 'string' && anyErr.details.length > 0) {
+        return new Error(anyErr.details)
+      }
+      return new Error(JSON.stringify(anyErr))
+    } catch (e) {
+      return new Error('Unknown error')
+    }
+  },
   /**
    * Get all jobs for the current user
    */
@@ -17,7 +36,7 @@ export const jobService = {
       .select('*')
       .order('created_at', { ascending: false })
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     return data || []
   },
 
@@ -31,7 +50,7 @@ export const jobService = {
       .eq('id', id)
       .single()
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     return data
   },
 
@@ -54,7 +73,7 @@ export const jobService = {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     return data
   },
 
@@ -77,7 +96,7 @@ export const jobService = {
 
     const { data, error } = await supabase.from('jobs').insert(rows).select('*')
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     return data || []
   },
 
@@ -92,7 +111,7 @@ export const jobService = {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     return data
   },
 
@@ -102,7 +121,7 @@ export const jobService = {
   async deleteJob(id: string): Promise<void> {
     const { error } = await supabase.from('jobs').delete().eq('id', id)
 
-    if (error) throw error
+    if (error) throw this._toError(error)
   },
 
   /**
@@ -123,7 +142,7 @@ export const jobService = {
       .order('changed_at', { ascending: false })
       .limit(50)
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     return data || []
   },
 
@@ -137,7 +156,7 @@ export const jobService = {
       .order('changed_at', { ascending: true })
       .limit(5000)
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     return data || []
   },
 
@@ -149,7 +168,7 @@ export const jobService = {
       body: { url },
     })
 
-    if (error) throw error
+    if (error) throw this._toError(error)
     if (!data || typeof data !== 'object' || !('values' in data)) {
       throw new Error('Auto-fill returned an invalid response')
     }

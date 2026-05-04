@@ -141,14 +141,15 @@ function buildLatexPreviewHtml(latexCode: string): string {
         }
 
         try {
-          if (!window.latexjs || !window.latexjs.HtmlGenerator || !window.latexjs.parse) {
+          var latexLib = window.latexjs || window['latexjs'] || window['LatexJS'] || window['latex'];
+          if (!latexLib || !latexLib.HtmlGenerator || !latexLib.parse) {
             showFallback('Live renderer unavailable in this browser. Showing source.');
             return;
           }
 
           const previewCode = normalizeForPreview(code);
-          const generator = new window.latexjs.HtmlGenerator({ hyphenate: false });
-          const parsed = window.latexjs.parse(previewCode, { generator: generator });
+          const generator = new latexLib.HtmlGenerator({ hyphenate: false });
+          const parsed = latexLib.parse(previewCode, { generator: generator });
           const fragment = parsed && parsed.domFragment ? parsed.domFragment : null;
           if (!fragment) {
             showFallback('Could not parse this LaTeX. Showing source.');
@@ -254,7 +255,7 @@ export default function ResumePage() {
               title="LaTeX preview"
               srcDoc={previewHtml}
               className="h-[540px] w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white"
-              sandbox="allow-scripts"
+              sandbox="allow-scripts allow-same-origin"
             />
           </div>
         </div>

@@ -42,7 +42,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
     })
-    if (error) throw error
+    if (error) {
+      const anyErr = error as any
+      throw new Error(anyErr.message || JSON.stringify(anyErr))
+    }
   }
 
   const signUp = async (email: string, password: string) => {
@@ -50,12 +53,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email,
       password,
     })
-    if (error) throw error
+    if (error) {
+      const anyErr = error as any
+      throw new Error(anyErr.message || JSON.stringify(anyErr))
+    }
   }
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    if (error) {
+      const anyErr = error as any
+      throw new Error(anyErr.message || JSON.stringify(anyErr))
+    }
   }
 
   return (
