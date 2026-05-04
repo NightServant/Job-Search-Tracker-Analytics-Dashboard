@@ -117,7 +117,27 @@ function normalizeWordContent(content: ResumeContent | null | undefined): JSONCo
 }
 
 function normalizeLatexSource(content: ResumeContent | null | undefined): string {
-  return isLatexContent(content) && content.source.trim() ? content.source : DEFAULT_LATEX_SOURCE
+  if (!isLatexContent(content) || !content.source.trim()) {
+    return DEFAULT_LATEX_SOURCE
+  }
+
+  const source = content.source
+  const legacyMarkers = [
+    'Eric Janssen P. Quiambao',
+    'eric.j.quiambao@gmail.com',
+    'ensues.github.io',
+    'linkedin.com/in/ericjanssenquiambao',
+    'github.com/Ensues',
+    'Wireless Access for Health',
+    'CodSoft',
+    'Tarlac State University',
+  ]
+
+  if (legacyMarkers.some((marker) => source.includes(marker))) {
+    return DEFAULT_LATEX_SOURCE
+  }
+
+  return source
 }
 
 function formatSaveTime(timestamp: string | null): string {
