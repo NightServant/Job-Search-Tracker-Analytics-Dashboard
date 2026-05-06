@@ -92,7 +92,7 @@ export default function JobCard({
   if (compact) {
     // Compact version for Kanban board
     return (
-      <div className="card-hover p-3 space-y-2">
+      <div className="card-hover group p-3 space-y-2 hover:-translate-y-0.5 hover:shadow-lg">
         <div className="flex items-start gap-2">
           {dragHandleProps ? (
             <button
@@ -158,7 +158,7 @@ export default function JobCard({
 
   // Full version for list view
   return (
-    <div className="card-hover p-4 md:p-5">
+    <div className="card-hover group p-4 md:p-5 hover:-translate-y-0.5 hover:shadow-lg hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40">
       <div className="flex flex-col md:flex-row md:items-center gap-4">
         {/* Company Logo Placeholder */}
         <div className="hidden md:flex w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 items-center justify-center flex-shrink-0">

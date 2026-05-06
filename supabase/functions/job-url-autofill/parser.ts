@@ -219,7 +219,7 @@ function applyLinkedInHeuristics(url: URL, html: string, values: AutofillValues,
 
   // As a last resort, scan body text for simple " at COMPANY" patterns.
   if (!values.company) {
-    const bodyMatch = html.match(/\b\bat\s+([A-Z][\w &.\-]{2,60})\b/)
+    const bodyMatch = html.match(/\b\bat\s+([A-Z][\w &.-]{2,60})\b/)
     if (bodyMatch && bodyMatch[1]) {
       const extracted = cleanText(bodyMatch[1])
       if (extracted && extracted.length < 80) {

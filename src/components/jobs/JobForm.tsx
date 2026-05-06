@@ -106,6 +106,25 @@ export default function JobForm({
     setAutofillWarnings([])
   }, [job, isOpen])
 
+  const normalizePostingUrl = (value: string): string => {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+
+    if (trimmed.startsWith('//')) {
+      return `https:${trimmed}`
+    }
+
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+      return trimmed
+    }
+
+    if (/^[\w.-]+\.[a-z]{2,}(?:\/|$)/i.test(trimmed)) {
+      return `https://${trimmed}`
+    }
+
+    return trimmed
+  }
+
   const applyAutofillResult = (result: JobAutofillResult) => {
     const fieldLabels: Record<string, string> = {
       company: 'Company',
@@ -197,7 +216,7 @@ export default function JobForm({
   }
 
   const handleAutofill = async () => {
-    const url = (formData.url || '').trim()
+    const url = normalizePostingUrl(formData.url || '')
     if (!url) {
       setAutofillSummary('Enter a job URL first, then click Auto-fill.')
       setAutofillWarnings([])
@@ -205,7 +224,7 @@ export default function JobForm({
     }
 
     if (!/^https?:\/\/.+/i.test(url)) {
-      setAutofillSummary('Please enter a valid URL (must start with http:// or https://).')
+      setAutofillSummary('Please enter a valid job posting URL.')
       setAutofillWarnings([])
       return
     }
@@ -270,7 +289,8 @@ export default function JobForm({
       newErrors.salary_max = 'Max salary must be greater than min'
     }
 
-    if (formData.url && !/^https?:\/\/.+/.test(formData.url)) {
+    const normalizedUrl = formData.url ? normalizePostingUrl(formData.url) : ''
+    if (formData.url && !/^https?:\/\/.+/.test(normalizedUrl)) {
       newErrors.url = 'Please enter a valid URL'
     }
     if (formData.contact_email && !/^\S+@\S+\.\S+$/.test(formData.contact_email)) {
@@ -306,7 +326,7 @@ export default function JobForm({
       ...formData,
       salary_min: formData.salary_min ?? null,
       salary_max: formData.salary_max ?? null,
-      url: toNullableString(formData.url),
+      url: toNullableString(normalizePostingUrl(formData.url || '')),
       date_applied: toNullableString(formData.date_applied),
       notes: toNullableString(formData.notes),
       contact_name: toNullableString(formData.contact_name),

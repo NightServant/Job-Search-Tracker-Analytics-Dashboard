@@ -67,6 +67,25 @@ interface AutofillRequest {
   url: string
 }
 
+function normalizeTargetUrl(rawUrl: string): string {
+  const trimmed = rawUrl.trim()
+  if (!trimmed) return ''
+
+  if (trimmed.startsWith('//')) {
+    return `https:${trimmed}`
+  }
+
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+    return trimmed
+  }
+
+  if (/^[\w.-]+\.[a-z]{2,}(?:\/|$)/i.test(trimmed)) {
+    return `https://${trimmed}`
+  }
+
+  return trimmed
+}
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -93,7 +112,7 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: 'Invalid JSON body' }, 400)
   }
 
-  const rawUrl = (body.url || '').trim()
+  const rawUrl = normalizeTargetUrl(body.url || '')
   if (!rawUrl) {
     return jsonResponse({ error: 'URL is required' }, 400)
   }
