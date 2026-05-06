@@ -8,7 +8,20 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Custom slate/zinc palette with indigo accent
+        // Shadcn-style semantic tokens plus a neutral zinc scale.
+        background: 'hsl(var(--background) / <alpha-value>)',
+        foreground: 'hsl(var(--foreground) / <alpha-value>)',
+        card: 'hsl(var(--card) / <alpha-value>)',
+        'card-foreground': 'hsl(var(--card-foreground) / <alpha-value>)',
+        popover: 'hsl(var(--popover) / <alpha-value>)',
+        'popover-foreground': 'hsl(var(--popover-foreground) / <alpha-value>)',
+        muted: 'hsl(var(--muted) / <alpha-value>)',
+        'muted-foreground': 'hsl(var(--muted-foreground) / <alpha-value>)',
+        accent: 'hsl(var(--accent) / <alpha-value>)',
+        'accent-foreground': 'hsl(var(--accent-foreground) / <alpha-value>)',
+        border: 'hsl(var(--border) / <alpha-value>)',
+        input: 'hsl(var(--input) / <alpha-value>)',
+        ring: 'hsl(var(--ring) / <alpha-value>)',
         primary: {
           50: '#eef2ff',
           100: '#e0e7ff',
@@ -22,18 +35,18 @@ export default {
           900: '#312e81',
           950: '#1e1b4b',
         },
-        surface: {
-          50: '#fafafa',
-          100: '#f4f4f5',
-          200: '#e4e4e7',
-          300: '#d4d4d8',
-          400: '#a1a1aa',
-          500: '#71717a',
-          600: '#52525b',
-          700: '#3f3f46',
-          800: '#27272a',
-          900: '#18181b',
-          950: '#09090b',
+        zinc: {
+          50: 'hsl(var(--zinc-50) / <alpha-value>)',
+          100: 'hsl(var(--zinc-100) / <alpha-value>)',
+          200: 'hsl(var(--zinc-200) / <alpha-value>)',
+          300: 'hsl(var(--zinc-300) / <alpha-value>)',
+          400: 'hsl(var(--zinc-400) / <alpha-value>)',
+          500: 'hsl(var(--zinc-500) / <alpha-value>)',
+          600: 'hsl(var(--zinc-600) / <alpha-value>)',
+          700: 'hsl(var(--zinc-700) / <alpha-value>)',
+          800: 'hsl(var(--zinc-800) / <alpha-value>)',
+          900: 'hsl(var(--zinc-900) / <alpha-value>)',
+          950: 'hsl(var(--zinc-950) / <alpha-value>)',
         }
       },
       fontFamily: {

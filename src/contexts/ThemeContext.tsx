@@ -25,11 +25,30 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   })
 
   useEffect(() => {
-    // Update document class and localStorage
     const root = window.document.documentElement
+    const body = window.document.body
+    const resolvedTheme = theme
+
+    // Match shadcn's class-based approach and keep native form controls aligned.
+    root.style.colorScheme = resolvedTheme
     root.classList.remove('light', 'dark')
-    root.classList.add(theme)
+    root.classList.add(resolvedTheme)
+
+    const disableTransitions = window.document.createElement('style')
+    disableTransitions.appendChild(
+      window.document.createTextNode(
+        `*, *::before, *::after { transition: none !important; }`
+      )
+    )
+    window.document.head.appendChild(disableTransitions)
+    window.requestAnimationFrame(() => {
+      disableTransitions.remove()
+    })
+
     localStorage.setItem('theme', theme)
+
+    // Keep the page background transition smooth once the theme settles.
+    body.style.colorScheme = resolvedTheme
   }, [theme])
 
   const toggleTheme = () => {
