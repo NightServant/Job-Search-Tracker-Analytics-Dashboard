@@ -6,6 +6,7 @@ import {
   emitMonitoringEvent,
   getRequestIdentity,
 } from '../_shared/edgeMonitoring.ts'
+import { mergeSecurityHeaders } from '../_shared/edgeHeaders.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { generateHTML } from 'npm:@tiptap/html@3.22.5'
 import StarterKit from 'npm:@tiptap/starter-kit@3.22.5'
@@ -27,7 +28,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...mergeSecurityHeaders(corsHeaders),
       'Content-Type': 'application/json',
     },
   })
@@ -116,7 +117,7 @@ Deno.serve(async (req: Request) => {
   }))
 
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: mergeSecurityHeaders(corsHeaders) })
   }
 
   if (req.method !== 'POST') {
@@ -248,10 +249,12 @@ Deno.serve(async (req: Request) => {
       return new Response(pdf, {
         status: 200,
         headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/pdf',
-          'Content-Disposition': `attachment; filename="${sanitizeFileName(title)}.pdf"`,
-          'Cache-Control': 'no-store',
+          ...mergeSecurityHeaders({
+            ...corsHeaders,
+            'Content-Type': 'application/pdf',
+            'Content-Disposition': `attachment; filename="${sanitizeFileName(title)}.pdf"`,
+            'Cache-Control': 'no-store',
+          }),
         },
       })
     } finally {

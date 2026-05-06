@@ -215,6 +215,20 @@ Monitor deployment in Vercel Console:
 - Watch for `edge_metric` JSON lines in Supabase function logs; they include request latency, throttle decisions, and DB connection counts.
 - In Supabase, create alerts for function error spikes, HTTP 429 spikes, and database usage spikes so the emitted metrics become actionable notifications.
 
+#### Security headers
+- The edge functions include a basic set of security headers by default: `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security`, `Referrer-Policy`, `X-Content-Type-Options`, and `Permissions-Policy`.
+- If you host the frontend behind a CDN or reverse-proxy, add the same headers at the edge for static pages and assets. For Vercel or Netlify you can add `_headers` or platform rules accordingly.
+
+#### Load testing (local quick-check)
+- A small Artillery scenario is included at `load-tests/job-autofill.yml`. Edit the `target` to your Supabase host (e.g. `https://<project-ref>.supabase.co`) before running.
+- Run locally with:
+
+```bash
+npx artillery run load-tests/job-autofill.yml
+```
+
+- Start small (5 RPS for 60s) and inspect Supabase Logs / Invocations. If you see 429 spikes or a high error rate, consider increasing plan or adding caching.
+
 #### Key Metrics
 - [ ] No 5xx errors
 - [ ] Response times < 2s

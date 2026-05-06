@@ -8,6 +8,7 @@ import {
   getRequestIdentity,
   takeThrottleSlot,
 } from '../_shared/edgeMonitoring.ts'
+import { mergeSecurityHeaders } from '../_shared/edgeHeaders.ts'
 import { extractAutofill } from './parser.ts'
 
 const corsHeaders = {
@@ -103,7 +104,7 @@ function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
+      ...mergeSecurityHeaders(corsHeaders),
       'Content-Type': 'application/json',
     },
   })
@@ -113,8 +114,7 @@ function jsonResponseWithHeaders(body: unknown, status: number, extraHeaders: Re
   return new Response(JSON.stringify(body), {
     status,
     headers: {
-      ...corsHeaders,
-      ...extraHeaders,
+      ...mergeSecurityHeaders({ ...corsHeaders, ...extraHeaders }),
       'Content-Type': 'application/json',
     },
   })
@@ -153,7 +153,7 @@ Deno.serve(async (req: Request) => {
   }))
   
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: mergeSecurityHeaders(corsHeaders) })
   }
 
   if (req.method !== 'POST') {
