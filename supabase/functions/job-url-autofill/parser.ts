@@ -201,6 +201,34 @@ function applyLinkedInHeuristics(url: URL, html: string, values: AutofillValues,
     }
   }
 
+  // Additional heuristics: extract company from the page title or body text when
+  // og:description isn't helpful. LinkedIn titles often include "Role at Company | LinkedIn".
+  if (!values.company) {
+    const title = ogTitle || extractTitle(html)
+    if (title) {
+      const m = title.match(/(?:\b|^)\s*([^|\n]+?)\s+at\s+([^|\n]+)\s*(?:\||$)/i)
+      if (m && m[2]) {
+        const extracted = cleanText(m[2])
+        if (extracted) {
+          values.company = extracted
+          confidence.company = 0.7
+        }
+      }
+    }
+  }
+
+  // As a last resort, scan body text for simple " at COMPANY" patterns.
+  if (!values.company) {
+    const bodyMatch = html.match(/\b\bat\s+([A-Z][\w &.\-]{2,60})\b/)
+    if (bodyMatch && bodyMatch[1]) {
+      const extracted = cleanText(bodyMatch[1])
+      if (extracted && extracted.length < 80) {
+        values.company = extracted
+        confidence.company = 0.5
+      }
+    }
+  }
+
   values.source = 'LinkedIn'
   confidence.source = 1
 

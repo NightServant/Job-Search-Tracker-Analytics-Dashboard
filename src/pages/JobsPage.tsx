@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import {
   Plus,
   Search,
@@ -63,6 +63,8 @@ export default function JobsPage() {
   const [editingJob, setEditingJob] = useState<Job | null>(null)
   const [filtersCollapsed, setFiltersCollapsed] = useState(false)
   const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest')
+  const [page, setPage] = useState(1)
+  const itemsPerPage = 20
 
   const existingDedupKeys = useMemo(() => {
     return new Set(
@@ -166,6 +168,11 @@ export default function JobsPage() {
     setTagFilter('')
     setTechStackFilter('')
   }
+
+  // reset to first page when filters or results change
+  useEffect(() => {
+    setPage(1)
+  }, [filteredJobs])
 
   // Handlers
   const handleCreateJob = async (data: JobFormData) => {
@@ -316,6 +323,12 @@ export default function JobsPage() {
       </div>
     )
   }
+
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / itemsPerPage))
+  const displayedJobs = useMemo(() => {
+    const start = (page - 1) * itemsPerPage
+    return filteredJobs.slice(start, start + itemsPerPage)
+  }, [filteredJobs, page])
 
   return (
     <div className="space-y-6 no-hover">
@@ -691,7 +704,7 @@ export default function JobsPage() {
         </div>
       ) : viewMode === 'list' ? (
         <div className="space-y-3">
-          {filteredJobs.map((job) => (
+          {displayedJobs.map((job) => (
             <JobCard
               key={job.id}
               job={job}
@@ -700,6 +713,31 @@ export default function JobsPage() {
               onStatusChange={handleStatusChange}
             />
           ))}
+
+          {filteredJobs.length > itemsPerPage && (
+            <div className="flex items-center justify-between mt-4">
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">
+                Showing {(page - 1) * itemsPerPage + 1}–{Math.min(page * itemsPerPage, filteredJobs.length)} of {filteredJobs.length}
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="btn-ghost px-3 py-1"
+                >
+                  Previous
+                </button>
+                <div className="text-sm text-zinc-600 dark:text-zinc-300">Page {page} / {totalPages}</div>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="btn-ghost px-3 py-1"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : (
         <KanbanBoard

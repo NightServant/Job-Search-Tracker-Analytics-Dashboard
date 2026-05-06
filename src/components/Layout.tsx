@@ -114,9 +114,7 @@ export default function Layout() {
                 >
                   <item.icon className="w-5 h-5" />
                   <span className={`${sidebarCollapsed ? 'hidden' : 'ml-1'}`}>{item.name}</span>
-                  {isActive && (
-                    <ChevronRight className="w-4 h-4 ml-auto" />
-                  )}
+                  {/* removed active chevron; active state is indicated by background/text color only */}
                 </NavLink>
               )
             })}

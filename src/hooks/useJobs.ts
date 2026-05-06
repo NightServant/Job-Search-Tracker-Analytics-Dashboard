@@ -56,11 +56,12 @@ export function useAllJobStatusHistory() {
  */
 export function useCreateJob() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: (data: JobFormData) => jobService.createJob(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
     },
   })
 }
@@ -70,11 +71,12 @@ export function useCreateJob() {
  */
 export function useCreateJobsBulk() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: (datas: JobFormData[]) => jobService.createJobsBulk(datas),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
     },
   })
 }
@@ -84,36 +86,33 @@ export function useCreateJobsBulk() {
  */
 export function useUpdateJob() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<JobFormData> }) =>
       jobService.updateJob(id, data),
     onMutate: async ({ id, data }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['jobs'] })
+      await queryClient.cancelQueries({ queryKey: ['jobs', user?.id] })
 
-      // Snapshot previous value
-      const previousJobs = queryClient.getQueryData<Job[]>(['jobs'])
+      const previousJobs = queryClient.getQueryData<Job[]>(['jobs', user?.id])
 
-      // Optimistically update
-      queryClient.setQueryData<Job[]>(['jobs'], (old) =>
+      queryClient.setQueryData<Job[]>(['jobs', user?.id], (old) =>
         old?.map((job) => (job.id === id ? { ...job, ...data } : job))
       )
 
       return { previousJobs }
     },
     onError: (_err, _variables, context) => {
-      // Rollback on error
       if (context?.previousJobs) {
-        queryClient.setQueryData(['jobs'], context.previousJobs)
+        queryClient.setQueryData(['jobs', user?.id], context.previousJobs)
       }
     },
     onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
       queryClient.invalidateQueries({
-        queryKey: ['job-status-history', variables.id],
+        queryKey: ['job-status-history', user?.id, variables.id],
       })
-      queryClient.invalidateQueries({ queryKey: ['job-status-history'] })
+      queryClient.invalidateQueries({ queryKey: ['job-status-history', user?.id] })
     },
   })
 }
@@ -123,15 +122,16 @@ export function useUpdateJob() {
  */
 export function useUpdateJobStatus() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: JobStatus }) =>
       jobService.updateJobStatus(id, status),
     onMutate: async ({ id, status }) => {
-      await queryClient.cancelQueries({ queryKey: ['jobs'] })
-      const previousJobs = queryClient.getQueryData<Job[]>(['jobs'])
+      await queryClient.cancelQueries({ queryKey: ['jobs', user?.id] })
+      const previousJobs = queryClient.getQueryData<Job[]>(['jobs', user?.id])
 
-      queryClient.setQueryData<Job[]>(['jobs'], (old) =>
+      queryClient.setQueryData<Job[]>(['jobs', user?.id], (old) =>
         old?.map((job) => (job.id === id ? { ...job, status } : job))
       )
 
@@ -139,15 +139,15 @@ export function useUpdateJobStatus() {
     },
     onError: (_err, _variables, context) => {
       if (context?.previousJobs) {
-        queryClient.setQueryData(['jobs'], context.previousJobs)
+        queryClient.setQueryData(['jobs', user?.id], context.previousJobs)
       }
     },
     onSettled: (_data, _error, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
       queryClient.invalidateQueries({
-        queryKey: ['job-status-history', variables.id],
+        queryKey: ['job-status-history', user?.id, variables.id],
       })
-      queryClient.invalidateQueries({ queryKey: ['job-status-history'] })
+      queryClient.invalidateQueries({ queryKey: ['job-status-history', user?.id] })
     },
   })
 }
@@ -157,14 +157,15 @@ export function useUpdateJobStatus() {
  */
 export function useDeleteJob() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: (id: string) => jobService.deleteJob(id),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['jobs'] })
-      const previousJobs = queryClient.getQueryData<Job[]>(['jobs'])
+      await queryClient.cancelQueries({ queryKey: ['jobs', user?.id] })
+      const previousJobs = queryClient.getQueryData<Job[]>(['jobs', user?.id])
 
-      queryClient.setQueryData<Job[]>(['jobs'], (old) =>
+      queryClient.setQueryData<Job[]>(['jobs', user?.id], (old) =>
         old?.filter((job) => job.id !== id)
       )
 
@@ -172,11 +173,11 @@ export function useDeleteJob() {
     },
     onError: (_err, _id, context) => {
       if (context?.previousJobs) {
-        queryClient.setQueryData(['jobs'], context.previousJobs)
+        queryClient.setQueryData(['jobs', user?.id], context.previousJobs)
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
     },
   })
 }
