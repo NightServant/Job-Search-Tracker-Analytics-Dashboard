@@ -76,7 +76,7 @@ BEGIN
   ) THEN
     ALTER TABLE public.jobs
       ADD CONSTRAINT jobs_work_mode_check
-      CHECK (work_mode IS NULL OR work_mode IN ('remote', 'hybrid'));
+      CHECK (work_mode IS NULL OR work_mode IN ('remote', 'hybrid', 'onsite'));
   END IF;
 END $$;
 
