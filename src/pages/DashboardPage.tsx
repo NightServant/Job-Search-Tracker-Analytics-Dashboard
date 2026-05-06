@@ -10,6 +10,7 @@ import {
 import { useJobStats, useApplicationsOverTime, useStatusDistribution } from '@/hooks/useJobStats'
 import { useAllJobStatusHistory, useJobs } from '@/hooks/useJobs'
 import { Job, JobStatus, STATUS_CONFIG } from '@/types'
+import { AnalyticsSections } from '@/components/dashboard/AnalyticsSections'
 
 type GoalPeriod = 'weekly' | 'daily'
 
@@ -812,6 +813,9 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* Advanced Analytics */}
+      {jobs.length > 0 && <AnalyticsSections />}
     </div>
   )
 }
