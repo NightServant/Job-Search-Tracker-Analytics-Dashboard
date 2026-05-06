@@ -31,9 +31,16 @@ export const jobService = {
    * Get all jobs for the current user
    */
   async getJobs(): Promise<Job[]> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Not authenticated')
+
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
+      .eq('user_id', user.id)
       .order('created_at', { ascending: false })
 
     if (error) throw this._toError(error)
@@ -44,10 +51,17 @@ export const jobService = {
    * Get a single job by ID
    */
   async getJob(id: string): Promise<Job> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Not authenticated')
+
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single()
 
     if (error) throw this._toError(error)
@@ -104,10 +118,17 @@ export const jobService = {
    * Update an existing job
    */
   async updateJob(id: string, updates: Partial<JobFormData>): Promise<Job> {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Not authenticated')
+
     const { data, error } = await supabase
       .from('jobs')
       .update(updates)
       .eq('id', id)
+      .eq('user_id', user.id)
       .select()
       .single()
 
@@ -119,7 +140,17 @@ export const jobService = {
    * Delete a job
    */
   async deleteJob(id: string): Promise<void> {
-    const { error } = await supabase.from('jobs').delete().eq('id', id)
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Not authenticated')
+
+    const { error } = await supabase
+      .from('jobs')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
 
     if (error) throw this._toError(error)
   },
@@ -135,6 +166,24 @@ export const jobService = {
    * Get status history for a job
    */
   async getJobStatusHistory(jobId: string): Promise<JobStatusHistoryEntry[]> {
+    // Ensure the job belongs to the current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Not authenticated')
+
+    const jobCheck = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('id', jobId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (jobCheck.error || !jobCheck.data) {
+      throw new Error('Not found or not authorized')
+    }
+
     const { data, error } = await supabase
       .from('job_status_history')
       .select('*')
@@ -150,9 +199,29 @@ export const jobService = {
    * Get status history across all jobs for the current user
    */
   async getAllJobStatusHistory(): Promise<JobStatusHistoryEntry[]> {
+    // Only return status history for jobs owned by the current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) throw new Error('Not authenticated')
+
+    // Get job IDs for the user
+    const { data: jobs, error: jobsErr } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('user_id', user.id)
+
+    if (jobsErr) throw this._toError(jobsErr)
+
+    const ids = (jobs || []).map((j: any) => j.id)
+
+    if (ids.length === 0) return []
+
     const { data, error } = await supabase
       .from('job_status_history')
       .select('*')
+      .in('job_id', ids)
       .order('changed_at', { ascending: true })
       .limit(5000)
 

@@ -1,7 +1,7 @@
 // Job status type
 export type JobStatus = 'wishlist' | 'applied' | 'interviewing' | 'offer' | 'rejected';
 
-export type WorkMode = 'remote' | 'hybrid';
+export type WorkMode = 'remote' | 'hybrid' | 'onsite';
 
 // Job interface matching database schema
 export interface Job {

@@ -138,6 +138,7 @@ function parseWorkMode(value: string): WorkMode | null {
   if (!v) return null
   if (v === 'remote') return 'remote'
   if (v === 'hybrid') return 'hybrid'
+  if (v === 'onsite' || v === 'on-site' || v === 'on site') return 'onsite'
   return null
 }
 

@@ -565,6 +565,7 @@ export default function JobForm({
                 <option value="">Not set</option>
                 <option value="remote">Remote</option>
                 <option value="hybrid">Hybrid</option>
+                <option value="onsite">On-site</option>
               </select>
             </div>
           </div>

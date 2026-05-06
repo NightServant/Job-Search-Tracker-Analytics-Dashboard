@@ -61,6 +61,8 @@ export default function JobsPage() {
   const [techStackFilter, setTechStackFilter] = useState('')
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingJob, setEditingJob] = useState<Job | null>(null)
+  const [filtersCollapsed, setFiltersCollapsed] = useState(false)
+  const [dateSort, setDateSort] = useState<'newest' | 'oldest'>('newest')
 
   const existingDedupKeys = useMemo(() => {
     return new Set(
@@ -84,14 +86,14 @@ export default function JobsPage() {
     return Array.from(sources).sort((a, b) => a.localeCompare(b))
   }, [jobs])
 
-  // Filter jobs
+  // Filter jobs and apply date sorting
   const filteredJobs = useMemo(() => {
     const search = searchQuery.trim().toLowerCase()
     const location = locationFilter.trim().toLowerCase()
     const tag = tagFilter.trim().toLowerCase()
     const tech = techStackFilter.trim().toLowerCase()
 
-    return jobs.filter((job) => {
+    const matched = jobs.filter((job) => {
       const matchesSearch =
         !search ||
         job.company.toLowerCase().includes(search) ||
@@ -122,6 +124,15 @@ export default function JobsPage() {
         matchesTech
       )
     })
+
+    // Sort by creation date
+    const sorted = matched.slice().sort((a, b) => {
+      const ta = a.created_at ? new Date(a.created_at).getTime() : 0
+      const tb = b.created_at ? new Date(b.created_at).getTime() : 0
+      return dateSort === 'newest' ? tb - ta : ta - tb
+    })
+
+    return sorted
   }, [
     jobs,
     searchQuery,
@@ -132,6 +143,7 @@ export default function JobsPage() {
     referralOnly,
     tagFilter,
     techStackFilter,
+    dateSort,
   ])
 
   const hasActiveFilters =
@@ -306,7 +318,7 @@ export default function JobsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 no-hover">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -464,11 +476,30 @@ export default function JobsPage() {
             <div className="text-sm text-zinc-500 dark:text-zinc-400">
               {filteredJobs.length} of {jobs.length} shown
             </div>
+            <div className="flex items-center">
+              <label className="text-sm text-zinc-500 dark:text-zinc-400 mr-2">Sort</label>
+              <select
+                value={dateSort}
+                onChange={(e) => setDateSort(e.target.value as 'newest' | 'oldest')}
+                className="input px-2 py-1 text-sm"
+                aria-label="Sort by date"
+              >
+                <option value="newest">Newest</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </div>
             {hasActiveFilters ? (
               <button onClick={clearFilters} className="btn-ghost px-3 py-2">
                 Clear filters
               </button>
             ) : null}
+            <button
+              onClick={() => setFiltersCollapsed((s) => !s)}
+              className="btn-ghost px-3 py-2"
+              aria-expanded={!filtersCollapsed}
+            >
+              {filtersCollapsed ? 'Show filters' : 'Hide filters'}
+            </button>
             <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-lg">
               <button
                 onClick={() => setViewMode('list')}
@@ -537,8 +568,9 @@ export default function JobsPage() {
         </div>
       </div>
 
-      {/* Advanced Filters */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+      {/* Advanced Filters (collapsable) */}
+      <div className={`transition-[max-height] duration-300 overflow-hidden ${filtersCollapsed ? 'max-h-0' : 'max-h-[600px]'}`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
         <input
           type="text"
           placeholder="Location"
@@ -561,6 +593,7 @@ export default function JobsPage() {
           <option value="all">All work modes</option>
           <option value="remote">Remote</option>
           <option value="hybrid">Hybrid</option>
+          <option value="onsite">On-site</option>
         </select>
 
         <select
@@ -601,6 +634,7 @@ export default function JobsPage() {
           onChange={(e) => setTechStackFilter(e.target.value)}
           className="input"
         />
+        </div>
       </div>
 
       {/* Content */}

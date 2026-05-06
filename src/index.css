@@ -39,11 +39,36 @@ body {
   min-height: 100vh;
 }
 
+/* Smooth theme transition */
+body {
+  @apply transition-colors duration-300;
+}
 /* Focus styles */
 *:focus-visible {
   @apply outline-none ring-2 ring-primary-500 ring-offset-2 dark:ring-offset-zinc-900;
 }
 
+/* Utility to suppress hover/focus visuals when applied to a container.
+   Keeps elements interactive but prevents hover/focus bounding boxes from appearing. */
+.no-hover .card-hover:hover,
+.no-hover .card:hover {
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+.no-hover .btn:hover,
+.no-hover button:hover,
+.no-hover a:hover {
+  background-color: inherit !important;
+  color: inherit !important;
+  box-shadow: none !important;
+}
+
+.no-hover *:focus,
+.no-hover *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
 /* Custom component classes */
 @layer components {
   .btn {
