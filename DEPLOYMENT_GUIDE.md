@@ -1,239 +1,302 @@
-# Deployment Guide
+# 🚀 Deployment Guide
+
+> Complete step-by-step instructions for deploying the Job Search Tracker to production.
+
+## 📋 Quick Checklist
+- [ ] All tests passing: `npm test`
+- [ ] Production build works: `npm run build`
+- [ ] Supabase project created and credentials saved
+- [ ] Database migrations applied (see [Database Migrations](#step-1-database-migrations))
+- [ ] Edge functions deployed (job-url-autofill, resume-export-pdf, analytics-cache-proxy)
+- [ ] Analytics cache table created
+- [ ] Environment variables set in Vercel
+- [ ] Smoke tests passed on production URL
+
+---
 
 ## Table of Contents
 1. [Pre-Deployment Setup](#pre-deployment-setup)
-2. [Database Migration](#database-migration)
-3. [Environment Configuration](#environment-configuration)
-4. [Vercel Deployment](#vercel-deployment)
-5. [Post-Deployment Verification](#post-deployment-verification)
+2. [Step 1: Database Migrations](#step-1-database-migrations)
+3. [Step 2: Deploy Edge Functions](#step-2-deploy-edge-functions)
+4. [Step 3: Vercel Deployment](#step-3-vercel-deployment)
+5. [Step 4: Post-Deployment Verification](#step-4-post-deployment-verification)
 6. [Troubleshooting](#troubleshooting)
 
 ---
 
 ## Pre-Deployment Setup
 
-### Requirements
-- [ ] GitHub account with push access
+### ✅ Requirements
+- [ ] GitHub account with push access to repo
 - [ ] Vercel account (free tier OK)
-- [ ] Supabase project (production)
-- [ ] Node.js 18+ locally
-- [ ] All tests passing: `npm test`
-- [ ] Production build verified: `npm run build`
+- [ ] Supabase account (free tier OK)
+- [ ] Node.js 18+ and npm installed
+- [ ] Supabase CLI installed (`npm install -g supabase`)
+- [ ] Supabase project created at [supabase.com](https://supabase.com)
 
-### 1. Code Review Checklist
+### Local Code Review
+
 ```bash
-# Ensure all features are working
+# Start dev server and spot-check features
 npm run dev
+# → Open http://localhost:5173
+# → Create test job, verify Kanban drag-and-drop works
+# → Check analytics dashboard loads
 
-# Run full test suite
+# Run all tests
 npm test
+# → Should show 200+ passing tests
 
 # Build for production
 npm run build
+# → Should succeed with no TypeScript errors
 
-# Check bundle size
-ls -lh dist/assets/*.js | sort -k5 -h
-```
-
-### 2. Environment Variables
-Create `.env.production` with:
-```
-VITE_SUPABASE_URL=https://your-prod-project.supabase.co
-VITE_SUPABASE_ANON_KEY=your-prod-anon-key
-VITE_SENTRY_DSN=your-sentry-dsn (optional)
-VITE_SENTRY_ENVIRONMENT=production
+# Optional: Check bundle size
+ls -lh dist/assets/
+# → Main bundle should be < 150KB gzipped
 ```
 
 ---
 
-## Database Migration
+## Step 1: Database Migrations
 
-### Canonical Migration Doc
+### 📌 Important: Migrations Must Run First
+Edge functions depend on database tables. **Run these before deploying functions.**
 
-The full, canonical database migration checklist and SQL lives in [texts/database_migrations.md](texts/database_migrations.md). Keep migration edits there so the README and deployment docs do not drift.
+### Full Migration Guide
+The complete, canonical database migration steps live in **[texts/database_migrations.md](texts/database_migrations.md)**.
+
+**Key migrations to apply (in order):**
+
+1. **Main schema** (jobs, job_status_history tables)
+   - See: `texts/database_schema_v3_migration.txt`
+
+2. **Resume feature** (resume_snapshots, resume_templates tables)
+   - See: `texts/resumes_feature_migration.sql`
+
+3. **RLS policies & constraints**
+   - See: `texts/supabase_fix.sql`
+
+4. **Analytics cache** (NEW - May 7, 2026)
+   ```sql
+   BEGIN;
+   
+   CREATE TABLE IF NOT EXISTS public.analytics_cache (
+     user_id uuid NOT NULL,
+     metric_name text NOT NULL,
+     payload jsonb NOT NULL,
+     updated_at timestamptz NOT NULL DEFAULT now(),
+     PRIMARY KEY (user_id, metric_name)
+   );
+   
+   CREATE INDEX IF NOT EXISTS analytics_cache_updated_at_idx 
+     ON public.analytics_cache (updated_at);
+   
+   CREATE OR REPLACE FUNCTION public.upsert_analytics_cache(
+     p_user uuid, p_metric text, p_payload jsonb
+   )
+   RETURNS void LANGUAGE plpgsql AS $$
+   BEGIN
+     INSERT INTO public.analytics_cache (user_id, metric_name, payload, updated_at)
+     VALUES (p_user, p_metric, p_payload, now())
+     ON CONFLICT (user_id, metric_name) DO UPDATE
+     SET payload = EXCLUDED.payload,
+         updated_at = now();
+   END;
+   $$;
+   
+   COMMIT;
+   ```
+
+### How to Apply Migrations
+
+**Via Supabase Dashboard (Easiest):**
+1. Open [app.supabase.com](https://app.supabase.com)
+2. Select your project
+3. Go to **SQL Editor**
+4. Click **"New Query"**
+5. Copy-paste each SQL migration above
+6. Click **"Run"**
+7. Verify success (no error messages)
+
+**Via Supabase CLI:**
+```bash
+supabase db pull  # Download current schema
+supabase db push  # Apply any pending migrations
+```
 
 ---
 
-## Environment Configuration
+## Step 2: Deploy Edge Functions
 
-### 1. Supabase Edge Functions Setup
-If using auto-fill and PDF export features:
+### 🔐 Authenticate Supabase CLI
 
 ```bash
-# Install Supabase CLI
-npm install -g supabase
-
-# Login and link project
+# Interactive login (opens browser)
 supabase login
-supabase link --project-ref your-project-ref
 
-# Deploy functions
+# Link your local repo to Supabase project
+supabase link --project-ref YOUR_PROJECT_REF
+# → To find YOUR_PROJECT_REF: Open Supabase dashboard → Settings → General → Project Ref
+```
+
+### Deploy Functions
+
+Deploy all 3 edge functions to Supabase:
+
+```bash
 supabase functions deploy job-url-autofill
 supabase functions deploy resume-export-pdf
+supabase functions deploy analytics-cache-proxy
 ```
 
-### 2. Vercel Configuration
-In Vercel Dashboard:
+You should see:
+```
+✓ Function deployed successfully
+✓ Available at: https://YOUR_PROJECT.functions.supabase.co/job-url-autofill
+```
 
-1. **Import Project**
-   - Connect GitHub repo
-   - Select `main` branch for production
-   - Select `develop` for preview (optional)
+### Optional: Set Supabase Secrets
 
-2. **Environment Variables**
-   - Add `VITE_SUPABASE_URL`
-   - Add `VITE_SUPABASE_ANON_KEY`
-   - Add `VITE_SENTRY_DSN` (optional)
-   - Add `VITE_SENTRY_ENVIRONMENT=production`
+For error monitoring on edge functions:
 
-3. **Build Settings**
-   - Framework: Vite
-   - Build command: `npm run build`
-   - Output directory: `dist`
+```bash
+supabase secrets set EDGE_SENTRY_DSN=https://your-sentry-key@sentry.io/project
+supabase secrets set EDGE_SENTRY_ENVIRONMENT=production
+```
 
-4. **Deployment**
-   - Enable "Production branch auto-deploy"
-   - Set to `main` branch
+Or set via Supabase Dashboard:
+1. Go to **Settings > Edge Functions > Secrets**
+2. Add `EDGE_SENTRY_DSN` and `EDGE_SENTRY_ENVIRONMENT`
 
 ---
 
-## Vercel Deployment
+## Step 3: Vercel Deployment
 
-### Option 1: Automatic (Recommended)
-Push to `main` branch on GitHub:
+### Option A: Automatic (Recommended)
+
 ```bash
-git checkout main
-git pull origin main
-# Make your changes
-git add .
-git commit -m "Describe your changes"
+# Just push to main — Vercel auto-deploys
 git push origin main
 ```
 
-Vercel auto-deploys on push.
+Vercel will:
+1. Trigger CI workflow
+2. Run tests
+3. Build for production
+4. Deploy to vercel.app domain
 
-### Option 2: Manual
-1. Go to Vercel Dashboard
-2. Select your project
-3. Click **Deployments**
-4. Click **Redeploy** on desired deployment
+### Option B: Manual Setup
 
-### Deployment Logs
-Monitor deployment in Vercel Console:
-- Build logs
-- Runtime errors
-- Performance metrics
+1. Go to [vercel.com/dashboard](https://vercel.com/dashboard)
+2. Click **"Add New...\" > \"Project\"**
+3. **Import Git Repository**
+   - Select your GitHub repo
+   - Select `main` branch for production
+   - (Optional) Select `develop` branch for preview deployments
+4. **Configure Build Settings**
+   - Framework: **Vite**
+   - Build Command: `npm run build`
+   - Output Directory: `dist`
+5. **Add Environment Variables**
+
+   ```
+   VITE_SUPABASE_URL = https://your-project.supabase.co
+   VITE_SUPABASE_ANON_KEY = your-anon-key
+   VITE_SENTRY_DSN = your-sentry-dsn (optional)
+   VITE_SENTRY_ENVIRONMENT = production (optional)
+   ```
+
+6. Click **"Deploy"**
+
+Vercel will build and deploy. Monitor the deployment in the **Deployments** tab.
 
 ---
 
-## Post-Deployment Verification
+## Step 4: Post-Deployment Verification
 
-### Smoke Tests (5-10 minutes)
+### 🧪 Smoke Tests (5-10 minutes)
 
-#### 1. Basic Functionality
-```bash
-# Visit https://your-domain.vercel.app
-# You should see:
-- ✅ Login page
-- ✅ Dark mode toggle works
-- ✅ No console errors
+#### 1. Site Is Live
+```
+Visit: https://your-project.vercel.app
+✓ Page loads (no 404 or blank screen)
+✓ No console errors (press F12 → Console)
+✓ Dark/Light mode toggle works
 ```
 
-#### 2. Authentication
-```bash
-# Sign in with test account
-- ✅ Login succeeds
-- ✅ Redirected to dashboard
-- ✅ User email shown in sidebar
-- ✅ Dark mode persists after refresh
+#### 2. Authentication Flow
+```
+✓ Click "Sign In"
+✓ Enter email and click sign-in link
+✓ Redirected to dashboard
+✓ User email shown in sidebar
+✓ Page doesn't break when logged in
+✓ Dark mode preference persists on refresh
 ```
 
 #### 3. Job Management
-```bash
-# Add a job
-- ✅ Form saves without errors
-- ✅ Job appears in Jobs tab
-- ✅ Can edit job
-- ✅ Can delete job
-- ✅ Can export to CSV with all fields
+```
+✓ Click "Jobs" tab
+✓ Add a new job (fill all fields)
+✓ Verify job appears in list
+✓ Drag job between Kanban columns
+✓ Click a job to open details
+✓ Edit job and save
+✓ Delete job
 ```
 
 #### 4. Analytics Dashboard
-```bash
-# View dashboard
-- ✅ Status breakdown displays
-- ✅ Charts load (may take 2-3 sec)
-- ✅ Goal tracking works
-- ✅ All metrics calculated correctly
+```
+✓ Click "Dashboard" tab
+✓ Charts load (may take 10-15s for compute on first request)
+✓ No error messages
+✓ Try different date ranges (if filter available)
 ```
 
-#### 5. Security: Multi-Account Isolation
-```bash
-# Test account A
-1. Sign in as test@account-a.com
-2. Add 5 jobs with unique titles
-3. Sign out
-
-# Test account B
-4. Sign in as test@account-b.com
-5. Dashboard should be EMPTY (no jobs from Account A)
-6. Add 3 jobs
-7. Export CSV and verify only your 3 jobs
-8. Sign out
-
-# Verify Account A again
-9. Sign in as test@account-a.com
-10. Your 5 original jobs still there
-11. No jobs from Account B visible
+#### 5. Resume Builder (Optional)
+```
+✓ Click "Resume" tab
+✓ Enter resume content
+✓ Click "Export PDF"
+✓ PDF downloads successfully
 ```
 
-#### 6. Resume Builder
-```bash
-# Word editor
-- ✅ Create new resume
-- ✅ Type and edit content
-- ✅ Auto-saves (check status message)
-- ✅ Export PDF succeeds
+### 📊 Verify Edge Functions Are Working
 
-# LaTeX editor
-- ✅ Create LaTeX resume
-- ✅ Edit source
-- ✅ Live preview updates
-- ✅ Toast notification appears (then auto-dismisses)
+**Check Job Auto-fill:**
+1. In dashboard, add a new job
+2. Paste a LinkedIn or Indeed URL in the URL field
+3. Click **"Auto-fill from URL"** (if button appears)
+4. Job fields should populate automatically
+5. If error: Edge function `job-url-autofill` may not have deployed
+
+**Check Edge Logs:**
+```bash
+# View function invocations in real-time
+supabase functions logs job-url-autofill
+
+# Or in Supabase Dashboard: Functions → Select function → Logs tab
 ```
 
-### Monitoring (First 24 Hours)
+### 🎯 Monitor Performance
 
-#### Check Logs
-- Vercel: https://vercel.com/dashboard → select project → **Logs**
-- Supabase: Go to project → **Database** → **Logs**
-- Sentry: https://sentry.io → select project (if configured)
+**Optional: Set Up Sentry Alerts**
+- If you configured `VITE_SENTRY_DSN` in Vercel:
+  1. Go to [sentry.io/organizations/your-org/issues](https://sentry.io)
+  2. You should see errors (if any) from edge functions and browser
+  3. Click an error to see stack trace and affected users
 
-#### Edge Function Telemetry
-- Set `EDGE_SENTRY_DSN` for server-side edge errors and slow-request alerts.
-- Set `EDGE_SENTRY_ENVIRONMENT` if you want the edge events separated by environment.
-- Watch for `edge_metric` JSON lines in Supabase function logs; they include request latency, throttle decisions, and DB connection counts.
-- In Supabase, create alerts for function error spikes, HTTP 429 spikes, and database usage spikes so the emitted metrics become actionable notifications.
-
-#### Security headers
-- The edge functions include a basic set of security headers by default: `Content-Security-Policy`, `X-Frame-Options`, `Strict-Transport-Security`, `Referrer-Policy`, `X-Content-Type-Options`, and `Permissions-Policy`.
-- If you host the frontend behind a CDN or reverse-proxy, add the same headers at the edge for static pages and assets. For Vercel or Netlify you can add `_headers` or platform rules accordingly.
-
-#### Load testing (local quick-check)
-- A small Artillery scenario is included at `load-tests/job-autofill.yml`. Edit the `target` to your Supabase host (e.g. `https://<project-ref>.supabase.co`) before running.
-- Run locally with:
-
-```bash
-npx artillery run load-tests/job-autofill.yml
-```
-
-- Start small (5 RPS for 60s) and inspect Supabase Logs / Invocations. If you see 429 spikes or a high error rate, consider increasing plan or adding caching.
-
-#### Key Metrics
-- [ ] No 5xx errors
-- [ ] Response times < 2s
-- [ ] Database queries < 500ms
-- [ ] Zero unhandled exceptions
+**View Analytics Cache Hits:**
+- In Supabase dashboard:
+  1. Go to **SQL Editor**
+  2. Run:
+     ```sql
+     SELECT metric_name, COUNT(*), MAX(updated_at)
+     FROM analytics_cache
+     GROUP BY metric_name;
+     ```
+  3. Should show cached metrics with recent `updated_at` timestamps
 
 ---
 

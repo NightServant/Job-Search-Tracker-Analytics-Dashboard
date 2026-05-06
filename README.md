@@ -1,6 +1,9 @@
-# Job Search Tracker & Analytics Dashboard
+# 📊 Job Search Tracker & Analytics Dashboard
 
-A professional portfolio piece demonstrating full-stack web development and data science skills. The application allows users to track their job applications, visualize progress with an analytics dashboard, and export data for Python analysis.
+> A full-stack web application for tracking job applications, visualizing progress, and gaining insights into your search strategy.
+
+**Built with**: React · TypeScript · TanStack Query · Supabase · Vite · Tailwind CSS  
+**Perfect for**: Showcasing full-stack skills, data visualization, and DevOps practices
 
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
@@ -8,41 +11,56 @@ A professional portfolio piece demonstrating full-stack web development and data
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase)
 
-## Features
+## ✨ Key Features
 
-- **Job Entry System**: Add jobs with company, role, salary, URL, status, date applied, and notes
-- **Status Pipeline**: Track jobs through Wishlist → Applied → Interviewing → Offer/Rejected
-- **Kanban Board**: Visual pipeline view with drag-and-drop status updates
-- **Analytics Dashboard**: 
-  - Total applications and conversion rates
-  - Bar chart of applications over time
-  - Pie chart of status distribution
-- **Build Metadata**: Version, commit SHA, and build time displayed in the footer for debugging
-- **Error Monitoring**: Optional Sentry reporting with a friendly error boundary fallback screen
-- **Performance**: Lazy-loaded pages and charts to reduce initial bundle size
-- **Search & Filter**: Filter by status or search by company/role name
-- **Dark Mode**: Professional dark theme with toggle
-- **CSV Export**: Export data for Python analysis
-- **Resume Maker**: LaTeX editor + side-by-side live preview for resume drafting
-- **Resume Builder**: Tiptap Word-like editor with autosaved drafts and PDF export
-- **Testing**: Vitest + React Testing Library with CI on pull requests
-- **Python Analysis Script**: Pandas-based data analysis with visualizations
+### Job Tracking
+- **Full-Featured Entry System**: Company, role, salary, URL, status, date applied, notes, location, work mode  
+- **Smart Status Pipeline**: Wishlist → Applied → Interviewing → Offer/Rejected with drag-and-drop Kanban board  
+- **Advanced Filtering**: Filter by status, search by company/role, sort by date, and export as CSV  
 
-## Tech Stack
+### Analytics & Insights
+- **Real-Time Dashboard**: Conversion rates, applications over time, status distribution  
+- **Deep Analytics**: Time-in-stage metrics, conversion funnels, cohort analysis, source trends  
+- **Intelligent Caching**: Edge function cache-proxy with automatic compute on miss (SWR pattern)  
+- **Python Analysis**: Export data for Pandas-based statistical analysis with visualizations  
 
-| Layer | Technology |
-|-------|------------|
-| Frontend | React 18 + Vite + TypeScript |
-| Styling | Tailwind CSS v3 (dark mode) |
-| State | TanStack Query + React hooks |
-| Database/Auth | Supabase (PostgreSQL) |
-| Charts | Recharts (lazy-loaded) |
-| UX | dnd-kit, React Router |
-| Observability | Sentry (optional) |
-| Testing | Vitest + React Testing Library |
-| CI | GitHub Actions |
-| Icons | Lucide React |
-| Data Science | Python + Pandas + Matplotlib |
+### Developer Experience
+- **Dark Mode**: Smooth theme transitions with toggle and localStorage persistence  
+- **Error Boundary**: Friendly fallback UI with optional Sentry error reporting  
+- **Performance Optimized**: Lazy-loaded pages/charts, optimized bundle (~143KB gzip)  
+- **Testing**: 200+ unit tests (Vitest + React Testing Library), CI on pull requests  
+- **Build Metadata**: Version, commit SHA, build time in footer for debugging  
+
+### Resume Tools
+- **Resume Maker**: LaTeX editor with live side-by-side preview  
+- **Resume Builder**: Word-like editor (Tiptap) with autosaved drafts and PDF export via edge functions
+
+## 🏗️ Architecture
+
+### Frontend Stack
+| Layer | Technology | Why? |
+|-------|-----------|---------|
+| UI Framework | React 18 + Vite | Fast refresh, optimized builds, minimal config |
+| State Management | TanStack Query v5 | Built-in caching (SWR), auto-deduplication, background refetch |
+| Type Safety | TypeScript | Strict mode, catch errors at compile time |
+| Styling | Tailwind CSS v3 | Utility-first, dark mode built-in, small footprint |
+| Data Fetching | @tanstack/react-query | Client-side cache layer before edge functions |
+| Forms/Editors | Tiptap, React Hook Form | Rich editing, validation, autosave |
+| Charts | Recharts | Lazy-loaded, responsive, accessibility-friendly |
+| Icons | Lucide React | Consistent, tree-shakeable, on-brand |
+
+### Backend Stack
+| Layer | Technology | Details |
+|-------|-----------|---------|
+| Database | PostgreSQL (Supabase) | 5 tables, RLS policies, indexes for query performance |
+| Authentication | Supabase Auth | Magic links, social auth, built-in 2FA |
+| Edge Functions | Deno (Supabase Functions) | Auto-fill URL parsing, PDF export, analytics cache proxy |
+| Analytics Cache | PostgreSQL + Edge Functions | SWR pattern: check cache → compute on miss → auto-upsert |
+| Monitoring | Sentry (optional) + Edge Logs | Error tracking, performance monitoring, custom edge metrics |
+| Infrastructure | Vercel (frontend) + Supabase (backend) | Serverless deployment, auto-scaling, edge caching |
+| Testing | Vitest + React Testing Library | 200+ unit tests, smoke tests |
+| CI/CD | GitHub Actions | Auto-test on PR, build verification |
+| Data Science | Python 3.8+ (Pandas, Matplotlib) | Local analysis script post-export |
 
 ## Getting Started
 
