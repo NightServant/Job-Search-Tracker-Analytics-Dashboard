@@ -34,20 +34,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     root.classList.remove('light', 'dark')
     root.classList.add(resolvedTheme)
 
-    const disableTransitions = window.document.createElement('style')
-    disableTransitions.appendChild(
-      window.document.createTextNode(
-        `*, *::before, *::after { transition: none !important; }`
-      )
-    )
-    window.document.head.appendChild(disableTransitions)
-    window.requestAnimationFrame(() => {
-      disableTransitions.remove()
-    })
-
+    // Persist preference and update color-scheme on body
     localStorage.setItem('theme', theme)
-
-    // Keep the page background transition smooth once the theme settles.
     body.style.colorScheme = resolvedTheme
   }, [theme])
 

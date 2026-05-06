@@ -66,6 +66,19 @@ html.dark {
   color-scheme: dark;
 }
 
+/* Global theme transition: animate core color properties so components change together. */
+:root,
+html,
+body,
+.card,
+.card-hover,
+.btn,
+.input,
+.label,
+.popover {
+  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease, box-shadow 300ms ease;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
