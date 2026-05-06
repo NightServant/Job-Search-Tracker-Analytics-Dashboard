@@ -54,7 +54,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -65,20 +65,26 @@ export default function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-zinc-900 border-r border-zinc-200 dark:border-zinc-800 transform transition-all duration-200 ease-in-out lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-card border-r border-zinc-200 dark:border-border transform transition-all duration-200 ease-in-out lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${sidebarCollapsed ? 'w-20' : 'w-64'}`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center justify-between h-16 px-4 border-b border-zinc-200 dark:border-zinc-800">
+          <div
+            className={`flex items-center h-16 border-b border-zinc-200 dark:border-border ${
+              sidebarCollapsed ? 'justify-center px-2' : 'justify-between px-4'
+            }`}
+          >
             <button
               onClick={() => {
                 const next = !sidebarCollapsed
                 setSidebarCollapsed(next)
                 try { localStorage.setItem('sidebarCollapsed', next ? '1' : '0') } catch (e) {}
               }}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              className={`flex items-center gap-2 hover:opacity-80 transition-opacity ${
+                sidebarCollapsed ? 'w-full justify-center' : ''
+              }`}
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
@@ -160,7 +166,7 @@ export default function Layout() {
       {/* Main content */}
       <div className={`${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-64'}`}>
         {/* Top bar (mobile) */}
-        <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-white dark:bg-zinc-900 border-b border-zinc-200 dark:border-zinc-800 lg:hidden">
+        <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-white dark:bg-card border-b border-zinc-200 dark:border-border lg:hidden">
           <button
             className="p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
             onClick={() => setSidebarOpen(true)}

@@ -141,7 +141,7 @@ html.dark {
 
   .btn-secondary {
     @apply btn bg-zinc-100 text-zinc-900 hover:bg-zinc-200
-           focus:ring-ring dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700;
+         focus:ring-ring dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700;
   }
 
   .btn-danger {
