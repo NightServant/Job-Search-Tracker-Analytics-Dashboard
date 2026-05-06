@@ -7,6 +7,7 @@ import {
   JobStatus,
   JobStatusHistoryEntry,
 } from '@/types'
+import { assertJobFormDataValid, jobValidation } from './jobValidation'
 
 export const jobService = {
   // Convert Supabase/Postgrest error-like objects into standard Error
@@ -80,6 +81,9 @@ export const jobService = {
 
     if (!user) throw new Error('Not authenticated')
 
+    // Validate all job fields before insertion
+    assertJobFormDataValid(jobData)
+
     Sentry.addBreadcrumb({
       category: 'job.mutation',
       message: 'Creating job',
@@ -113,6 +117,23 @@ export const jobService = {
 
     if (!user) throw new Error('Not authenticated')
 
+    // Validate all jobs before bulk insert
+    const validationErrors: Array<{ index: number; errors: any[] }> = []
+    jobDatas.forEach((jobData, idx) => {
+      const errors = jobValidation.validateJobFormData(jobData)
+      if (errors.length > 0) {
+        validationErrors.push({ index: idx, errors })
+      }
+    })
+
+    if (validationErrors.length > 0) {
+      const message = validationErrors
+        .map((e) => `Row ${e.index + 1}: ${e.errors.map((err: any) => `${err.field}: ${err.message}`).join('; ')}`).join('\n')
+      const error = new Error(`Validation errors in bulk insert:\n${message}`)
+      ;(error as any).validationErrors = validationErrors
+      throw error
+    }
+
     const rows = jobDatas.map((jobData) => ({
       ...jobData,
       user_id: user.id,
@@ -133,6 +154,26 @@ export const jobService = {
     } = await supabase.auth.getUser()
 
     if (!user) throw new Error('Not authenticated')
+
+    // Validate partial updates for any provided fields
+    const errors = jobValidation.validateJobFormData({
+      company: updates.company || 'temp',
+      role: updates.role || 'temp',
+      status: updates.status || 'wishlist',
+      ...updates,
+    })
+
+    if (errors.length > 0) {
+      // Filter to only errors for fields we're actually updating
+      const updateKeys = Object.keys(updates)
+      const relevantErrors = errors.filter((e) => updateKeys.includes(e.field))
+      if (relevantErrors.length > 0) {
+        const message = relevantErrors.map((e) => `${e.field}: ${e.message}`).join('; ')
+        const error = new Error(message)
+        ;(error as any).validationErrors = relevantErrors
+        throw error
+      }
+    }
 
     Sentry.addBreadcrumb({
       category: 'job.mutation',
