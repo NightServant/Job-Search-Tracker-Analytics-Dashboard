@@ -2,6 +2,7 @@ export interface AutofillValues {
   company?: string
   role?: string
   location?: string
+  work_mode?: string
   source?: string
   salary_min?: number
   salary_max?: number
@@ -28,6 +29,51 @@ function decodeHtmlEntities(value: string): string {
 function cleanText(value: string | null | undefined): string {
   if (!value) return ''
   return decodeHtmlEntities(value.replace(/\s+/g, ' ').trim())
+}
+
+function decodePossiblyEncoded(value: string): string {
+  if (!value) return ''
+  let v = value.replace(/\+/g, ' ')
+  if (/%[0-9A-Fa-f]{2}/.test(v)) {
+    try {
+      v = decodeURIComponent(v)
+    } catch {
+      // ignore decode errors
+    }
+  }
+  return v
+}
+
+function normalizeCompany(raw: string): string {
+  if (!raw) return ''
+  let v = cleanText(decodePossiblyEncoded(raw))
+  v = v.replace(/\s+by\s+[^,|\-]+$/i, '')
+  v = v.replace(/\s*[|\-:].*$/i, '')
+  return v.trim()
+}
+
+function normalizeRole(raw: string, company?: string): string {
+  if (!raw) return ''
+  let v = cleanText(decodePossiblyEncoded(raw))
+  v = v.replace(/\s*[|\-:]\s*.*(LinkedIn|Careers|Workday|Greenhouse|Indeed|Glassdoor|–|—).*$/i, '')
+  v = v.replace(new RegExp('^' + (company ? company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : '') + '\\s+', 'i'), '')
+  v = v.replace(/\b(hiring|recruiting)\b.*$/i, '')
+  if (company) {
+    const c = company.replace(/\s+/g, ' ').trim()
+    if (c && v.toLowerCase().startsWith(c.toLowerCase())) {
+      v = v.slice(c.length).trim()
+    }
+  }
+  return v.trim()
+}
+
+function inferWorkModeFromText(text: string): string | undefined {
+  if (!text) return undefined
+  const lower = text.toLowerCase()
+  if (/(remote|work from home|telecommute|telework)/i.test(lower)) return 'remote'
+  if (/hybrid/i.test(lower)) return 'hybrid'
+  if (/(on[- ]site|onsite|in[- ]person)/i.test(lower)) return 'onsite'
+  return undefined
 }
 
 function extractTitle(html: string): string {
@@ -341,6 +387,13 @@ export function extractAutofill(url: URL, html: string): AutofillResponse {
       values.salary_max = salary.max
       confidence.salary_max = 0.9
     }
+    // Infer work mode from JSON-LD's jobLocationType if present
+    const jobLocationType = String((jsonLd as Record<string, unknown>).jobLocationType || '')
+    const inferredFromJsonLd = inferWorkModeFromText(jobLocationType)
+    if (inferredFromJsonLd) {
+      values.work_mode = inferredFromJsonLd
+      confidence.work_mode = 0.9
+    }
   }
 
   const host = url.hostname.toLowerCase()
@@ -379,6 +432,29 @@ export function extractAutofill(url: URL, html: string): AutofillResponse {
     if (locality) {
       values.location = locality
       confidence.location = 0.5
+    }
+  }
+
+  // Normalize and clean extracted text fields
+  if (values.company) {
+    values.company = normalizeCompany(values.company)
+  }
+
+  if (values.role) {
+    values.role = normalizeRole(values.role, values.company)
+  }
+
+  if (values.location) {
+    values.location = cleanText(decodePossiblyEncoded(values.location))
+  }
+
+  // Infer work mode from page text if not found earlier
+  if (!values.work_mode) {
+    const pageText = [extractMetaTag(html, 'og:description'), extractMetaTag(html, 'description'), extractMetaTag(html, 'og:title'), extractMetaTag(html, 'twitter:title'), extractTitle(html), html].filter(Boolean).join('\n')
+    const inferred = inferWorkModeFromText(pageText)
+    if (inferred) {
+      values.work_mode = inferred
+      confidence.work_mode = confidence.work_mode || 0.5
     }
   }
 
