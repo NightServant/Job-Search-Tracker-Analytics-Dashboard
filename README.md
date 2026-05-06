@@ -149,11 +149,16 @@
 │   └── App.tsx           # Root component
 ├── scripts/
 │   └── data_analysis.py  # Python analysis script
-├── texts/                # Documentation
-│   ├── project_roadmap.txt
-│   ├── database_schema.txt
-│   ├── component_architecture.txt
-│   └── api_logic.txt
+├── texts/                # Documentation & References
+│   ├── database_migrations.md         # Current DB setup (v3 schema)
+│   ├── database_schema_v3_migration.txt
+│   ├── database_schema.txt            # Base schema reference
+│   ├── data_dictionary.txt            # Field definitions
+│   ├── component_architecture.txt     # Component patterns
+│   ├── api_logic.txt                  # API layer overview
+│   ├── technical_appendix.txt         # Edge functions & monitoring
+│   ├── resumes_feature_migration.sql  # Resume builder migration
+│   └── supabase_fix.sql               # RLS policies & fixes
 └── public/               # Static assets
 ```
 

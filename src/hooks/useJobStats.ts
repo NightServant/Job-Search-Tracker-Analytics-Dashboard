@@ -1,27 +1,28 @@
 import { useMemo } from 'react'
 import { useJobs } from './useJobs'
-import { JobStats, JobStatus, STATUS_CONFIG, TimeSeriesDataPoint, StatusDataPoint } from '@/types'
+import { JobStats, JobStatus, STATUS_CONFIG, TimeSeriesDataPoint, StatusDataPoint, Job } from '@/types'
 
 /**
  * Hook to calculate job statistics
  */
 export function useJobStats(): JobStats & { isLoading: boolean } {
   const { data: jobs = [], isLoading } = useJobs()
+  const typedJobs = (jobs || []) as Job[]
 
   const stats = useMemo(() => {
-    const totalJobs = jobs.length
+    const totalJobs = typedJobs.length
 
     // Applied = everything except wishlist
-    const appliedJobs = jobs.filter((j) => j.status !== 'wishlist')
+    const appliedJobs = typedJobs.filter((j: Job) => j.status !== 'wishlist')
     const totalApplications = appliedJobs.length
 
     // Interviews = interviewing + offer (they got past application stage)
-    const interviews = jobs.filter(
-      (j) => j.status === 'interviewing' || j.status === 'offer'
+    const interviews = typedJobs.filter(
+      (j: Job) => j.status === 'interviewing' || j.status === 'offer'
     ).length
 
-    const offers = jobs.filter((j) => j.status === 'offer').length
-    const rejections = jobs.filter((j) => j.status === 'rejected').length
+    const offers = typedJobs.filter((j: Job) => j.status === 'offer').length
+    const rejections = typedJobs.filter((j: Job) => j.status === 'rejected').length
 
     // Conversion rate: (Interviews / Applications) × 100
     const conversionRate =
@@ -33,11 +34,11 @@ export function useJobStats(): JobStats & { isLoading: boolean } {
 
     // Status distribution
     const statusDistribution = {
-      wishlist: jobs.filter((j) => j.status === 'wishlist').length,
-      applied: jobs.filter((j) => j.status === 'applied').length,
-      interviewing: jobs.filter((j) => j.status === 'interviewing').length,
-      offer: jobs.filter((j) => j.status === 'offer').length,
-      rejected: jobs.filter((j) => j.status === 'rejected').length,
+      wishlist: typedJobs.filter((j: Job) => j.status === 'wishlist').length,
+      applied: typedJobs.filter((j: Job) => j.status === 'applied').length,
+      interviewing: typedJobs.filter((j: Job) => j.status === 'interviewing').length,
+      offer: typedJobs.filter((j: Job) => j.status === 'offer').length,
+      rejected: typedJobs.filter((j: Job) => j.status === 'rejected').length,
     }
 
     return {
@@ -50,7 +51,7 @@ export function useJobStats(): JobStats & { isLoading: boolean } {
       offerRate: Math.round(offerRate * 10) / 10,
       statusDistribution,
     }
-  }, [jobs])
+  }, [typedJobs])
 
   return { ...stats, isLoading }
 }
@@ -63,6 +64,7 @@ export function useApplicationsOverTime(): {
   isLoading: boolean
 } {
   const { data: jobs = [], isLoading } = useJobs()
+  const typedJobs = (jobs || []) as Job[]
 
   const data = useMemo(() => {
     const parseISODateLocal = (value: string): Date => {
@@ -78,7 +80,7 @@ export function useApplicationsOverTime(): {
     }
 
     // Filter jobs with date_applied
-    const appliedJobs = jobs.filter((j) => j.date_applied)
+    const appliedJobs = typedJobs.filter((j: Job) => j.date_applied)
 
     if (appliedJobs.length === 0) return []
 
@@ -101,7 +103,7 @@ export function useApplicationsOverTime(): {
     return Object.entries(grouped)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date))
-  }, [jobs])
+  }, [typedJobs])
 
   return { data, isLoading }
 }

@@ -12,6 +12,11 @@ export function useJobs() {
     queryKey: ['jobs', user?.id],
     queryFn: jobService.getJobs,
     enabled: !!user,
+    staleTime: 30_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 1,
   })
 }
 
@@ -24,6 +29,10 @@ export function useJob(id: string) {
     queryKey: ['jobs', user?.id, id],
     queryFn: () => jobService.getJob(id),
     enabled: !!id && !!user,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 }
 
@@ -36,6 +45,10 @@ export function useJobStatusHistory(jobId?: string) {
     queryKey: ['job-status-history', user?.id, jobId],
     queryFn: () => jobService.getJobStatusHistory(jobId!),
     enabled: !!jobId && !!user,
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 }
 
@@ -48,6 +61,10 @@ export function useAllJobStatusHistory() {
     queryKey: ['job-status-history', user?.id],
     queryFn: jobService.getAllJobStatusHistory,
     enabled: !!user,
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 }
 

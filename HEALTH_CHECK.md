@@ -285,21 +285,29 @@ Next user on same metric gets instant cache hit
 
 ## Documentation Status
 
-| Document | Status | Last Updated |
-|----------|--------|--------------|
-| `README.md` | ⚠️ Needs update | Features section outdated |
-| `texts/project_roadmap.txt` | ⚠️ Needs update | Several features now complete |
-| `texts/database_schema_v3_migration.txt` | ✅ Current | Reflects v3 schema |
-| `texts/supabase_fix.sql` | ✅ Current | RLS + constraint updates |
-| `DEPLOYMENT_GUIDE.md` | ⚠️ Missing | Consider creating |
-| `CONTRIBUTING.md` | ⚠️ Missing | Consider creating |
+| Document | Status | Details |
+|----------|--------|---------|
+| `README.md` | ✅ Current | Updated with modern formatting and full feature list |
+| `DEPLOYMENT_GUIDE.md` | ✅ Current | Complete step-by-step deployment process |
+| `CONTRIBUTING.md` | ✅ Current | Contributing guidelines and local setup |
+| `HEALTH_CHECK.md` | ✅ Current | This health & status report |
+| `texts/database_schema_v3_migration.txt` | ✅ Current | Active v3 schema |
+| `texts/database_migrations.md` | ✅ Current | Database setup checklist |
+| `texts/supabase_fix.sql` | ✅ Current | RLS policies & constraints |
 
-### Documentation To-Do
-- [ ] Update README features list with recent additions
-- [ ] Update project roadmap to mark completed items
-- [ ] Create deployment guide with step-by-step instructions
-- [ ] Create contributing guidelines
-- [ ] Document RLS policy structure in technical appendix
+### Removed Documentation (Obsolete/Superseded)
+- ~~texts/project_roadmap.txt~~ → Old planning doc (project complete)
+- ~~texts/deployment_guide.txt~~ → Superseded by DEPLOYMENT_GUIDE.md
+- ~~texts/testing_and_deployment_playbook.txt~~ → Superseded by DEPLOYMENT_GUIDE.md
+- ~~texts/database_schema_v2.txt~~ → Obsolete (using v3 schema)
+- ~~texts/troubleshooting_guide.txt~~ → Superseded by docs + modern error handling
+
+### Retained Reference Documentation
+- `texts/database_schema.txt` — Base schema for reference
+- `texts/data_dictionary.txt` — Field definitions and types
+- `texts/component_architecture.txt` — Component patterns and structure
+- `texts/api_logic.txt` — API layer overview
+- `texts/technical_appendix.txt` — Edge functions, monitoring, security headers
 
 ---
 
