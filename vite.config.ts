@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+// Removed optional build-only plugins (compression / imagemin) for local build reliability.
 
 const commitSha =
   process.env.VERCEL_GIT_COMMIT_SHA ??

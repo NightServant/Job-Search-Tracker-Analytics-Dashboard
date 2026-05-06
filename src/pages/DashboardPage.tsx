@@ -10,7 +10,9 @@ import {
 import { useJobStats, useApplicationsOverTime, useStatusDistribution } from '@/hooks/useJobStats'
 import { useAllJobStatusHistory, useJobs } from '@/hooks/useJobs'
 import { Job, JobStatus, STATUS_CONFIG } from '@/types'
-import { AnalyticsSections } from '@/components/dashboard/AnalyticsSections'
+const AnalyticsSections = lazy(() =>
+  import('@/components/dashboard/AnalyticsSections').then((m) => ({ default: m.AnalyticsSections }))
+)
 
 type GoalPeriod = 'weekly' | 'daily'
 
@@ -815,7 +817,11 @@ export default function DashboardPage() {
       </div>
 
       {/* Advanced Analytics */}
-      {jobs.length > 0 && <AnalyticsSections />}
+      {jobs.length > 0 && (
+        <Suspense fallback={<div className="card p-5">Loading analytics…</div>}>
+          <AnalyticsSections />
+        </Suspense>
+      )}
     </div>
   )
 }

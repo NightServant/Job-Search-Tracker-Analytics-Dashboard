@@ -238,6 +238,17 @@ function applyLinkedInHeuristics(url: URL, html: string, values: AutofillValues,
     confidence.role = 0.75
   }
 
+  // If description contains "hiring <Role>" extract role explicitly (LinkedIn often uses this phrasing).
+  // Prefer description-derived role over title-derived role when available.
+  if (ogDescription) {
+    const m = ogDescription.match(/\bhiring\s+(.+?)(?:\s+in\b|[.,]|$)/i)
+    const extractedRole = cleanText(m?.[1] || '')
+    if (extractedRole) {
+      values.role = extractedRole
+      confidence.role = 0.85
+    }
+  }
+
   if (!values.company && ogDescription) {
     const match = ogDescription.match(/\bat\s+([^.,|-]+)/i)
     const company = cleanText(match?.[1] || '')
@@ -258,6 +269,15 @@ function applyLinkedInHeuristics(url: URL, html: string, values: AutofillValues,
         if (extracted) {
           values.company = extracted
           confidence.company = 0.7
+        }
+      }
+      else {
+        // Sometimes LinkedIn uses titles like "Company Name by 2x | LinkedIn" or
+        // page title is just a company string before the pipe. Use that as a fallback.
+        const beforePipe = cleanText(String((title || '').split('|')[0]))
+        if (beforePipe && /\b(inc|llc|corp|consultancy|co|company|ltd)\b/i.test(beforePipe)) {
+          values.company = beforePipe
+          confidence.company = 0.6
         }
       }
     }

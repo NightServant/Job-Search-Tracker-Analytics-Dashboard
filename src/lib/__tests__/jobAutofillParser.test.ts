@@ -271,4 +271,42 @@ describe('job url autofill parser', () => {
       ])
     )
   })
+
+  it('cleans noisy LinkedIn boilerplate and encoded fragments', () => {
+    const url = new URL('https://www.linkedin.com/jobs/view/123')
+    // Simulate LinkedIn meta and a messy autopopulated title/body
+    const html = `
+      <html>
+        <head>
+          <meta property="og:title" content="Bluesky HR Consultancy Inc. by 2x | LinkedIn" />
+          <meta property="og:description" content="Bluesky HR Consultancy Inc. hiring Data Analyst in Makati, National Capital Region" />
+          <title>Bluesky HR Consultancy Inc. hiring Data Analyst in Makati, National Capital Region | LinkedIn</title>
+        </head>
+      </html>
+    `
+
+    const result = extractAutofill(url, html)
+    expect(result.values.company).toBeTruthy()
+    expect(result.values.company?.toLowerCase()).toContain('bluesky hr consultancy')
+    expect(result.values.company?.toLowerCase()).not.toContain('by 2x')
+    expect(result.values.role).toBeTruthy()
+    expect(result.values.role?.toLowerCase()).toContain('data analyst')
+  })
+
+  it('decodes percent-encoded meta content and plus-as-space fragments', () => {
+    const url = new URL('https://careers.example.com/jobs/encoded')
+    const encodedTitle = 'Senior%20Engineer%20%7C%20Acme%20Corp'
+    const html = `
+      <html>
+        <head>
+          <meta property="og:title" content="${encodedTitle}" />
+          <meta property="og:site_name" content="ACME+Corp" />
+        </head>
+      </html>
+    `
+
+    const result = extractAutofill(url, html)
+    expect(result.values.role).toContain('Senior Engineer')
+    expect(result.values.company).toBe('ACME Corp')
+  })
 })
