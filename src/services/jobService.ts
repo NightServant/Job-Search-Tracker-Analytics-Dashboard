@@ -1,3 +1,4 @@
+import * as Sentry from '@sentry/react'
 import { supabase } from '@/lib/supabase'
 import {
   Job,
@@ -79,6 +80,13 @@ export const jobService = {
 
     if (!user) throw new Error('Not authenticated')
 
+    Sentry.addBreadcrumb({
+      category: 'job.mutation',
+      message: 'Creating job',
+      level: 'info',
+      data: { company: jobData.company, role: jobData.role },
+    })
+
     const { data, error } = await supabase
       .from('jobs')
       .insert({
@@ -126,6 +134,13 @@ export const jobService = {
 
     if (!user) throw new Error('Not authenticated')
 
+    Sentry.addBreadcrumb({
+      category: 'job.mutation',
+      message: 'Updating job',
+      level: 'info',
+      data: { jobId: id, keys: Object.keys(updates) },
+    })
+
     const { data, error } = await supabase
       .from('jobs')
       .update(updates)
@@ -148,6 +163,13 @@ export const jobService = {
     } = await supabase.auth.getUser()
 
     if (!user) throw new Error('Not authenticated')
+
+    Sentry.addBreadcrumb({
+      category: 'job.mutation',
+      message: 'Deleting job',
+      level: 'info',
+      data: { jobId: id },
+    })
 
     const { error } = await supabase
       .from('jobs')
@@ -236,15 +258,66 @@ export const jobService = {
    * Attempt to auto-fill job form fields from a public posting URL.
    */
   async autofillFromUrl(url: string): Promise<JobAutofillResult> {
-    const { data, error } = await supabase.functions.invoke('job-url-autofill', {
-      body: { url },
+    const requestId = `autofill-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    
+    Sentry.addBreadcrumb({
+      category: 'job.autofill',
+      message: 'Autofill request initiated',
+      level: 'info',
+      data: { url: url.substring(0, 100), requestId },
     })
 
-    if (error) throw this._toError(error)
-    if (!data || typeof data !== 'object' || !('values' in data)) {
-      throw new Error('Auto-fill returned an invalid response')
-    }
+    try {
+      const { data, error } = await supabase.functions.invoke('job-url-autofill', {
+        body: { url },
+      })
 
-    return data as JobAutofillResult
+      if (error) {
+        const errorMsg = error instanceof Error ? error.message : JSON.stringify(error)
+        Sentry.captureException(error, {
+          tags: {
+            function: 'job-url-autofill',
+            requestId,
+          },
+          extra: {
+            url: url.substring(0, 100),
+            errorMessage: errorMsg,
+          },
+        })
+        throw this._toError(error)
+      }
+
+      if (!data || typeof data !== 'object' || !('values' in data)) {
+        const invalidErr = new Error('Auto-fill returned an invalid response')
+        Sentry.captureException(invalidErr, {
+          tags: {
+            function: 'job-url-autofill',
+            requestId,
+          },
+          extra: {
+            url: url.substring(0, 100),
+            responseData: JSON.stringify(data).substring(0, 200),
+          },
+        })
+        throw invalidErr
+      }
+
+      Sentry.addBreadcrumb({
+        category: 'job.autofill',
+        message: 'Autofill successful',
+        level: 'info',
+        data: { requestId, fieldsExtracted: Object.keys(data.values) },
+      })
+
+      return data as JobAutofillResult
+    } catch (err) {
+      Sentry.addBreadcrumb({
+        category: 'job.autofill',
+        message: 'Autofill failed',
+        level: 'error',
+        data: { requestId, error: err instanceof Error ? err.message : String(err) },
+      })
+      throw err
+    }
   },
 }

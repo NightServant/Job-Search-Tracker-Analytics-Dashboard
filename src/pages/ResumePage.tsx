@@ -16,6 +16,7 @@ import {
   RotateCcw,
   Save,
   Trash2,
+  AlertCircle,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -473,6 +474,7 @@ export default function ResumePage() {
   const { error: showError, info } = useToast()
   const [drafts, setDrafts] = useState<ResumeDraft[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [loadError, setLoadError] = useState<Error | null>(null)
   const [activeDraftId, setActiveDraftId] = useState<string | null>(null)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
 
@@ -483,12 +485,17 @@ export default function ResumePage() {
       setDrafts([])
       setActiveDraftId(null)
       setIsLoading(false)
+      setLoadError(null)
       return
     }
 
     setIsLoading(true)
+    setLoadError(null)
     try {
-      const { data, error } = await supabase.from('resumes').select('id, title, mode, content, updated_at').order('updated_at', { ascending: false })
+      const { data, error } = await supabase
+        .from('resumes')
+        .select('id, title, mode, content, updated_at')
+        .order('updated_at', { ascending: false })
       if (error) throw error
       const nextDrafts = (data ?? []).map((row) => ({
         id: row.id,
@@ -500,7 +507,9 @@ export default function ResumePage() {
       setDrafts(nextDrafts)
       setActiveDraftId((current) => (current && nextDrafts.some((draft) => draft.id === current) ? current : null))
     } catch (err) {
-      showError('Failed to load resumes', err instanceof Error ? err.message : 'Could not load drafts')
+      const error = err instanceof Error ? err : new Error(String(err))
+      setLoadError(error)
+      showError('Failed to load resumes', error.message)
     } finally {
       setIsLoading(false)
     }
@@ -548,6 +557,23 @@ export default function ResumePage() {
 
   return (
     <div className="space-y-6">
+      {loadError && (
+        <div className="card p-6 border-l-4 border-red-500 bg-red-50 dark:bg-red-950">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-red-900 dark:text-red-100">Could not load resumes</h3>
+              <p className="text-sm text-red-800 dark:text-red-200 mt-1">{loadError.message}</p>
+              <button
+                onClick={() => void loadDrafts()}
+                className="mt-3 btn-danger"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {!activeDraft ? (
         <ResumeHub drafts={drafts} isLoading={isLoading} onOpenDraft={(draft) => setActiveDraftId(draft.id)} onCreateNew={() => setIsCreateModalOpen(true)} onDeleteDraft={deleteDraft} />
       ) : activeDraft.mode === 'latex' ? (

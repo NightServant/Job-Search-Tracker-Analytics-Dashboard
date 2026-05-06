@@ -96,41 +96,56 @@ function jsonResponse(body: unknown, status = 200): Response {
   })
 }
 
+function generateRequestId(): string {
+  return `autofill-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+}
+
 Deno.serve(async (req: Request) => {
+  const requestId = generateRequestId()
+  const startTime = Date.now()
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed' }, 405)
+    console.error(`[${requestId}] Invalid method: ${req.method}`)
+    return jsonResponse({ error: 'Method not allowed', requestId }, 405)
   }
 
   let body: AutofillRequest
   try {
     body = (await req.json()) as AutofillRequest
-  } catch {
-    return jsonResponse({ error: 'Invalid JSON body' }, 400)
+  } catch (err) {
+    console.error(`[${requestId}] Invalid JSON body:`, err)
+    return jsonResponse({ error: 'Invalid JSON body', requestId }, 400)
   }
 
   const rawUrl = normalizeTargetUrl(body.url || '')
   if (!rawUrl) {
-    return jsonResponse({ error: 'URL is required' }, 400)
+    console.warn(`[${requestId}] Empty URL provided`)
+    return jsonResponse({ error: 'URL is required', requestId }, 400)
   }
 
   let targetUrl: URL
   try {
     targetUrl = new URL(rawUrl)
-  } catch {
-    return jsonResponse({ error: 'Invalid URL format' }, 400)
+  } catch (err) {
+    console.error(`[${requestId}] Invalid URL format for "${rawUrl}":`, err)
+    return jsonResponse({ error: 'Invalid URL format', requestId }, 400)
   }
 
   if (!['http:', 'https:'].includes(targetUrl.protocol)) {
-    return jsonResponse({ error: 'URL must start with http:// or https://' }, 400)
+    console.warn(`[${requestId}] Invalid protocol: ${targetUrl.protocol}`)
+    return jsonResponse({ error: 'URL must start with http:// or https://', requestId }, 400)
   }
 
   if (isDisallowedHostname(targetUrl.hostname)) {
-    return jsonResponse({ error: 'URL must be a public job posting URL' }, 400)
+    console.warn(`[${requestId}] Disallowed hostname: ${targetUrl.hostname}`)
+    return jsonResponse({ error: 'URL must be a public job posting URL', requestId }, 400)
   }
+
+  console.log(`[${requestId}] Fetching: ${targetUrl.hostname}${targetUrl.pathname.substring(0, 50)}`)
 
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS)
@@ -148,39 +163,48 @@ Deno.serve(async (req: Request) => {
     })
   } catch (err) {
     clearTimeout(timer)
+    const errorMsg = err instanceof Error ? err.message : String(err)
+    console.error(`[${requestId}] Fetch failed:`, errorMsg)
     if (err instanceof DOMException && err.name === 'AbortError') {
-      return jsonResponse({ error: 'Timed out while fetching job page' }, 504)
+      return jsonResponse({ error: 'Timed out while fetching job page', requestId }, 504)
     }
-    return jsonResponse({ error: 'Could not fetch this URL' }, 422)
+    return jsonResponse({ error: 'Could not fetch this URL', requestId }, 422)
   }
 
   clearTimeout(timer)
 
   if (!response.ok) {
-    return jsonResponse({ error: `Could not fetch page (status ${response.status})` }, 422)
+    console.warn(`[${requestId}] HTTP ${response.status}: ${targetUrl.hostname}`)
+    return jsonResponse({ error: `Could not fetch page (status ${response.status})`, requestId }, 422)
   }
 
   let finalUrl: URL
   try {
     finalUrl = new URL(response.url || targetUrl.toString())
-  } catch {
-    return jsonResponse({ error: 'Could not resolve final URL' }, 422)
+  } catch (err) {
+    console.error(`[${requestId}] Could not resolve final URL:`, err)
+    return jsonResponse({ error: 'Could not resolve final URL', requestId }, 422)
   }
 
   if (!['http:', 'https:'].includes(finalUrl.protocol) || isDisallowedHostname(finalUrl.hostname)) {
-    return jsonResponse({ error: 'URL redirected to an invalid host' }, 422)
+    console.warn(`[${requestId}] Redirect to disallowed host: ${finalUrl.hostname}`)
+    return jsonResponse({ error: 'URL redirected to an invalid host', requestId }, 422)
   }
 
   const contentType = (response.headers.get('content-type') || '').toLowerCase()
   if (!contentType.includes('text/html') && !contentType.includes('application/xhtml+xml')) {
-    return jsonResponse({ error: 'URL did not return an HTML page' }, 422)
+    console.warn(`[${requestId}] Invalid content-type: ${contentType}`)
+    return jsonResponse({ error: 'URL did not return an HTML page', requestId }, 422)
   }
 
   const html = await response.text()
   if (!html || html.length > MAX_HTML_BYTES) {
-    return jsonResponse({ error: 'Page content is too large or empty' }, 422)
+    console.warn(`[${requestId}] Page size invalid: ${html.length} bytes`)
+    return jsonResponse({ error: 'Page content is too large or empty', requestId }, 422)
   }
 
   const result = extractAutofill(finalUrl, html)
-  return jsonResponse(result, 200)
+  const duration = Date.now() - startTime
+  console.log(`[${requestId}] Success in ${duration}ms, extracted ${Object.keys(result).length} fields`)
+  return jsonResponse({ ...result, requestId }, 200)
 })

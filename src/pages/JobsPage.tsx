@@ -7,6 +7,7 @@ import {
   Loader2,
   Briefcase,
   Upload,
+  AlertCircle,
 } from 'lucide-react'
 import {
   useJobs,
@@ -36,7 +37,7 @@ interface CsvImportState {
 }
 
 export default function JobsPage() {
-  const { data: jobs = [], isLoading } = useJobs()
+  const { data: jobs = [], isLoading, error: jobsError } = useJobs()
   const createJob = useCreateJob()
   const createJobsBulk = useCreateJobsBulk()
   const updateJob = useUpdateJob()
@@ -147,6 +148,12 @@ export default function JobsPage() {
     techStackFilter,
     dateSort,
   ])
+
+  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / itemsPerPage))
+  const displayedJobs = useMemo(() => {
+    const start = (page - 1) * itemsPerPage
+    return filteredJobs.slice(start, start + itemsPerPage)
+  }, [filteredJobs, page])
 
   const hasActiveFilters =
     !!searchQuery.trim() ||
@@ -324,11 +331,27 @@ export default function JobsPage() {
     )
   }
 
-  const totalPages = Math.max(1, Math.ceil(filteredJobs.length / itemsPerPage))
-  const displayedJobs = useMemo(() => {
-    const start = (page - 1) * itemsPerPage
-    return filteredJobs.slice(start, start + itemsPerPage)
-  }, [filteredJobs, page])
+  if (jobsError) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="card p-6 max-w-md text-center">
+          <AlertCircle className="w-10 h-10 text-red-500 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-zinc-900 dark:text-white mb-2">
+            Could not load jobs
+          </h3>
+          <p className="text-sm text-zinc-600 dark:text-zinc-300 mb-4">
+            {jobsError instanceof Error ? jobsError.message : 'An error occurred while loading your jobs'}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="btn-primary w-full"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
