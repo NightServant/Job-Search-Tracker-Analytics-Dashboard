@@ -146,15 +146,3 @@ $$\text{Conversion \%} = \left( \frac{\text{Interviews}}{\text{Applications}} \r
 
 **Offer Rate:**
 $$\text{Offer \%} = \left( \frac{\text{Offers}}{\text{Applications}} \right) \times 100$$
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT License - feel free to use this project for your portfolio!
-
----
-
-Built with ❤️ as a portfolio piece demonstrating Full-Stack Development and Data Science expertise.
