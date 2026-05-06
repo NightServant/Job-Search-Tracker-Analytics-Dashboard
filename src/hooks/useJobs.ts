@@ -1,14 +1,17 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { jobService } from '@/services/jobService'
 import { Job, JobFormData, JobStatus } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 /**
  * Hook to fetch all jobs
  */
 export function useJobs() {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['jobs'],
+    queryKey: ['jobs', user?.id],
     queryFn: jobService.getJobs,
+    enabled: !!user,
   })
 }
 
@@ -16,10 +19,11 @@ export function useJobs() {
  * Hook to fetch a single job
  */
 export function useJob(id: string) {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['jobs', id],
+    queryKey: ['jobs', user?.id, id],
     queryFn: () => jobService.getJob(id),
-    enabled: !!id,
+    enabled: !!id && !!user,
   })
 }
 
@@ -27,10 +31,11 @@ export function useJob(id: string) {
  * Hook to fetch status history for a job
  */
 export function useJobStatusHistory(jobId?: string) {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['job-status-history', jobId],
+    queryKey: ['job-status-history', user?.id, jobId],
     queryFn: () => jobService.getJobStatusHistory(jobId!),
-    enabled: !!jobId,
+    enabled: !!jobId && !!user,
   })
 }
 
@@ -38,9 +43,11 @@ export function useJobStatusHistory(jobId?: string) {
  * Hook to fetch status history across all jobs
  */
 export function useAllJobStatusHistory() {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['job-status-history'],
+    queryKey: ['job-status-history', user?.id],
     queryFn: jobService.getAllJobStatusHistory,
+    enabled: !!user,
   })
 }
 

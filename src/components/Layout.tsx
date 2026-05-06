@@ -34,7 +34,7 @@ function formatBuildTime(value: string): string {
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed] = useState(() => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
       const v = localStorage.getItem('sidebarCollapsed')
       return v === '1'
@@ -73,14 +73,22 @@ export default function Layout() {
         <div className="flex flex-col h-full">
           {/* Logo */}
           <div className="flex items-center justify-between h-16 px-4 border-b border-zinc-200 dark:border-zinc-800">
-            <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const next = !sidebarCollapsed
+                setSidebarCollapsed(next)
+                try { localStorage.setItem('sidebarCollapsed', next ? '1' : '0') } catch (e) {}
+              }}
+              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+            >
               <div className="w-8 h-8 rounded-lg bg-primary-600 flex items-center justify-center">
                 <Briefcase className="w-5 h-5 text-white" />
               </div>
               <span className={`font-semibold text-zinc-900 dark:text-white ${sidebarCollapsed ? 'hidden' : 'inline'}`}>
                 Job Tracker
               </span>
-            </div>
+            </button>
             <button
               className="lg:hidden p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
               onClick={() => setSidebarOpen(false)}
