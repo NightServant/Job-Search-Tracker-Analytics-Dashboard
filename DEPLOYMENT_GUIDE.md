@@ -209,6 +209,12 @@ Monitor deployment in Vercel Console:
 - Supabase: Go to project → **Database** → **Logs**
 - Sentry: https://sentry.io → select project (if configured)
 
+#### Edge Function Telemetry
+- Set `EDGE_SENTRY_DSN` for server-side edge errors and slow-request alerts.
+- Set `EDGE_SENTRY_ENVIRONMENT` if you want the edge events separated by environment.
+- Watch for `edge_metric` JSON lines in Supabase function logs; they include request latency, throttle decisions, and DB connection counts.
+- In Supabase, create alerts for function error spikes, HTTP 429 spikes, and database usage spikes so the emitted metrics become actionable notifications.
+
 #### Key Metrics
 - [ ] No 5xx errors
 - [ ] Response times < 2s
@@ -276,6 +282,7 @@ If deployment breaks production:
 ## Post-Launch Checklist
 
 - [ ] Monitor Sentry for errors (24 hours)
+- [ ] Confirm edge function telemetry is flowing to logs/Sentry
 - [ ] Verify database backups run daily
 - [ ] Set up Vercel analytics alerts
 - [ ] Update user documentation

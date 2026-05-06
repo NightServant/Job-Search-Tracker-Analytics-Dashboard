@@ -73,6 +73,8 @@ A professional portfolio piece demonstrating full-stack web development and data
    - Deploy edge function `resume-export-pdf` from `supabase/functions/resume-export-pdf`
      - This is required for the **“Auto-fill from URL”** button. If you skip this step, the rest of the app still works, but auto-fill will show an error at runtime.
      - This is also required for the **“Export PDF”** button in Resume Builder.
+       - Optional but recommended: set `EDGE_SENTRY_DSN` and `EDGE_SENTRY_ENVIRONMENT` as Supabase secrets so edge-function errors and slow requests show up in Sentry.
+       - The edge functions emit `edge_metric` JSON logs with latency, throttling, and DB connection counts, which can feed Supabase log-based alerts or a lightweight external monitor.
      - Using the Supabase CLI (recommended):
        ```bash
        # Install the Supabase CLI first (see Supabase docs)

@@ -1,3 +1,11 @@
+import {
+  buildCompletionEvent,
+  buildErrorEvent,
+  buildInvocationEvent,
+  createRequestId,
+  emitMonitoringEvent,
+  getRequestIdentity,
+} from '../_shared/edgeMonitoring.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { generateHTML } from 'npm:@tiptap/html@3.22.5'
 import StarterKit from 'npm:@tiptap/starter-kit@3.22.5'
@@ -96,17 +104,49 @@ function renderResumeHtml(innerHtml: string, title: string): string {
 }
 
 Deno.serve(async (req: Request) => {
+  const requestId = createRequestId('resume-export-pdf')
+  const startedAt = Date.now()
+  const callerKey = getRequestIdentity(req)
+
+  emitMonitoringEvent(buildInvocationEvent({
+    functionName: 'resume-export-pdf',
+    requestId,
+    callerKey,
+    dbConnections: 0,
+  }))
+
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   if (req.method !== 'POST') {
+    const latencyMs = Date.now() - startedAt
+    emitMonitoringEvent(buildErrorEvent({
+      functionName: 'resume-export-pdf',
+      requestId,
+      status: 405,
+      latencyMs,
+      callerKey,
+      dbConnections: 0,
+      message: 'Invalid method',
+      extra: { method: req.method },
+    }))
     return jsonResponse({ error: 'Method not allowed' }, 405)
   }
 
   try {
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
+      const latencyMs = Date.now() - startedAt
+      emitMonitoringEvent(buildErrorEvent({
+        functionName: 'resume-export-pdf',
+        requestId,
+        status: 401,
+        latencyMs,
+        callerKey,
+        dbConnections: 0,
+        message: 'Missing Authorization header',
+      }))
       return jsonResponse({ error: 'Missing Authorization header' }, 401)
     }
 
@@ -123,6 +163,7 @@ Deno.serve(async (req: Request) => {
         },
       },
     })
+    const dbConnections = 1
 
     const {
       data: { user },
@@ -130,12 +171,33 @@ Deno.serve(async (req: Request) => {
     } = await supabase.auth.getUser()
 
     if (authError || !user) {
+      const latencyMs = Date.now() - startedAt
+      emitMonitoringEvent(buildErrorEvent({
+        functionName: 'resume-export-pdf',
+        requestId,
+        status: 401,
+        latencyMs,
+        callerKey,
+        dbConnections,
+        message: 'Unauthorized',
+        extra: { authError: authError?.message },
+      }))
       return jsonResponse({ error: 'Unauthorized' }, 401)
     }
 
     const payload = (await req.json()) as ExportPayload
     const title = (payload.title || 'Resume').trim() || 'Resume'
     if (!payload.content || typeof payload.content !== 'object') {
+      const latencyMs = Date.now() - startedAt
+      emitMonitoringEvent(buildErrorEvent({
+        functionName: 'resume-export-pdf',
+        requestId,
+        status: 400,
+        latencyMs,
+        callerKey,
+        dbConnections,
+        message: 'Missing content JSON',
+      }))
       return jsonResponse({ error: 'content JSON is required' }, 400)
     }
 
@@ -168,6 +230,21 @@ Deno.serve(async (req: Request) => {
         },
       })
 
+      const latencyMs = Date.now() - startedAt
+      emitMonitoringEvent(buildCompletionEvent({
+        functionName: 'resume-export-pdf',
+        requestId,
+        status: 200,
+        latencyMs,
+        callerKey,
+        dbConnections,
+        message: 'PDF export complete',
+        extra: {
+          title,
+          bytes: pdf.byteLength,
+        },
+      }))
+
       return new Response(pdf, {
         status: 200,
         headers: {
@@ -182,6 +259,17 @@ Deno.serve(async (req: Request) => {
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error'
+    const latencyMs = Date.now() - startedAt
+    emitMonitoringEvent(buildErrorEvent({
+      functionName: 'resume-export-pdf',
+      requestId,
+      status: 500,
+      latencyMs,
+      callerKey,
+      dbConnections: 1,
+      message: 'PDF generation failed',
+      extra: { error: message },
+    }))
     return jsonResponse({ error: `PDF generation failed: ${message}` }, 500)
   }
 })
