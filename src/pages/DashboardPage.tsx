@@ -154,25 +154,45 @@ function exportToCSV(jobs: Job[]) {
   const headers = [
     'Company',
     'Role',
+    'Location',
     'Status',
+    'Work Mode',
     'Salary Min',
     'Salary Max',
     'Date Applied',
     'URL',
+    'Source',
+    'Referral',
+    'Tech Stack',
+    'Tags',
+    'Contact Name',
+    'Contact Email',
+    'Contact LinkedIn',
     'Notes',
     'Created At',
+    'Updated At',
   ]
 
   const rows = jobs.map((job) => [
     job.company,
     job.role,
+    job.location || '',
     job.status,
+    job.work_mode || '',
     job.salary_min || '',
     job.salary_max || '',
     job.date_applied || '',
     job.url || '',
+    job.source || '',
+    job.is_referral ? 'Yes' : 'No',
+    (job.tech_stack || []).join('; '),
+    (job.tags || []).join('; '),
+    job.contact_name || '',
+    job.contact_email || '',
+    job.contact_linkedin || '',
     (job.notes || '').replace(/"/g, '""'),
     job.created_at,
+    job.updated_at || '',
   ])
 
   const csv = [
@@ -537,6 +557,34 @@ export default function DashboardPage() {
         />
       </div>
 
+      {/* Status Breakdown */}
+      <div className="card p-5">
+        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
+          Status Breakdown
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          {(Object.keys(STATUS_CONFIG) as Array<keyof typeof STATUS_CONFIG>).map(
+            (status) => (
+              <div
+                key={status}
+                className="text-center p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800"
+              >
+                <div
+                  className="w-3 h-3 rounded-full mx-auto mb-2"
+                  style={{ backgroundColor: STATUS_CONFIG[status].color }}
+                />
+                <p className="text-2xl font-bold text-zinc-900 dark:text-white">
+                  {stats.statusDistribution[status]}
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  {STATUS_CONFIG[status].label}
+                </p>
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
       {/* Charts */}
       <Suspense
         fallback={
@@ -743,34 +791,6 @@ export default function DashboardPage() {
           hasStatusHistoryError={!!statusHistoryError}
         />
       </Suspense>
-
-      {/* Quick Stats */}
-      <div className="card p-5">
-        <h2 className="text-lg font-semibold text-zinc-900 dark:text-white mb-4">
-          Status Breakdown
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {(Object.keys(STATUS_CONFIG) as Array<keyof typeof STATUS_CONFIG>).map(
-            (status) => (
-              <div
-                key={status}
-                className="text-center p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800"
-              >
-                <div
-                  className="w-3 h-3 rounded-full mx-auto mb-2"
-                  style={{ backgroundColor: STATUS_CONFIG[status].color }}
-                />
-                <p className="text-2xl font-bold text-zinc-900 dark:text-white">
-                  {stats.statusDistribution[status]}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {STATUS_CONFIG[status].label}
-                </p>
-              </div>
-            )
-          )}
-        </div>
-      </div>
 
       {/* Conversion Formula */}
       <div className="card p-5 bg-primary-50 dark:bg-primary-950 border-primary-200 dark:border-primary-900">

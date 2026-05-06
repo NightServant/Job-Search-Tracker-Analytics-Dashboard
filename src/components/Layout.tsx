@@ -34,7 +34,7 @@ function formatBuildTime(value: string): string {
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+  const [sidebarCollapsed] = useState(() => {
     try {
       const v = localStorage.getItem('sidebarCollapsed')
       return v === '1'
@@ -81,28 +81,12 @@ export default function Layout() {
                 Job Tracker
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              {/* Collapse toggle (desktop) */}
-              <button
-                className="hidden lg:inline-flex p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                onClick={() => {
-                  const next = !sidebarCollapsed
-                  setSidebarCollapsed(next)
-                  try { localStorage.setItem('sidebarCollapsed', next ? '1' : '0') } catch (e) {}
-                }}
-                aria-pressed={sidebarCollapsed}
-                title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-              >
-                <ChevronRight className={`w-5 h-5 text-zinc-500 transition-transform ${sidebarCollapsed ? 'rotate-180' : 'rotate-0'}`} />
-              </button>
-
-              <button
-                className="lg:hidden p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
-                onClick={() => setSidebarOpen(false)}
-              >
-                <X className="w-5 h-5 text-zinc-500" />
-              </button>
-            </div>
+            <button
+              className="lg:hidden p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              onClick={() => setSidebarOpen(false)}
+            >
+              <X className="w-5 h-5 text-zinc-500" />
+            </button>
           </div>
 
           {/* Navigation */}
@@ -144,7 +128,7 @@ export default function Layout() {
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 mt-2">
+            <div className={`flex items-center gap-2 mt-2 ${sidebarCollapsed ? 'hidden' : ''}`}>
               <button
                 onClick={toggleTheme}
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"

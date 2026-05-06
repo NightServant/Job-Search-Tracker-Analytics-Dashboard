@@ -237,7 +237,7 @@ export default function JobCard({
             {job.work_mode && (
               <div className="flex items-center gap-1">
                 <Wifi className="w-4 h-4" />
-                {job.work_mode === 'remote' ? 'Remote' : 'Hybrid'}
+                {job.work_mode === 'remote' ? 'Remote' : job.work_mode === 'onsite' ? 'On-site' : 'Hybrid'}
               </div>
             )}
             {job.source && (
