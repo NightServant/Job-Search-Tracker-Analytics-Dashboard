@@ -161,20 +161,112 @@ function toFriendlyLatexPreviewText(input: string): string {
   const body = beginMatch && endMatch && beginMatch.index < endMatch.index ? source.slice(beginMatch.index + beginMatch[0].length, endMatch.index) : source
 
   return body
-    .replace(/\\textbf\{([^}]*)\}/g, '$1')
+    .replace(/\\textbf\{([^}]*)\}/g, '**$1**')
+    .replace(/\\textit\{([^}]*)\}/g, '*$1*')
     .replace(/\\href\{[^}]*\}\{([^}]*)\}/g, '$1')
     .replace(/\\begin\{itemize\}/g, '')
     .replace(/\\end\{itemize\}/g, '')
     .replace(/^\s*\\item\s+/gm, '• ')
     .replace(/\\\\/g, '\n')
+    .replace(/\\emph\{([^}]*)\}/g, '*$1*')
+    .replace(/\\section\{([^}]*)\}/g, '\n### $1\n')
+    .replace(/\\subsection\{([^}]*)\}/g, '\n#### $1\n')
     .replace(/[{}]/g, '')
     .trim()
 }
 
-function buildLatexPreviewHtml(latexCode: string, cdnScript?: string | null): string {
+function buildLatexPreviewHtml(latexCode: string, cdnAvailable: boolean): string {
   const safeCode = escapeForScript(latexCode)
   const safeFallbackText = escapeHtml(toFriendlyLatexPreviewText(latexCode))
-  return `<!doctype html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>${cdnScript ? `<script>${cdnScript}</script>` : '<script src="https://cdn.jsdelivr.net/npm/latex.js/dist/latex.min.js"></script>'}<style>body{margin:0;padding:1rem;font-family:ui-serif,Georgia,serif;background:#fafafa;color:#111827}#root{background:#fff;border:1px solid #e5e7eb;border-radius:.75rem;padding:1rem;min-height:calc(100vh - 2rem);overflow:auto}pre{white-space:pre-wrap;word-break:break-word;background:#f4f4f5;border-radius:.5rem;padding:.75rem}.error{color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:.5rem;padding:.75rem}.info{color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.5rem;padding:.75rem}.fallback{font-family:ui-serif,Georgia,serif;font-size:.95rem;line-height:1.45}</style></head><body><div id="root"><pre class="fallback">${safeFallbackText}</pre></div><script>(function(){const code=${JSON.stringify(safeCode)};const root=document.getElementById('root');function normalizeForPreview(input){let body=String(input||'');const beginMatch=/\\begin{document}/i.exec(body);const endMatch=/\\end{document}/i.exec(body);if(beginMatch&&endMatch&&beginMatch.index<endMatch.index){body=body.slice(beginMatch.index+beginMatch[0].length,endMatch.index)}return '\\begin{document}\n'+body.replace(/^\\documentclass[^\n]*$/gim,'').replace(/^\\usepackage[^\n]*$/gim,'').replace(/^\\pagenumbering[^\n]*$/gim,'').replace(/\\href\{[^}]*\}\{([^}]*)\}/g,'$1').replace(/\\begin\{itemize\}\[[^\]]*\]/g,'\\begin{itemize}').replace(/\\vspace\{[^}]*\}/g,'').replace(/\\hrule/g,'').replace(/\\hfill/g,' ').replace(/\\quad/g,' ').trim()+'\n\\end{document}'}function fallback(message){const safeMessage=String(message).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');const friendlyText=String(code).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\textbf\{([^}]*)\}/g,'$1').replace(/\\href\{[^}]*\}\{([^}]*)\}/g,'$1').replace(/\\begin\{itemize\}/g,'').replace(/\\end\{itemize\}/g,'').replace(/^\s*\\item\s+/gm,'• ').replace(/\\\\/g,'\n').replace(/[{}]/g,'').trim();root.innerHTML='<p class="error">'+safeMessage+'</p><h3>Readable preview</h3><pre class="fallback">'+friendlyText+'</pre>'}try{const latexLib=window.latexjs||window['latexjs']||window['LatexJS']||window['latex'];if(!latexLib||!latexLib.HtmlGenerator||!latexLib.parse){fallback('Live renderer unavailable in this browser. Showing source.');return}const parsed=latexLib.parse(normalizeForPreview(code),{generator:new latexLib.HtmlGenerator({hyphenate:false})});const fragment=parsed&&parsed.domFragment?parsed.domFragment:null;if(!fragment){fallback('Could not parse this LaTeX. Showing source.');return}root.innerHTML='';root.appendChild(fragment)}catch(err){fallback('LaTeX parse error: '+(err&&err.message?err.message:'Unknown parser error'))}})();</script></body></html>`
+  
+  const cdnUrl = 'https://cdn.jsdelivr.net/npm/latex.js@0.12.4/dist/latex.min.js'
+  const scriptTag = cdnAvailable ? `<script src="${cdnUrl}" defer></script>` : ''
+  
+  // Build the inline script separately to avoid long lines and escape issues
+  const rendererScript = `
+    (function(){
+      const code = ${JSON.stringify(safeCode)};
+      const root = document.getElementById('root');
+      const maxRetries = 3;
+      let retryCount = 0;
+      
+      function normalizeForPreview(input) {
+        let body = String(input || '');
+        const beginMatch = /\\\\begin\\{document\\}/i.exec(body);
+        const endMatch = /\\\\end\\{document\\}/i.exec(body);
+        if (beginMatch && endMatch && beginMatch.index < endMatch.index) {
+          body = body.slice(beginMatch.index + beginMatch[0].length, endMatch.index);
+        }
+        return '\\\\begin{document}\\n' + body
+          .replace(/^\\\\documentclass[^\\n]*$/gim, '')
+          .replace(/^\\\\usepackage[^\\n]*$/gim, '')
+          .replace(/^\\\\pagenumbering[^\\n]*$/gim, '')
+          .replace(/\\\\href\\{[^}]*\\}\\{([^}]*)\\}/g, '$1')
+          .replace(/\\\\begin\\{itemize\\}\\[[^\\]]*\\]/g, '\\\\begin{itemize}')
+          .replace(/\\\\vspace\\{[^}]*\\}/g, '')
+          .replace(/\\\\hrule/g, '')
+          .replace(/\\\\hfill/g, ' ')
+          .replace(/\\\\quad/g, ' ')
+          .trim() + '\\n\\\\end{document}';
+      }
+      
+      function fallback(message) {
+        const safeMessage = String(message)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        const friendlyText = String(code)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/\\\\textbf\\{([^}]*)\\}/g, '**$$1**')
+          .replace(/\\\\textit\\{([^}]*)\\}/g, '*$$1*')
+          .replace(/\\\\href\\{[^}]*\\}\\{([^}]*)\\}/g, '$$1')
+          .replace(/\\\\begin\\{itemize\\}/g, '')
+          .replace(/\\\\end\\{itemize\\}/g, '')
+          .replace(/^\\s*\\\\item\\s+/gm, '• ')
+          .replace(/\\\\\\\\\\\\\\\\/g, '\\n')
+          .replace(/\\\\emph\\{([^}]*)\\}/g, '*$$1*')
+          .replace(/\\\\section\\{([^}]*)\\}/g, '\\n### $$1\\n')
+          .replace(/\\\\subsection\\{([^}]*)\\}/g, '\\n#### $$1\\n')
+          .replace(/[{}]/g, '')
+          .trim();
+        root.innerHTML = '<p class="error">' + safeMessage + '</p><h3 style="margin-top:1rem">Readable Preview</h3><pre class="fallback">' + friendlyText + '</pre>';
+      }
+      
+      function tryRender() {
+        try {
+          const latexLib = window.latexjs || window['latexjs'] || window['LatexJS'];
+          if (!latexLib || !latexLib.HtmlGenerator || !latexLib.parse) {
+            if (retryCount < maxRetries && ${cdnAvailable}) {
+              retryCount++;
+              setTimeout(tryRender, 500);
+              return;
+            }
+            fallback('LaTeX live renderer unavailable. Showing fallback preview.');
+            return;
+          }
+          const parsed = latexLib.parse(normalizeForPreview(code), {
+            generator: new latexLib.HtmlGenerator({ hyphenate: false })
+          });
+          const fragment = parsed && parsed.domFragment ? parsed.domFragment : null;
+          if (!fragment) {
+            fallback('Could not parse LaTeX. Showing fallback preview.');
+            return;
+          }
+          root.innerHTML = '';
+          root.appendChild(fragment);
+        } catch (err) {
+          fallback('LaTeX error: ' + (err && err.message ? err.message : 'parsing failed'));
+        }
+      }
+      
+      window.addEventListener('load', tryRender);
+      setTimeout(tryRender, ${cdnAvailable ? 2000 : 100});
+    })();
+  `.replace(/\n\s+/g, '') // Minify by removing newlines and extra spaces
+  
+  return `<!doctype html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/>${scriptTag}<style>body{margin:0;padding:1rem;font-family:ui-serif,Georgia,serif;background:#fafafa;color:#111827;font-size:14px}#root{background:#fff;border:1px solid #e5e7eb;border-radius:.75rem;padding:1.5rem;min-height:calc(100vh - 2rem);overflow:auto}h1,h2,h3,h4,h5,h6{margin-top:1rem;margin-bottom:0.5rem;font-weight:bold}h1{font-size:1.5rem}h2{font-size:1.25rem}h3{font-size:1.1rem}h4{font-size:1rem}pre{white-space:pre-wrap;word-break:break-word;background:#f4f4f5;border-radius:.5rem;padding:.75rem;font-size:0.9rem;line-height:1.4}.error{color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:.5rem;padding:.75rem;margin-bottom:1rem;font-size:0.9rem}.info{color:#1d4ed8;background:#dbeafe;border:1px solid #bfdbfe;border-radius:.5rem;padding:.75rem;margin-bottom:1rem;font-size:0.9rem}.fallback{font-family:ui-serif,Georgia,serif;font-size:.95rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}ul{list-style:disc;margin-left:1.5rem;margin-top:0.5rem;margin-bottom:0.5rem}li{margin:0.25rem 0}strong{font-weight:bold}em{font-style:italic}</style></head><body><div id="root"><pre class="fallback">${safeFallbackText}</pre></div><script>${rendererScript}</script></body></html>`
 }
 
 function DraftModePill({ mode }: { mode: ResumeMode }) {
@@ -287,28 +379,45 @@ function WordResumeEditor({ draft, onBack, onDelete, onPersistDraft }: { draft: 
 }
 
 function LatexResumeEditor({ draft, onBack, onDelete, onPersistDraft }: { draft: ResumeDraft; onBack: () => void; onDelete: (draftId: string) => void; onPersistDraft: (draftId: string, title: string, mode: ResumeMode, content: ResumeContent) => Promise<ResumeDraft> }) {
-  const { success, error: showError, info } = useToast()
+  const { success, error: showError } = useToast()
   const [title, setTitle] = useState(draft.title)
   const [latexSource, setLatexSource] = useState(normalizeLatexSource(draft.content))
   const [isSaving, setIsSaving] = useState(false)
   const [isDirty, setIsDirty] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState(draft.updated_at)
-  const [cdnScript, setCdnScript] = useState<string | null>(null)
+  const [cdnAvailable, setCdnAvailable] = useState(false)
+  const cdnCheckRef = useRef(false)
   const autosaveTimerRef = useRef<number | null>(null)
 
+  // Load CDN with retry logic and timeout
   useEffect(() => {
+    if (cdnCheckRef.current) return // Only check once per component lifetime
+    cdnCheckRef.current = true
+    
     let mounted = true
-    ;(async () => {
+    let attemptCount = 0
+    const maxAttempts = 2
+    
+    const checkCdn = async () => {
       try {
-        const resp = await fetch('https://cdn.jsdelivr.net/npm/latex.js/dist/latex.min.js')
-        if (resp.ok) {
-          const text = await resp.text()
-          if (mounted) setCdnScript(text)
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+        
+        const resp = await fetch('https://cdn.jsdelivr.net/npm/latex.js@0.12.4/dist/latex.min.js', { signal: controller.signal })
+        clearTimeout(timeout)
+        
+        if (resp.ok && mounted) {
+          setCdnAvailable(true)
         }
-      } catch {
-        if (mounted) setCdnScript(null)
+      } catch (err) {
+        if (mounted && attemptCount < maxAttempts) {
+          attemptCount++
+          setTimeout(checkCdn, 1000) // Retry after 1 second
+        }
       }
-    })()
+    }
+    
+    checkCdn()
     return () => { mounted = false }
   }, [])
 
@@ -319,11 +428,7 @@ function LatexResumeEditor({ draft, onBack, onDelete, onPersistDraft }: { draft:
     setIsDirty(false)
   }, [draft.id])
 
-  useEffect(() => {
-    info('Preparing live renderer', 'If unavailable, a readable preview is shown below.')
-  }, [draft.id, info])
-
-  const previewHtml = useMemo(() => buildLatexPreviewHtml(latexSource, cdnScript), [latexSource, cdnScript])
+  const previewHtml = useMemo(() => buildLatexPreviewHtml(latexSource, cdnAvailable), [latexSource, cdnAvailable])
 
   const saveDraft = async (notify = false) => {
     setIsSaving(true)
@@ -358,10 +463,9 @@ function LatexResumeEditor({ draft, onBack, onDelete, onPersistDraft }: { draft:
   const resetTemplate = () => {
     setLatexSource(DEFAULT_LATEX_SOURCE)
     setIsDirty(true)
-    info('Template reset', 'The LaTeX source has been reset to the starter template.')
   }
 
-  return <section className="card p-5 md:p-6 space-y-4"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div className="flex items-center gap-3"><button className="btn-secondary" onClick={onBack}><ArrowLeft className="w-4 h-4" />Back to drafts</button><div><h1 className="text-2xl font-bold text-zinc-900 dark:text-white">LaTeX Resume</h1><p className="text-sm text-zinc-500 dark:text-zinc-400">Source editor with live preview.</p></div></div><div className="flex flex-wrap items-center gap-2"><button className="btn-secondary" onClick={resetTemplate}><RotateCcw className="w-4 h-4" />Reset Template</button><button className="btn-secondary" onClick={() => void saveDraft(true)} disabled={isSaving}><Save className="w-4 h-4" />{isSaving ? 'Saving...' : 'Save Draft'}</button><button className="btn-secondary" onClick={copyLatex}><Code2 className="w-4 h-4" />Copy LaTeX</button><button type="button" className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900" onClick={() => onDelete(draft.id)} title="Delete draft"><Trash2 className="w-4 h-4" /></button></div></div><div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-center"><label className="block"><span className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Resume title</span><input value={title} onChange={(e) => { setTitle(e.target.value); setIsDirty(true) }} placeholder="Untitled Resume" className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-primary-500" /></label><div className="text-sm text-zinc-500 dark:text-zinc-400 md:text-right">{formatSaveTime(lastSavedAt)}{isDirty ? <span className="ml-2 text-amber-500">Unsaved changes</span> : null}</div></div><div className="grid grid-cols-1 gap-4 xl:grid-cols-2"><div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">LaTeX Source</p><span className="text-xs text-zinc-500">{latexSource.length} chars</span></div><textarea value={latexSource} onChange={(e) => { setLatexSource(e.target.value); setIsDirty(true) }} className="h-[540px] w-full resize-y rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-primary-500" spellCheck={false} aria-label="LaTeX source" /></div><div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Preview</p><span className="inline-flex items-center gap-1 text-xs text-zinc-500"><FileText className="w-3.5 h-3.5" />Live</span></div><iframe title="LaTeX preview" srcDoc={previewHtml} className="h-[540px] w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white" sandbox="allow-scripts allow-same-origin" />{cdnScript === null ? <p className="mt-2 text-xs text-zinc-500">Preview unavailable right now. The fallback preview is shown in the frame.</p> : null}</div></div></section>
+  return <section className="card p-5 md:p-6 space-y-4"><div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between"><div className="flex items-center gap-3"><button className="btn-secondary" onClick={onBack}><ArrowLeft className="w-4 h-4" />Back to drafts</button><div><h1 className="text-2xl font-bold text-zinc-900 dark:text-white">LaTeX Resume</h1><p className="text-sm text-zinc-500 dark:text-zinc-400">Source editor with live preview{cdnAvailable ? ' ✓' : ' (rendering optimized)'}.</p></div></div><div className="flex flex-wrap items-center gap-2"><button className="btn-secondary" onClick={resetTemplate}><RotateCcw className="w-4 h-4" />Reset Template</button><button className="btn-secondary" onClick={() => void saveDraft(true)} disabled={isSaving}><Save className="w-4 h-4" />{isSaving ? 'Saving...' : 'Save Draft'}</button><button className="btn-secondary" onClick={copyLatex}><Code2 className="w-4 h-4" />Copy LaTeX</button><button type="button" className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-2 text-zinc-500 hover:bg-zinc-100 dark:hover:bg-zinc-900" onClick={() => onDelete(draft.id)} title="Delete draft"><Trash2 className="w-4 h-4" /></button></div></div><div className="grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto] md:items-center"><label className="block"><span className="text-xs uppercase tracking-wide text-zinc-500 dark:text-zinc-400">Resume title</span><input value={title} onChange={(e) => { setTitle(e.target.value); setIsDirty(true) }} placeholder="Untitled Resume" className="mt-1 w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-sm text-zinc-900 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-primary-500" /></label><div className="text-sm text-zinc-500 dark:text-zinc-400 md:text-right">{formatSaveTime(lastSavedAt)}{isDirty ? <span className="ml-2 text-amber-500">Unsaved changes</span> : null}</div></div><div className="grid grid-cols-1 gap-4 xl:grid-cols-2"><div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">LaTeX Source</p><span className="text-xs text-zinc-500">{latexSource.length} chars</span></div><textarea value={latexSource} onChange={(e) => { setLatexSource(e.target.value); setIsDirty(true) }} className="h-[540px] w-full resize-y rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 font-mono text-xs text-zinc-800 dark:text-zinc-100 focus:outline-none focus:ring-2 focus:ring-primary-500" spellCheck={false} aria-label="LaTeX source" /></div><div className="rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/60 dark:bg-zinc-900/40 p-3"><div className="mb-2 flex items-center justify-between"><p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Preview</p><span className="inline-flex items-center gap-1 text-xs text-zinc-500"><FileText className="w-3.5 h-3.5" />{cdnAvailable ? 'Live rendering' : 'Readable preview'}</span></div><iframe title="LaTeX preview" srcDoc={previewHtml} className="h-[540px] w-full rounded-lg border border-zinc-300 dark:border-zinc-700 bg-white" sandbox="allow-scripts allow-same-origin" /></div></div></section>
 }
 
 export default function ResumePage() {
