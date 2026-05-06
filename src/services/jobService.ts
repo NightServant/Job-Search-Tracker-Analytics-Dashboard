@@ -62,9 +62,10 @@ export const jobService = {
       .select('*')
       .eq('id', id)
       .eq('user_id', user.id)
-      .single()
+      .maybeSingle()
 
     if (error) throw this._toError(error)
+    if (!data) throw new Error('Not found')
     return data
   },
 
@@ -85,9 +86,10 @@ export const jobService = {
         user_id: user.id,
       })
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw this._toError(error)
+    if (!data) throw new Error('Insert failed')
     return data
   },
 
@@ -130,9 +132,10 @@ export const jobService = {
       .eq('id', id)
       .eq('user_id', user.id)
       .select()
-      .single()
+      .maybeSingle()
 
     if (error) throw this._toError(error)
+    if (!data) throw new Error('Update failed or not authorized')
     return data
   },
 
