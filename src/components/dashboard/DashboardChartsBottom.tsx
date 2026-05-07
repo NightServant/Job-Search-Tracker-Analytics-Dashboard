@@ -94,8 +94,9 @@ export default function DashboardChartsBottom({
                 Range Distribution
               </h3>
               {salaryInsights.distribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={salaryInsights.distribution}>
+                <div className="w-full h-56 sm:h-60 lg:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={salaryInsights.distribution}>
                     <CartesianGrid
                       strokeDasharray="3 3"
                       stroke="#e4e4e7"
@@ -123,10 +124,11 @@ export default function DashboardChartsBottom({
                       }}
                     />
                     <Bar dataKey="count" fill="#6366f1" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
-                <div className="h-[220px] flex items-center justify-center text-zinc-400">
+                <div className="h-56 sm:h-60 lg:h-64 flex items-center justify-center text-zinc-400">
                   <p>No salary distribution data</p>
                 </div>
               )}
@@ -137,37 +139,39 @@ export default function DashboardChartsBottom({
                 Average by Stage
               </h3>
               {salaryInsights.averageByStatus.length > 0 ? (
-                <ResponsiveContainer width="100%" height={220}>
-                  <BarChart data={salaryInsights.averageByStatus}>
-                    <CartesianGrid
-                      strokeDasharray="3 3"
-                      stroke="#e4e4e7"
-                      className="dark:stroke-zinc-700"
-                    />
-                    <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#71717a" />
-                    <YAxis
-                      tick={{ fontSize: 12 }}
-                      stroke="#71717a"
-                      tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
-                    />
-                    <Tooltip
-                      formatter={(value: number) => currencyFormatter.format(value)}
-                      contentStyle={{
-                        backgroundColor: 'white',
-                        border: '1px solid #e4e4e7',
-                        borderRadius: '8px',
-                      }}
-                    />
-                    <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
-                      {salaryInsights.averageByStatus.map((entry) => (
-                        <Cell key={entry.status} fill={entry.color} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
+                <div className="w-full h-56 sm:h-60 lg:h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={salaryInsights.averageByStatus}>
+                      <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#e4e4e7"
+                        className="dark:stroke-zinc-700"
+                      />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#71717a" />
+                      <YAxis
+                        tick={{ fontSize: 12 }}
+                        stroke="#71717a"
+                        tickFormatter={(v) => `${Math.round(Number(v) / 1000)}k`}
+                      />
+                      <Tooltip
+                        formatter={(value: number) => currencyFormatter.format(value)}
+                        contentStyle={{
+                          backgroundColor: 'white',
+                          border: '1px solid #e4e4e7',
+                          borderRadius: '8px',
+                        }}
+                      />
+                      <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
+                        {salaryInsights.averageByStatus.map((entry) => (
+                          <Cell key={entry.status} fill={entry.color} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               ) : (
-                <div className="h-[220px] flex items-center justify-center text-zinc-400">
-                  <p>No stage averages yet</p>
+                <div className="h-56 sm:h-60 lg:h-64 flex items-center justify-center text-zinc-400">
+                  <p>No salary data by stage</p>
                 </div>
               )}
             </div>
@@ -242,8 +246,9 @@ export default function DashboardChartsBottom({
             <p>Loading status history…</p>
           </div>
         ) : sankeyData.links.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <Sankey
+          <div className="w-full h-72 sm:h-80 lg:h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <Sankey
               data={sankeyData}
               nodePadding={20}
               nodeWidth={12}
@@ -256,10 +261,11 @@ export default function DashboardChartsBottom({
                   borderRadius: '8px',
                 }}
               />
-            </Sankey>
-          </ResponsiveContainer>
+              </Sankey>
+            </ResponsiveContainer>
+          </div>
         ) : (
-          <div className="h-[300px] flex items-center justify-center text-zinc-400">
+          <div className="h-72 sm:h-80 lg:h-96 flex items-center justify-center text-zinc-400">
             <p>No status changes yet</p>
           </div>
         )}

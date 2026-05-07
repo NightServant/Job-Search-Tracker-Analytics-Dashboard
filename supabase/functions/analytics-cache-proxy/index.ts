@@ -8,14 +8,15 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: {
-      ...mergeSecurityHeaders(corsHeaders),
-      'Content-Type': 'application/json',
-    },
-  })
+function jsonResponse(body: unknown, status = 200, cacheControl?: string) {
+  const headers: Record<string, string> = {
+    ...mergeSecurityHeaders(corsHeaders),
+    'Content-Type': 'application/json',
+  }
+  if (cacheControl) {
+    headers['Cache-Control'] = cacheControl
+  }
+  return new Response(JSON.stringify(body), { status, headers })
 }
 
 // Compute analytics by querying Supabase directly
@@ -221,7 +222,7 @@ Deno.serve(async (req: Request) => {
       if (cached?.payload) {
         // Cache hit
         emitMonitoringEvent(buildCompletionEvent({ functionName: 'analytics-cache-proxy', requestId, status: 200, latencyMs: Date.now() - start, callerKey, message: 'Cache hit', extra: { metric } }))
-        return jsonResponse({ cached: true, payload: cached.payload, updated_at: cached.updated_at }, 200)
+        return jsonResponse({ cached: true, payload: cached.payload, updated_at: cached.updated_at }, 200, 'public, max-age=300')
       }
     }
 
@@ -262,7 +263,8 @@ Deno.serve(async (req: Request) => {
 
     return jsonResponse(
       { cached: false, payload: computedPayload, updated_at: new Date().toISOString() },
-      200
+      200,
+      'public, max-age=300'
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)

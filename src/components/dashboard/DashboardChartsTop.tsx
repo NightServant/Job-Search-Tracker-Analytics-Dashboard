@@ -30,8 +30,9 @@ export default function DashboardChartsTop({
           Applications Over Time
         </h2>
         {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={chartData}>
+          <div className="w-full h-72 sm:h-80 lg:h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
               <CartesianGrid
                 strokeDasharray="3 3"
                 stroke="#e4e4e7"
@@ -57,9 +58,10 @@ export default function DashboardChartsTop({
                 name="Applications"
               />
             </BarChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         ) : (
-          <div className="h-[300px] flex items-center justify-center text-zinc-400">
+          <div className="h-72 sm:h-80 lg:h-96 flex items-center justify-center text-zinc-400">
             <p>No application data yet</p>
           </div>
         )}
@@ -71,8 +73,9 @@ export default function DashboardChartsTop({
           Status Distribution
         </h2>
         {statusData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
+          <div className="w-full h-72 sm:h-80 lg:h-96">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
               <Pie
                 data={statusData}
                 cx="50%"
@@ -103,9 +106,10 @@ export default function DashboardChartsTop({
                 }
               />
             </PieChart>
-          </ResponsiveContainer>
+            </ResponsiveContainer>
+          </div>
         ) : (
-          <div className="h-[300px] flex items-center justify-center text-zinc-400">
+          <div className="h-72 sm:h-80 lg:h-96 flex items-center justify-center text-zinc-400">
             <p>No jobs tracked yet</p>
           </div>
         )}
