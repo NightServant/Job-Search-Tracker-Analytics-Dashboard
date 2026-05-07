@@ -12,6 +12,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from '@/contexts/ThemeContext'
+import { useToast } from '@/contexts/ToastContext'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -41,15 +42,23 @@ export default function Layout() {
       return false
     }
   })
+  const [isSigningOut, setIsSigningOut] = useState(false)
   const { user, signOut } = useAuth()
   const { theme, toggleTheme } = useTheme()
+  const { error: showError } = useToast()
   const location = useLocation()
 
   const handleSignOut = async () => {
     try {
+      setIsSigningOut(true)
       await signOut()
+      // Close sidebar after signing out
+      setSidebarOpen(false)
     } catch (error) {
+      setIsSigningOut(false)
       console.error('Error signing out:', error)
+      const message = error instanceof Error ? error.message : 'Failed to sign out'
+      showError('Sign Out Failed', message)
     }
   }
 
@@ -153,10 +162,20 @@ export default function Layout() {
               </button>
               <button
                 onClick={handleSignOut}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors"
+                disabled={isSigningOut}
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <LogOut className="w-4 h-4" />
-                Sign Out
+                {isSigningOut ? (
+                  <>
+                    <div className="w-4 h-4 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                    Signing Out...
+                  </>
+                ) : (
+                  <>
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </>
+                )}
               </button>
             </div>
           </div>
