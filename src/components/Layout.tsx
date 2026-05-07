@@ -52,7 +52,9 @@ export default function Layout() {
     try {
       setIsSigningOut(true)
       await signOut()
-      // Close sidebar after signing out
+      // Sidebar and redirect are handled automatically:
+      // - Sidebar closes due to UI unmount
+      // - ProtectedRoute detects user === null and redirects to /login
       setSidebarOpen(false)
     } catch (error) {
       setIsSigningOut(false)
@@ -76,7 +78,7 @@ export default function Layout() {
       <aside
         className={`fixed inset-y-0 left-0 z-50 bg-white dark:bg-card border-r border-zinc-200 dark:border-border transform transition-all duration-200 ease-in-out lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${sidebarCollapsed ? 'w-20' : 'w-64'}`}
+        } w-full ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-64'}`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -104,7 +106,7 @@ export default function Layout() {
               </span>
             </button>
             <button
-              className="lg:hidden p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              className="lg:hidden p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 min-h-11 min-w-11"
               onClick={() => setSidebarOpen(false)}
             >
               <X className="w-5 h-5 text-zinc-500" />
@@ -119,7 +121,7 @@ export default function Layout() {
                 <NavLink
                   key={item.name}
                   to={item.href}
-                  className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-3'} py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-3'} py-3 rounded-lg text-sm font-medium transition-colors min-h-11 ${
                     isActive
                       ? 'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400'
                       : 'text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800'
@@ -151,7 +153,7 @@ export default function Layout() {
             <div className={`flex items-center gap-2 mt-2 ${sidebarCollapsed ? 'hidden' : ''}`}>
               <button
                 onClick={toggleTheme}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors min-h-11"
               >
                 {theme === 'dark' ? (
                   <Sun className="w-4 h-4" />
@@ -163,7 +165,7 @@ export default function Layout() {
               <button
                 onClick={handleSignOut}
                 disabled={isSigningOut}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm text-red-600 hover:bg-red-50 dark:hover:bg-red-950 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed min-h-11"
               >
                 {isSigningOut ? (
                   <>
@@ -187,7 +189,7 @@ export default function Layout() {
         {/* Top bar (mobile) */}
         <header className="sticky top-0 z-30 flex items-center h-16 px-4 bg-white dark:bg-card border-b border-zinc-200 dark:border-border lg:hidden">
           <button
-            className="p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            className="p-2 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800 min-h-11 min-w-11"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="w-5 h-5 text-zinc-500" />
