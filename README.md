@@ -45,7 +45,7 @@ A professional portfolio piece demonstrating full-stack web development and data
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/Job-Search-Tracker-Analytics-Dashboard.git
+   git clone https://github.com/NightServant/Job-Search-Tracker-Analytics-Dashboard.git
    cd Job-Search-Tracker-Analytics-Dashboard
    ```
 
