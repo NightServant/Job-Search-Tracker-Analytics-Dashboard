@@ -37,7 +37,7 @@ describe('Smoke Tests - Critical User Flows', () => {
       const session = { user: { id: 'user1' }, token: 'token123' }
 
       // Navigate to different pages
-      const pages = ['/jobs', '/resume', '/dashboard']
+      const pages = ['/jobs', '/cv', '/dashboard']
       pages.forEach((page) => {
         expect(session.user.id).toBe('user1') // Session should persist
       })

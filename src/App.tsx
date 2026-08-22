@@ -95,7 +95,7 @@ function AppRoutes() {
           }
         />
         <Route
-          path="resume"
+          path="cv"
           element={
             <Suspense fallback={<RouteLoader />}>
               <ResumePage />

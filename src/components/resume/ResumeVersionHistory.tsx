@@ -45,7 +45,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
     try {
       const snapshot = await getSnapshot(snapshotId, userId)
       await onRestore(snapshot.content)
-      success('Version restored', 'Resume has been restored to the selected version.')
+      success('Version restored', 'CV has been restored to the selected version.')
       setIsOpen(false)
     } catch (err) {
       showError('Restore failed', err instanceof Error ? err.message : 'Could not restore version')

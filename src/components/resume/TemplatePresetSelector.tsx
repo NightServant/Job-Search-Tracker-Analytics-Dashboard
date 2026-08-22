@@ -32,7 +32,7 @@ export function TemplatePresetSelector({ mode, onSelect }: TemplatePresetSelecto
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute left-0 top-full mt-2 z-50 w-80 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-lg">
             <div className="border-b border-zinc-200 dark:border-zinc-800 p-4">
-              <h3 className="font-semibold text-zinc-900 dark:text-white">Resume Templates</h3>
+              <h3 className="font-semibold text-zinc-900 dark:text-white">CV Templates</h3>
               <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
                 Choose a template to replace your current content.
               </p>

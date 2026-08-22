@@ -17,7 +17,7 @@ import { useToast } from '@/contexts/ToastContext'
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Jobs', href: '/jobs', icon: Briefcase },
-  { name: 'Resume Maker', href: '/resume', icon: FileText },
+  { name: 'CV Maker', href: '/cv', icon: FileText },
 ]
 
 function formatBuildTime(value: string): string {

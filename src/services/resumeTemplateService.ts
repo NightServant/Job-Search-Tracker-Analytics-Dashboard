@@ -13,7 +13,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
   {
     id: 'word-classic',
     name: 'Classic',
-    description: 'Traditional resume with clear sections and formatting',
+    description: 'Traditional CV with clear sections and formatting',
     mode: 'word',
     content: {
       type: 'doc',
@@ -383,7 +383,7 @@ export const LATEX_TEMPLATES: ResumeTemplate[] = [
   {
     id: 'latex-modern',
     name: 'Modern',
-    description: 'Clean and professional LaTeX resume with modern formatting',
+    description: 'Clean and professional LaTeX CV with modern formatting',
     mode: 'latex',
     content: {
       type: 'latex',
@@ -458,7 +458,7 @@ University Name, City, State
   {
     id: 'latex-compact',
     name: 'Compact',
-    description: 'Space-efficient LaTeX resume for keeping it to one page',
+    description: 'Space-efficient LaTeX CV for keeping it to one page',
     mode: 'latex',
     content: {
       type: 'latex',
@@ -514,7 +514,7 @@ email@example.com $|$ (555) 123-4567 $|$ linkedin.com/in/profile
   {
     id: 'latex-academic',
     name: 'Academic',
-    description: 'LaTeX resume with research and publications sections',
+    description: 'LaTeX CV with research and publications sections',
     mode: 'latex',
     content: {
       type: 'latex',
