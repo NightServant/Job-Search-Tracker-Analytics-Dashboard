@@ -36,3 +36,7 @@ __pycache__/
 .env
 venv/
 ENV/
+
+# Analysis script output (scripts/data_analysis.py)
+scripts/*.png
+scripts/*.csv
