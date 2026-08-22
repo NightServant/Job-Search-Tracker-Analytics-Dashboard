@@ -7,7 +7,6 @@
 -- - RLS policies only restrict access (never grant new access)
 -- - No data is modified
 
-BEGIN;
 
 -- ============================================================================
 -- 1. Allow 'onsite' in work_mode check constraint
@@ -71,4 +70,3 @@ CREATE POLICY "Users can delete own job status history"
   ON public.job_status_history FOR DELETE
   USING (auth.uid() = user_id);
 
-COMMIT;

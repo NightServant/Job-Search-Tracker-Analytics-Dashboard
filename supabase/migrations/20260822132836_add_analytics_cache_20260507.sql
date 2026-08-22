@@ -1,7 +1,6 @@
 -- Migration: create analytics_cache table for precomputed user metrics
 -- Run this in Supabase SQL editor or via psql
 
-BEGIN;
 
 -- Table to store JSON payloads for per-user analytics metrics
 CREATE TABLE IF NOT EXISTS public.analytics_cache (
@@ -27,7 +26,6 @@ BEGIN
 END;
 $$;
 
-COMMIT;
 
 -- Example queries you can run in Supabase SQL editor:
 -- 1) Read cached metric for a user:
