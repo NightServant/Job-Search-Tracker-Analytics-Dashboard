@@ -1,221 +1,190 @@
-# 📊 Job Search Tracker & Analytics Dashboard
+# Job Search Tracker & Analytics Dashboard
 
-> A full-stack web application for tracking job applications, visualizing progress, and gaining insights into your search strategy.
+Track job applications, visualise the pipeline, and build a CV — a full-stack React + Supabase application.
 
-**Built with**: React · TypeScript · TanStack Query · Supabase · Vite · Tailwind CSS  
-**Perfect for**: Showcasing full-stack skills, data visualization, and DevOps practices
+> **Project lineage.** This repository is the continuation of the [Job Search Tracker & Analytics Dashboard](https://github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard) originally created and built by **[Ensues (Janssen Quiambao)](https://github.com/Ensues)**, who authored the application and its features between March and May 2026. Development continues here under [@NightServant](https://github.com/NightServant). See [Credits](#credits).
 
-![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-06B6D4?style=for-the-badge&logo=tailwindcss)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
-![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3FCF8E?style=for-the-badge&logo=supabase)
+---
 
-## ✨ Key Features
+## Status
 
-### Job Tracking
-- **Full-Featured Entry System**: Company, role, salary, URL, status, date applied, notes, location, work mode  
-- **Smart Status Pipeline**: Wishlist → Applied → Interviewing → Offer/Rejected with drag-and-drop Kanban board  
-- **Advanced Filtering**: Filter by status, search by company/role, sort by date, and export as CSV  
+Active development. The database schema, migrations, and test suite are current; a public demo is **not deployed at the moment** while hosting is migrated. Run it locally with the instructions below.
 
-### Analytics & Insights
-- **Real-Time Dashboard**: Conversion rates, applications over time, status distribution  
-- **Deep Analytics**: Time-in-stage metrics, conversion funnels, cohort analysis, source trends  
-- **Intelligent Caching**: Edge function cache-proxy with automatic compute on miss (SWR pattern)  
-- **Python Analysis**: Export data for Pandas-based statistical analysis with visualizations  
+---
 
-### Developer Experience
-- **Dark Mode**: Smooth theme transitions with toggle and localStorage persistence  
-- **Error Boundary**: Friendly fallback UI with optional Sentry error reporting  
-- **Performance Optimized**: Lazy-loaded pages/charts, optimized bundle (~143KB gzip)  
-- **Testing**: 200+ unit tests (Vitest + React Testing Library), CI on pull requests  
-- **Build Metadata**: Version, commit SHA, build time in footer for debugging  
+## Features
 
-### Resume Tools
-- **Resume Maker**: LaTeX editor with live side-by-side preview  
-- **Resume Builder**: Word-like editor (Tiptap) with autosaved drafts and PDF export via edge functions
+**Job tracking**
+- Applications with company, role, salary range, location, work mode, source, tags, and tech stack
+- Status pipeline — wishlist → applied → interviewing → offer / rejected — with drag-and-drop
+- Automatic status-change history, recorded by a database trigger
+- Auto-fill from a job posting URL, parsed server-side across multiple job boards
+- Filtering, search, sorting, and CSV export
 
-## 🏗️ Architecture
+**Analytics**
+- Conversion and offer rates, applications over time, status distribution
+- Time-in-stage metrics, conversion funnels, and source trends
+- Precomputed metrics cached in Postgres behind an edge function (stale-while-revalidate)
 
-### Frontend Stack
-| Layer | Technology | Why? |
-|-------|-----------|---------|
-| UI Framework | React 18 + Vite | Fast refresh, optimized builds, minimal config |
-| State Management | TanStack Query v5 | Built-in caching (SWR), auto-deduplication, background refetch |
-| Type Safety | TypeScript | Strict mode, catch errors at compile time |
-| Styling | Tailwind CSS v3 | Utility-first, dark mode built-in, small footprint |
-| Data Fetching | @tanstack/react-query | Client-side cache layer before edge functions |
-| Forms/Editors | Tiptap, React Hook Form | Rich editing, validation, autosave |
-| Charts | Recharts | Lazy-loaded, responsive, accessibility-friendly |
-| Icons | Lucide React | Consistent, tree-shakeable, on-brand |
+**CV builder**
+- Word-style rich text editor (Tiptap) with autosave
+- LaTeX source editor with live side-by-side preview
+- Template presets for both modes
+- Version history — snapshots capped at 10 per CV
+- PDF export via edge function
 
-### Backend Stack
-| Layer | Technology | Details |
-|-------|-----------|---------|
-| Database | PostgreSQL (Supabase) | 5 tables, RLS policies, indexes for query performance |
-| Authentication | Supabase Auth | Magic links, social auth, built-in 2FA |
-| Edge Functions | Deno (Supabase Functions) | Auto-fill URL parsing, PDF export, analytics cache proxy |
-| Analytics Cache | PostgreSQL + Edge Functions | SWR pattern: check cache → compute on miss → auto-upsert |
-| Monitoring | Sentry (optional) + Edge Logs | Error tracking, performance monitoring, custom edge metrics |
-| Infrastructure | Vercel (frontend) + Supabase (backend) | Serverless deployment, auto-scaling, edge caching |
-| Testing | Vitest + React Testing Library | 200+ unit tests, smoke tests |
-| CI/CD | GitHub Actions | Auto-test on PR, build verification |
-| Data Science | Python 3.8+ (Pandas, Matplotlib) | Local analysis script post-export |
+**Engineering**
+- Row-Level Security on every table; users can only reach their own rows
+- 218 unit tests across 13 files (Vitest + React Testing Library)
+- Error boundaries with optional Sentry reporting
+- Dark mode, lazy-loaded routes and charts
 
-## Getting Started
+---
 
-### Prerequisites
+## Stack
 
-- Node.js 18+ and npm
-- Supabase account (free tier works)
-- Python 3.8+ (for data analysis script)
+| Layer | Technology |
+|---|---|
+| UI | React 18, TypeScript, Vite |
+| Styling | Tailwind CSS, shadcn-style semantic tokens |
+| Data fetching | TanStack Query v5 |
+| Editor | Tiptap |
+| Charts | Recharts |
+| Database | PostgreSQL (Supabase) |
+| Auth | Supabase Auth |
+| Server-side | Supabase Edge Functions (Deno) |
+| Testing | Vitest, React Testing Library |
+| Analysis | Python (pandas, matplotlib, seaborn) |
 
-### Installation
+---
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/NightServant/Job-Search-Tracker-Analytics-Dashboard.git
-   cd Job-Search-Tracker-Analytics-Dashboard
-   ```
+## Architecture
 
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
+**Database** — five tables, RLS enabled on all of them:
 
-3. **Set up Supabase**
-   - Create a new project at [supabase.com](https://supabase.com)
-   - Follow the canonical migration steps in [texts/database_migrations.md](texts/database_migrations.md)
-   - Run `texts/resumes_feature_migration.sql` to enable Resume Builder draft storage
-   - Deploy edge function `job-url-autofill` from `supabase/functions/job-url-autofill`
-   - Deploy edge function `resume-export-pdf` from `supabase/functions/resume-export-pdf`
-     - This is required for the **“Auto-fill from URL”** button. If you skip this step, the rest of the app still works, but auto-fill will show an error at runtime.
-     - This is also required for the **“Export PDF”** button in Resume Builder.
-       - Optional but recommended: set `EDGE_SENTRY_DSN` and `EDGE_SENTRY_ENVIRONMENT` as Supabase secrets so edge-function errors and slow requests show up in Sentry.
-       - The edge functions emit `edge_metric` JSON logs with latency, throttling, and DB connection counts, which can feed Supabase log-based alerts or a lightweight external monitor.
-     - Using the Supabase CLI (recommended):
-       ```bash
-       # Install the Supabase CLI first (see Supabase docs)
-       supabase login
-       supabase link --project-ref <your-project-ref>
-       supabase functions deploy job-url-autofill
-       supabase functions deploy resume-export-pdf
-       ```
-   - Copy the project URL and anon key from Settings > API
+| Table | Purpose |
+|---|---|
+| `jobs` | Applications, with contact/tag/tech-stack fields |
+| `job_status_history` | Append-only status transitions, written by trigger |
+| `resumes` | CV drafts; Tiptap JSON or LaTeX source |
+| `resume_snapshots` | Immutable version history |
+| `analytics_cache` | Precomputed per-user metrics, service-role only |
 
-4. **Configure environment variables**
-   ```bash
-   cp .env.example .env.local
-   ```
-   Edit `.env.local` with the Supabase credentials:
-   ```
-   VITE_SUPABASE_URL=https://project-id.supabase.co
-   VITE_SUPABASE_ANON_KEY=anon-key-value
-   ```
+**Edge functions** (Deno, in `supabase/functions/`):
 
-5. **Start the development server**
-   ```bash
-   npm run dev
-   ```
+| Function | Purpose |
+|---|---|
+| `job-url-autofill` | Fetches and parses job postings into form fields |
+| `analytics-cache-proxy` | Reads cache, computes on miss, upserts result |
+| `resume-export-pdf` | Renders a CV to PDF |
+| `_shared` | Common headers and telemetry helpers |
 
-6. **Open the app**
-   Navigate to `http://localhost:5173`
+---
 
-### Testing
+## Getting started
 
-- Run unit tests:
-   ```bash
-   npm test
-   ```
-- Run tests in watch mode:
-   ```bash
-   npm run test:watch
-   ```
-- The CI workflow runs tests and a production build on every pull request.
+**Prerequisites** — Node.js 18+, a Supabase project, and the [Supabase CLI](https://supabase.com/docs/guides/local-development).
 
-## Project Structure
-
-```
-├── src/
-│   ├── components/       # React components
-│   │   ├── jobs/         # Job-related components
-│   │   └── Layout.tsx    # App shell
-│   ├── contexts/         # React contexts (auth, theme)
-│   ├── hooks/            # Custom hooks (useJobs, useJobStats)
-│   ├── lib/              # Utilities (Supabase client)
-│   ├── pages/            # Page components
-│   ├── services/         # API service layer
-│   ├── types/            # TypeScript definitions
-│   └── App.tsx           # Root component
-├── scripts/
-│   └── data_analysis.py  # Python analysis script
-├── texts/                # Documentation & References
-│   ├── database_migrations.md         # Current DB setup (v3 schema)
-│   ├── database_schema_v3_migration.txt
-│   ├── database_schema.txt            # Base schema reference
-│   ├── data_dictionary.txt            # Field definitions
-│   ├── component_architecture.txt     # Component patterns
-│   ├── api_logic.txt                  # API layer overview
-│   ├── technical_appendix.txt         # Edge functions & monitoring
-│   ├── resumes_feature_migration.sql  # Resume builder migration
-│   └── supabase_fix.sql               # RLS policies & fixes
-└── public/               # Static assets
+```bash
+git clone https://github.com/NightServant/Job-Search-Tracker-Analytics-Dashboard.git
+cd Job-Search-Tracker-Analytics-Dashboard
+npm install
 ```
 
-## Data Analysis (Python)
+**Configure environment** — copy the example and fill in your project's values from Supabase → Settings → API:
 
-1. **Export job data** from the dashboard (CSV download button)
-
-2. **Install Python dependencies**
-   ```bash
-   pip install pandas matplotlib seaborn
-   ```
-
-3. **Run the analysis**
-   ```bash
-   cd scripts
-   python data_analysis.py
-   ```
-
-The script generates:
-- Statistical report with conversion rates
-- Status distribution pie chart
-- Applications timeline bar chart
-- Salary distribution box plot
-- Top companies chart
-
-## Deployment
-
-### Vercel (Recommended)
-
-1. Push the code to GitHub
-2. Import the project in Vercel
-3. Add environment variables in Vercel settings
-4. Deploy!
-
-### Environment Variables for Production
-
-```
-VITE_SUPABASE_URL=production_url
-VITE_SUPABASE_ANON_KEY=production_anon_key
-VITE_SENTRY_DSN=optional_sentry_dsn
-VITE_SENTRY_ENVIRONMENT=production
+```bash
+cp .env.example .env
 ```
 
-The build also embeds the app version, commit SHA, and build time in the footer for support/debugging.
+```
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_...
+```
 
-### Production Checklist
+Use the **publishable** key, never the secret key — Vite inlines `VITE_`-prefixed variables into the client bundle.
 
-1. Run `npm test`.
-2. Run `npm run build`.
-3. Confirm [texts/database_migrations.md](texts/database_migrations.md) has been applied in Supabase.
-4. Deploy the Supabase edge functions used by auto-fill and PDF export.
-5. Verify the production URL after deployment.
+**Apply migrations** — the eight files in `supabase/migrations/` reproduce the full schema:
 
-## Analytics Formulas
+```bash
+supabase link --project-ref <your-project-ref>
+supabase db push
+```
 
-**Conversion Rate (Interview Rate):**
-$$\text{Conversion \%} = \left( \frac{\text{Interviews}}{\text{Applications}} \right) \times 100$$
+**Deploy edge functions** — optional, but auto-fill and PDF export need them:
 
-**Offer Rate:**
-$$\text{Offer \%} = \left( \frac{\text{Offers}}{\text{Applications}} \right) \times 100$$
+```bash
+supabase functions deploy job-url-autofill
+supabase functions deploy resume-export-pdf
+supabase functions deploy analytics-cache-proxy
+```
+
+**Run it:**
+
+```bash
+npm run dev
+```
+
+---
+
+## Testing
+
+```bash
+npm test          # single run
+npm run test:watch
+npm run build     # type-check and production build
+```
+
+---
+
+## Data analysis
+
+An optional Python script produces statistics and charts from exported CSV data.
+
+```bash
+python3 -m venv venv
+./venv/bin/pip install pandas matplotlib seaborn
+cd scripts && ../venv/bin/python data_analysis.py
+```
+
+Export your jobs as CSV from the dashboard and place the file in `scripts/`. Without one, the script runs on built-in sample data and reports fabricated numbers — check the output for the "Generating sample data" notice.
+
+---
+
+## Project structure
+
+```
+src/
+├── components/     UI components; jobs/, resume/, dashboard/, errors/
+├── contexts/       Auth, theme, toast
+├── hooks/          useJobs, useAnalytics
+├── lib/            Supabase client, CSV, Sentry
+├── pages/          Dashboard, Jobs, CV, Login
+└── services/       Data access, validation, templates, analytics
+supabase/
+├── functions/      Deno edge functions
+└── migrations/     Ordered SQL migrations
+scripts/            Python analysis
+texts/              Design and reference documentation
+```
+
+---
+
+## Roadmap
+
+- [ ] Restore a public demo deployment
+- [ ] Break up the oversized page components
+- [ ] Migrate to Next.js and Vercel
+- [ ] Design system pass (shadcn/ui + motion)
+- [ ] Grammar and spelling checks in the CV editor
+- [ ] AI-assisted CV tailoring against a job description
+
+---
+
+## Credits
+
+**Original author** — [Ensues (Janssen Quiambao)](https://github.com/Ensues) designed and built this application: the job tracker, analytics dashboard, CV builder, edge functions, and test suite.
+
+**Current maintainer** — [@NightServant](https://github.com/NightServant), continuing development from August 2026: repository and branch consolidation, database migration history, schema fixes, and ongoing feature work.
+
+Run `git shortlog -sne --all` for the full contribution breakdown.
