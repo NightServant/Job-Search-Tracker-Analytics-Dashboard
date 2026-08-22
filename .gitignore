@@ -40,3 +40,6 @@ ENV/
 # Analysis script output (scripts/data_analysis.py)
 scripts/*.png
 scripts/*.csv
+
+# Supabase CLI local link state (machine-specific, must not be committed)
+supabase/.temp/
