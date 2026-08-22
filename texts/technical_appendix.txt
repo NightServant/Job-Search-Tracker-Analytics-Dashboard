@@ -1,0 +1,55 @@
+================================================================================
+TECHNICAL APPENDIX
+================================================================================
+
+Purpose
+- This appendix gives a simple system overview for the Job Search Tracker app.
+- It is meant to help us understand how the UI, Supabase, and analytics pieces fit together.
+
+System Overview
+- Frontend: React + TypeScript + Vite + Tailwind CSS.
+- Backend/data layer: Supabase (Auth, Postgres, Edge Functions).
+- Data fetching: TanStack Query.
+- Visualization: dashboard charts, including the Pipeline Flow (Sankey).
+
+Main Data Flow
+1. The user signs in through Supabase Auth.
+2. The app reads and writes job records from the public.jobs table.
+3. The dashboard computes analytics from those job records.
+4. The Sankey chart reads public.job_status_history to show status transitions.
+5. The Auto-fill from URL feature calls the job-url-autofill Supabase Edge Function.
+
+Current Database Tables
+- public.jobs: main job tracker table.
+- public.job_status_history: stores status change history for Sankey and job history views.
+- public.resume_documents: exists in the schema context, but the current app code does not reference it.
+
+What the App Expects
+- A signed-in user must be able to read and write only their own jobs.
+- The jobs table must allow inserts, updates, deletes, and selects through RLS.
+- The job_status_history table must exist and be readable by the owner.
+- The database should log status changes automatically, otherwise the Sankey chart will have no data.
+
+Likely Cause of the Error
+- The screenshot shows a permission/RLS failure when saving a job.
+- That usually means one of these is missing:
+  - RLS policies for public.jobs
+  - The job status history migration
+  - The trigger that writes history rows on status change
+  - A valid authenticated session when the save happens
+
+Simple Diagnosis
+- If adding a job fails immediately, check public.jobs policies first.
+- If the job saves but the Sankey chart says it cannot load status history, check public.job_status_history and its trigger.
+- If the job-url auto-fill fails, confirm the job-url-autofill Edge Function is deployed.
+
+Recommended Database State
+- Apply the base jobs schema.
+- Apply the V3 migration for job_status_history and the status-change trigger.
+- Enable RLS on both public.jobs and public.job_status_history.
+- Add owner-only SELECT/INSERT/UPDATE/DELETE policies.
+
+Notes
+- The current frontend does not write to job_status_history directly.
+- History rows must be created by the database trigger, not by the UI.
+- resume_documents is optional for the current codebase unless the resume-storage feature is restored.

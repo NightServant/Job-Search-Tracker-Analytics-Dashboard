@@ -1,6 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import AppErrorBoundary from '@/components/errors/AppErrorBoundary'
+import { initSentry } from '@/lib/sentry'
 import App from './App'
 import './index.css'
 
@@ -14,10 +16,14 @@ const queryClient = new QueryClient({
   },
 })
 
+initSentry()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <App />
-    </QueryClientProvider>
+    <AppErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <App />
+      </QueryClientProvider>
+    </AppErrorBoundary>
   </StrictMode>,
 )

@@ -5,6 +5,11 @@ import {
   DollarSign,
   Calendar,
   MoreVertical,
+  MapPin,
+  Wifi,
+  Clock,
+  User,
+  GripVertical,
 } from 'lucide-react'
 import { useState, useRef, useEffect } from 'react'
 import { Job, JobStatus, STATUS_CONFIG } from '@/types'
@@ -15,6 +20,7 @@ interface JobCardProps {
   onDelete: (id: string) => void
   onStatusChange: (id: string, status: JobStatus) => void
   compact?: boolean
+  dragHandleProps?: React.HTMLAttributes<HTMLButtonElement>
 }
 
 export default function JobCard({
@@ -23,6 +29,7 @@ export default function JobCard({
   onDelete,
   onStatusChange,
   compact = false,
+  dragHandleProps,
 }: JobCardProps) {
   const [showMenu, setShowMenu] = useState(false)
   const [showStatusMenu, setShowStatusMenu] = useState(false)
@@ -65,15 +72,38 @@ export default function JobCard({
     })
   }
 
+  const formatDateTime = (date: string) => {
+    return new Date(date).toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
   const statusConfig = STATUS_CONFIG[job.status]
   const salary = formatSalary(job.salary_min, job.salary_max)
   const appliedDate = formatDate(job.date_applied)
+  const lastTouched = formatDateTime(job.updated_at)
+  const tags = job.tags ?? []
+  const techStack = job.tech_stack ?? []
 
   if (compact) {
     // Compact version for Kanban board
     return (
-      <div className="card-hover p-3 space-y-2">
-        <div className="flex items-start justify-between gap-2">
+      <div className="card-hover group p-3 space-y-2 hover:-translate-y-0.5 hover:shadow-lg">
+        <div className="flex items-start gap-2">
+          {dragHandleProps ? (
+            <button
+              type="button"
+              aria-label="Drag job"
+              className="p-1 -ml-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 cursor-grab active:cursor-grabbing"
+              {...dragHandleProps}
+            >
+              <GripVertical className="w-4 h-4" />
+            </button>
+          ) : null}
           <div className="min-w-0 flex-1">
             <h4 className="font-medium text-sm text-zinc-900 dark:text-white truncate">
               {job.role}
@@ -82,10 +112,11 @@ export default function JobCard({
               {job.company}
             </p>
           </div>
-          <div className="relative" ref={menuRef}>
+          <div className="relative ml-auto" ref={menuRef}>
             <button
               onClick={() => setShowMenu(!showMenu)}
               className="p-1 rounded hover:bg-zinc-100 dark:hover:bg-zinc-800"
+              aria-label="More actions"
             >
               <MoreVertical className="w-4 h-4 text-zinc-400" />
             </button>
@@ -127,7 +158,7 @@ export default function JobCard({
 
   // Full version for list view
   return (
-    <div className="card-hover p-4 md:p-5">
+    <div className="card-hover group p-4 md:p-5 hover:-translate-y-0.5 hover:shadow-lg hover:border-zinc-300 dark:hover:border-zinc-700 hover:bg-zinc-50/80 dark:hover:bg-zinc-900/40">
       <div className="flex flex-col md:flex-row md:items-center gap-4">
         {/* Company Logo Placeholder */}
         <div className="hidden md:flex w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 items-center justify-center flex-shrink-0">
@@ -167,7 +198,7 @@ export default function JobCard({
                       }}
                       className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-zinc-100 dark:hover:bg-zinc-700 ${
                         status === job.status
-                          ? 'text-indigo-600 dark:text-indigo-400 font-medium'
+                          ? 'text-primary-600 dark:text-primary-400 font-medium'
                           : 'text-zinc-600 dark:text-zinc-300'
                       }`}
                     >
@@ -197,12 +228,35 @@ export default function JobCard({
                 {appliedDate}
               </div>
             )}
+            {job.location && (
+              <div className="flex items-center gap-1">
+                <MapPin className="w-4 h-4" />
+                {job.location}
+              </div>
+            )}
+            {job.work_mode && (
+              <div className="flex items-center gap-1">
+                <Wifi className="w-4 h-4" />
+                {job.work_mode === 'remote' ? 'Remote' : job.work_mode === 'onsite' ? 'On-site' : 'Hybrid'}
+              </div>
+            )}
+            {job.source && (
+              <div className="flex items-center gap-1">
+                <span className="font-medium">Source:</span>
+                {job.source}
+              </div>
+            )}
+            {job.is_referral && (
+              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300">
+                Referral
+              </span>
+            )}
             {job.url && (
               <a
                 href={job.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 hover:underline"
+                className="flex items-center gap-1 text-primary-600 dark:text-primary-400 hover:underline"
               >
                 <ExternalLink className="w-4 h-4" />
                 View Posting
@@ -210,12 +264,68 @@ export default function JobCard({
             )}
           </div>
 
+          {/* Tags / Tech */}
+          {(tags.length > 0 || techStack.length > 0) && (
+            <div className="mt-3 flex flex-wrap gap-1">
+              {tags.slice(0, 8).map((tag) => (
+                <span
+                  key={`tag-${tag}`}
+                  className="px-2 py-0.5 rounded-full text-xs bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  {tag}
+                </span>
+              ))}
+              {techStack.slice(0, 8).map((tech) => (
+                <span
+                  key={`tech-${tech}`}
+                  className="px-2 py-0.5 rounded-full text-xs bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                >
+                  {tech}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Contact */}
+          {(job.contact_name || job.contact_email || job.contact_linkedin) && (
+            <div className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 flex flex-wrap items-center gap-2">
+              <span className="flex items-center gap-1">
+                <User className="w-4 h-4" />
+                {job.contact_name || 'Contact'}
+              </span>
+              {job.contact_email && (
+                <a
+                  href={`mailto:${job.contact_email}`}
+                  className="text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  {job.contact_email}
+                </a>
+              )}
+              {job.contact_linkedin && (
+                <a
+                  href={job.contact_linkedin}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary-600 dark:text-primary-400 hover:underline"
+                >
+                  LinkedIn
+                </a>
+              )}
+            </div>
+          )}
+
           {/* Notes */}
           {job.notes && (
             <p className="mt-3 text-sm text-zinc-600 dark:text-zinc-400 line-clamp-2">
               {job.notes}
             </p>
           )}
+
+          {/* Last touched */}
+          <div className="mt-3 flex items-center gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+            <Clock className="w-3 h-3" />
+            Last touched {lastTouched}
+          </div>
         </div>
 
         {/* Actions */}

@@ -25,11 +25,18 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   })
 
   useEffect(() => {
-    // Update document class and localStorage
     const root = window.document.documentElement
+    const body = window.document.body
+    const resolvedTheme = theme
+
+    // Match shadcn's class-based approach and keep native form controls aligned.
+    root.style.colorScheme = resolvedTheme
     root.classList.remove('light', 'dark')
-    root.classList.add(theme)
+    root.classList.add(resolvedTheme)
+
+    // Persist preference and update color-scheme on body
     localStorage.setItem('theme', theme)
+    body.style.colorScheme = resolvedTheme
   }, [theme])
 
   const toggleTheme = () => {

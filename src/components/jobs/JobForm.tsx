@@ -1,6 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { X, Loader2 } from 'lucide-react'
-import { Job, JobFormData, JobStatus, STATUS_CONFIG } from '@/types'
+import { useAutofillJobFromUrl, useJobStatusHistory } from '@/hooks/useJobs'
+import {
+  Job,
+  JobAutofillResult,
+  JobFormData,
+  JobStatus,
+  STATUS_CONFIG,
+  WorkMode,
+} from '@/types'
 
 interface JobFormProps {
   isOpen: boolean
@@ -26,8 +34,26 @@ export default function JobForm({
     status: 'wishlist',
     date_applied: '',
     notes: '',
+    contact_name: '',
+    contact_email: '',
+    contact_linkedin: '',
+    contact_notes: '',
+    location: '',
+    work_mode: undefined,
+    source: '',
+    is_referral: false,
   })
-  const [errors, setErrors] = useState<Partial<Record<keyof JobFormData, string>>>({})
+  const [tagsInput, setTagsInput] = useState('')
+  const [techStackInput, setTechStackInput] = useState('')
+  const [touched, setTouched] = useState<Partial<Record<keyof JobFormData, boolean>>>({})
+  const [attemptedSubmit, setAttemptedSubmit] = useState(false)
+  const [autofillSummary, setAutofillSummary] = useState<string>('')
+  const [autofillWarnings, setAutofillWarnings] = useState<string[]>([])
+
+  const autofillFromUrl = useAutofillJobFromUrl()
+
+  const { data: statusHistory = [], isLoading: isHistoryLoading } =
+    useJobStatusHistory(job?.id)
 
   // Populate form when editing
   useEffect(() => {
@@ -41,7 +67,17 @@ export default function JobForm({
         status: job.status,
         date_applied: job.date_applied ?? '',
         notes: job.notes ?? '',
+        contact_name: job.contact_name ?? '',
+        contact_email: job.contact_email ?? '',
+        contact_linkedin: job.contact_linkedin ?? '',
+        contact_notes: job.contact_notes ?? '',
+        location: job.location ?? '',
+        work_mode: job.work_mode ?? undefined,
+        source: job.source ?? '',
+        is_referral: job.is_referral ?? false,
       })
+      setTagsInput((job.tags ?? []).join(', '))
+      setTechStackInput((job.tech_stack ?? []).join(', '))
     } else {
       setFormData({
         company: '',
@@ -52,12 +88,189 @@ export default function JobForm({
         status: 'wishlist',
         date_applied: '',
         notes: '',
+        contact_name: '',
+        contact_email: '',
+        contact_linkedin: '',
+        contact_notes: '',
+        location: '',
+        work_mode: undefined,
+        source: '',
+        is_referral: false,
       })
+      setTagsInput('')
+      setTechStackInput('')
     }
-    setErrors({})
+    setTouched({})
+    setAttemptedSubmit(false)
+    setAutofillSummary('')
+    setAutofillWarnings([])
   }, [job, isOpen])
 
-  const validate = (): boolean => {
+  const normalizePostingUrl = (value: string): string => {
+    const trimmed = value.trim()
+    if (!trimmed) return ''
+
+    if (trimmed.startsWith('//')) {
+      return `https:${trimmed}`
+    }
+
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) {
+      return trimmed
+    }
+
+    if (/^[\w.-]+\.[a-z]{2,}(?:\/|$)/i.test(trimmed)) {
+      return `https://${trimmed}`
+    }
+
+    return trimmed
+  }
+
+  const applyAutofillResult = (result: JobAutofillResult) => {
+    const fieldLabels: Record<string, string> = {
+      company: 'Company',
+      role: 'Role',
+      location: 'Location',
+      source: 'Source',
+      salary_min: 'Min Salary',
+      salary_max: 'Max Salary',
+      url: 'Job URL',
+    }
+
+    const incoming = result.values
+    const changedLabels: string[] = []
+    const overwrittenLabels: string[] = []
+    const conflictingLabels: string[] = []
+    const keys = Object.keys(fieldLabels) as Array<keyof typeof fieldLabels>
+
+    for (const key of keys) {
+      const incomingValue = incoming[key as keyof typeof incoming]
+      if (incomingValue === undefined || incomingValue === null || incomingValue === '') {
+        continue
+      }
+
+      const currentValue = formData[key as keyof JobFormData]
+      const isCurrentEmpty =
+        currentValue === undefined ||
+        currentValue === null ||
+        (typeof currentValue === 'string' && currentValue.trim() === '')
+
+      if (!isCurrentEmpty && String(currentValue).trim() !== String(incomingValue).trim()) {
+        conflictingLabels.push(fieldLabels[key])
+      }
+    }
+
+    let shouldOverwriteConflicts = false
+    if (conflictingLabels.length > 0) {
+      shouldOverwriteConflicts = window.confirm(
+        `Auto-fill found different values for: ${conflictingLabels.join(', ')}. Overwrite your current entries for those fields?`
+      )
+    }
+
+    const next = { ...formData }
+
+    for (const key of keys) {
+      const incomingValue = incoming[key as keyof typeof incoming]
+      if (incomingValue === undefined || incomingValue === null || incomingValue === '') {
+        continue
+      }
+
+      const currentValue = formData[key as keyof JobFormData]
+      const isCurrentEmpty =
+        currentValue === undefined ||
+        currentValue === null ||
+        (typeof currentValue === 'string' && currentValue.trim() === '')
+
+      if (isCurrentEmpty) {
+        ;(next as Record<string, unknown>)[key] = incomingValue
+        changedLabels.push(fieldLabels[key])
+        continue
+      }
+
+      if (
+        shouldOverwriteConflicts &&
+        String(currentValue).trim() !== String(incomingValue).trim()
+      ) {
+        ;(next as Record<string, unknown>)[key] = incomingValue
+        overwrittenLabels.push(fieldLabels[key])
+      }
+    }
+
+    setFormData(next)
+
+    if (changedLabels.length > 0 || overwrittenLabels.length > 0) {
+      const changedText = changedLabels.length > 0 ? `Filled: ${changedLabels.join(', ')}` : ''
+      const overwrittenText =
+        overwrittenLabels.length > 0
+          ? `Overwrote: ${overwrittenLabels.join(', ')}`
+          : ''
+      const summaryText = [changedText, overwrittenText].filter(Boolean).join('. ')
+
+      setAutofillSummary(
+        `${summaryText}. Review everything before saving.`
+      )
+    } else {
+      setAutofillSummary('No empty fields were updated. You can still edit values manually.')
+    }
+
+    setAutofillWarnings(result.warnings || [])
+  }
+
+  const handleAutofill = async () => {
+    const url = normalizePostingUrl(formData.url || '')
+    if (!url) {
+      setAutofillSummary('Enter a job URL first, then click Auto-fill.')
+      setAutofillWarnings([])
+      return
+    }
+
+    if (!/^https?:\/\/.+/i.test(url)) {
+      setAutofillSummary('Please enter a valid job posting URL.')
+      setAutofillWarnings([])
+      return
+    }
+
+    try {
+      const result = await autofillFromUrl.mutateAsync(url)
+      applyAutofillResult(result)
+    } catch (err) {
+      setAutofillWarnings([])
+      setAutofillSummary(
+        err instanceof Error
+          ? err.message
+          : 'Could not auto-fill this URL. You can still complete the form manually.'
+      )
+    }
+  }
+
+  const toNullableString = (value: string | null | undefined): string | null => {
+    const trimmed = (value ?? '').trim()
+    return trimmed ? trimmed : null
+  }
+
+  const parseCommaList = (value: string): string[] => {
+    const items = value
+      .split(',')
+      .map((item) => item.trim())
+      .filter(Boolean)
+
+    return Array.from(new Set(items))
+  }
+
+  const formatDateTime = (value?: string | null): string => {
+    if (!value) return ''
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return value
+
+    return date.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  const computeErrors = useMemo(() => {
     const newErrors: Partial<Record<keyof JobFormData, string>> = {}
 
     if (!formData.company.trim()) {
@@ -66,28 +279,66 @@ export default function JobForm({
     if (!formData.role.trim()) {
       newErrors.role = 'Role is required'
     }
-    if (formData.salary_min && formData.salary_max && formData.salary_min > formData.salary_max) {
+
+    const min = formData.salary_min
+    const max = formData.salary_max
+    const hasMin = typeof min === 'number' && Number.isFinite(min)
+    const hasMax = typeof max === 'number' && Number.isFinite(max)
+
+    if (hasMin && hasMax && min! > max!) {
       newErrors.salary_max = 'Max salary must be greater than min'
     }
-    if (formData.url && !/^https?:\/\/.+/.test(formData.url)) {
+
+    const normalizedUrl = formData.url ? normalizePostingUrl(formData.url) : ''
+    if (formData.url && !/^https?:\/\/.+/.test(normalizedUrl)) {
       newErrors.url = 'Please enter a valid URL'
     }
+    if (formData.contact_email && !/^\S+@\S+\.\S+$/.test(formData.contact_email)) {
+      newErrors.contact_email = 'Please enter a valid email'
+    }
+    if (formData.contact_linkedin && !/^https?:\/\/.+/.test(formData.contact_linkedin)) {
+      newErrors.contact_linkedin = 'Please enter a valid URL'
+    }
 
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
+    return newErrors
+  }, [formData])
+
+  const errors = useMemo(() => {
+    if (attemptedSubmit) return computeErrors
+
+    const filtered: Partial<Record<keyof JobFormData, string>> = {}
+    ;(Object.keys(computeErrors) as Array<keyof JobFormData>).forEach((key) => {
+      if (touched[key]) filtered[key] = computeErrors[key]
+    })
+    return filtered
+  }, [attemptedSubmit, computeErrors, touched])
+
+  const markTouched = (field: keyof JobFormData) => {
+    setTouched((prev) => ({ ...prev, [field]: true }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!validate()) return
+    setAttemptedSubmit(true)
+    if (Object.keys(computeErrors).length > 0) return
 
     await onSubmit({
       ...formData,
-      salary_min: formData.salary_min || undefined,
-      salary_max: formData.salary_max || undefined,
-      url: formData.url || undefined,
-      date_applied: formData.date_applied || undefined,
-      notes: formData.notes || undefined,
+      salary_min: formData.salary_min ?? null,
+      salary_max: formData.salary_max ?? null,
+      url: toNullableString(normalizePostingUrl(formData.url || '')),
+      date_applied: toNullableString(formData.date_applied),
+      notes: toNullableString(formData.notes),
+      contact_name: toNullableString(formData.contact_name),
+      contact_email: toNullableString(formData.contact_email),
+      contact_linkedin: toNullableString(formData.contact_linkedin),
+      contact_notes: toNullableString(formData.contact_notes),
+      location: toNullableString(formData.location),
+      work_mode: formData.work_mode ?? null,
+      source: toNullableString(formData.source),
+      is_referral: !!formData.is_referral,
+      tags: parseCommaList(tagsInput),
+      tech_stack: parseCommaList(techStackInput),
     })
   }
 
@@ -102,7 +353,7 @@ export default function JobForm({
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-lg bg-white dark:bg-zinc-900 rounded-2xl shadow-xl animate-slide-up max-h-[90vh] overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white dark:bg-zinc-900 rounded-2xl shadow-xl animate-slide-up max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-zinc-200 dark:border-zinc-800">
           <h2 className="text-xl font-semibold text-zinc-900 dark:text-white">
@@ -110,6 +361,7 @@ export default function JobForm({
           </h2>
           <button
             onClick={onClose}
+            aria-label="Close dialog"
             className="p-2 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
           >
             <X className="w-5 h-5 text-zinc-500" />
@@ -130,8 +382,10 @@ export default function JobForm({
               onChange={(e) =>
                 setFormData({ ...formData, company: e.target.value })
               }
+              onBlur={() => markTouched('company')}
               className={`input ${errors.company ? 'border-red-500' : ''}`}
               placeholder="Google, Meta, etc."
+              aria-invalid={!!errors.company}
             />
             {errors.company && (
               <p className="mt-1 text-xs text-red-500">{errors.company}</p>
@@ -150,8 +404,10 @@ export default function JobForm({
               onChange={(e) =>
                 setFormData({ ...formData, role: e.target.value })
               }
+              onBlur={() => markTouched('role')}
               className={`input ${errors.role ? 'border-red-500' : ''}`}
               placeholder="Software Engineer, Product Manager, etc."
+              aria-invalid={!!errors.role}
             />
             {errors.role && (
               <p className="mt-1 text-xs text-red-500">{errors.role}</p>
@@ -174,6 +430,7 @@ export default function JobForm({
                     salary_min: e.target.value ? Number(e.target.value) : undefined,
                   })
                 }
+                onBlur={() => markTouched('salary_min')}
                 className="input"
                 placeholder="100000"
               />
@@ -192,8 +449,10 @@ export default function JobForm({
                     salary_max: e.target.value ? Number(e.target.value) : undefined,
                   })
                 }
+                onBlur={() => markTouched('salary_max')}
                 className={`input ${errors.salary_max ? 'border-red-500' : ''}`}
                 placeholder="150000"
+                aria-invalid={!!errors.salary_max}
               />
               {errors.salary_max && (
                 <p className="mt-1 text-xs text-red-500">{errors.salary_max}</p>
@@ -206,16 +465,50 @@ export default function JobForm({
             <label htmlFor="url" className="label">
               Job URL
             </label>
-            <input
-              type="text"
-              id="url"
-              value={formData.url}
-              onChange={(e) => setFormData({ ...formData, url: e.target.value })}
-              className={`input ${errors.url ? 'border-red-500' : ''}`}
-              placeholder="https://careers.company.com/job/123"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                id="url"
+                value={formData.url ?? ''}
+                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                onBlur={() => markTouched('url')}
+                className={`input ${errors.url ? 'border-red-500' : ''}`}
+                placeholder="https://careers.company.com/job/123"
+                aria-invalid={!!errors.url}
+              />
+              <button
+                type="button"
+                onClick={handleAutofill}
+                className="btn-secondary whitespace-nowrap"
+                disabled={autofillFromUrl.isPending}
+              >
+                {autofillFromUrl.isPending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Auto-filling...
+                  </>
+                ) : (
+                  'Auto-fill from URL'
+                )}
+              </button>
+            </div>
             {errors.url && (
               <p className="mt-1 text-xs text-red-500">{errors.url}</p>
+            )}
+            <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+              Auto-fill is best effort. Always review fields before saving.
+            </p>
+            {autofillSummary && (
+              <p className="mt-1 text-xs text-primary-600 dark:text-primary-400">{autofillSummary}</p>
+            )}
+            {autofillWarnings.length > 0 && (
+              <ul className="mt-1 space-y-1">
+                {autofillWarnings.map((warning, idx) => (
+                  <li key={`${warning}-${idx}`} className="text-xs text-amber-600 dark:text-amber-400">
+                    {warning}
+                  </li>
+                ))}
+              </ul>
             )}
           </div>
 
@@ -247,12 +540,200 @@ export default function JobForm({
               <input
                 type="date"
                 id="date_applied"
-                value={formData.date_applied}
+                value={formData.date_applied ?? ''}
                 onChange={(e) =>
                   setFormData({ ...formData, date_applied: e.target.value })
                 }
                 className="input"
               />
+            </div>
+          </div>
+
+          {/* Location & Work Mode */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="location" className="label">
+                Location
+              </label>
+              <input
+                type="text"
+                id="location"
+                value={formData.location ?? ''}
+                onChange={(e) =>
+                  setFormData({ ...formData, location: e.target.value })
+                }
+                className="input"
+                placeholder="City, State / Remote"
+              />
+            </div>
+            <div>
+              <label htmlFor="work_mode" className="label">
+                Work Mode
+              </label>
+              <select
+                id="work_mode"
+                value={formData.work_mode ?? ''}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    work_mode: e.target.value
+                      ? (e.target.value as WorkMode)
+                      : undefined,
+                  })
+                }
+                className="input"
+              >
+                <option value="">Not set</option>
+                <option value="remote">Remote</option>
+                <option value="hybrid">Hybrid</option>
+                <option value="onsite">On-site</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Source & Referral */}
+          <div className="grid grid-cols-2 gap-4 items-end">
+            <div>
+              <label htmlFor="source" className="label">
+                Source
+              </label>
+              <input
+                type="text"
+                id="source"
+                value={formData.source ?? ''}
+                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
+                className="input"
+                placeholder="LinkedIn, company site, etc."
+              />
+            </div>
+            <div>
+              <label className="label">Referral</label>
+              <label className="flex items-center gap-2 text-sm text-zinc-700 dark:text-zinc-300 h-10">
+                <input
+                  type="checkbox"
+                  checked={!!formData.is_referral}
+                  onChange={(e) =>
+                    setFormData({ ...formData, is_referral: e.target.checked })
+                  }
+                  className="h-4 w-4 rounded border-zinc-300 dark:border-zinc-700"
+                />
+                Referral
+              </label>
+            </div>
+          </div>
+
+          {/* Tags & Tech Stack */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label htmlFor="tags" className="label">
+                Tags
+              </label>
+              <input
+                type="text"
+                id="tags"
+                value={tagsInput}
+                onChange={(e) => setTagsInput(e.target.value)}
+                className="input"
+                placeholder="comma-separated (e.g. new-grad, fintech)"
+              />
+            </div>
+            <div>
+              <label htmlFor="tech_stack" className="label">
+                Tech Stack
+              </label>
+              <input
+                type="text"
+                id="tech_stack"
+                value={techStackInput}
+                onChange={(e) => setTechStackInput(e.target.value)}
+                className="input"
+                placeholder="comma-separated (e.g. react, node)"
+              />
+            </div>
+          </div>
+
+          {/* Contact */}
+          <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+            <p className="text-sm font-medium text-zinc-900 dark:text-white">
+              Contact
+            </p>
+            <div className="mt-3 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="contact_name" className="label">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    id="contact_name"
+                    value={formData.contact_name ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, contact_name: e.target.value })
+                    }
+                    className="input"
+                    placeholder="Recruiter / Hiring manager"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="contact_email" className="label">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    id="contact_email"
+                    value={formData.contact_email ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, contact_email: e.target.value })
+                    }
+                    onBlur={() => markTouched('contact_email')}
+                    className={`input ${errors.contact_email ? 'border-red-500' : ''}`}
+                    placeholder="name@company.com"
+                    aria-invalid={!!errors.contact_email}
+                  />
+                  {errors.contact_email && (
+                    <p className="mt-1 text-xs text-red-500">{errors.contact_email}</p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="contact_linkedin" className="label">
+                  LinkedIn
+                </label>
+                <input
+                  type="text"
+                  id="contact_linkedin"
+                  value={formData.contact_linkedin ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      contact_linkedin: e.target.value,
+                    })
+                  }
+                  onBlur={() => markTouched('contact_linkedin')}
+                  className={`input ${errors.contact_linkedin ? 'border-red-500' : ''}`}
+                  placeholder="https://www.linkedin.com/in/..."
+                  aria-invalid={!!errors.contact_linkedin}
+                />
+                {errors.contact_linkedin && (
+                  <p className="mt-1 text-xs text-red-500">{errors.contact_linkedin}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="contact_notes" className="label">
+                  Notes
+                </label>
+                <textarea
+                  id="contact_notes"
+                  value={formData.contact_notes ?? ''}
+                  onChange={(e) =>
+                    setFormData({ ...formData, contact_notes: e.target.value })
+                  }
+                  className="input min-h-[80px] resize-y"
+                  placeholder="Any context (e.g. reached out on LinkedIn, follow-up date, etc.)"
+                />
+              </div>
             </div>
           </div>
 
@@ -263,7 +744,7 @@ export default function JobForm({
             </label>
             <textarea
               id="notes"
-              value={formData.notes}
+              value={formData.notes ?? ''}
               onChange={(e) =>
                 setFormData({ ...formData, notes: e.target.value })
               }
@@ -271,6 +752,47 @@ export default function JobForm({
               placeholder="Add any notes about this job..."
             />
           </div>
+
+          {/* Status history */}
+          {job && (
+            <div className="pt-2 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center justify-between gap-4">
+                <p className="text-sm font-medium text-zinc-900 dark:text-white">
+                  Status history
+                </p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Last touched {formatDateTime(job.updated_at)}
+                </p>
+              </div>
+
+              <div className="mt-3">
+                {isHistoryLoading ? (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading…</p>
+                ) : statusHistory.length === 0 ? (
+                  <p className="text-sm text-zinc-500 dark:text-zinc-400">
+                    No status changes yet.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {statusHistory.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className="text-sm text-zinc-700 dark:text-zinc-300 flex items-start justify-between gap-4"
+                      >
+                        <span>
+                          {STATUS_CONFIG[entry.from_status].label} →{' '}
+                          {STATUS_CONFIG[entry.to_status].label}
+                        </span>
+                        <span className="text-xs text-zinc-500 dark:text-zinc-400 whitespace-nowrap">
+                          {formatDateTime(entry.changed_at)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-zinc-200 dark:border-zinc-800">

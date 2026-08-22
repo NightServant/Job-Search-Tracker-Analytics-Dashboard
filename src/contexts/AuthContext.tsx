@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { hasValidSupabaseConfig, supabase, supabaseConfigError } from '@/lib/supabase'
 
 interface AuthContextType {
   user: User | null
@@ -38,24 +38,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signIn = async (email: string, password: string) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
     const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
-    if (error) throw error
+    if (error) {
+      const anyErr = error as any
+      throw new Error(anyErr.message || JSON.stringify(anyErr))
+    }
   }
 
   const signUp = async (email: string, password: string) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
     const { error } = await supabase.auth.signUp({
       email,
       password,
     })
-    if (error) throw error
+    if (error) {
+      const anyErr = error as any
+      throw new Error(anyErr.message || JSON.stringify(anyErr))
+    }
   }
 
   const signOut = async () => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
     const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    if (error) {
+      const anyErr = error as any
+      throw new Error(anyErr.message || JSON.stringify(anyErr))
+    }
   }
 
   return (

@@ -1,14 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { jobService } from '@/services/jobService'
 import { Job, JobFormData, JobStatus } from '@/types'
+import { useAuth } from '@/contexts/AuthContext'
 
 /**
  * Hook to fetch all jobs
  */
 export function useJobs() {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['jobs'],
+    queryKey: ['jobs', user?.id],
     queryFn: jobService.getJobs,
+    enabled: !!user,
+    staleTime: 30_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: true,
+    retry: 1,
   })
 }
 
@@ -16,10 +24,47 @@ export function useJobs() {
  * Hook to fetch a single job
  */
 export function useJob(id: string) {
+  const { user } = useAuth()
   return useQuery({
-    queryKey: ['jobs', id],
+    queryKey: ['jobs', user?.id, id],
     queryFn: () => jobService.getJob(id),
-    enabled: !!id,
+    enabled: !!id && !!user,
+    staleTime: 30_000,
+    gcTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  })
+}
+
+/**
+ * Hook to fetch status history for a job
+ */
+export function useJobStatusHistory(jobId?: string) {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['job-status-history', user?.id, jobId],
+    queryFn: () => jobService.getJobStatusHistory(jobId!),
+    enabled: !!jobId && !!user,
+    staleTime: 30_000,
+    gcTime: 10 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  })
+}
+
+/**
+ * Hook to fetch status history across all jobs
+ */
+export function useAllJobStatusHistory() {
+  const { user } = useAuth()
+  return useQuery({
+    queryKey: ['job-status-history', user?.id],
+    queryFn: jobService.getAllJobStatusHistory,
+    enabled: !!user,
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   })
 }
 
@@ -28,11 +73,27 @@ export function useJob(id: string) {
  */
 export function useCreateJob() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: (data: JobFormData) => jobService.createJob(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
+    },
+  })
+}
+
+/**
+ * Hook to create multiple jobs (bulk import)
+ */
+export function useCreateJobsBulk() {
+  const queryClient = useQueryClient()
+  const { user } = useAuth()
+
+  return useMutation({
+    mutationFn: (datas: JobFormData[]) => jobService.createJobsBulk(datas),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
     },
   })
 }
@@ -42,32 +103,33 @@ export function useCreateJob() {
  */
 export function useUpdateJob() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: Partial<JobFormData> }) =>
       jobService.updateJob(id, data),
     onMutate: async ({ id, data }) => {
-      // Cancel outgoing refetches
-      await queryClient.cancelQueries({ queryKey: ['jobs'] })
+      await queryClient.cancelQueries({ queryKey: ['jobs', user?.id] })
 
-      // Snapshot previous value
-      const previousJobs = queryClient.getQueryData<Job[]>(['jobs'])
+      const previousJobs = queryClient.getQueryData<Job[]>(['jobs', user?.id])
 
-      // Optimistically update
-      queryClient.setQueryData<Job[]>(['jobs'], (old) =>
+      queryClient.setQueryData<Job[]>(['jobs', user?.id], (old) =>
         old?.map((job) => (job.id === id ? { ...job, ...data } : job))
       )
 
       return { previousJobs }
     },
     onError: (_err, _variables, context) => {
-      // Rollback on error
       if (context?.previousJobs) {
-        queryClient.setQueryData(['jobs'], context.previousJobs)
+        queryClient.setQueryData(['jobs', user?.id], context.previousJobs)
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
+      queryClient.invalidateQueries({
+        queryKey: ['job-status-history', user?.id, variables.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ['job-status-history', user?.id] })
     },
   })
 }
@@ -77,15 +139,16 @@ export function useUpdateJob() {
  */
 export function useUpdateJobStatus() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status: JobStatus }) =>
       jobService.updateJobStatus(id, status),
     onMutate: async ({ id, status }) => {
-      await queryClient.cancelQueries({ queryKey: ['jobs'] })
-      const previousJobs = queryClient.getQueryData<Job[]>(['jobs'])
+      await queryClient.cancelQueries({ queryKey: ['jobs', user?.id] })
+      const previousJobs = queryClient.getQueryData<Job[]>(['jobs', user?.id])
 
-      queryClient.setQueryData<Job[]>(['jobs'], (old) =>
+      queryClient.setQueryData<Job[]>(['jobs', user?.id], (old) =>
         old?.map((job) => (job.id === id ? { ...job, status } : job))
       )
 
@@ -93,11 +156,15 @@ export function useUpdateJobStatus() {
     },
     onError: (_err, _variables, context) => {
       if (context?.previousJobs) {
-        queryClient.setQueryData(['jobs'], context.previousJobs)
+        queryClient.setQueryData(['jobs', user?.id], context.previousJobs)
       }
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    onSettled: (_data, _error, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
+      queryClient.invalidateQueries({
+        queryKey: ['job-status-history', user?.id, variables.id],
+      })
+      queryClient.invalidateQueries({ queryKey: ['job-status-history', user?.id] })
     },
   })
 }
@@ -107,14 +174,15 @@ export function useUpdateJobStatus() {
  */
 export function useDeleteJob() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
 
   return useMutation({
     mutationFn: (id: string) => jobService.deleteJob(id),
     onMutate: async (id) => {
-      await queryClient.cancelQueries({ queryKey: ['jobs'] })
-      const previousJobs = queryClient.getQueryData<Job[]>(['jobs'])
+      await queryClient.cancelQueries({ queryKey: ['jobs', user?.id] })
+      const previousJobs = queryClient.getQueryData<Job[]>(['jobs', user?.id])
 
-      queryClient.setQueryData<Job[]>(['jobs'], (old) =>
+      queryClient.setQueryData<Job[]>(['jobs', user?.id], (old) =>
         old?.filter((job) => job.id !== id)
       )
 
@@ -122,11 +190,20 @@ export function useDeleteJob() {
     },
     onError: (_err, _id, context) => {
       if (context?.previousJobs) {
-        queryClient.setQueryData(['jobs'], context.previousJobs)
+        queryClient.setQueryData(['jobs', user?.id], context.previousJobs)
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['jobs'] })
+      queryClient.invalidateQueries({ queryKey: ['jobs', user?.id] })
     },
+  })
+}
+
+/**
+ * Hook to auto-fill job fields from a posting URL.
+ */
+export function useAutofillJobFromUrl() {
+  return useMutation({
+    mutationFn: (url: string) => jobService.autofillFromUrl(url),
   })
 }

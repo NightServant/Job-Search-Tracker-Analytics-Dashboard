@@ -13,6 +13,70 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* Shadcn-style neutral tokens with our accent colors preserved. */
+  --background: 0 0% 100%;
+  --foreground: 222.2 84% 4.9%;
+  --card: 0 0% 100%;
+  --card-foreground: 222.2 84% 4.9%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222.2 84% 4.9%;
+  --muted: 210 40% 96.1%;
+  --muted-foreground: 215.4 16.3% 46.9%;
+  --accent: 210 40% 96.1%;
+  --accent-foreground: 222.2 47.4% 11.2%;
+  --border: 214.3 31.8% 91.4%;
+  --input: 214.3 31.8% 91.4%;
+  --ring: 221.2 83.2% 53.3%;
+
+  --zinc-50: 0 0% 100%;
+  --zinc-100: 210 40% 96.1%;
+  --zinc-200: 214.3 31.8% 91.4%;
+  --zinc-300: 212.7 26.8% 83.9%;
+  --zinc-400: 215 20.2% 65.1%;
+  --zinc-500: 215.4 16.3% 46.9%;
+  --zinc-600: 215.3 19.3% 34.5%;
+  --zinc-700: 215.3 25% 26.7%;
+  --zinc-800: 217.2 32.6% 17.5%;
+  --zinc-900: 222.2 47.4% 11.2%;
+  --zinc-950: 222.2 84% 4.9%;
+}
+
+.dark {
+  --background: 222.2 84% 4.9%;
+  --foreground: 210 40% 98%;
+  --card: 222.2 84% 4.9%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222.2 84% 4.9%;
+  --popover-foreground: 210 40% 98%;
+  --muted: 217.2 32.6% 17.5%;
+  --muted-foreground: 215 20.2% 65.1%;
+  --accent: 217.2 32.6% 17.5%;
+  --accent-foreground: 210 40% 98%;
+  --border: 217.2 32.6% 17.5%;
+  --input: 217.2 32.6% 17.5%;
+  --ring: 224.3 76.3% 48%;
+}
+
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
+/* Global theme transition: animate core color properties so components change together. */
+:root,
+html,
+body,
+.card,
+.card-hover,
+.btn,
+.input,
+.label,
+.popover {
+  transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease, box-shadow 300ms ease;
 }
 
 /* Custom scrollbar */
@@ -22,28 +86,58 @@
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-zinc-100 dark:bg-zinc-800;
+  @apply bg-zinc-100 dark:bg-zinc-900;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-zinc-300 dark:bg-zinc-600 rounded-full;
+  @apply bg-zinc-300 dark:bg-zinc-700 rounded-full;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-400 dark:bg-zinc-500;
+  @apply bg-zinc-400 dark:bg-zinc-600;
 }
 
-/* Base styles */
-body {
-  @apply bg-zinc-50 text-zinc-900 dark:bg-zinc-950 dark:text-zinc-100;
-  min-height: 100vh;
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground transition-colors duration-300;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: hsl(var(--ring) / 0.16);
+  }
+
+  /* Focus styles */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 dark:ring-offset-zinc-950;
+  }
 }
 
-/* Focus styles */
-*:focus-visible {
-  @apply outline-none ring-2 ring-indigo-500 ring-offset-2 dark:ring-offset-zinc-900;
+/* Utility to suppress hover/focus visuals when applied to a container.
+   Keeps elements interactive but prevents hover/focus bounding boxes from appearing. */
+.no-hover .card-hover:hover,
+.no-hover .card:hover {
+  box-shadow: none !important;
+  border-color: transparent !important;
 }
 
+.no-hover .btn:hover,
+.no-hover button:hover,
+.no-hover a:hover {
+  background-color: inherit !important;
+  color: inherit !important;
+  box-shadow: none !important;
+}
+
+.no-hover *:focus,
+.no-hover *:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
 /* Custom component classes */
 @layer components {
   .btn {
@@ -54,13 +148,13 @@ body {
   }
 
   .btn-primary {
-    @apply btn bg-indigo-600 text-white hover:bg-indigo-700 
-           focus:ring-indigo-500 dark:bg-indigo-500 dark:hover:bg-indigo-600;
+      @apply btn bg-primary-600 text-white hover:bg-primary-700 
+        focus:ring-primary-500 dark:bg-primary-500 dark:hover:bg-primary-600;
   }
 
   .btn-secondary {
-    @apply btn bg-zinc-200 text-zinc-800 hover:bg-zinc-300
-           focus:ring-zinc-500 dark:bg-zinc-700 dark:text-zinc-100 dark:hover:bg-zinc-600;
+    @apply btn bg-zinc-100 text-zinc-900 hover:bg-zinc-200
+         focus:ring-ring dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700;
   }
 
   .btn-danger {
@@ -70,24 +164,23 @@ body {
 
   .btn-ghost {
     @apply btn bg-transparent text-zinc-600 hover:bg-zinc-100
-           dark:text-zinc-400 dark:hover:bg-zinc-800;
+        dark:text-zinc-300 dark:hover:bg-zinc-800;
   }
 
   .input {
-    @apply w-full px-3 py-2 rounded-lg border border-zinc-300 
-           bg-white text-zinc-900 placeholder-zinc-400
-           focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500
-           dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-100
-           dark:placeholder-zinc-500 dark:focus:border-indigo-400;
+      @apply w-full px-3 py-2 rounded-lg border border-input 
+        bg-background text-foreground placeholder-zinc-500
+        focus:border-ring focus:ring-1 focus:ring-ring
+        dark:placeholder-zinc-400;
   }
 
   .label {
-    @apply block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1;
+      @apply block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1;
   }
 
   .card {
-    @apply bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 
-           dark:border-zinc-800 shadow-sm;
+      @apply bg-card text-card-foreground rounded-xl border border-border 
+        shadow-sm;
   }
 
   .card-hover {

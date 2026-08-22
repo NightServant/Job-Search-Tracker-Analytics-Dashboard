@@ -1,0 +1,28 @@
+import '@testing-library/jest-dom/vitest'
+import { vi } from 'vitest'
+
+// Mock window.matchMedia for tests
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: vi.fn().mockImplementation((query) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+})
+
+// Mock global variables set by Vite
+declare global {
+  var __APP_VERSION__: string
+  var __BUILD_SHA__: string
+  var __BUILD_TIME__: string
+}
+
+globalThis.__APP_VERSION__ = '1.0.0'
+globalThis.__BUILD_SHA__ = 'dev'
+globalThis.__BUILD_TIME__ = new Date().toISOString()
