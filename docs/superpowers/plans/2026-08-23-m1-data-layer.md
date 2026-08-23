@@ -296,7 +296,14 @@ git commit -m "feat: add salary currency to applications"
 
 **Interfaces:**
 - Consumes: `resumes`, `resume_snapshots`, `jobs` (all exist).
-- Produces: table `application_documents(id, job_id, resume_id, snapshot_id, user_id, sent_at)` and `describeLink(link): string`. M2's `documentLinkService` writes rows here; M5's application detail page reads them.
+- Produces: table `application_documents(id, job_id, resume_id, snapshot_id, user_id, sent_at)`, `resume_snapshots.version`, and `describeLink(link): string`. M2's `documentLinkService` writes rows here; M5's application detail page reads them.
+
+**Why `version` lands here:** `describeLink` renders `"version 3"`, but
+`resume_snapshots` has no version column — it stores only `content`, `label` and
+`created_at`. Deriving the number by `created_at` rank at read time was rejected:
+deleting a snapshot would silently renumber every later one, and this number is
+pinned to an application as the exact version sent. A stored column keeps
+version 3 as version 3 forever, gaps included.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -311,7 +318,7 @@ describe('describeLink', () => {
       .toBe('software engineer cv · version 3 · sent 21 AUG 2026')
   })
 
-  it('says unpinned when no snapshot is attached', () => {
+  it('falls back to latest when no snapshot version is pinned', () => {
     expect(describeLink({ title: 'software engineer cv', version: null, sent_at: '2026-08-21' }))
       .toBe('software engineer cv · latest · sent 21 AUG 2026')
   })
@@ -367,7 +374,35 @@ CREATE POLICY "Users can delete own application documents"
   ON public.application_documents FOR DELETE USING (auth.uid() = user_id);
 
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.application_documents TO authenticated;
+
+-- describeLink renders a version number; resume_snapshots never stored one.
+ALTER TABLE public.resume_snapshots
+  ADD COLUMN IF NOT EXISTS version INTEGER;
+
+COMMENT ON COLUMN public.resume_snapshots.version IS 'Monotonic per resume, assigned on insert; stable across deletes of other snapshots';
+
+-- Backfill existing rows by creation order within each resume.
+WITH ranked AS (
+  SELECT id, ROW_NUMBER() OVER (PARTITION BY resume_id ORDER BY created_at) AS rn
+  FROM public.resume_snapshots
+)
+UPDATE public.resume_snapshots s
+  SET version = ranked.rn
+  FROM ranked
+  WHERE ranked.id = s.id AND s.version IS NULL;
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'resume_snapshots_version_unique') THEN
+    ALTER TABLE public.resume_snapshots
+      ADD CONSTRAINT resume_snapshots_version_unique UNIQUE (resume_id, version);
+  END IF;
+END $$;
 ```
+
+Leave `version` nullable: `resumeSnapshotService` does not assign it yet, and
+making it NOT NULL would break every existing insert path. M2 tightens it once
+the service writes the value.
 
 - [ ] **Step 4: Apply the migration**
 
@@ -1177,12 +1212,14 @@ git commit -m "feat: enforce read-only demo accounts in RLS"
 ### Task 9: Verify and document the schema
 
 **Files:**
+- Create: `src/types/database.ts`
 - Modify: `README.md`
 - Test: none (verification task)
 
 **Interfaces:**
 - Consumes: everything from Tasks 1-8.
-- Produces: a schema table in the README that M2 onward can rely on.
+- Produces: generated `src/types/database.ts`, and a schema table in the README
+  that M2 onward can rely on.
 
 - [ ] **Step 1: Verify migration parity**
 
@@ -1206,7 +1243,22 @@ Expected: `rowsecurity = true` for every row. `analytics_cache` included.
 Use the Supabase dashboard's Advisors tab, or the MCP `get_advisors` tool with `type: "security"`.
 Expected: no ERROR-level lints. WARN-level `function_search_path_mutable` must be zero — every function in this plan sets `search_path`.
 
-- [ ] **Step 4: Update the README schema table**
+- [ ] **Step 4: Generate the database types**
+
+This is roadmap item 1.9. `src/types/database.ts` does not exist yet — this
+creates it. Tasks 1-8 hand-edited `src/types/index.ts`; this file is the
+generated mirror of the live schema, and M2's services import from it.
+
+Run: `supabase gen types typescript --linked > src/types/database.ts`
+Expected: a file exporting `Database`, containing every table added in Tasks
+3-8 (`application_documents`, `events`, `activity_log`, `contacts`,
+`application_contacts`, `demo_accounts`) plus `jobs.description`,
+`jobs.salary_currency`, and `resumes.sections`.
+
+Verify with: `npx tsc --noEmit`
+Expected: no errors.
+
+- [ ] **Step 5: Update the README schema table**
 
 Replace the database table in `README.md` with:
 
@@ -1225,7 +1277,7 @@ Replace the database table in `README.md` with:
 | `demo_accounts` | Read-only demo users, enforced by RLS |
 ```
 
-- [ ] **Step 5: Run the full suite**
+- [ ] **Step 6: Run the full suite**
 
 Run: `npm test`
 Expected: PASS, 248 tests.
@@ -1233,18 +1285,18 @@ Expected: PASS, 248 tests.
 Run: `npm run build`
 Expected: build succeeds.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add README.md
-git commit -m "docs: document the M1 schema"
+git add README.md src/types/database.ts
+git commit -m "docs: document the M1 schema and generate database types"
 ```
 
 ---
 
 ## Self-Review
 
-**Spec coverage:** F1 → Task 1. F9 → Task 2. F2 → Task 3. F4 → Task 4. F5 → Task 5. F6 → Task 6. C7/G1 → Task 7. F11 → Task 8. Schema documentation → Task 9. All M1 sub-tasks from the roadmap are covered.
+**Spec coverage:** F1 → Task 1. F9 → Task 2. F2 → Task 3. F4 → Task 4. F5 → Task 5. F6 → Task 6. C7/G1 → Task 7. F11 → Task 8. Roadmap 1.9 (generate `src/types/database.ts`) → Task 9 Step 4. Schema documentation → Task 9 Step 5. All M1 sub-tasks from the roadmap are covered.
 
 **Placeholders:** none. Every step contains the SQL or TypeScript to write.
 

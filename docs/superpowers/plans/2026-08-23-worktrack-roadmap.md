@@ -132,7 +132,13 @@ Move the shell before building new UI, so nothing is built twice.
 Translate the Figma system into code. No screens yet.
 
 - 4.1 Tokens: the three Figma collections → CSS custom properties with light/dark
-- 4.2 Type scale → Tailwind config; Helvetica Neue with a real fallback stack
+- 4.2 Type scale → Tailwind config; Helvetica with the fallback stack
+  `Helvetica, "Helvetica Neue", Arial, sans-serif`. Helvetica Neue is not used:
+  the Figma MCP cannot load it, so the system standardises on plain Helvetica.
+  `Caption` is still Inter Medium in Figma — reconcile it to Helvetica or keep
+  Inter deliberately, but do not ship it undecided. Data/* styles need
+  `font-variant-numeric: tabular-nums`; Helvetica has proportional digits, so
+  table columns will not align without it.
 - 4.3 Icon set: 26 SVGs as React components from the Figma vectors
 - 4.4 Primitives: Button, Input, Status Marker, ATS Check, Breadcrumb, Theme Toggle
 - 4.5 Composites: KPI Stat, Application Row, Job Card, Kanban Column, Nav Item, Sidebar
