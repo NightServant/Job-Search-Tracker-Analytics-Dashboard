@@ -73,6 +73,16 @@ of this plan.
 | `vercel:shadcn` | M4. Component library adoption. |
 | `vercel:deployments-cicd` | M3. Vercel deploy pipeline. |
 | `vercel:env-vars` | M3. `VITE_*` → `NEXT_PUBLIC_*` migration. |
+| `ui-ux-pro-max` | M4-M6. Accessibility, touch targets, responsive layout, animation timing, forms, navigation rule sets. |
+| `tailwind-design-system` | M4. Tailwind v4 CSS-first `@theme` tokens, CVA variants, `@custom-variant dark`. |
+| `design-taste-frontend` | M6. Anti-slop pass on the public surface. Hard bans: em-dashes, eyebrow spam, div-based fake screenshots, section-number labels. |
+| `design-motion-principles` | M5-M6. Motion audit. Turns the Figma motion rules into real transitions with `prefers-reduced-motion` honoured. |
+| `figma:figma-design-to-code` | M4-M6. Reads the Worktrack Figma file into code via `get_design_context`. Requires Figma MCP auth. |
+| `vercel:react-best-practices` | M3-M6. Waterfalls, bundle size, RSC serialization, re-render discipline. |
+
+`taste-skill:design-taste-frontend` is not a valid skill name. That plugin exposes
+`taste-skill:taste-skill`, which is the same skill as the standalone
+`design-taste-frontend` listed above. Load one, not both.
 
 ---
 
