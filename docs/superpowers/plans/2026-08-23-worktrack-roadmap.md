@@ -27,7 +27,10 @@ framework, against a schema that already exists.
   interviewing **violet**, offer green, rejected red. Orange is never a status.
 - **No status pills.** Use the Status Marker pattern: 2px rule + label, no fill,
   no dot, no radius.
-- **Icons:** the custom 26-icon set from Figma. Never Lucide.
+- **Icons:** the custom 26-icon set from Figma. Never Lucide. `skiper26` pulls
+  `lucide-react` transitively; because shadcn copies source in-tree, edit the
+  import out rather than accepting it. `grep -r lucide src/` must come back
+  empty once 4.3 lands.
 - **Radius caps at 4px.** Separation is hairline rules, not card borders.
 - **Every migration is idempotent** and lands in `supabase/migrations/` with the
   version recorded remotely. `supabase migration list --linked` must show
@@ -124,6 +127,15 @@ Move the shell before building new UI, so nothing is built twice.
 
 - 3.1 Scaffold Next.js App Router alongside Vite; both build
 - 3.2 Port `AuthContext`, `ThemeContext`, `ToastContext` to client components
+  - **`ThemeContext` is replaced, not ported.** skiper26's `useThemeToggle()`
+    requires `next-themes`, which owns the same job today's context does —
+    localStorage, system preference, and the `light`/`dark` class on `<html>`.
+    Two sources of truth for theme is a bug waiting to happen. Wrap the app in
+    `NextThemesProvider` with `attribute="class" defaultTheme="system"
+    enableSystem`, then delete `src/contexts/ThemeContext.tsx` and repoint
+    `useTheme` consumers.
+  - `suppressHydrationWarning` on `<html>` is required; next-themes writes the
+    class before React hydrates.
 - 3.3 `VITE_*` → `NEXT_PUBLIC_*`; update `src/lib/supabase.ts`
 - 3.4 Port routes: `/dashboard`, `/applications`, `/cv` as-is, no redesign
 - 3.5 Port the 218 tests to the Next.js paths; all green
@@ -144,23 +156,40 @@ Translate the Figma system into code. No screens yet.
   table columns will not align without it.
 - 4.3 Icon set: 26 SVGs as React components from the Figma vectors
 - 4.4 Primitives: Button, Input, Status Marker, ATS Check, Breadcrumb, Theme Toggle
-  - Theme Toggle: the Figma component defines the mark; **skiper4 is reference
-    only** for the icon animation. Do not install it. Its five buttons are
-    animated SVGs that change no state, and they are somebody else's icon
-    vocabulary — this system uses the custom 26-icon set, never Lucide and never
-    a vendor's.
-  - Today's app already has a working toggle at `src/components/Layout.tsx:155`
-    wired to `ThemeContext`. It renders Lucide icons, so it violates the icon
-    constraint and gets replaced here — the context behind it does not.
+  - Theme Toggle: **skiper4 supplies the button.**
+    `pnpm dlx shadcn add @skiper-ui/skiper4` — pulls `framer-motion` + `clsx`.
+    It exports five animated SVGs, `ThemeToggleButton1`-`5`; pick one and delete
+    the rest rather than carrying four unused variants.
+  - skiper4 changes **no state** — its own docs say so. It is the button only.
+    The switching comes from 4.6.
+  - Reconcile against the Figma Theme Toggle component (`Mode=Light/Dark`),
+    which currently defines this mark. If skiper4's animation wins, the Figma
+    component is superseded and should be updated to match, not left to drift.
+  - Today's toggle at `src/components/Layout.tsx:155` is replaced here. It
+    renders Lucide icons; its `ThemeContext` wiring is already retired by 3.2.
 - 4.5 Composites: KPI Stat, Application Row, Job Card, Kanban Column, Nav Item, Sidebar
 - 4.6 Motion: `IntersectionObserver` mount-gating, `prefers-reduced-motion`, View Transitions theme wipe
-  - **skiper26's `useThemeToggle()` is the reference implementation** of the
-    wipe — it is the View Transition API approach this task already assumes.
-    Read it, then write our own against `ThemeContext`; adopting the package
-    would pull `framer-motion` in at M4 rather than M6.
+  - **skiper26 supplies the theme transition, on every page.**
+    `pnpm dlx shadcn add @skiper-ui/skiper26` — pulls `framer-motion`,
+    `next-themes`, and `lucide-react`. Its `useThemeToggle()` drives the change
+    through the View Transition API. Drive skiper4's button with it:
+    `const { isDark, toggleTheme } = useThemeToggle({ variant, start })`.
+  - **Variant:** `circle` or `rectangle`, `blur: off`. Not `gif` — it fetches a
+    remote GIF from a third party on every toggle, which is a network
+    dependency, a privacy leak, and the opposite of a restrained Swiss system.
+    Not `polygon`. Pick one `start` direction and use it everywhere; a wipe that
+    changes direction per page reads as a bug.
+  - **`lucide-react` conflict.** skiper26 depends on Lucide, which a Global
+    Constraint forbids. It installs as copied source, not a package, so edit the
+    import out of `@/components/v1/skiper26` and substitute the custom icon.
+    Verify with `grep -r lucide src/` that 4.3 leaves no Lucide in the tree.
   - The wipe must no-op under `prefers-reduced-motion`, and the theme must still
-    change when View Transitions are unsupported. Progressive enhancement, not a
-    dependency.
+    change where View Transitions are unsupported — Safari and Firefox both
+    lagged here. Progressive enhancement: the transition is decoration, the
+    state change is not.
+  - Applying this across all pages makes theme switching a shared surface, so it
+    belongs to the app shell, not to any one route. Landing, auth, and the
+    protected routes all mount the same toggle.
 
 **Exit:** every component rendered in a Storybook-style route, light and dark, matching Figma.
 
@@ -197,9 +226,9 @@ What a reviewer sees first.
     `Sticky Navbar (reveals after hero)`; since that navbar is hidden until the
     hero scrolls past, repeat it in `Footer Links` so the control is reachable
     from the top of the page.
-  - Use the M4 4.4 Theme Toggle primitive, not a vendor component. **skiper4 is
-    reference only** for how the icon animates; the switching behaviour comes
-    from 4.6. Neither package gets installed.
+  - Use the M4 4.4 Theme Toggle primitive — skiper4's button driven by 4.6's
+    `useThemeToggle()`. It is the same control the app shell mounts, not a
+    landing-specific one.
 - 6.2 Auth layout — split panel, `/login` and `/signup`, smooth-caret inputs
   - Smooth-caret input is **skiper106** (`Smooth caret input`, free).
     `pnpm dlx shadcn add @skiper-ui/skiper106` — pulls `dialkit` + `framer-motion`.
@@ -238,23 +267,41 @@ Registry: https://skiper-ui.com/components — 106 components, 37 free, installe
 through the shadcn CLI (`pnpm dlx shadcn add @skiper-ui/<id>`). Free tier
 **requires attribution**; Pro does not. Verified 2026-08-25.
 
-Attribution attaches to what ships, not to what is read. Components we install
-(`skiper51`, `skiper106`) must credit Skiper UI. Components marked **reference
-only** are studied and reimplemented against our own tokens, and carry no
-obligation — the same line already drawn around CVJunction. `skiper4` is
-itself adapted from toggles.dev by Alfie Jones; credit both if it ever ships.
+Attribution attaches to what ships, not to what is read. All four adopted
+components — `skiper4`, `skiper26`, `skiper51`, `skiper106` — must credit
+Skiper UI. Components marked **reference only** are studied and reimplemented
+against our own tokens, and carry no obligation: the same line already drawn
+around CVJunction.
 
-Every component below pulls `framer-motion`, which is a third motion system
-alongside M4 4.6's IntersectionObserver gating and View Transitions. Pick one
-per surface rather than layering all three, and confirm each honours
-`prefers-reduced-motion` before it ships.
+Upstreams get credited too: `skiper4` is adapted from toggles.dev by Alfie
+Jones, `skiper26` from `rudrodip/theme-toggle-effect`, and `skiper51` uses
+Swiper.js with illustrations by AarzooAly.
 
-**Committed — already named in the Figma frames**
+**These install as source, not as packages.** The Skiper registry is a shadcn
+registry: the CLI copies files into `@/components/v1/<id>`, so vendor imports
+are editable in-tree. That is how the `lucide-react` conflict below gets
+resolved rather than tolerated.
+
+**`framer-motion` is now a committed dependency and it arrives at M4**, not M6 —
+skiper4 and skiper26 both need it. That settles the earlier open question: it is
+the motion library, sitting alongside 4.6's IntersectionObserver gating and the
+View Transition wipe rather than competing with them. Confirm every adopted
+component honours `prefers-reduced-motion` before it ships.
+
+**Prerequisite: shadcn is not initialised.** There is no `components.json` in
+the repo. Run `shadcn init` before the first `shadcn add`, after M3 has
+established the Next.js app and Tailwind v4. Nothing here installs onto the
+current Vite + Tailwind v3.4 setup.
+
+**Adopted** — `skiper51` and `skiper106` are named in the Figma frames;
+`skiper4` and `skiper26` are not, and were chosen after the file was built.
 
 | ID | Name | Tier | Lands in | Deps |
 |---|---|---|---|---|
 | `skiper51` | Creative carousel 002 | Free | 6.1 landing carousel | swiper, framer-motion |
 | `skiper106` | Smooth caret input | Free | 6.2 auth inputs | dialkit, framer-motion |
+| `skiper4` | Theme toggle buttons | Free | 4.4 Theme Toggle button | framer-motion, clsx |
+| `skiper26` | Theme toggle btn | Free | 4.6 theme transition, **all pages** | framer-motion, next-themes, **lucide-react** |
 
 **Free candidates — evaluate, do not assume**
 
@@ -269,8 +316,6 @@ per surface rather than layering all three, and confirm each honours
 | `skiper101` | Custom tooltip | 5.6 analytics |
 | `skiper62` | Loop animation hook | 4.6 utility |
 | `skiper65` / `skiper102` | Breakpoint indicator, Debug panel | 5.7 mobile work — dev only, never shipped |
-| `skiper4` | Theme toggle buttons | **Reference only** — 4.4 Theme Toggle and the 6.1 homepage toggle. Five animated SVG icons (`ThemeToggleButton1`-`5`); by its own docs they do **not** switch the theme |
-| `skiper26` | Theme toggle btn | Ships `useThemeToggle()`, which drives the switch through the **View Transition API** — the mechanism 4.6 already specifies for the theme wipe |
 
 **Premium — costs money, listed so the choice is deliberate**
 
