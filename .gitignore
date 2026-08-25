@@ -47,3 +47,4 @@ supabase/.temp/
 # Next.js
 .next/
 next-env.d.ts
+.vercel
