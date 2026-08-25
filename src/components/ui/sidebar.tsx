@@ -4,24 +4,56 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { NavItem } from '@/components/ui/nav-item'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { useAuth } from '@/contexts/AuthContext'
 import type { IconName } from '@/components/icons'
 
 /**
- * Logo, nav, divider, settings, spacer, theme toggle, footer -- in that order.
+ * Logo, nav, divider, settings, spacer, sign out, theme toggle, footer -- in
+ * that order.
  *
  * The order matches Figma and is load-bearing rather than incidental. Settings
  * sits below the divider because it is chrome, not a destination alongside the
- * five sections. The spacer is what pins the toggle and footer to the bottom on
- * a tall viewport; without it they float directly under Settings and the
- * sidebar reads as unfinished at 1440px.
+ * five sections. The spacer is what pins sign out, the toggle and the footer to
+ * the bottom on a tall viewport; without it they float directly under Settings
+ * and the sidebar reads as unfinished at 1440px.
  */
 export const NAV: { href: string; label: string; icon: IconName }[] = [
   { href: '/dashboard', label: 'Overview', icon: 'Overview' },
-  { href: '/jobs', label: 'Applications', icon: 'Applications' },
+  { href: '/applications', label: 'Applications', icon: 'Applications' },
   { href: '/calendar', label: 'Calendar', icon: 'Calendar' },
   { href: '/documents', label: 'Documents', icon: 'Documents' },
   { href: '/analytics', label: 'Analytics', icon: 'Analytics' },
 ]
+
+/**
+ * Text, not icon -- `LogOut` is one of the four glyphs the icon set
+ * deliberately eliminated (see the M5 icon-gap task). Disabled while the
+ * sign-out promise is in flight so a slow network can't be clicked twice.
+ */
+function SignOutButton() {
+  const { signOut } = useAuth()
+  const [pending, setPending] = React.useState(false)
+
+  const handleClick = async () => {
+    setPending(true)
+    try {
+      await signOut()
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={pending}
+      className="mx-3 rounded-md px-3 py-2 text-left text-body-m text-text-secondary transition-colors duration-[--duration-fast] hover:bg-bg-inset hover:text-text-primary disabled:opacity-50"
+    >
+      Sign out
+    </button>
+  )
+}
 
 export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
   pathname?: string
@@ -50,6 +82,8 @@ export function Sidebar({ pathname = '/dashboard', className, ...props }: Sideba
       <NavItem href="/settings" label="Settings" icon="Settings" active={pathname === '/settings'} />
 
       <div data-sidebar-spacer className="flex-1" />
+
+      <SignOutButton />
 
       <div className="px-3">
         <ThemeToggle />

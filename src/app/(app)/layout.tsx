@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
-import Layout from '@/components/Layout'
+import { AppShell } from '@/components/shell/AppShell'
 
 /**
  * The authenticated shell.
@@ -25,5 +25,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // flashes protected chrome at someone who is not signed in.
   if (loading || !user) return null
 
-  return <Layout>{children}</Layout>
+  return <AppShell>{children}</AppShell>
 }

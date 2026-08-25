@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { KpiStat } from '../kpi-stat'
 import { ApplicationRow } from '../application-row'
 import { JobCard } from '../job-card'
@@ -8,6 +8,11 @@ import { NavItem } from '../nav-item'
 import { Sidebar, NAV } from '../sidebar'
 
 vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'light', setTheme: vi.fn() }) }))
+
+const signOut = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: null, loading: false, signOut, signIn: vi.fn(), signUp: vi.fn() }),
+}))
 
 describe('KpiStat', () => {
   it('renders its value with tabular figures', () => {
@@ -104,6 +109,10 @@ describe('NavItem', () => {
 })
 
 describe('Sidebar', () => {
+  beforeEach(() => {
+    signOut.mockClear()
+  })
+
   it('places the theme toggle last, before the footer note', () => {
     const { container } = render(<Sidebar />)
     const nav = container.querySelector('nav')!
@@ -131,9 +140,17 @@ describe('Sidebar', () => {
   })
 
   it('marks only the current route active', () => {
-    render(<Sidebar pathname="/jobs" />)
+    render(<Sidebar pathname="/applications" />)
     const active = screen.getAllByRole('link').filter((l) => l.getAttribute('aria-current'))
     expect(active).toHaveLength(1)
-    expect(active[0].getAttribute('href')).toBe('/jobs')
+    expect(active[0].getAttribute('href')).toBe('/applications')
+  })
+
+  it('signs out and does not leave the button clickable while it works', async () => {
+    render(<Sidebar pathname="/dashboard" />)
+    const button = screen.getByRole('button', { name: 'Sign out' })
+    fireEvent.click(button)
+    expect(button).toHaveProperty('disabled', true)
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
   })
 })
