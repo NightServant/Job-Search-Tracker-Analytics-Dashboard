@@ -53,6 +53,16 @@ export interface JobFormData {
   tech_stack?: string[];
 }
 
+export interface ApplicationDocument {
+  id: string;
+  job_id: string;
+  resume_id: string;
+  snapshot_id: string | null;
+  user_id: string;
+  sent_at: string;
+  created_at: string;
+}
+
 export interface JobStatusHistoryEntry {
   id: string;
   job_id: string;
