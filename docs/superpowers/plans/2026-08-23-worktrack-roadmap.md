@@ -312,6 +312,21 @@ What a reviewer sees first.
   - Use the M4 4.4 Theme Toggle primitive — skiper4's button driven by 4.6's
     `useThemeToggle()`. It is the same control the app shell mounts, not a
     landing-specific one.
+  - **The landing page routes to auth.** Added 2026-08-25; before that its only
+    CTAs were the demo and the source, so `/login` and `/signup` were
+    unreachable from the homepage and the auth screens were orphaned.
+  - Sticky navbar carries `sign in` (text link) and `sign up` (primary button)
+    at the right end, on both breakpoints. Desktop also keeps `open the demo`,
+    **demoted to secondary** — it and `sign up` were both primary, and two
+    filled buttons in one bar have no hierarchy. Mobile drops the navbar demo
+    entirely: 375px cannot hold logo plus three controls, and the hero already
+    carries the demo prominently.
+  - Hero gains `create account` as a **secondary** button beside `try the live
+    demo`, which stays primary. The demo leads on purpose — this is a portfolio
+    piece and the frictionless path is the one worth pushing; account creation
+    is offered, not pressed.
+  - On mobile the hero's 40px spacer was removed to pay for the new button, so
+    the hero still measures exactly 667 and continues to fill the viewport.
 - 6.1a **Pinned scroll sequence for hero and carousel.** Hero holds the viewport
   while it scrolls, releases; carousel holds, releases; the sticky nav bar
   appears and Features onward scroll normally to the footer. Large enough to be
