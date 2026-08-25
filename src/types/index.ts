@@ -12,6 +12,7 @@ export interface Job {
   salary_min: number | null;
   salary_max: number | null;
   url: string | null;
+  description: string | null;
   status: JobStatus;
   date_applied: string | null;
   notes: string | null;
