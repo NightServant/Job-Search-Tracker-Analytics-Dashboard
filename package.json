@@ -15,7 +15,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "load:autofill": "npx artillery run load-tests/job-autofill.yml",
-    "test:integration": "vitest run --config vitest.integration.config.ts"
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "seed:demo": "node --env-file=.env scripts/seed-demo.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
