@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation'
 import { isDevSurfaceEnabled } from '@/lib/isDevSurface'
 import { Tokens } from './sections/Tokens'
 import { Icons } from './sections/Icons'
+import { Primitives } from './sections/Primitives'
 
 /**
  * The design system review surface.
@@ -22,7 +23,8 @@ export default function GalleryPage() {
       </header>
       <Tokens />
       <Icons />
-      {/* Sections appended by Tasks 4-6 */}
+      <Primitives />
+      {/* Sections appended by Tasks 5-6 */}
     </main>
   )
 }

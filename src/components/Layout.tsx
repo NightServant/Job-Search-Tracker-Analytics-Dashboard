@@ -11,12 +11,10 @@ import {
   Menu,
   X,
   LogOut,
-  Moon,
-  Sun,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from 'next-themes'
 import { useToast } from '@/contexts/ToastContext'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
@@ -48,7 +46,6 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
   })
   const [isSigningOut, setIsSigningOut] = useState(false)
   const { user, signOut } = useAuth()
-  const { resolvedTheme: theme, setTheme } = useTheme()
   const { error: showError } = useToast()
   const pathname = usePathname()
 
@@ -155,17 +152,7 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
               </div>
             </div>
             <div className={`flex items-center gap-2 mt-2 ${sidebarCollapsed ? 'hidden' : ''}`}>
-              <button
-                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-                className="flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors min-h-11"
-              >
-                {theme === 'dark' ? (
-                  <Sun className="w-4 h-4" />
-                ) : (
-                  <Moon className="w-4 h-4" />
-                )}
-                {theme === 'dark' ? 'Light' : 'Dark'}
-              </button>
+              <ThemeToggle />
               <button
                 onClick={handleSignOut}
                 disabled={isSigningOut}
