@@ -202,10 +202,15 @@ Rebuild the app surface against the design system.
 - 5.4 `/applications` — kanban desktop, list + status tabs on mobile
 - 5.5 `/applications/[id]` — JD, activity, linked CV, ATS match, next event
 - 5.6 `/calendar`, `/documents`, `/analytics`, `/settings`
-  - `/settings` has **no Appearance section** — removed from the Figma frames on
-    2026-08-25. Its three groups are account, data, danger zone. The theme
-    control lives in the app shell (4.4 + 4.6), so a second one in Settings
-    would be a duplicate source of truth over the same `next-themes` state.
+  - `/settings` is **two groups: account and danger zone.** Appearance and data
+    were both removed from the Figma frames on 2026-08-25.
+  - No Appearance group: the theme control lives in the app shell (4.4 + 4.6),
+    so a second one here would be a duplicate source of truth over the same
+    `next-themes` state.
+  - No data group: CSV export belongs to `/applications`, whose toolbar already
+    carries `Import CSV` and `Export CSV`. Settings duplicated the export and
+    nothing else, so the group had no reason to exist. Do not reintroduce an
+    export control here — 5.4 owns it.
 - 5.7 Mobile: bottom nav, stacked tables, no kanban below 768px
 
 **Exit:** all six routes match their Figma frames in both themes.
