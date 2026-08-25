@@ -5,21 +5,16 @@
   "homepage": "https://nightservant.github.io/Job-Search-Tracker-Analytics-Dashboard",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "build:gh-pages": "tsc -b && vite build --base=/Job-Search-Tracker-Analytics-Dashboard/ && node scripts/create-gh-pages-404.cjs",
-    "predeploy": "npm run build:gh-pages",
-    "deploy": "gh-pages -d dist",
+    "dev": "next dev",
+    "build": "next build",
     "lint": "eslint .",
-    "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "load:autofill": "npx artillery run load-tests/job-autofill.yml",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "seed:demo": "node --env-file=.env scripts/seed-demo.mjs",
-    "dev:next": "next dev",
-    "build:next": "next build",
-    "start:next": "next start"
+    "start": "next start",
+    "build:vite": "tsc -b && vite build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

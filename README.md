@@ -104,8 +104,8 @@ cp .env.example .env
 ```
 
 ```
-VITE_SUPABASE_URL=https://<project-ref>.supabase.co
-VITE_SUPABASE_ANON_KEY=sb_publishable_...
+NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 ```
 
 Use the **publishable** key, never the secret key — Vite inlines `VITE_`-prefixed variables into the client bundle.
