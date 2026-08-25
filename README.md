@@ -60,15 +60,21 @@ Active development. The database schema, migrations, and test suite are current;
 
 ## Architecture
 
-**Database** — five tables, RLS enabled on all of them:
+**Database** — twelve tables, RLS enabled on all of them:
 
 | Table | Purpose |
 |---|---|
-| `jobs` | Applications, with contact/tag/tech-stack fields |
+| `jobs` | Applications, with description, currency, contact and tag fields |
 | `job_status_history` | Append-only status transitions, written by trigger |
-| `resumes` | CV drafts; Tiptap JSON or LaTeX source |
+| `activity_log` | Free-form timestamped notes per application |
+| `events` | Interviews, deadlines, take-homes |
+| `resumes` | CV drafts; structured sections, Tiptap JSON, or LaTeX |
 | `resume_snapshots` | Immutable version history |
+| `application_documents` | Which CV snapshot was sent to which application |
+| `contacts` / `application_contacts` | Recruiters and referrals, linked many-to-many |
+| `user_preferences` | Per-user settings; default currency for new applications |
 | `analytics_cache` | Precomputed per-user metrics, service-role only |
+| `demo_accounts` | Read-only demo users, enforced by RLS |
 
 **Edge functions** (Deno, in `supabase/functions/`):
 
