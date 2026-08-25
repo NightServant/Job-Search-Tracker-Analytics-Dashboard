@@ -144,8 +144,23 @@ Translate the Figma system into code. No screens yet.
   table columns will not align without it.
 - 4.3 Icon set: 26 SVGs as React components from the Figma vectors
 - 4.4 Primitives: Button, Input, Status Marker, ATS Check, Breadcrumb, Theme Toggle
+  - Theme Toggle: the Figma component defines the mark; **skiper4 is reference
+    only** for the icon animation. Do not install it. Its five buttons are
+    animated SVGs that change no state, and they are somebody else's icon
+    vocabulary — this system uses the custom 26-icon set, never Lucide and never
+    a vendor's.
+  - Today's app already has a working toggle at `src/components/Layout.tsx:155`
+    wired to `ThemeContext`. It renders Lucide icons, so it violates the icon
+    constraint and gets replaced here — the context behind it does not.
 - 4.5 Composites: KPI Stat, Application Row, Job Card, Kanban Column, Nav Item, Sidebar
 - 4.6 Motion: `IntersectionObserver` mount-gating, `prefers-reduced-motion`, View Transitions theme wipe
+  - **skiper26's `useThemeToggle()` is the reference implementation** of the
+    wipe — it is the View Transition API approach this task already assumes.
+    Read it, then write our own against `ThemeContext`; adopting the package
+    would pull `framer-motion` in at M4 rather than M6.
+  - The wipe must no-op under `prefers-reduced-motion`, and the theme must still
+    change when View Transitions are unsupported. Progressive enhancement, not a
+    dependency.
 
 **Exit:** every component rendered in a Storybook-style route, light and dark, matching Figma.
 
@@ -176,6 +191,15 @@ What a reviewer sees first.
     the vendor's own guidance is `!important` overrides. Budget a task for
     reconciling it with the M4 tokens, and kill the creative effect's default
     `shadow: true` — this system is flat with hairline rules.
+  - **Add a Theme Toggle to the homepage.** The landing page is drawn in both
+    themes (`Desktop / Landing Page` and its Dark twin, same for mobile) but no
+    frame contains a toggle, so a visitor has no way to switch. Place it in
+    `Sticky Navbar (reveals after hero)`; since that navbar is hidden until the
+    hero scrolls past, repeat it in `Footer Links` so the control is reachable
+    from the top of the page.
+  - Use the M4 4.4 Theme Toggle primitive, not a vendor component. **skiper4 is
+    reference only** for how the icon animates; the switching behaviour comes
+    from 4.6. Neither package gets installed.
 - 6.2 Auth layout — split panel, `/login` and `/signup`, smooth-caret inputs
   - Smooth-caret input is **skiper106** (`Smooth caret input`, free).
     `pnpm dlx shadcn add @skiper-ui/skiper106` — pulls `dialkit` + `framer-motion`.
@@ -214,6 +238,12 @@ Registry: https://skiper-ui.com/components — 106 components, 37 free, installe
 through the shadcn CLI (`pnpm dlx shadcn add @skiper-ui/<id>`). Free tier
 **requires attribution**; Pro does not. Verified 2026-08-25.
 
+Attribution attaches to what ships, not to what is read. Components we install
+(`skiper51`, `skiper106`) must credit Skiper UI. Components marked **reference
+only** are studied and reimplemented against our own tokens, and carry no
+obligation — the same line already drawn around CVJunction. `skiper4` is
+itself adapted from toggles.dev by Alfie Jones; credit both if it ever ships.
+
 Every component below pulls `framer-motion`, which is a third motion system
 alongside M4 4.6's IntersectionObserver gating and View Transitions. Pick one
 per surface rather than layering all three, and confirm each honours
@@ -239,7 +269,8 @@ per surface rather than layering all three, and confirm each honours
 | `skiper101` | Custom tooltip | 5.6 analytics |
 | `skiper62` | Loop animation hook | 4.6 utility |
 | `skiper65` / `skiper102` | Breakpoint indicator, Debug panel | 5.7 mobile work — dev only, never shipped |
-| `skiper4` / `skiper26` | Theme toggle | Reference only. Figma already defines Theme Toggle, and 4.6 wants a View Transitions wipe |
+| `skiper4` | Theme toggle buttons | **Reference only** — 4.4 Theme Toggle and the 6.1 homepage toggle. Five animated SVG icons (`ThemeToggleButton1`-`5`); by its own docs they do **not** switch the theme |
+| `skiper26` | Theme toggle btn | Ships `useThemeToggle()`, which drives the switch through the **View Transition API** — the mechanism 4.6 already specifies for the theme wipe |
 
 **Premium — costs money, listed so the choice is deliberate**
 
