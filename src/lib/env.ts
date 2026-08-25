@@ -48,6 +48,8 @@ function nextPublicEnv(): Record<string, string | undefined> {
       NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
       NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
       NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
+      NEXT_PUBLIC_BUILD_SHA: process.env.NEXT_PUBLIC_BUILD_SHA,
+      NEXT_PUBLIC_BUILD_TIME: process.env.NEXT_PUBLIC_BUILD_TIME,
       NODE_ENV: process.env.NODE_ENV,
     }
   } catch {
@@ -85,6 +87,8 @@ export interface RuntimeFlags {
   sentryDsn: string
   sentryEnvironment: string
   appVersion: string
+  buildSha: string
+  buildTime: string
 }
 
 /**
@@ -107,6 +111,8 @@ export function readRuntimeFlags(source: Record<string, string | undefined>): Ru
     sentryDsn: (source.NEXT_PUBLIC_SENTRY_DSN ?? source.VITE_SENTRY_DSN ?? '').trim(),
     sentryEnvironment: (source.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? source.VITE_SENTRY_ENVIRONMENT ?? '').trim(),
     appVersion: source.NEXT_PUBLIC_APP_VERSION ?? '0.0.0',
+    buildSha: source.NEXT_PUBLIC_BUILD_SHA ?? 'dev',
+    buildTime: source.NEXT_PUBLIC_BUILD_TIME ?? '',
   }
 }
 

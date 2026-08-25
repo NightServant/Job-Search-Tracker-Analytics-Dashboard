@@ -17,12 +17,4 @@ Object.defineProperty(window, 'matchMedia', {
 })
 
 // Mock global variables set by Vite
-declare global {
-  var __APP_VERSION__: string
-  var __BUILD_SHA__: string
-  var __BUILD_TIME__: string
-}
 
-globalThis.__APP_VERSION__ = '1.0.0'
-globalThis.__BUILD_SHA__ = 'dev'
-globalThis.__BUILD_TIME__ = new Date().toISOString()

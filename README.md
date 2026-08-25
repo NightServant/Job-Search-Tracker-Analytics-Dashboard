@@ -45,7 +45,7 @@ Active development. The database schema, migrations, and test suite are current;
 
 | Layer | Technology |
 |---|---|
-| UI | React 18, TypeScript, Vite |
+| UI | React 18, TypeScript, Next.js |
 | Styling | Tailwind CSS, shadcn-style semantic tokens |
 | Data fetching | TanStack Query v5 |
 | Editor | Tiptap |
@@ -108,7 +108,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 ```
 
-Use the **publishable** key, never the secret key — Vite inlines `VITE_`-prefixed variables into the client bundle.
+Use the **publishable** key, never the secret key — Next.js inlines `VITE_`-prefixed variables into the client bundle.
 
 **Apply migrations** — the eight files in `supabase/migrations/` reproduce the full schema:
 

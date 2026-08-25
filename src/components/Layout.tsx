@@ -243,9 +243,9 @@ export default function Layout({ children }: { children?: React.ReactNode }) {
             <span className="mx-2">·</span>
             <span>v{runtimeFlags.appVersion}</span>
             <span className="mx-2">·</span>
-            <span>sha {__BUILD_SHA__.slice(0, 8)}</span>
+            <span>sha {runtimeFlags.buildSha.slice(0, 8)}</span>
             <span className="mx-2">·</span>
-            <span>{formatBuildTime(__BUILD_TIME__)}</span>
+            <span>{formatBuildTime(runtimeFlags.buildTime)}</span>
           </footer>
         </main>
       </div>

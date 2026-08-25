@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
     // so the same value is published as a normal public variable and read
     // through src/lib/env.ts like everything else.
     NEXT_PUBLIC_APP_VERSION: process.env.npm_package_version ?? '0.0.0',
+    // Vercel exposes the commit as VERCEL_GIT_COMMIT_SHA; locally there is none.
+    NEXT_PUBLIC_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA ?? 'dev',
+    NEXT_PUBLIC_BUILD_TIME: new Date().toISOString(),
   },
   // The Vite app still lives in src/ and must not be swept into the Next build.
   pageExtensions: ['tsx', 'ts'],
