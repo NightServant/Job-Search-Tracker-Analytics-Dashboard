@@ -255,6 +255,11 @@ Rebuild the app surface against the design system.
     routes to `/settings`, styled to match the Theme Toggle beside it. Removing
     `more` and adding that button are the same change: settings moved out of the
     nav and into the chrome.
+  - **Top Bar chrome is Theme Toggle then Settings, at the right end of every
+    app screen** — all seven carry both. Screen-specific controls (`Add`,
+    `Edit`, the analytics range) sit to the *left* of the chrome, so the right
+    edge means the same thing on every screen. Public pages are excluded:
+    Privacy keeps its slim Back Link bar, Landing and 404 have no bar at all.
   - **`/settings` therefore has no active bottom-nav item.** It is not a nav
     destination any more, so nothing there is highlighted; the Top Bar Settings
     button carries the accent instead. Every other screen highlights exactly one
