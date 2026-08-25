@@ -256,10 +256,16 @@ Rebuild the app surface against the design system.
     `more` and adding that button are the same change: settings moved out of the
     nav and into the chrome.
   - **Top Bar chrome is Theme Toggle then Settings, at the right end of every
-    app screen** — all seven carry both. Screen-specific controls (`Add`,
-    `Edit`, the analytics range) sit to the *left* of the chrome, so the right
-    edge means the same thing on every screen. Public pages are excluded:
-    Privacy keeps its slim Back Link bar, Landing and 404 have no bar at all.
+    app screen** — all seven carry both. Public pages are excluded: Privacy
+    keeps its slim Back Link bar, Landing and 404 have no bar at all.
+  - **Content controls belong in the body header, not the Top Bar.** The
+    analytics range picker moved there beside the page title, matching how
+    Documents carries `+ new cv`. Five of the seven app screens now have an
+    identical bar (Logo · Spacer · Toggle · Settings). Only Applications keeps
+    `Add`, and Application Detail keeps `Back`/`Edit` — Back is navigation, so
+    it belongs. **`Add` is the remaining inconsistency:** it is the same kind of
+    control as Documents' `+ new cv`, so it should probably move to the body
+    header too.
   - **`/settings` therefore has no active bottom-nav item.** It is not a nav
     destination any more, so nothing there is highlighted; the Top Bar Settings
     button carries the accent instead. Every other screen highlights exactly one
