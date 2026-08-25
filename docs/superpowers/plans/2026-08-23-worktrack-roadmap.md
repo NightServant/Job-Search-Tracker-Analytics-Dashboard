@@ -238,9 +238,15 @@ Rebuild the app surface against the design system.
     Bottom Nav stays at 739 and the screen stays 812. The icon inside stays 18px
     with 13px padding. Desktop keeps its 32px toggle — a pointer target does not
     need 44, and the sidebar has no room to spare.
-  - **Mobile is now 9 screens per theme**, matching desktop's coverage of the
-    app surface: Landing, Dashboard, Applications, Application Detail, Calendar,
-    Analytics, Settings, Privacy Policy, 404. Built 2026-08-25.
+  - **Mobile is 10 screens per theme**: Landing, Dashboard, Applications,
+    Application Detail, Calendar, Documents, Analytics, Settings, Privacy
+    Policy, 404. Built 2026-08-25.
+  - **Every bottom-nav destination now resolves to a mobile screen** — overview,
+    apps, calendar, docs, stats all have one. `docs` previously pointed at
+    nothing, which is what adding Documents fixed.
+  - Mobile Documents stacks what desktop lays out in four columns. The desktop
+    row is Info · ATS Check · version · date across 1104px; at 335px the ATS
+    marker, version and date drop onto their own line beneath the title.
   - **The bottom nav is five real destinations, 01-05**: overview, apps,
     calendar, docs, stats — the same numbering as the desktop sidebar. The
     `more` catch-all is gone, and calendar sits at 03 where the numbering
