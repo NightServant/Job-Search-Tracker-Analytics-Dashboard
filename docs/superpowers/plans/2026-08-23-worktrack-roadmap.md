@@ -337,11 +337,36 @@ What a reviewer sees first.
     scroll distance allocated for its hold (roughly one viewport each), so the
     real page is materially taller than the 3102px desktop frame. Do not derive
     scroll math from the mockup.
-  - **Conflict to resolve before building: skiper51 owns its own gestures.**
-    It is Swiper-based with drag and swipe. If page scroll also advances slides
-    while the carousel is pinned, scroll and touch fight each other on mobile.
-    Decide one: scroll drives the slides (disable Swiper's touch handling), or
-    the carousel is merely pinned and keeps its own swipe. Do not ship both.
+  - **Settled: scroll drives the slides and the carousel is not touchable.**
+    Page scroll advances skiper51 while it is pinned; direct manipulation is
+    off. This also removes the scroll-versus-gesture conflict on mobile, which
+    makes pinning viable there — the vertical swipe that scrolls the page is
+    the same gesture that advances the carousel.
+  - Disable Swiper's input: `allowTouchMove: false` and `simulateTouch: false`.
+    skiper51 does not expose these through its props (`images`, `className`,
+    `showPagination`, `showNavigation`, `loop`, `autoplay`, `spaceBetween`), so
+    set them in the copied source at `@/components/v1/skiper51` — the registry
+    installs source, not a package, so this is an edit, not a fork.
+  - **`loop` must be `false`.** Scroll progress has to map 1:1 onto the slides
+    so the pin can release deterministically on the last one; a looping carousel
+    has no last slide and the section would never end.
+  - Drive it with Swiper's `setProgress(0..1)` from the pinned section's scroll
+    progress rather than firing `slideNext()` on thresholds — progress mapping
+    is what makes the movement track the scrollbar instead of snapping.
+  - `autoplay` stays off, which it already had to be. With no autoplay and no
+    touch, nothing auto-advances, so the WCAG 2.2.2 pause requirement no longer
+    applies to this component.
+  - **Removing touch removes the only direct control, so replace it.** Keep
+    `showNavigation` arrows (and/or pagination) as a real, focusable affordance,
+    and make sure each slide's content is reachable in Tab order — otherwise
+    keyboard and screen-reader users have no way through the carousel at all.
+  - **Reduced motion needs a real fallback.** When pinning is disabled the
+    carousel is no longer scroll-driven, so it cannot also be untouchable or it
+    becomes inert. Under `prefers-reduced-motion` re-enable touch and arrows and
+    let it behave as a conventional carousel, or render the screens as a plain
+    stacked list. Decide which, but do not leave it frozen.
+  - Pin length scales with slide count: allocate scroll distance per slide so
+    the pace stays constant if a screen is added or removed.
   - Pause the hero's background video once the hero unpins — battery and
     decode cost, and it is invisible by then.
   - Keyboard order must stay honest: content inside a pinned section has to
