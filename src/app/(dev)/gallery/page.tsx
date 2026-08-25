@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import { isDevSurfaceEnabled } from '@/lib/isDevSurface'
+import { Tokens } from './sections/Tokens'
 
 /**
  * The design system review surface.
@@ -18,7 +19,8 @@ export default function GalleryPage() {
           Every component, both themes. Toggle the theme to review dark.
         </p>
       </header>
-      {/* Sections appended by Tasks 2-6 */}
+      <Tokens />
+      {/* Sections appended by Tasks 3-6 */}
     </main>
   )
 }
