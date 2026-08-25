@@ -81,4 +81,18 @@ describe('Dashboard', () => {
       expect(v.className).toContain('tabular')
     }
   })
+
+  it('separates the six blocks with a hairline rule, not a border box', () => {
+    // Only job-card.tsx earns a full border in this system, and its own doc
+    // comment says why: it moves. A static dashboard grouping doesn't, so it
+    // gets a rule instead -- same vocabulary as application-row's border-b.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const blocks = container.querySelectorAll('[data-dashboard-block]')
+    expect(blocks).toHaveLength(6)
+    for (const b of blocks) {
+      const el = b as HTMLElement
+      expect(el.className).toContain('border-t')
+      expect(el.className).not.toMatch(/(^|\s)border(\s|$)/)
+    }
+  })
 })

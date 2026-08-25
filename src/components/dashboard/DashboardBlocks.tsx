@@ -18,10 +18,7 @@ interface BlockProps {
 
 function Block({ title, href, linkLabel, children }: BlockProps) {
   return (
-    <section
-      data-dashboard-block
-      className="flex flex-col gap-3 rounded-md border border-border-subtle p-5"
-    >
+    <section data-dashboard-block className="flex flex-col gap-3 border-t border-border-subtle pt-5">
       <div className="flex items-center justify-between gap-4">
         <h2 className="text-heading-m text-text-primary">{title}</h2>
         <Link href={href} className="text-body-s text-accent-default hover:text-accent-hover">
@@ -42,6 +39,15 @@ function Block({ title, href, linkLabel, children }: BlockProps) {
  * Upcoming events and Documents have no data source on this page -- there is
  * no calendar or document list in `jobs` -- so those two are link-out cards
  * rather than fabricated numbers.
+ *
+ * Separation is a top hairline rule, not a border box. `job-card.tsx` is the
+ * one bordered container in this system, and it earns the border because it
+ * moves -- a kanban card being dragged needs a boundary. A static grouping on
+ * a dashboard doesn't move, so by the same logic it gets a rule instead. A
+ * top rule was chosen over column dividers because the grid collapses to one
+ * column at mobile widths, where a vertical divider between columns has
+ * nothing left to sit between; a top rule keeps working as a plain row
+ * separator once the grid stacks.
  */
 export function DashboardBlocks({ jobs }: DashboardBlocksProps) {
   const recent = [...jobs]
