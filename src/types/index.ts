@@ -11,6 +11,7 @@ export interface Job {
   role: string;
   salary_min: number | null;
   salary_max: number | null;
+  salary_currency: string;
   url: string | null;
   description: string | null;
   status: JobStatus;
