@@ -360,11 +360,25 @@ What a reviewer sees first.
     `showNavigation` arrows (and/or pagination) as a real, focusable affordance,
     and make sure each slide's content is reachable in Tab order — otherwise
     keyboard and screen-reader users have no way through the carousel at all.
-  - **Reduced motion needs a real fallback.** When pinning is disabled the
-    carousel is no longer scroll-driven, so it cannot also be untouchable or it
-    becomes inert. Under `prefers-reduced-motion` re-enable touch and arrows and
-    let it behave as a conventional carousel, or render the screens as a plain
-    stacked list. Decide which, but do not leave it frozen.
+  - **Settled: under `prefers-reduced-motion` the carousel becomes a
+    conventional one.** Pinning is off, the section sits in normal flow, and
+    touch and arrows are restored — `allowTouchMove: true`,
+    `simulateTouch: true`, nothing driving `setProgress`. Without this the
+    carousel would be frozen on slide one for exactly the users who opted out
+    of motion.
+  - **Arrows are on in both modes, not only the reduced one.** They are the
+    keyboard affordance, and the scroll-driven mode has no other control at all
+    once touch is off. Touch is the only thing that toggles between the two
+    modes.
+  - **Read the preference live, not once at mount.** Someone can change the OS
+    setting with the page open. Subscribe with
+    `matchMedia('(prefers-reduced-motion: reduce)')` and flip
+    `swiper.params.allowTouchMove` plus the pin on change; a value captured at
+    mount silently strands whoever changes it mid-session.
+  - `loop` stays `false` in both modes — the scroll-driven path needs it, and a
+    conventional carousel does not benefit enough to justify two configurations.
+  - Both paths get tested. The reduced-motion path is the one that rots
+    unnoticed, because nobody sees it unless they turn the setting on.
   - Pin length scales with slide count: allocate scroll distance per slide so
     the pace stays constant if a screen is added or removed.
   - Pause the hero's background video once the hero unpins — battery and
