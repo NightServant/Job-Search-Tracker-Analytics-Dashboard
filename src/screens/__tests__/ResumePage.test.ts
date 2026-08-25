@@ -5,6 +5,10 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 global.URL.createObjectURL = vi.fn((blob: Blob) => `blob:${Math.random()}`)
 global.URL.revokeObjectURL = vi.fn()
 
+// Fake host: tests must never name a real backend project.
+const TEST_FUNCTIONS_BASE_URL = 'https://test.supabase.invalid/functions/v1'
+const EXPORT_PDF_URL = `${TEST_FUNCTIONS_BASE_URL}/resume-export-pdf`
+
 // Mock components for testing resume functionality
 describe('Resume Export and LaTeX Preview', () => {
   beforeEach(() => {
@@ -20,7 +24,7 @@ describe('Resume Export and LaTeX Preview', () => {
 
       global.fetch = mockFetch
 
-      const response = await fetch('https://zlqepevzcfnnygaorvxn.supabase.co/functions/v1/resume-export-pdf', {
+      const response = await fetch(EXPORT_PDF_URL, {
         method: 'POST',
         body: JSON.stringify({ title: 'My Resume', content: {} }),
       })
@@ -39,7 +43,7 @@ describe('Resume Export and LaTeX Preview', () => {
 
       global.fetch = mockFetch
 
-      const response = await fetch('https://zlqepevzcfnnygaorvxn.supabase.co/functions/v1/resume-export-pdf', {
+      const response = await fetch(EXPORT_PDF_URL, {
         method: 'POST',
       })
 
@@ -55,7 +59,7 @@ describe('Resume Export and LaTeX Preview', () => {
 
       global.fetch = mockFetch
 
-      await fetch('https://zlqepevzcfnnygaorvxn.supabase.co/functions/v1/resume-export-pdf', {
+      await fetch(EXPORT_PDF_URL, {
         method: 'POST',
         headers: {
           Authorization: 'Bearer token123',
