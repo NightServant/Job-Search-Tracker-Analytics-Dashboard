@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import { isDevSurfaceEnabled } from '@/lib/isDevSurface'
 import { Tokens } from './sections/Tokens'
+import { Icons } from './sections/Icons'
 
 /**
  * The design system review surface.
@@ -20,7 +21,8 @@ export default function GalleryPage() {
         </p>
       </header>
       <Tokens />
-      {/* Sections appended by Tasks 3-6 */}
+      <Icons />
+      {/* Sections appended by Tasks 4-6 */}
     </main>
   )
 }
