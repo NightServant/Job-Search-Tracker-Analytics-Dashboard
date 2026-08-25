@@ -1,7 +1,7 @@
 import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
-import { ThemeProvider } from '@/contexts/ThemeContext'
+import { ThemeProvider } from 'next-themes'
 import { ToastProvider } from '@/contexts/ToastContext'
 import Layout from '@/components/Layout'
 
@@ -110,7 +110,7 @@ function AppRoutes() {
 
 function App() {
   return (
-    <ThemeProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <ToastProvider>
         <AuthProvider>
           <BrowserRouter basename={import.meta.env.BASE_URL}>

@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import Layout from '../Layout'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { ThemeProvider } from '@/contexts/ThemeContext'
+import { ThemeProvider } from 'next-themes'
 import { ToastProvider } from '@/contexts/ToastContext'
 import * as supabaseModule from '@/lib/supabase'
 

@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import '../index.css'
+import { Providers } from './providers'
 
 export const metadata: Metadata = {
   title: 'Worktrack',
@@ -11,7 +12,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   // before React hydrates, which would otherwise log a mismatch on every load.
   return (
     <html lang="en" suppressHydrationWarning>
-      <body>{children}</body>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
     </html>
   )
 }

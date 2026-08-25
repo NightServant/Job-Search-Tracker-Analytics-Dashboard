@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Mail, Lock, Briefcase, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from '@/contexts/ThemeContext'
+import { useTheme } from 'next-themes'
 import { hasValidSupabaseConfig } from '@/lib/supabase'
 
 export default function LoginPage() {
@@ -14,7 +14,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const { signIn, signUp } = useAuth()
-  const { theme } = useTheme()
+  const { resolvedTheme: theme } = useTheme()
   const navigate = useNavigate()
 
   const hasSupabaseConfig = hasValidSupabaseConfig

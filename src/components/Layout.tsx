@@ -11,7 +11,7 @@ import {
   Sun,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from '@/contexts/ThemeContext'
+import { useTheme } from 'next-themes'
 import { useToast } from '@/contexts/ToastContext'
 
 const navigation = [
@@ -44,7 +44,7 @@ export default function Layout() {
   })
   const [isSigningOut, setIsSigningOut] = useState(false)
   const { user, signOut } = useAuth()
-  const { theme, toggleTheme } = useTheme()
+  const { resolvedTheme: theme, setTheme } = useTheme()
   const { error: showError } = useToast()
   const location = useLocation()
 
@@ -152,7 +152,7 @@ export default function Layout() {
             </div>
             <div className={`flex items-center gap-2 mt-2 ${sidebarCollapsed ? 'hidden' : ''}`}>
               <button
-                onClick={toggleTheme}
+                onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
                 className="flex-1 flex items-center justify-center gap-2 px-3 py-3 text-sm text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors min-h-11"
               >
                 {theme === 'dark' ? (

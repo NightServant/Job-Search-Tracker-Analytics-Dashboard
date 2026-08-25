@@ -42,9 +42,12 @@ export function currentEnvSource(): Record<string, string | undefined> {
   const fromProcess = typeof process !== 'undefined' && process.env ? process.env : {}
   let fromImportMeta: Record<string, string | undefined> = {}
   try {
+    // Must stay a property access. Aliasing `import.meta` to a variable makes
+    // webpack emit "Accessing import.meta directly is unsupported"; the cast is
+    // erased by TypeScript, so this compiles to plain `import.meta.env`. No
+    // optional chaining either: it downlevels to a temp assignment, same problem.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const meta = import.meta as any
-    if (meta && meta.env) fromImportMeta = meta.env
+    fromImportMeta = ((import.meta as any).env ?? {}) as Record<string, string | undefined>
   } catch {
     // import.meta is unavailable in some CJS contexts; process.env alone is fine there.
   }
