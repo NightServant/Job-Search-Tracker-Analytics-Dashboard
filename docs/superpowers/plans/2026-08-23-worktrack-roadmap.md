@@ -202,6 +202,10 @@ Rebuild the app surface against the design system.
 - 5.4 `/applications` — kanban desktop, list + status tabs on mobile
 - 5.5 `/applications/[id]` — JD, activity, linked CV, ATS match, next event
 - 5.6 `/calendar`, `/documents`, `/analytics`, `/settings`
+  - `/settings` has **no Appearance section** — removed from the Figma frames on
+    2026-08-25. Its three groups are account, data, danger zone. The theme
+    control lives in the app shell (4.4 + 4.6), so a second one in Settings
+    would be a duplicate source of truth over the same `next-themes` state.
 - 5.7 Mobile: bottom nav, stacked tables, no kanban below 768px
 
 **Exit:** all six routes match their Figma frames in both themes.
