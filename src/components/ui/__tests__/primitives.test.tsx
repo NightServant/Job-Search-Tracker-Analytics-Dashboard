@@ -29,6 +29,16 @@ describe('Button', () => {
     expect(container.innerHTML).not.toContain('accent-500')
   })
 
+  it('keeps its foreground colour after the class merge', () => {
+    // tailwind-merge read the custom `text-body-m` scale as a colour and
+    // dropped `text-accent-on-accent`, leaving white-on-orange rendering as
+    // inherited near-black on orange. It failed only in a browser.
+    const { container } = render(<Button variant="primary" size="m">Go</Button>)
+    const cls = container.querySelector('button')!.className
+    expect(cls).toContain('text-accent-on-accent')
+    expect(cls).toContain('text-body-m')
+  })
+
   it('defaults to type="button" so it cannot submit a form by accident', () => {
     render(<Button>Go</Button>)
     expect(screen.getByRole('button')).toHaveProperty('type', 'button')

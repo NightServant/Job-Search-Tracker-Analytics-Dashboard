@@ -1,10 +1,12 @@
 'use client'
 
 import * as React from 'react'
+import { flushSync } from 'react-dom'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 import { SunIcon, MoonIcon } from '@/components/icons'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 
 /**
  * The theme control. One button, two icons, one of them visible.
@@ -27,9 +29,15 @@ export interface ThemeToggleProps extends React.ButtonHTMLAttributes<HTMLButtonE
 
 const SPIN = { type: 'spring', stiffness: 220, damping: 22 } as const
 
+type ViewTransitionDocument = Document & {
+  startViewTransition?: (cb: () => void) => { ready: Promise<void> }
+}
+
 export function ThemeToggle({ size = 32, className, onClick, ...props }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme()
   const [mounted, setMounted] = React.useState(false)
+  const reduced = usePrefersReducedMotion()
+  const ref = React.useRef<HTMLButtonElement>(null)
 
   // The server has no way to know the stored theme, so the first client render
   // must match the server's. Reading `resolvedTheme` before mount renders the
@@ -38,14 +46,51 @@ export function ThemeToggle({ size = 32, className, onClick, ...props }: ThemeTo
 
   const isDark = mounted && resolvedTheme === 'dark'
 
+  /**
+   * The wipe is decoration; the theme change is the feature.
+   *
+   * Written against next-themes rather than installing skiper26, which pulls
+   * lucide-react and mounts a second theme provider beside the one M3 already
+   * has. Three paths, and the two that skip the animation are the ones that
+   * matter: reduced motion, and any browser without View Transitions -- Safari
+   * and Firefox both shipped late. In both the theme still flips, instantly.
+   */
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     onClick?.(e)
     if (e.defaultPrevented) return
-    setTheme(isDark ? 'light' : 'dark')
+
+    const next = isDark ? 'light' : 'dark'
+    const doc = typeof document === 'undefined' ? null : (document as ViewTransitionDocument)
+
+    if (reduced || !doc?.startViewTransition) {
+      setTheme(next)
+      return
+    }
+
+    // The wipe grows from the button, so it needs the button's centre. Set as
+    // custom properties because a pseudo-element cannot be styled inline.
+    const box = ref.current?.getBoundingClientRect()
+    if (box) {
+      const x = box.left + box.width / 2
+      const y = box.top + box.height / 2
+      const radius = Math.hypot(
+        Math.max(x, window.innerWidth - x),
+        Math.max(y, window.innerHeight - y)
+      )
+      doc.documentElement.style.setProperty('--theme-wipe-x', `${x}px`)
+      doc.documentElement.style.setProperty('--theme-wipe-y', `${y}px`)
+      doc.documentElement.style.setProperty('--theme-wipe-r', `${radius}px`)
+    }
+
+    // flushSync is required: startViewTransition snapshots the DOM when its
+    // callback returns, and React would otherwise still be holding the update
+    // in a batch, so the "after" snapshot would be identical to the "before".
+    doc.startViewTransition(() => flushSync(() => setTheme(next)))
   }
 
   return (
     <button
+      ref={ref}
       type="button"
       onClick={handleClick}
       data-theme-toggle

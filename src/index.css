@@ -1,6 +1,3 @@
-/* Import Inter font */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
 @import "tailwindcss";
 
 /* next-themes sets .dark on <html>. v3 had darkMode:'class' in the JS config;
@@ -220,7 +217,11 @@
 }
 
 :root {
-  font-family: 'Inter', system-ui, sans-serif;
+  /* Read the token rather than restating a stack. This line said 'Inter' until
+     M4 Task 6 review: --font-sans had been Helvetica since Task 2, but a
+     leftover literal here outranked it and the whole app still rendered Inter.
+     A second copy of a value is a second thing that can be wrong. */
+  font-family: var(--font-sans);
   line-height: 1.5;
   font-weight: 400;
   font-synthesis: none;
@@ -448,5 +449,43 @@ body,
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Theme wipe (View Transitions)
+
+   The new theme is revealed by a circle growing from the toggle. Only the new
+   snapshot animates -- the old one is held still underneath, so there is no
+   crossfade of two full-page paints, which is what makes the default look like
+   a flash.
+
+   The @media block is not belt-and-braces over the JS gate. A view transition
+   can be started by something other than the toggle, and CSS is the only place
+   that can refuse to animate one it did not initiate.
+--------------------------------------------------------------------------- */
+::view-transition-old(root) {
+  animation: none;
+  z-index: 0;
+}
+
+::view-transition-new(root) {
+  animation: theme-wipe var(--duration-slow) cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1;
+}
+
+@keyframes theme-wipe {
+  from {
+    clip-path: circle(0 at var(--theme-wipe-x, 50%) var(--theme-wipe-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--theme-wipe-r, 150vmax) at var(--theme-wipe-x, 50%) var(--theme-wipe-y, 50%));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
   }
 }

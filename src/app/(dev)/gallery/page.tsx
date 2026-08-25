@@ -4,6 +4,7 @@ import { Tokens } from './sections/Tokens'
 import { Icons } from './sections/Icons'
 import { Primitives } from './sections/Primitives'
 import { Composites } from './sections/Composites'
+import { Motion } from './sections/Motion'
 
 /**
  * The design system review surface.
@@ -26,7 +27,7 @@ export default function GalleryPage() {
       <Icons />
       <Primitives />
       <Composites />
-      {/* Section appended by Task 6 */}
+      <Motion />
     </main>
   )
 }
