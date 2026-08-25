@@ -1,3 +1,5 @@
+import type { SupportedCurrency } from '@/services/userPreferences';
+
 // Job status type
 export type JobStatus = 'wishlist' | 'applied' | 'interviewing' | 'offer' | 'rejected';
 
@@ -37,7 +39,11 @@ export interface JobFormData {
   role: string;
   salary_min?: number | null;
   salary_max?: number | null;
+  /** ISO code for salary_min/salary_max. Omit to take the column default of PHP. */
+  salary_currency?: SupportedCurrency;
   url?: string | null;
+  /** Full posting text, used for ATS keyword matching and AI tailoring. */
+  description?: string | null;
   status: JobStatus;
   date_applied?: string | null;
   notes?: string | null;

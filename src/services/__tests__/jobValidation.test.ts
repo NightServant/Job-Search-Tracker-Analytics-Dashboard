@@ -412,4 +412,48 @@ describe('jobValidation', () => {
       expect(errors.filter((e) => e.field.includes('salary')).length).toBeGreaterThan(0)
     })
   })
+  describe('validateSalaryCurrency', () => {
+    it('accepts every code the database CHECK allows', () => {
+      for (const code of ['PHP', 'USD', 'EUR', 'GBP', 'SGD', 'AUD']) {
+        expect(jobValidation.validateSalaryCurrency(code)).toBeNull()
+      }
+    })
+
+    it('rejects a code the database would refuse', () => {
+      const err = jobValidation.validateSalaryCurrency('XYZ')
+      expect(err).not.toBeNull()
+      expect(err?.field).toBe('salary_currency')
+    })
+
+    it('treats an absent currency as valid, since the column defaults', () => {
+      expect(jobValidation.validateSalaryCurrency(undefined)).toBeNull()
+      expect(jobValidation.validateSalaryCurrency(null)).toBeNull()
+    })
+  })
+
+  describe('M1 columns on JobFormData', () => {
+    it('surfaces an unsupported currency through validateJobFormData', () => {
+      const data = {
+        company: 'Stripe',
+        role: 'Software Engineer',
+        status: 'applied',
+        salary_currency: 'XYZ',
+      } as JobFormData
+
+      const errors = jobValidation.validateJobFormData(data)
+      expect(errors.some((e) => e.field === 'salary_currency')).toBe(true)
+    })
+
+    it('accepts a full-length job posting as the description', () => {
+      const data: JobFormData = {
+        company: 'Stripe',
+        role: 'Software Engineer',
+        status: 'applied',
+        description: 'x'.repeat(8000),
+      }
+
+      const errors = jobValidation.validateJobFormData(data)
+      expect(errors.filter((e) => e.field === 'description')).toHaveLength(0)
+    })
+  })
 })

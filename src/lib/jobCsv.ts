@@ -1,5 +1,6 @@
 import Papa from 'papaparse'
 import { JobFormData, JobStatus, WorkMode } from '@/types'
+import { isSupportedCurrency, type SupportedCurrency } from '@/services/userPreferences'
 
 export interface ParsedJobRow {
   rowNumber: number
@@ -23,7 +24,9 @@ const HEADER_ALIASES: Record<keyof JobFormData | 'tags' | 'tech_stack', string[]
   role: ['role', 'title', 'position', 'job_title'],
   salary_min: ['salary_min', 'min_salary', 'salary_from', 'salary_low', 'min'],
   salary_max: ['salary_max', 'max_salary', 'salary_to', 'salary_high', 'max'],
+  salary_currency: ['salary_currency', 'currency', 'salary_ccy'],
   url: ['url', 'job_url', 'posting_url', 'link'],
+  description: ['description', 'job_description', 'posting', 'jd'],
   status: ['status', 'stage', 'pipeline_stage'],
   date_applied: ['date_applied', 'applied_date', 'date', 'application_date'],
   notes: ['notes', 'note'],
@@ -252,13 +255,29 @@ export function parseJobsCsvText(csvText: string): ParseJobsCsvResult {
     const tagsRaw = getFirstValue(row, HEADER_ALIASES.tags)
     const techRaw = getFirstValue(row, HEADER_ALIASES.tech_stack)
 
+    // An unrecognised currency is dropped rather than passed through: the column
+    // has a CHECK constraint, so one bad cell would fail the whole insert. The
+    // row still imports, taking the column default.
+    const currencyRaw = getFirstValue(row, HEADER_ALIASES.salary_currency).trim().toUpperCase()
+    const salary_currency = isSupportedCurrency(currencyRaw)
+      ? (currencyRaw as SupportedCurrency)
+      : undefined
+    if (currencyRaw && !salary_currency) {
+      issues.push({
+        rowNumber,
+        message: `Unrecognised currency "${currencyRaw}", imported with the default instead`,
+      })
+    }
+
     const data: JobFormData = {
       company,
       role,
       status,
       salary_min,
       salary_max,
+      ...(salary_currency ? { salary_currency } : {}),
       url,
+      description: getFirstValue(row, HEADER_ALIASES.description) || null,
       date_applied,
       notes: getFirstValue(row, HEADER_ALIASES.notes) || null,
       contact_name: getFirstValue(row, HEADER_ALIASES.contact_name) || null,

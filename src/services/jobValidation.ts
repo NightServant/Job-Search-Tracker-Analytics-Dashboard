@@ -1,4 +1,5 @@
 import type { JobFormData, WorkMode } from '@/types'
+import { SUPPORTED_CURRENCIES, isSupportedCurrency } from '@/services/userPreferences'
 
 /**
  * Validation errors for job form data
@@ -298,6 +299,23 @@ export const jobValidation = {
    * Validate entire job form data
    * Returns array of all validation errors found
    */
+  /**
+   * Validate salary currency against the same list as jobs_salary_currency_check.
+   *
+   * Absent is valid: the column has a default, so omitting it is how a caller
+   * asks for that default rather than an error.
+   */
+  validateSalaryCurrency(value: string | null | undefined): ValidationError | null {
+    if (value === null || value === undefined || value === '') return null
+    if (!isSupportedCurrency(value)) {
+      return {
+        field: 'salary_currency',
+        message: `salary_currency must be one of ${SUPPORTED_CURRENCIES.join(', ')}`,
+      }
+    }
+    return null
+  },
+
   validateJobFormData(data: JobFormData): ValidationError[] {
     const errors: ValidationError[] = []
 
@@ -336,8 +354,15 @@ export const jobValidation = {
     const contactNameErr = this.validateContactName(data.contact_name)
     if (contactNameErr) errors.push(contactNameErr)
 
+    const currencyErr = this.validateSalaryCurrency(data.salary_currency)
+    if (currencyErr) errors.push(currencyErr)
+
     const notesErr = this.validateTextField(data.notes, 'notes')
     if (notesErr) errors.push(notesErr)
+
+    // A real posting runs well past the 5000 default, so give it its own ceiling.
+    const descriptionErr = this.validateTextField(data.description, 'description', 20000)
+    if (descriptionErr) errors.push(descriptionErr)
 
     const locationErr = this.validateTextField(data.location, 'location', 255)
     if (locationErr) errors.push(locationErr)
