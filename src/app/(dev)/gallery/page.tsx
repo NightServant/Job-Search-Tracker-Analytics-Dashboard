@@ -3,6 +3,7 @@ import { isDevSurfaceEnabled } from '@/lib/isDevSurface'
 import { Tokens } from './sections/Tokens'
 import { Icons } from './sections/Icons'
 import { Primitives } from './sections/Primitives'
+import { Composites } from './sections/Composites'
 
 /**
  * The design system review surface.
@@ -24,7 +25,8 @@ export default function GalleryPage() {
       <Tokens />
       <Icons />
       <Primitives />
-      {/* Sections appended by Tasks 5-6 */}
+      <Composites />
+      {/* Section appended by Task 6 */}
     </main>
   )
 }
