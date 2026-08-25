@@ -1,44 +1,22 @@
 import { createClient } from '@supabase/supabase-js'
+import { currentEnvSource, readSupabaseConfig } from './env'
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+const config = readSupabaseConfig(currentEnvSource())
 
-const looksLikePlaceholderUrl = (value?: string) => {
-  if (!value) return true
-  return (
-    value.includes('your-project.supabase.co') ||
-    value.includes('placeholder.supabase.co') ||
-    value.includes('project-id.supabase.co')
-  )
-}
-
-const looksLikePlaceholderKey = (value?: string) => {
-  if (!value) return true
-  const lowered = value.toLowerCase()
-  return (
-    lowered.includes('placeholder') ||
-    lowered.includes('anon-key-value') ||
-    lowered.includes('your-anon-key')
-  )
-}
-
-export const hasValidSupabaseConfig =
-  !!supabaseUrl &&
-  !!supabaseAnonKey &&
-  !looksLikePlaceholderUrl(supabaseUrl) &&
-  !looksLikePlaceholderKey(supabaseAnonKey)
+export const hasValidSupabaseConfig = config.isConfigured
 
 export const supabaseConfigError = hasValidSupabaseConfig
   ? null
-  : 'Supabase is not configured for this environment. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env.local with real project values.'
+  : 'Supabase is not configured for this environment. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local with real project values.'
 
 if (!hasValidSupabaseConfig) {
-  console.warn(
-    supabaseConfigError
-  )
+  console.warn(supabaseConfigError)
 }
 
+// Falling back to a placeholder rather than throwing keeps the app importable in
+// environments with no credentials -- CI, a fresh clone -- so the config error
+// surfaces as a readable warning instead of a module-load crash.
 export const supabase = createClient(
-  hasValidSupabaseConfig ? supabaseUrl : 'https://placeholder.supabase.co',
-  hasValidSupabaseConfig ? supabaseAnonKey : 'placeholder-key'
+  hasValidSupabaseConfig ? config.url : 'https://placeholder.supabase.co',
+  hasValidSupabaseConfig ? config.anonKey : 'placeholder-key'
 )
