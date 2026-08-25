@@ -1,3 +1,5 @@
+import { runtimeFlags } from '@/lib/env'
+
 type FallbackProps = {
   error: unknown
   eventId?: string
@@ -16,7 +18,7 @@ function getErrorMessage(error: unknown): string {
 }
 
 export default function ErrorFallback({ error, eventId, resetError }: FallbackProps) {
-  const sentryEnabled = Boolean((import.meta.env.VITE_SENTRY_DSN ?? '').trim())
+  const sentryEnabled = Boolean(runtimeFlags.sentryDsn)
   const message = getErrorMessage(error)
 
   const handleTryAgain = () => {

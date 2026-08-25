@@ -1,4 +1,8 @@
-import { Outlet, NavLink, useLocation } from 'react-router-dom'
+'use client'
+
+import Link from 'next/link'
+import { usePathname } from 'next/navigation'
+import { runtimeFlags } from '@/lib/env'
 import { useState } from 'react'
 import {
   LayoutDashboard,
@@ -32,7 +36,7 @@ function formatBuildTime(value: string): string {
   })
 }
 
-export default function Layout() {
+export default function Layout({ children }: { children?: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
     try {
@@ -46,7 +50,7 @@ export default function Layout() {
   const { user, signOut } = useAuth()
   const { resolvedTheme: theme, setTheme } = useTheme()
   const { error: showError } = useToast()
-  const location = useLocation()
+  const pathname = usePathname()
 
   const handleSignOut = async () => {
     try {
@@ -116,11 +120,11 @@ export default function Layout() {
           {/* Navigation */}
           <nav className="flex-1 px-3 py-4 space-y-1">
             {navigation.map((item) => {
-              const isActive = location.pathname === item.href
+              const isActive = pathname === item.href
               return (
-                <NavLink
+                <Link
                   key={item.name}
-                  to={item.href}
+                  href={item.href}
                   className={`flex items-center ${sidebarCollapsed ? 'justify-center' : 'gap-3 px-3'} py-3 rounded-lg text-sm font-medium transition-colors min-h-11 ${
                     isActive
                       ? 'bg-primary-50 text-primary-600 dark:bg-primary-950 dark:text-primary-400'
@@ -131,7 +135,7 @@ export default function Layout() {
                   <item.icon className="w-5 h-5" />
                   <span className={`${sidebarCollapsed ? 'hidden' : 'ml-1'}`}>{item.name}</span>
                   {/* removed active chevron; active state is indicated by background/text color only */}
-                </NavLink>
+                </Link>
               )
             })}
           </nav>
@@ -206,7 +210,7 @@ export default function Layout() {
 
         {/* Page content */}
         <main className="p-4 md:p-6 lg:p-8">
-          <Outlet />
+          {children}
 
           <footer className="mt-8 text-center text-xs text-zinc-500 dark:text-zinc-500">
             Made by{' '}
@@ -237,7 +241,7 @@ export default function Layout() {
               Report a bug
             </a>
             <span className="mx-2">·</span>
-            <span>v{__APP_VERSION__}</span>
+            <span>v{runtimeFlags.appVersion}</span>
             <span className="mx-2">·</span>
             <span>sha {__BUILD_SHA__.slice(0, 8)}</span>
             <span className="mx-2">·</span>

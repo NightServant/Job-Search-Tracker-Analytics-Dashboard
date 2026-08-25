@@ -1,15 +1,16 @@
 import * as Sentry from '@sentry/react'
+import { runtimeFlags } from './env'
 
 export function initSentry(): void {
-  const dsn = (import.meta.env.VITE_SENTRY_DSN ?? '').trim()
+  const dsn = runtimeFlags.sentryDsn
   if (!dsn) return
 
   const environment =
-    (import.meta.env.VITE_SENTRY_ENVIRONMENT ?? '').trim() || import.meta.env.MODE
+    runtimeFlags.sentryEnvironment || runtimeFlags.mode
 
   Sentry.init({
     dsn,
     environment,
-    release: `job-search-tracker@${__APP_VERSION__}`,
+    release: `job-search-tracker@${runtimeFlags.appVersion}`,
   })
 }

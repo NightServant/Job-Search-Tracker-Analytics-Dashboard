@@ -1,5 +1,7 @@
+'use client'
+
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import Link from 'next/link'
 import {
   Briefcase,
   TrendingUp,
@@ -518,7 +520,7 @@ export default function DashboardPage() {
             Add your first job to unlock analytics, or import a CSV from a spreadsheet.
           </p>
           <div className="mt-4 flex flex-col sm:flex-row gap-2">
-            <Link to="/jobs" className="btn-primary w-fit">
+            <Link href="/jobs" className="btn-primary w-fit">
               Go to Jobs
             </Link>
             <p className="text-xs text-zinc-500 dark:text-zinc-400 self-center">

@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { BrowserRouter } from 'react-router-dom'
 import Layout from '../Layout'
 import { AuthProvider } from '@/contexts/AuthContext'
 import { ThemeProvider } from 'next-themes'
@@ -28,15 +27,13 @@ describe('Layout Component - Sign Out Functionality', () => {
 
   const renderLayout = () => {
     return render(
-      <BrowserRouter>
-        <ToastProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <Layout />
-            </AuthProvider>
-          </ThemeProvider>
-        </ToastProvider>
-      </BrowserRouter>
+      <ToastProvider>
+        <ThemeProvider>
+          <AuthProvider>
+            <Layout />
+          </AuthProvider>
+        </ThemeProvider>
+      </ToastProvider>
     )
   }
 

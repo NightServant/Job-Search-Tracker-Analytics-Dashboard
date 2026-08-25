@@ -1,5 +1,8 @@
+'use client'
+
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useRouter } from 'next/navigation'
+import { runtimeFlags } from '@/lib/env'
 import { Mail, Lock, Briefcase, AlertCircle } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from 'next-themes'
@@ -15,7 +18,7 @@ export default function LoginPage() {
 
   const { signIn, signUp } = useAuth()
   const { resolvedTheme: theme } = useTheme()
-  const navigate = useNavigate()
+  const router = useRouter()
 
   const hasSupabaseConfig = hasValidSupabaseConfig
 
@@ -47,7 +50,7 @@ export default function LoginPage() {
       } else {
         await signUp(email, password)
       }
-      navigate('/dashboard')
+      router.push('/dashboard')
     } catch (err: unknown) {
       const raw = err instanceof Error ? err.message : 'An error occurred'
       const lowered = raw.toLowerCase()
@@ -208,7 +211,7 @@ export default function LoginPage() {
             </button>
           </p>
 
-          {import.meta.env.DEV && !hasSupabaseConfig && (
+          {runtimeFlags.isDev && !hasSupabaseConfig && (
             <div className="mt-8 p-4 bg-zinc-100 dark:bg-zinc-900 rounded-lg">
               <p className="text-xs text-zinc-500 dark:text-zinc-500 text-center">
                 <strong>Demo Mode:</strong> Configure Supabase credentials in{' '}
@@ -249,7 +252,7 @@ export default function LoginPage() {
               Report a bug
             </a>
             <span className="mx-2">·</span>
-            <span>v{__APP_VERSION__}</span>
+            <span>v{runtimeFlags.appVersion}</span>
           </p>
         </div>
       </div>

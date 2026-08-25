@@ -1,3 +1,5 @@
+'use client'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -25,6 +27,7 @@ import { ResumeVersionHistory } from '@/components/resume/ResumeVersionHistory'
 import { TemplatePresetSelector } from '@/components/resume/TemplatePresetSelector'
 import { createSnapshot } from '@/services/resumeSnapshotService'
 import type { ResumeTemplate } from '@/services/resumeTemplateService'
+import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 
 type ResumeMode = 'word' | 'latex'
 type ResumeContent = JSONContent | { type: 'latex'; source: string }
@@ -369,8 +372,7 @@ function WordResumeEditor({ draft, onBack, onDelete, onPersistDraft }: { draft: 
       await saveDraft(false)
       const { data: { session } } = await supabase.auth.getSession()
       if (!session?.access_token) throw new Error('No active session found')
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
+      const { url: supabaseUrl, anonKey: supabaseAnonKey } = readSupabaseConfig(currentEnvSource())
       const response = await fetch(`${supabaseUrl}/functions/v1/resume-export-pdf`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${session.access_token}`, apikey: supabaseAnonKey, 'Content-Type': 'application/json' },

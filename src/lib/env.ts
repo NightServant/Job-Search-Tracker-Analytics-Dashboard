@@ -32,24 +32,82 @@ export function readSupabaseConfig(source: Record<string, string | undefined>): 
 }
 
 /**
+ * Reads one Next public variable as a literal.
+ *
+ * These accesses must stay written out in full. Next replaces the exact text
+ * `process.env.NEXT_PUBLIC_FOO` at build time and does nothing for a spread or
+ * a computed key, so `{ ...process.env }` is empty in a browser bundle and the
+ * app would silently come up unconfigured. The try/catch covers Vite, where
+ * `process` does not exist at all and the reference throws.
+ */
+function nextPublicEnv(): Record<string, string | undefined> {
+  try {
+    return {
+      NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      NEXT_PUBLIC_SENTRY_DSN: process.env.NEXT_PUBLIC_SENTRY_DSN,
+      NEXT_PUBLIC_SENTRY_ENVIRONMENT: process.env.NEXT_PUBLIC_SENTRY_ENVIRONMENT,
+      NEXT_PUBLIC_APP_VERSION: process.env.NEXT_PUBLIC_APP_VERSION,
+      NODE_ENV: process.env.NODE_ENV,
+    }
+  } catch {
+    return {}
+  }
+}
+
+/**
  * The ambient environment, merged across both runtimes.
  *
- * Next exposes NEXT_PUBLIC_* on process.env; Vite exposes VITE_* on
- * import.meta.env and has no process. Reading both behind typeof guards means
- * this module loads in either without throwing.
+ * Vite exposes everything on import.meta.env; Next exposes only the literals
+ * above. Reading both behind guards means this module loads in either without
+ * throwing, which matters because it is imported during server prerender where
+ * import.meta.env is undefined.
  */
 export function currentEnvSource(): Record<string, string | undefined> {
-  const fromProcess = typeof process !== 'undefined' && process.env ? process.env : {}
   let fromImportMeta: Record<string, string | undefined> = {}
   try {
-    // Must stay a property access. Aliasing `import.meta` to a variable makes
-    // webpack emit "Accessing import.meta directly is unsupported"; the cast is
-    // erased by TypeScript, so this compiles to plain `import.meta.env`. No
-    // optional chaining either: it downlevels to a temp assignment, same problem.
+    // Must stay a property access. Aliasing `import.meta` to a variable, or
+    // optional-chaining it, makes webpack emit "Accessing import.meta directly
+    // is unsupported"; the cast is erased by TypeScript so this compiles to
+    // plain `import.meta.env`.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     fromImportMeta = ((import.meta as any).env ?? {}) as Record<string, string | undefined>
   } catch {
-    // import.meta is unavailable in some CJS contexts; process.env alone is fine there.
+    // No import.meta in this runtime; the Next literals below are the source.
   }
-  return { ...fromProcess, ...fromImportMeta }
+  return { ...nextPublicEnv(), ...fromImportMeta }
 }
+
+export interface RuntimeFlags {
+  isDev: boolean
+  isProd: boolean
+  mode: string
+  sentryDsn: string
+  sentryEnvironment: string
+  appVersion: string
+}
+
+/**
+ * Build-mode flags, normalised across Vite and Next.
+ *
+ * Vite gives DEV/PROD/MODE; Next gives NODE_ENV. Reading whichever exists means
+ * a component does not have to know which bundler compiled it -- and does not
+ * crash during prerender by reaching for a Vite-only flag.
+ */
+export function readRuntimeFlags(source: Record<string, string | undefined>): RuntimeFlags {
+  const nodeEnv = source.NODE_ENV
+  const mode = (source.MODE as string | undefined) ?? nodeEnv ?? 'development'
+  // Vite's PROD is a real boolean, Next has no PROD at all -- String() covers both
+  // without widening the source type to `unknown` for one field.
+  const isProd = String(source.PROD) === 'true' || nodeEnv === 'production'
+  return {
+    isDev: !isProd,
+    isProd,
+    mode,
+    sentryDsn: (source.NEXT_PUBLIC_SENTRY_DSN ?? source.VITE_SENTRY_DSN ?? '').trim(),
+    sentryEnvironment: (source.NEXT_PUBLIC_SENTRY_ENVIRONMENT ?? source.VITE_SENTRY_ENVIRONMENT ?? '').trim(),
+    appVersion: source.NEXT_PUBLIC_APP_VERSION ?? '0.0.0',
+  }
+}
+
+export const runtimeFlags: RuntimeFlags = readRuntimeFlags(currentEnvSource())

@@ -1,5 +1,5 @@
 import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom'
 import { AuthProvider, useAuth } from '@/contexts/AuthContext'
 import { ThemeProvider } from 'next-themes'
 import { ToastProvider } from '@/contexts/ToastContext'
@@ -73,7 +73,7 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
-            <Layout />
+            <Layout><Outlet /></Layout>
           </ProtectedRoute>
         }
       >
