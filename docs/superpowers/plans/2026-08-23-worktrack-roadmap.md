@@ -35,6 +35,9 @@ framework, against a schema that already exists.
 - **TDD is mandatory.** No production code without a failing test first.
 - **Currency:** salary values are Philippine pesos unless a currency column says
   otherwise. Never assume USD.
+- **Third-party components carry attribution obligations.** Skiper UI free-tier
+  components require crediting Skiper UI. Every external component adopted gets
+  a line in the README, same discipline already applied to CVJunction.
 
 ## Execution Protocol — APPROVAL REQUIRED
 
@@ -163,10 +166,35 @@ Rebuild the app surface against the design system.
 What a reviewer sees first.
 
 - 6.1 Landing page — hero with poster/video, carousel of real screens, ATS section, footer
+  - Carousel is **skiper51** (`Creative carousel 002`, free), named in the Figma
+    frames `Section / Carousel (skiper51)`. Export is `Carousel_005`; the file is
+    `skiper51`; the title says `002`. Three identifiers, none matching.
+  - `pnpm dlx shadcn add @skiper-ui/skiper51` — pulls `swiper` + `framer-motion`.
+  - **`autoplay` must default off.** An auto-advancing carousel with no pause
+    control fails WCAG 2.2.2. If autoplay is wanted, ship a visible pause.
+  - Swiper ships its own CSS and DOM (`.swiper-slide`, `.swiper-pagination`) and
+    the vendor's own guidance is `!important` overrides. Budget a task for
+    reconciling it with the M4 tokens, and kill the creative effect's default
+    `shadow: true` — this system is flat with hairline rules.
 - 6.2 Auth layout — split panel, `/login` and `/signup`, smooth-caret inputs
+  - Smooth-caret input is **skiper106** (`Smooth caret input`, free).
+    `pnpm dlx shadcn add @skiper-ui/skiper106` — pulls `dialkit` + `framer-motion`.
+  - **Name collision:** skiper106 exports `Input` *and* `SmoothInput`. M4 4.4
+    builds its own `Input` from the Figma Input Field component. Take only
+    `SmoothInput`, alias it, and keep the M4 primitive as the single `Input`.
+  - skiper106 hides the native caret and redraws it with Framer Motion. Verify
+    against the four Figma Input states and run it through `ui-ux-pro-max`
+    before committing — a hidden system caret is an accessibility risk.
+  - **Figma has no Sign Up frame.** Only `Desktop / Auth — Sign In` exists, in
+    both themes. Design `/signup` or drop it from this task.
 - 6.3 Custom 404 with recovery links; privacy policy page
 - 6.4 Demo mode — seeded read-only account, banner, write controls disabled
 - 6.5 README rewrite with live link and screenshots
+  - **Must credit Skiper UI.** Both components are free-tier, and the licence
+    reads: "Free to use and modify in both personal and commercial projects.
+    Attribution to Skiper UI is required when using the free version." Credit in
+    the README and the landing footer. Carousel illustrations are by AarzooAly;
+    the carousel itself is Swiper.js.
 
 **Exit:** a stranger can open the demo and understand the product without an account.
 
@@ -177,6 +205,60 @@ What a reviewer sees first.
 - 7.4 MCP server exposing the tracker to Claude
 
 ---
+
+---
+
+## Third-party components — Skiper UI
+
+Registry: https://skiper-ui.com/components — 106 components, 37 free, installed
+through the shadcn CLI (`pnpm dlx shadcn add @skiper-ui/<id>`). Free tier
+**requires attribution**; Pro does not. Verified 2026-08-25.
+
+Every component below pulls `framer-motion`, which is a third motion system
+alongside M4 4.6's IntersectionObserver gating and View Transitions. Pick one
+per surface rather than layering all three, and confirm each honours
+`prefers-reduced-motion` before it ships.
+
+**Committed — already named in the Figma frames**
+
+| ID | Name | Tier | Lands in | Deps |
+|---|---|---|---|---|
+| `skiper51` | Creative carousel 002 | Free | 6.1 landing carousel | swiper, framer-motion |
+| `skiper106` | Smooth caret input | Free | 6.2 auth inputs | dialkit, framer-motion |
+
+**Free candidates — evaluate, do not assume**
+
+| ID | Name | Would serve |
+|---|---|---|
+| `skiper67` | Video player 001 | 6.1 hero. Figma has `Hero (background video)` desktop and `Hero (poster only)` mobile — this is the shape |
+| `skiper3` | Apple play button | 6.1 hero play control, pairs with `skiper67` |
+| `skiper37` | Animated number | 5.3 KPI strip count-up. Must respect reduced-motion |
+| `skiper87` | Scroll with fade effect | 4.6 mount-gating — this is the IntersectionObserver pattern the plan describes |
+| `skiper41` | Progressive Blur | 6.1 `Sticky Navbar (reveals after hero)`, already a Figma frame |
+| `skiper89` | Scroll progress 001 | 6.1 landing |
+| `skiper101` | Custom tooltip | 5.6 analytics |
+| `skiper62` | Loop animation hook | 4.6 utility |
+| `skiper65` / `skiper102` | Breakpoint indicator, Debug panel | 5.7 mobile work — dev only, never shipped |
+| `skiper4` / `skiper26` | Theme toggle | Reference only. Figma already defines Theme Toggle, and 4.6 wants a View Transitions wipe |
+
+**Premium — costs money, listed so the choice is deliberate**
+
+| ID | Name | Would serve |
+|---|---|---|
+| `skiper5` | Things drag and scroll | 5.4 kanban drag — the most relevant paid component on the site |
+| `skiper96` | Expandable tabs navigation | 5.4 mobile status tabs |
+| `skiper74` | Timeline calendar | 5.6 `/calendar` |
+| `skiper69` | Skiper Number flow | 5.3 KPI, stronger than `skiper37` |
+| `skiper92` | Vercel Command Search | command palette, not currently scoped |
+
+**Rejected — these fight the design system**
+
+Squircles (`skiper63`) break the 4px radius cap. Gooey and gradient effects
+(`skiper64`, `skiper86`, `skiper90`) are not Swiss. Spectacle heroes
+(`skiper12`, `skiper14`, `skiper36`, `skiper39`) fight the restraint the whole
+system is built on. Cursor gimmicks (`skiper18`, `skiper59`, `skiper61`) are
+desktop-only and pointer-dependent. Preloaders (`skiper7`-`skiper11`,
+`skiper15`) are unnecessary under RSC streaming. The web3 set is irrelevant.
 
 ## Dependency graph
 
