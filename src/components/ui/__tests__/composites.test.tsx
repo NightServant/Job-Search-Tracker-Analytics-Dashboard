@@ -14,6 +14,11 @@ vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: null, loading: false, signOut, signIn: vi.fn(), signUp: vi.fn() }),
 }))
 
+const showError = vi.hoisted(() => vi.fn())
+vi.mock('@/contexts/ToastContext', () => ({
+  useToast: () => ({ success: vi.fn(), error: showError, info: vi.fn() }),
+}))
+
 describe('KpiStat', () => {
   it('renders its value with tabular figures', () => {
     // Proportional digits reflow as the number changes and the strip jitters.
@@ -111,6 +116,8 @@ describe('NavItem', () => {
 describe('Sidebar', () => {
   beforeEach(() => {
     signOut.mockClear()
+    signOut.mockResolvedValue(undefined)
+    showError.mockClear()
   })
 
   it('places the theme toggle last, before the footer note', () => {
@@ -146,11 +153,32 @@ describe('Sidebar', () => {
     expect(active[0].getAttribute('href')).toBe('/applications')
   })
 
+  it('highlights the section for a child route, not just an exact match', () => {
+    // /applications/abc-123 is a detail route, not one of the five NAV hrefs
+    // -- this is the case activeNavHref exists for, and the one that shipped
+    // broken when Sidebar computed active state off a bare pathname === href.
+    render(<Sidebar pathname="/applications/abc-123" />)
+    const active = screen.getAllByRole('link').filter((l) => l.getAttribute('aria-current'))
+    expect(active).toHaveLength(1)
+    expect(active[0].getAttribute('href')).toBe('/applications')
+  })
+
   it('signs out and does not leave the button clickable while it works', async () => {
     render(<Sidebar pathname="/dashboard" />)
     const button = screen.getByRole('button', { name: 'Sign out' })
     fireEvent.click(button)
     expect(button).toHaveProperty('disabled', true)
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
+  })
+
+  it('surfaces a failed sign-out as a toast and leaves the button usable again', async () => {
+    signOut.mockRejectedValueOnce(new Error('network blip'))
+    render(<Sidebar pathname="/dashboard" />)
+    const button = screen.getByRole('button', { name: 'Sign out' })
+    fireEvent.click(button)
+    await waitFor(() =>
+      expect(showError).toHaveBeenCalledWith('Sign Out Failed', 'network blip')
+    )
+    expect(button).toHaveProperty('disabled', false)
   })
 })

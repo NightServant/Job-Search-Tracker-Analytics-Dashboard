@@ -8,6 +8,9 @@ vi.mock('next/navigation', () => ({ usePathname: vi.fn(() => '/dashboard') }))
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({ user: null, loading: false, signOut: vi.fn(), signIn: vi.fn(), signUp: vi.fn() }),
 }))
+vi.mock('@/contexts/ToastContext', () => ({
+  useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
+}))
 
 describe('AppShell', () => {
   beforeEach(() => {
