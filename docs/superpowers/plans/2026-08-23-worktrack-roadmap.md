@@ -241,11 +241,19 @@ Rebuild the app surface against the design system.
   - **Mobile is now 9 screens per theme**, matching desktop's coverage of the
     app surface: Landing, Dashboard, Applications, Application Detail, Calendar,
     Analytics, Settings, Privacy Policy, 404. Built 2026-08-25.
-  - **The Top Bar hamburger is gone.** It was replaced by a Settings icon button
-    that routes to `/settings`, styled to match the Theme Toggle beside it. The
-    bottom nav's `more` item stays; Calendar and Settings are both reached
-    through it, which is why those screens show `more` as the active nav item
-    rather than leaving nothing active.
+  - **The bottom nav is five real destinations, 01-05**: overview, apps,
+    calendar, docs, stats — the same numbering as the desktop sidebar. The
+    `more` catch-all is gone, and calendar sits at 03 where the numbering
+    always had a hole (the nav previously ran 01, 02, 04, 05, 06).
+  - **The Top Bar hamburger is gone**, replaced by a Settings icon button that
+    routes to `/settings`, styled to match the Theme Toggle beside it. Removing
+    `more` and adding that button are the same change: settings moved out of the
+    nav and into the chrome.
+  - **`/settings` therefore has no active bottom-nav item.** It is not a nav
+    destination any more, so nothing there is highlighted; the Top Bar Settings
+    button carries the accent instead. Every other screen highlights exactly one
+    item, and Application Detail highlights `apps` because it is a child of that
+    section.
   - **Mobile Calendar deliberately diverges from desktop.** Desktop is a
     six-week month grid; at 375px that yields 47px cells that can show a dot but
     never an event. Mobile is a **week strip plus an agenda**: the strip gives
