@@ -205,6 +205,10 @@ Translate the Figma system into code. No screens yet.
   - Applying this across all pages makes theme switching a shared surface, so it
     belongs to the app shell, not to any one route. Landing, auth, and the
     protected routes all mount the same toggle.
+  - **One reduced-motion gate serves all of it.** Mount-gating here, the theme
+    wipe, and 6.1a's pinned landing sequence must read the same
+    `prefers-reduced-motion` source rather than each testing separately —
+    otherwise the page half-animates for someone who asked it not to.
 
 **Exit:** every component rendered in a Storybook-style route, light and dark, matching Figma.
 
@@ -308,6 +312,44 @@ What a reviewer sees first.
   - Use the M4 4.4 Theme Toggle primitive — skiper4's button driven by 4.6's
     `useThemeToggle()`. It is the same control the app shell mounts, not a
     landing-specific one.
+- 6.1a **Pinned scroll sequence for hero and carousel.** Hero holds the viewport
+  while it scrolls, releases; carousel holds, releases; the sticky nav bar
+  appears and Features onward scroll normally to the footer. Large enough to be
+  its own task — do not fold it into 6.1.
+  - **This is pinning, not parallax.** Classic parallax moves layers at
+    different speeds; what is specified is two stacked sections that each hold
+    the viewport while scroll advances them, then unpin. Say pinning in code and
+    comments so nobody builds depth-layer parallax by mistake.
+  - **The Figma already encodes the sequence.** Desktop: hero 0-607, carousel
+    607-1414, `Sticky Navbar` at exactly 1414, Features from 1494. Mobile:
+    667 / 1110 / 1170. On both breakpoints the navbar sits precisely at the
+    carousel's end, so the reveal point is already designed — the frame's name
+    ("reveals after hero") is loose, its position is right.
+  - **Prefer CSS `position: sticky` over JS scroll hijacking.** Sticky is
+    native, keeps the scrollbar honest, survives keyboard paging and in-page
+    anchors, and degrades to normal flow when unsupported. Use `framer-motion`'s
+    `useScroll` only for progress-linked values inside a pinned section, not to
+    take over scrolling.
+  - **`prefers-reduced-motion` disables pinning entirely** — the sections
+    become normal flow. Scroll-jacking is a vestibular trigger; this is a hard
+    requirement, not a nicety.
+  - **The Figma frame height is not the scroll height.** A pinned section needs
+    scroll distance allocated for its hold (roughly one viewport each), so the
+    real page is materially taller than the 3102px desktop frame. Do not derive
+    scroll math from the mockup.
+  - **Conflict to resolve before building: skiper51 owns its own gestures.**
+    It is Swiper-based with drag and swipe. If page scroll also advances slides
+    while the carousel is pinned, scroll and touch fight each other on mobile.
+    Decide one: scroll drives the slides (disable Swiper's touch handling), or
+    the carousel is merely pinned and keeps its own swipe. Do not ship both.
+  - Pause the hero's background video once the hero unpins — battery and
+    decode cost, and it is invisible by then.
+  - Keyboard order must stay honest: content inside a pinned section has to
+    remain Tab-reachable in document order, and focusing something below must
+    not leave the page stuck in a pinned stage.
+  - Decide whether mobile pins at all. The mobile frames carry the same section
+    order so it can, but pinning costs a full viewport on a 375x812 screen and
+    is jankier under touch. Normal flow on mobile is a legitimate answer.
 - 6.2 Auth layout — split panel, `/login` and `/signup`, smooth-caret inputs
   - Smooth-caret input is **skiper106** (`Smooth caret input`, free).
     `pnpm dlx shadcn add @skiper-ui/skiper106` — pulls `dialkit` + `framer-motion`.
