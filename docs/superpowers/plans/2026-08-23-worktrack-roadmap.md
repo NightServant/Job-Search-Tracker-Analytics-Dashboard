@@ -106,6 +106,14 @@ Schema for every feature the UI will need. Ships as migrations only.
 - 1.7 Structured CV: `cv_sections` on the JSON Resume schema
 - 1.8 `demo_accounts` + `is_demo()` + write-policy guards on every table
 - 1.9 Regenerate `src/types/database.ts` from the live schema
+- 1.10 `user_preferences` — **new, and a blocker for the Settings screen.** The
+  Figma Settings page now has a `default currency` control, but nothing in the
+  schema stores a user-level preference. `jobs.salary_currency` is per-row with
+  a hardcoded `DEFAULT 'PHP'`; there is no `profiles` or `user_preferences`
+  table anywhere in `supabase/migrations/`. Needs `user_id` PK, a
+  `default_currency` column reusing Task 2's CHECK list, RLS, and the demo
+  guard from Task 8. The insert default for `jobs.salary_currency` should then
+  read from it rather than being hardcoded.
 
 **Exit:** all migrations applied, `local == remote`, 218 existing tests still green.
 
@@ -167,6 +175,12 @@ Translate the Figma system into code. No screens yet.
     component is superseded and should be updated to match, not left to drift.
   - Today's toggle at `src/components/Layout.tsx:155` is replaced here. It
     renders Lucide icons; its `ThemeContext` wiring is already retired by 3.2.
+  - **Placement, as drawn in Figma:** desktop puts it at the foot of the
+    Sidebar above the footer note; mobile puts it in the Top Bar, left of the
+    screen's own action. It is absent from Auth, Privacy and 404, which have no
+    nav. The Figma `Theme Toggle` component carries `Mode=Light` (Sun) and
+    `Mode=Dark` (Moon), tracking the *current* theme, so the variant must follow
+    the active theme rather than staying fixed.
 - 4.5 Composites: KPI Stat, Application Row, Job Card, Kanban Column, Nav Item, Sidebar
 - 4.6 Motion: `IntersectionObserver` mount-gating, `prefers-reduced-motion`, View Transitions theme wipe
   - **skiper26 supplies the theme transition, on every page.**
@@ -211,7 +225,15 @@ Rebuild the app surface against the design system.
     carries `Import CSV` and `Export CSV`. Settings duplicated the export and
     nothing else, so the group had no reason to exist. Do not reintroduce an
     export control here — 5.4 owns it.
+  - **A `preferences` group was added 2026-08-25** holding one row, `default
+    currency`: a six-segment control over PHP, USD, EUR, GBP, SGD, AUD, matching
+    the `jobs_salary_currency_check` constraint in M1 Task 2. PHP is active.
+    **This needs storage that does not exist — see 1.10.**
+
 - 5.7 Mobile: bottom nav, stacked tables, no kanban below 768px
+  - The Theme Toggle in the mobile Top Bar is **32x32, below the 44x44 minimum
+    touch target**. Keep the 32px visual box but give it a 44px hit area in
+    code; do not enlarge the drawn button. `ui-ux-pro-max` covers this.
 
 **Exit:** all six routes match their Figma frames in both themes.
 
