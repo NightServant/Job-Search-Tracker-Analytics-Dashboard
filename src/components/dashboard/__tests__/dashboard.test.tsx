@@ -1,0 +1,84 @@
+import { describe, it, expect } from 'vitest'
+import { render } from '@testing-library/react'
+import { Dashboard } from '../Dashboard'
+import type { Job } from '@/types'
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+function makeJob(overrides: Partial<Job> & Pick<Job, 'id' | 'status'>): Job {
+  const now = new Date().toISOString()
+  return {
+    id: overrides.id,
+    user_id: 'user-1',
+    company: 'Acme',
+    role: 'Engineer',
+    salary_min: 90000,
+    salary_max: 120000,
+    salary_currency: 'USD',
+    url: null,
+    description: null,
+    status: overrides.status,
+    date_applied: now,
+    notes: null,
+    contact_name: null,
+    contact_email: null,
+    contact_linkedin: null,
+    contact_notes: null,
+    location: null,
+    work_mode: null,
+    source: null,
+    is_referral: false,
+    tags: [],
+    tech_stack: [],
+    created_at: now,
+    updated_at: now,
+    ...overrides,
+  }
+}
+
+// A live application gone quiet for a month is well past the 14-day
+// follow-up threshold, whatever day the suite happens to run.
+const STALE_FIXTURE: Job[] = [
+  makeJob({
+    id: 'stale-1',
+    status: 'applied',
+    updated_at: new Date(Date.now() - 30 * DAY_MS).toISOString(),
+  }),
+]
+
+const FRESH_FIXTURE: Job[] = [
+  makeJob({ id: 'fresh-1', status: 'applied' }),
+  makeJob({ id: 'fresh-2', status: 'interviewing', company: 'Globex', role: 'PM' }),
+  makeJob({ id: 'fresh-3', status: 'wishlist', company: 'Initech', role: 'Analyst' }),
+]
+
+describe('Dashboard', () => {
+  it('puts the follow-up nudge above the KPI strip', () => {
+    // The nudge is the only thing on this page that asks for an action today.
+    // Below the fold it is a notification nobody reads.
+    const { container } = render(<Dashboard jobs={STALE_FIXTURE} />)
+    const nudge = container.querySelector('[data-follow-up]')!
+    const kpis = container.querySelector('[data-kpi-strip]')!
+    expect(nudge.compareDocumentPosition(kpis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('hides the nudge entirely when nothing is stale', () => {
+    // An empty "nothing to chase" card trains the eye to skip the slot.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    expect(container.querySelector('[data-follow-up]')).toBeNull()
+  })
+
+  it('renders six blocks, each linking out to its own route', () => {
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const blocks = container.querySelectorAll('[data-dashboard-block]')
+    expect(blocks).toHaveLength(6)
+    for (const b of blocks) expect(b.querySelector('a[href]')).toBeTruthy()
+  })
+
+  it('shows KPI values with tabular figures', () => {
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    for (const v of container.querySelectorAll('[data-kpi-value]')) {
+      expect(v.className).toContain('tabular')
+    }
+  })
+})
