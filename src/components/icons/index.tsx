@@ -239,8 +239,8 @@ export function MoonIcon({ size = 20, ...props }: IconProps) {
 export function AlertCircleIcon({ size = 20, ...props }: IconProps) {
   return (
     <svg {...svgProps(size)} {...props}>
-      <circle cx="10" cy="10" r="7.25" />
-      <path d="M 0 0 L 0 4.5 M 0 7.495 L 0 7.505" transform="translate(10 6)" />
+      <circle cx="10" cy="10" r="6.125" />
+      <path d="M 0 0 L 0 4.25 M 0 6.995 L 0 7.005" transform="translate(10 6.5)" />
     </svg>
   )
 }
@@ -289,8 +289,8 @@ export function UserIcon({ size = 20, ...props }: IconProps) {
 export function TargetIcon({ size = 20, ...props }: IconProps) {
   return (
     <svg {...svgProps(size)} {...props}>
-      <circle cx="10" cy="10" r="7.25" />
-      <circle cx="10" cy="10" r="3.25" />
+      <circle cx="10" cy="10" r="6.125" />
+      <circle cx="10" cy="10" r="2.75" />
       <path d="M 0 0 L 0 0.01" transform="translate(10 9.995)" />
     </svg>
   )
