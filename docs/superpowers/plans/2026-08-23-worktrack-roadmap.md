@@ -398,8 +398,23 @@ What a reviewer sees first.
   - skiper106 hides the native caret and redraws it with Framer Motion. Verify
     against the four Figma Input states and run it through `ui-ux-pro-max`
     before committing — a hidden system caret is an accessibility risk.
-  - **Figma has no Sign Up frame.** Only `Desktop / Auth — Sign In` exists, in
-    both themes. Design `/signup` or drop it from this task.
+  - **Auth is fully drawn as of 2026-08-25**: Sign In and Sign Up, desktop and
+    mobile, light and dark — eight frames. Mobile previously had no auth screen
+    at all, not even Sign In.
+  - Desktop keeps the split panel (brand left, form right). **Mobile drops the
+    brand panel entirely** — there is no room for it at 375px — and becomes a
+    single centred column: logo, form, legal, with the form vertically centred
+    by two growing spacers so it holds position on taller devices.
+  - Sign Up adds a `confirm password` field; Submit reads `create account`, and
+    the switch link inverts to `have an account?  sign in`. On desktop that
+    link sits top-right; on mobile it moves down with the form, since a
+    top-right link is an awkward tap target next to nothing else.
+  - Two things that will bite when this is coded. Only one field may render
+    focused at a time — cloning the password field carried its focus state onto
+    `confirm password` and had to be reset. And the reveal-password control is
+    absolutely positioned inside its field, so it does not follow a width
+    change: at 335px it sat off-canvas until repositioned. Anchor it to the
+    field's right edge rather than a fixed offset.
 - 6.3 Custom 404 with recovery links; privacy policy page
 - 6.4 Demo mode — seeded read-only account, banner, write controls disabled
 - 6.5 README rewrite with live link and screenshots
