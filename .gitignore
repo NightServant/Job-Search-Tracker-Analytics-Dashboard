@@ -43,3 +43,7 @@ scripts/*.csv
 
 # Supabase CLI local link state (machine-specific, must not be committed)
 supabase/.temp/
+
+# Next.js
+.next/
+next-env.d.ts

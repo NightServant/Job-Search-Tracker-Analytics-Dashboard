@@ -5,10 +5,10 @@ import { ThemeProvider } from '@/contexts/ThemeContext'
 import { ToastProvider } from '@/contexts/ToastContext'
 import Layout from '@/components/Layout'
 
-const LoginPage = lazy(() => import('@/pages/LoginPage'))
-const DashboardPage = lazy(() => import('@/pages/DashboardPage'))
-const JobsPage = lazy(() => import('@/pages/JobsPage'))
-const ResumePage = lazy(() => import('@/pages/ResumePage'))
+const LoginPage = lazy(() => import('@/screens/LoginPage'))
+const DashboardPage = lazy(() => import('@/screens/DashboardPage'))
+const JobsPage = lazy(() => import('@/screens/JobsPage'))
+const ResumePage = lazy(() => import('@/screens/ResumePage'))
 
 function RouteLoader() {
   return (
