@@ -232,10 +232,12 @@ Rebuild the app surface against the design system.
     **This needs storage that does not exist — see 1.10.**
 
 - 5.7 Mobile: bottom nav, stacked tables, no kanban below 768px
-  - The Theme Toggle in the mobile Top Bar is **32x32, below the 44x44 minimum
-    touch target**. Keep the 32px visual box but give it a 44px hit area in
-    code; do not enlarge the drawn button. Same applies to the Settings button
-    beside it. `ui-ux-pro-max` covers this.
+  - **Mobile chrome buttons are 44x44** — Theme Toggle and Settings both, in a
+    **64px Top Bar**. The bar grew from 55 (52 on Application Detail) to hold
+    them without crowding; `Scroll Body` absorbs the difference at y=64 h=675 so
+    Bottom Nav stays at 739 and the screen stays 812. The icon inside stays 18px
+    with 13px padding. Desktop keeps its 32px toggle — a pointer target does not
+    need 44, and the sidebar has no room to spare.
   - **Mobile is now 9 screens per theme**, matching desktop's coverage of the
     app surface: Landing, Dashboard, Applications, Application Detail, Calendar,
     Analytics, Settings, Privacy Policy, 404. Built 2026-08-25.
