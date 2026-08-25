@@ -48,3 +48,7 @@ supabase/.temp/
 .next/
 next-env.d.ts
 .vercel
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
