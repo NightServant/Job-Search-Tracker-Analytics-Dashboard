@@ -104,18 +104,19 @@ Schema for every feature the UI will need. Ships as migrations only.
 - 1.5 `activity_log` table — timestamped notes per application
 - 1.6 `contacts` + `application_contacts` join
 - 1.7 Structured CV: `cv_sections` on the JSON Resume schema
-- 1.8 `demo_accounts` + `is_demo()` + write-policy guards on every table
-- 1.9 Regenerate `src/types/database.ts` from the live schema
-- 1.10 `user_preferences` — **new, and a blocker for the Settings screen.** The
-  Figma Settings page now has a `default currency` control, but nothing in the
-  schema stores a user-level preference. `jobs.salary_currency` is per-row with
-  a hardcoded `DEFAULT 'PHP'`; there is no `profiles` or `user_preferences`
-  table anywhere in `supabase/migrations/`. Needs `user_id` PK, a
-  `default_currency` column reusing Task 2's CHECK list, RLS, and the demo
-  guard from Task 8. The insert default for `jobs.salary_currency` should then
-  read from it rather than being hardcoded.
+- 1.8 `user_preferences` — user-level `default_currency`, blocker for `/settings`
+- 1.9 `demo_accounts` + `is_demo()` + write-policy guards on every table
+- 1.10 Regenerate `src/types/database.ts` from the live schema
 
-**Exit:** all migrations applied, `local == remote`, 218 existing tests still green.
+1.8 exists because the Figma Settings screen has a `default currency` control
+and nothing in the schema can store a user-level preference —
+`jobs.salary_currency` is per-row with a hardcoded `DEFAULT 'PHP'`, and there is
+no `profiles` or `user_preferences` table in any migration. It is numbered ahead
+of the demo guards deliberately: 1.9 appends `NOT public.is_demo()` to every
+table's write policies and `user_preferences` has to be in that list.
+
+**Exit:** all migrations applied, `local == remote`, 218 existing tests still
+green, and 252 passing once M1's own tests land.
 
 ### M2 — Service layer *(backend)*
 Typed data access and derived logic. Still no UI.
@@ -233,7 +234,27 @@ Rebuild the app surface against the design system.
 - 5.7 Mobile: bottom nav, stacked tables, no kanban below 768px
   - The Theme Toggle in the mobile Top Bar is **32x32, below the 44x44 minimum
     touch target**. Keep the 32px visual box but give it a 44px hit area in
-    code; do not enlarge the drawn button. `ui-ux-pro-max` covers this.
+    code; do not enlarge the drawn button. Same applies to the Settings button
+    beside it. `ui-ux-pro-max` covers this.
+  - **Mobile is now 9 screens per theme**, matching desktop's coverage of the
+    app surface: Landing, Dashboard, Applications, Application Detail, Calendar,
+    Analytics, Settings, Privacy Policy, 404. Built 2026-08-25.
+  - **The Top Bar hamburger is gone.** It was replaced by a Settings icon button
+    that routes to `/settings`, styled to match the Theme Toggle beside it. The
+    bottom nav's `more` item stays; Calendar and Settings are both reached
+    through it, which is why those screens show `more` as the active nav item
+    rather than leaving nothing active.
+  - **Mobile Calendar deliberately diverges from desktop.** Desktop is a
+    six-week month grid; at 375px that yields 47px cells that can show a dot but
+    never an event. Mobile is a **week strip plus an agenda**: the strip gives
+    date orientation and marks today with a 2px accent rule — the Status Marker
+    vocabulary, not a filled chip — and the agenda below carries the actual
+    events with time, duration, title and company. Event rows use a neutral 2px
+    rule, **not** the status palette, because status colours are reserved for
+    application status and an event kind is not an application status.
+  - Mobile Settings stacks a row only when its control is genuinely wide (the
+    240px input, the 308px currency selector). Narrow buttons stay inline, which
+    is what keeps the danger zone above the fold.
 
 **Exit:** all six routes match their Figma frames in both themes.
 

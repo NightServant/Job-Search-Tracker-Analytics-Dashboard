@@ -1073,7 +1073,159 @@ git commit -m "feat: add structured CV sections on the JSON Resume schema"
 
 ---
 
-### Task 8: Demo account and write guards
+### Task 8: User preferences
+
+**Files:**
+- Create: `supabase/migrations/<ts>_add_user_preferences.sql`
+- Create: `src/services/userPreferences.ts`
+- Test: `src/services/__tests__/userPreferences.test.ts`
+
+**Interfaces:**
+- Consumes: `jobs` (shares Task 2's currency vocabulary).
+- Produces: table `user_preferences(user_id, default_currency, created_at, updated_at)`, plus `resolveDefaultCurrency(prefs)` and `isSupportedCurrency(code)`. M5's `/settings` reads and writes it; M5's new-application form seeds `jobs.salary_currency` from it.
+
+**Why this exists:** the Figma Settings screen has a `default currency` control
+over PHP, USD, EUR, GBP, SGD, AUD, and nothing in the schema can store a
+user-level preference. `jobs.salary_currency` is per-row with a hardcoded
+`DEFAULT 'PHP'`. Without this table the control is drawn and unbacked.
+
+**Ordering:** must land before Task 9, which appends the demo guard to every
+table's write policies — `user_preferences` is in that list.
+
+- [ ] **Step 1: Write the failing test**
+
+```typescript
+// src/services/__tests__/userPreferences.test.ts
+import { describe, it, expect } from 'vitest'
+import { resolveDefaultCurrency, isSupportedCurrency } from '../userPreferences'
+
+describe('resolveDefaultCurrency', () => {
+  it('returns the stored preference when one exists', () => {
+    expect(resolveDefaultCurrency({ default_currency: 'SGD' })).toBe('SGD')
+  })
+
+  it('falls back to PHP when the user has no preferences row', () => {
+    expect(resolveDefaultCurrency(null)).toBe('PHP')
+  })
+
+  it('falls back to PHP when the stored code is not supported', () => {
+    expect(resolveDefaultCurrency({ default_currency: 'XYZ' })).toBe('PHP')
+  })
+})
+
+describe('isSupportedCurrency', () => {
+  it('accepts every code the database CHECK allows', () => {
+    for (const c of ['PHP','USD','EUR','GBP','SGD','AUD']) {
+      expect(isSupportedCurrency(c)).toBe(true)
+    }
+  })
+})
+```
+
+- [ ] **Step 2: Run test to verify it fails**
+
+Run: `npx vitest run src/services/__tests__/userPreferences.test.ts`
+Expected: FAIL — module not found.
+
+- [ ] **Step 3: Write the migration**
+
+```sql
+-- supabase/migrations/<ts>_add_user_preferences.sql
+-- Settings needs a user-level default currency. jobs.salary_currency is
+-- per-row with a hardcoded default, so there was nowhere to store intent.
+CREATE TABLE IF NOT EXISTS public.user_preferences (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  default_currency TEXT NOT NULL DEFAULT 'PHP',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE public.user_preferences IS 'Per-user settings; one row per user, created lazily on first write';
+COMMENT ON COLUMN public.user_preferences.default_currency IS 'Seeds jobs.salary_currency for new applications';
+
+-- Same vocabulary as jobs_salary_currency_check. Keep the two in step.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'user_preferences_currency_check') THEN
+    ALTER TABLE public.user_preferences
+      ADD CONSTRAINT user_preferences_currency_check
+      CHECK (default_currency IN ('PHP','USD','EUR','GBP','SGD','AUD'));
+  END IF;
+END $$;
+
+ALTER TABLE public.user_preferences ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can view own preferences" ON public.user_preferences;
+CREATE POLICY "Users can view own preferences"
+  ON public.user_preferences FOR SELECT USING (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can insert own preferences" ON public.user_preferences;
+CREATE POLICY "Users can insert own preferences"
+  ON public.user_preferences FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+DROP POLICY IF EXISTS "Users can update own preferences" ON public.user_preferences;
+CREATE POLICY "Users can update own preferences"
+  ON public.user_preferences FOR UPDATE
+  USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+GRANT SELECT, INSERT, UPDATE ON public.user_preferences TO authenticated;
+```
+
+No DELETE policy and no DELETE grant: a preferences row is owned by the account
+and goes away with it via the `ON DELETE CASCADE`.
+
+- [ ] **Step 4: Apply the migration**
+
+Run: `supabase db push`
+Expected: one migration applied.
+
+- [ ] **Step 5: Write minimal implementation**
+
+```typescript
+// src/services/userPreferences.ts
+// Mirrors user_preferences_currency_check and jobs_salary_currency_check.
+export const SUPPORTED_CURRENCIES = ['PHP','USD','EUR','GBP','SGD','AUD'] as const
+export type SupportedCurrency = (typeof SUPPORTED_CURRENCIES)[number]
+
+export interface UserPreferences {
+  user_id: string
+  default_currency: string
+  created_at: string
+  updated_at: string
+}
+
+export function isSupportedCurrency(code: string): boolean {
+  return (SUPPORTED_CURRENCIES as readonly string[]).includes(code)
+}
+
+export function resolveDefaultCurrency(
+  prefs: Pick<UserPreferences, 'default_currency'> | null
+): SupportedCurrency {
+  if (prefs === null) return 'PHP'
+  return isSupportedCurrency(prefs.default_currency)
+    ? (prefs.default_currency as SupportedCurrency)
+    : 'PHP'
+}
+```
+
+- [ ] **Step 6: Run tests to verify they pass**
+
+Run: `npx vitest run src/services/__tests__/userPreferences.test.ts`
+Expected: PASS, 4 tests.
+
+Run: `npm test`
+Expected: PASS, 248 tests.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add supabase/migrations src/services/userPreferences.ts src/services/__tests__/userPreferences.test.ts
+git commit -m "feat: store a per-user default currency"
+```
+
+---
+
+### Task 9: Demo account and write guards
 
 **Files:**
 - Create: `supabase/migrations/<ts>_add_demo_accounts.sql`
@@ -1147,7 +1299,8 @@ DECLARE t TEXT;
 BEGIN
   FOREACH t IN ARRAY ARRAY[
     'jobs','resumes','resume_snapshots','application_documents',
-    'events','activity_log','contacts','application_contacts'
+    'events','activity_log','contacts','application_contacts',
+    'user_preferences'
   ] LOOP
     EXECUTE format('DROP POLICY IF EXISTS "demo_block_insert" ON public.%I', t);
     EXECUTE format(
@@ -1198,7 +1351,7 @@ Run: `npx vitest run src/services/__tests__/demoMode.test.ts`
 Expected: PASS, 4 tests.
 
 Run: `npm test`
-Expected: PASS, 248 tests.
+Expected: PASS, 252 tests.
 
 - [ ] **Step 8: Commit**
 
@@ -1209,7 +1362,7 @@ git commit -m "feat: enforce read-only demo accounts in RLS"
 
 ---
 
-### Task 9: Verify and document the schema
+### Task 10: Verify and document the schema
 
 **Files:**
 - Create: `src/types/database.ts`
@@ -1274,13 +1427,14 @@ Replace the database table in `README.md` with:
 | `application_documents` | Which CV snapshot was sent to which application |
 | `contacts` / `application_contacts` | Recruiters and referrals, linked many-to-many |
 | `analytics_cache` | Precomputed per-user metrics, service-role only |
+| `user_preferences` | Per-user settings; default currency for new applications |
 | `demo_accounts` | Read-only demo users, enforced by RLS |
 ```
 
 - [ ] **Step 6: Run the full suite**
 
 Run: `npm test`
-Expected: PASS, 248 tests.
+Expected: PASS, 252 tests.
 
 Run: `npm run build`
 Expected: build succeeds.
@@ -1296,10 +1450,10 @@ git commit -m "docs: document the M1 schema and generate database types"
 
 ## Self-Review
 
-**Spec coverage:** F1 → Task 1. F9 → Task 2. F2 → Task 3. F4 → Task 4. F5 → Task 5. F6 → Task 6. C7/G1 → Task 7. F11 → Task 8. Roadmap 1.9 (generate `src/types/database.ts`) → Task 9 Step 4. Schema documentation → Task 9 Step 5. All M1 sub-tasks from the roadmap are covered.
+**Spec coverage:** F1 → Task 1. F9 → Task 2. F2 → Task 3. F4 → Task 4. F5 → Task 5. F6 → Task 6. C7/G1 → Task 7. F11 → Task 9. Default currency storage (roadmap 1.10) → Task 8. Roadmap 1.9 (generate `src/types/database.ts`) → Task 10 Step 4. Schema documentation → Task 10 Step 5. All M1 sub-tasks from the roadmap are covered.
 
 **Placeholders:** none. Every step contains the SQL or TypeScript to write.
 
 **Type consistency:** `CalendarEvent` (Task 4), `ActivityEntry` (Task 5), `Contact` (Task 6), `CvDocument` (Task 7), and `ApplicationDocument` (Task 3) are each defined once and referenced by the same name in their own tests. `is_demo()` is defined in Task 8 and referenced only there; earlier tasks' policies are re-created by Task 8's loop, which is why the demo guard is not duplicated into Tasks 3-7.
 
-**Known ordering constraint:** Task 8 rewrites write policies for tables created in Tasks 3-7, so it must run last among the migration tasks. Task 9 verifies the result.
+**Known ordering constraint:** Task 9 rewrites write policies for tables created in Tasks 3-8, so it must run last among the migration tasks. `user_preferences` is created in Task 8 precisely so it is covered by that loop. Task 10 verifies the result.
