@@ -35,7 +35,7 @@ Active development. The database schema, migrations, and test suite are current;
 
 **Engineering**
 - Row-Level Security on every table; users can only reach their own rows
-- 218 unit tests across 13 files (Vitest + React Testing Library)
+- 304 unit tests across 28 files, plus 19 integration tests against the live database (Vitest + React Testing Library)
 - Error boundaries with optional Sentry reporting
 - Dark mode, lazy-loaded routes and charts
 
@@ -108,7 +108,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_...
 ```
 
-Use the **publishable** key, never the secret key — Next.js inlines `VITE_`-prefixed variables into the client bundle.
+Use the **publishable** key, never the secret key — Next.js inlines `NEXT_PUBLIC_`-prefixed variables into the client bundle, so anything with that prefix is public by definition. Row Level Security is what protects the data, not the key.
 
 **Apply migrations** — the eight files in `supabase/migrations/` reproduce the full schema:
 
