@@ -1,5 +1,5 @@
 import Papa from 'papaparse'
-import { JobFormData, JobStatus, WorkMode } from '@/types'
+import { Job, JobFormData, JobStatus, WorkMode } from '@/types'
 import { isSupportedCurrency, type SupportedCurrency } from '@/services/userPreferences'
 
 export interface ParsedJobRow {
@@ -152,8 +152,10 @@ function parseStatus(value: string): JobStatus {
   if (v.startsWith('wish')) return 'wishlist'
   if (v === 'saved') return 'wishlist'
 
-  if (v.startsWith('apply')) return 'applied'
-  if (v === 'application_sent') return 'applied'
+  // 'appl', not 'apply': "applied" -- the value this module's own exporter
+  // writes and the value stored on every row -- does not start with "apply",
+  // so the canonical status was silently landing back as wishlist on import.
+  if (v.startsWith('appl')) return 'applied'
 
   if (v.startsWith('interview')) return 'interviewing'
   if (v === 'screen') return 'interviewing'
@@ -316,4 +318,54 @@ export function parseJobsCsvText(csvText: string): ParseJobsCsvResult {
   }
 
   return { rows, issues }
+}
+
+/**
+ * The column order an exported file is written in. These are the first alias
+ * of each field in HEADER_ALIASES, so a file this function writes is a file
+ * `parseJobsCsvText` reads back without an import mapping step -- export,
+ * edit in a spreadsheet, re-import is the round trip people actually perform.
+ */
+const EXPORT_COLUMNS = [
+  'company', 'role', 'status', 'date_applied', 'salary_min', 'salary_max',
+  'salary_currency', 'location', 'work_mode', 'source', 'is_referral', 'url',
+  'tags', 'tech_stack', 'contact_name', 'contact_email', 'contact_linkedin',
+  'contact_notes', 'notes', 'description',
+] as const
+
+/**
+ * Serialise jobs to CSV text.
+ *
+ * Nulls become empty cells rather than the string "null", and the two array
+ * columns are joined with the same comma-space the import splits on. Salary
+ * currency is written per row and never dropped: a column of bare numbers with
+ * the code left behind is how a peso figure gets re-imported as dollars.
+ */
+export function buildJobsCsvText(
+  jobs: Array<Partial<Job> & Pick<Job, 'company' | 'role' | 'status'>>
+): string {
+  const rows = jobs.map((job) => ({
+    company: job.company,
+    role: job.role,
+    status: job.status,
+    date_applied: job.date_applied ?? '',
+    salary_min: job.salary_min ?? '',
+    salary_max: job.salary_max ?? '',
+    salary_currency: job.salary_currency ?? '',
+    location: job.location ?? '',
+    work_mode: job.work_mode ?? '',
+    source: job.source ?? '',
+    is_referral: job.is_referral ? 'true' : 'false',
+    url: job.url ?? '',
+    tags: (job.tags ?? []).join(', '),
+    tech_stack: (job.tech_stack ?? []).join(', '),
+    contact_name: job.contact_name ?? '',
+    contact_email: job.contact_email ?? '',
+    contact_linkedin: job.contact_linkedin ?? '',
+    contact_notes: job.contact_notes ?? '',
+    notes: job.notes ?? '',
+    description: job.description ?? '',
+  }))
+
+  return Papa.unparse(rows, { columns: [...EXPORT_COLUMNS] })
 }
