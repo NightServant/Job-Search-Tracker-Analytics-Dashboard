@@ -78,8 +78,10 @@ export default function Page() {
     try {
       await createJob.mutateAsync(data)
       success('Application added')
+      return true
     } catch (err) {
       showError('Could not add the application', message(err, 'Unknown error'))
+      return false
     }
   }
 
@@ -87,8 +89,10 @@ export default function Page() {
     try {
       await updateJob.mutateAsync({ id, data })
       success('Application updated')
+      return true
     } catch (err) {
       showError('Could not update the application', message(err, 'Unknown error'))
+      return false
     }
   }
 
@@ -114,8 +118,10 @@ export default function Page() {
     try {
       await createJobsBulk.mutateAsync(rows)
       success('CSV imported', `${rows.length} added`)
+      return true
     } catch (err) {
       showError('Import failed', message(err, 'Unknown error'))
+      return false
     }
   }
 

@@ -39,17 +39,51 @@ export interface StatusTabsProps {
 }
 
 export function StatusTabs({ value, onChange, counts, panelId, className }: StatusTabsProps) {
+  const tabRefs = React.useRef<Array<HTMLButtonElement | null>>([])
+
+  // Roving tabindex means Tab only ever reaches the selected tab -- the ARIA
+  // APG requires the arrow keys (plus Home/End) to move both focus and
+  // selection among the rest, or five of the six statuses are unreachable
+  // from the keyboard.
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    const currentIndex = STATUS_TABS.indexOf(value)
+    let nextIndex: number
+    switch (event.key) {
+      case 'ArrowRight':
+        nextIndex = (currentIndex + 1) % STATUS_TABS.length
+        break
+      case 'ArrowLeft':
+        nextIndex = (currentIndex - 1 + STATUS_TABS.length) % STATUS_TABS.length
+        break
+      case 'Home':
+        nextIndex = 0
+        break
+      case 'End':
+        nextIndex = STATUS_TABS.length - 1
+        break
+      default:
+        return
+    }
+    event.preventDefault()
+    onChange(STATUS_TABS[nextIndex])
+    tabRefs.current[nextIndex]?.focus()
+  }
+
   return (
     <div
       role="tablist"
       aria-label="Filter applications by status"
+      onKeyDown={handleKeyDown}
       className={cn('-mx-4 flex gap-1 overflow-x-auto px-4', className)}
     >
-      {STATUS_TABS.map((tab) => {
+      {STATUS_TABS.map((tab, index) => {
         const selected = tab === value
         return (
           <button
             key={tab}
+            ref={(node) => {
+              tabRefs.current[index] = node
+            }}
             type="button"
             role="tab"
             id={`status-tab-${tab}`}

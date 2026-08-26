@@ -28,6 +28,8 @@ export interface ApplicationsListProps {
   emptyMessage?: string
   id?: string
   className?: string
+  role?: string
+  'aria-labelledby'?: string
 }
 
 const CONTROL =
@@ -42,9 +44,17 @@ export function ApplicationsList({
   emptyMessage = 'Nothing matches these filters.',
   id,
   className,
+  role,
+  'aria-labelledby': ariaLabelledBy,
 }: ApplicationsListProps) {
   return (
-    <div data-list id={id} className={cn('md:hidden', className)}>
+    <div
+      data-list
+      id={id}
+      role={role}
+      aria-labelledby={ariaLabelledBy}
+      className={cn('md:hidden', className)}
+    >
       {jobs.length === 0 ? (
         <p className="py-8 text-body-s text-text-muted">{emptyMessage}</p>
       ) : (

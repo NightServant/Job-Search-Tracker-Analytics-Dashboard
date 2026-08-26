@@ -16,5 +16,12 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+// jsdom has no layout engine, so it never implemented scrollIntoView. Any
+// component that scrolls a panel into view on open needs this or the call
+// throws in every test that renders it.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = vi.fn()
+}
+
 // Mock global variables set by Vite
 

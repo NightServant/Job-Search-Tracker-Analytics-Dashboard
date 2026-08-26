@@ -2,11 +2,11 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 // The route wrapper must read the same react-query cache every other screen
-// reads (JobsPage, JobForm, useJobStats) rather than fetching on its own --
-// a second, cache-independent fetch here is exactly the stale-KPI bug this
-// hook exists to prevent. Mocking the hook module lets these tests drive its
-// isLoading/error/data states directly without standing up AuthProvider or
-// QueryClientProvider.
+// reads (ApplicationsPage, ApplicationForm, useJobStats) rather than
+// fetching on its own -- a second, cache-independent fetch here is exactly
+// the stale-KPI bug this hook exists to prevent. Mocking the hook module
+// lets these tests drive its isLoading/error/data states directly without
+// standing up AuthProvider or QueryClientProvider.
 const useJobsMock = vi.hoisted(() => vi.fn())
 vi.mock('@/hooks/useJobs', () => ({ useJobs: useJobsMock }))
 

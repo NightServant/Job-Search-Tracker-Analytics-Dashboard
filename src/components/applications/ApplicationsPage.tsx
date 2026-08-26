@@ -52,11 +52,11 @@ function downloadCsv(fileName: string, text: string) {
 export interface ApplicationsPageProps {
   jobs: Job[]
   defaultCurrency?: SupportedCurrency
-  onCreate?: (data: JobFormData) => Promise<void>
-  onUpdate?: (id: string, data: JobFormData) => Promise<void>
+  onCreate?: (data: JobFormData) => Promise<boolean>
+  onUpdate?: (id: string, data: JobFormData) => Promise<boolean>
   onDelete?: (job: Job) => void
   onStatusChange?: (job: Job, status: JobStatus) => void
-  onImport?: (rows: JobFormData[]) => Promise<void>
+  onImport?: (rows: JobFormData[]) => Promise<boolean>
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   onCsvError?: (message: string) => void
   saving?: boolean
@@ -83,6 +83,19 @@ export function ApplicationsPage({
   const [form, setForm] = React.useState<FormState>(null)
   const [csv, setCsv] = React.useState<CsvImport | null>(null)
   const [skipDuplicates, setSkipDuplicates] = React.useState(true)
+  const [parsingCsv, setParsingCsv] = React.useState(false)
+  const formSectionRef = React.useRef<HTMLElement | null>(null)
+
+  // A card low on a five-column board is off-screen from the header the form
+  // opens under, and nothing else moves the viewport or focus there. Without
+  // this, pressing Edit on such a card looks like it did nothing.
+  React.useEffect(() => {
+    if (!form) return
+    const node = formSectionRef.current
+    if (!node) return
+    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    node.querySelector<HTMLElement>('input, select, textarea')?.focus()
+  }, [form])
 
   const searched = React.useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -110,44 +123,52 @@ export function ApplicationsPage({
   const listed = tab === 'all' ? searched : searched.filter((job) => job.status === tab)
 
   const handleCsvFile = async (file: File) => {
-    const result = parseJobsCsvText(await file.text())
-    if (result.fatalError) {
-      onCsvError?.(result.fatalError)
-      setCsv(null)
-      return
-    }
-
-    const existing = new Set(
-      jobs.map((job) =>
-        buildJobDedupKey({
-          company: job.company,
-          role: job.role,
-          date_applied: job.date_applied,
-          url: job.url,
-        })
-      )
-    )
-    const seen = new Set<string>()
-    const importable: ParsedJobRow[] = []
-    let duplicates = 0
-
-    for (const row of result.rows) {
-      if (existing.has(row.dedupKey) || seen.has(row.dedupKey)) {
-        duplicates += 1
-        continue
+    setParsingCsv(true)
+    try {
+      const result = parseJobsCsvText(await file.text())
+      if (result.fatalError) {
+        onCsvError?.(result.fatalError)
+        setCsv(null)
+        return
       }
-      seen.add(row.dedupKey)
-      importable.push(row)
-    }
 
-    setSkipDuplicates(true)
-    setCsv({
-      fileName: file.name,
-      rows: result.rows,
-      importable,
-      duplicates,
-      invalid: result.issues.length,
-    })
+      const existing = new Set(
+        jobs.map((job) =>
+          buildJobDedupKey({
+            company: job.company,
+            role: job.role,
+            date_applied: job.date_applied,
+            url: job.url,
+          })
+        )
+      )
+      const seen = new Set<string>()
+      const importable: ParsedJobRow[] = []
+      let duplicates = 0
+
+      for (const row of result.rows) {
+        if (existing.has(row.dedupKey) || seen.has(row.dedupKey)) {
+          duplicates += 1
+          continue
+        }
+        seen.add(row.dedupKey)
+        importable.push(row)
+      }
+
+      setSkipDuplicates(true)
+      setCsv({
+        fileName: file.name,
+        rows: result.rows,
+        importable,
+        duplicates,
+        invalid: result.issues.length,
+      })
+    } catch (err) {
+      onCsvError?.(err instanceof Error ? err.message : 'Could not read that file.')
+      setCsv(null)
+    } finally {
+      setParsingCsv(false)
+    }
   }
 
   const runImport = async () => {
@@ -157,14 +178,19 @@ export function ApplicationsPage({
       setCsv(null)
       return
     }
-    await onImport?.(rows.map((row) => row.data))
-    setCsv(null)
+    // onImport resolves to false on a caught failure rather than throwing, so
+    // the parsed and deduped CSV state stays around for a retry instead of
+    // being thrown away behind a toast.
+    const ok = await onImport?.(rows.map((row) => row.data))
+    if (ok !== false) setCsv(null)
   }
 
   const submit = async (data: JobFormData) => {
-    if (form?.job) await onUpdate?.(form.job.id, data)
-    else await onCreate?.(data)
-    setForm(null)
+    // onCreate/onUpdate resolve to false on a caught failure rather than
+    // throwing, so a rejected save leaves the panel open with every typed
+    // field intact instead of discarding them behind a toast.
+    const ok = form?.job ? await onUpdate?.(form.job.id, data) : await onCreate?.(data)
+    if (ok !== false) setForm(null)
   }
 
   return (
@@ -181,6 +207,7 @@ export function ApplicationsPage({
 
       {form && (
         <section
+          ref={formSectionRef}
           data-application-form
           aria-label={form.job ? 'Edit application' : 'New application'}
           className="border-y border-border-subtle py-6"
@@ -203,7 +230,7 @@ export function ApplicationsPage({
         onSearchChange={setSearch}
         onCsvFile={handleCsvFile}
         onExport={() => downloadCsv('worktrack-applications.csv', buildJobsCsvText(jobs))}
-        importBusy={importing}
+        importBusy={importing || parsingCsv}
         exportDisabled={jobs.length === 0}
       />
 
@@ -261,6 +288,8 @@ export function ApplicationsPage({
           />
           <ApplicationsList
             id="applications-list"
+            role="tabpanel"
+            aria-labelledby={`status-tab-${tab}`}
             jobs={listed}
             onEdit={(job) => setForm({ job })}
             onDelete={onDelete}

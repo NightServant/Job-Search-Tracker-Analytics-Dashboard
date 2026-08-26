@@ -1,7 +1,9 @@
+import * as React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { ApplicationsPage } from '../ApplicationsPage'
 import { ApplicationForm } from '../ApplicationForm'
+import { StatusTabs, STATUS_TABS, type StatusTabValue } from '../StatusTabs'
 import type { Job } from '@/types'
 
 function makeJob(overrides: Partial<Job> & Pick<Job, 'id' | 'status'>): Job {
@@ -95,6 +97,132 @@ describe('ApplicationsPage', () => {
   it('says the list is empty rather than rendering an empty kanban', () => {
     render(<ApplicationsPage jobs={[]} />)
     expect(screen.getByText(/no applications yet/i)).toBeTruthy()
+  })
+
+  it('keeps the form open with the typed data when the save is rejected', async () => {
+    // The route handlers catch and used to swallow every failure, so the
+    // promise always resolved and the panel always closed -- a pasted job
+    // description vanished behind a toast on an RLS denial. onCreate now
+    // resolves to false on that same caught failure, and the panel has to
+    // stay open with the field intact instead of discarding it.
+    const onCreate = vi.fn().mockResolvedValue(false)
+    render(<ApplicationsPage jobs={JOBS} onCreate={onCreate} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.change(screen.getByLabelText(/^Company/), { target: { value: 'Acme' } })
+    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: /add application/i }))
+    await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
+    expect(screen.getByRole('heading', { name: /new application/i })).toBeTruthy()
+    expect(screen.getByLabelText(/^Company/)).toHaveValue('Acme')
+  })
+
+  it('closes the form only once the save resolves successfully', async () => {
+    const onCreate = vi.fn().mockResolvedValue(true)
+    render(<ApplicationsPage jobs={JOBS} onCreate={onCreate} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    fireEvent.change(screen.getByLabelText(/^Company/), { target: { value: 'Acme' } })
+    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: /add application/i }))
+    await waitFor(() =>
+      expect(screen.queryByRole('heading', { name: /new application/i })).toBeNull()
+    )
+  })
+
+  it('keeps the parsed CSV state when the import is rejected', async () => {
+    const onImport = vi.fn().mockResolvedValue(false)
+    const file = {
+      name: 'jobs.csv',
+      text: () => Promise.resolve('company,role\nAcme,Engineer'),
+    } as unknown as File
+    render(<ApplicationsPage jobs={JOBS} onImport={onImport} />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [file] } })
+    await screen.findByText(/jobs\.csv/i)
+    fireEvent.click(screen.getByRole('button', { name: /^import 1$/i }))
+    await waitFor(() => expect(onImport).toHaveBeenCalledTimes(1))
+    expect(screen.getByText(/jobs\.csv/i)).toBeTruthy()
+  })
+
+  it('reports a failed CSV read instead of leaving an unhandled rejection', async () => {
+    // handleCsvFile had no try/catch: a throw from file.text() or Papa became
+    // an unhandled rejection with no user feedback, the same failure-eats-work
+    // shape as a rejected save.
+    const onCsvError = vi.fn()
+    const brokenFile = {
+      name: 'broken.csv',
+      text: () => Promise.reject(new Error('disk error')),
+    } as unknown as File
+    render(<ApplicationsPage jobs={JOBS} onCsvError={onCsvError} />)
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, { target: { files: [brokenFile] } })
+    await waitFor(() => expect(onCsvError).toHaveBeenCalledWith('disk error'))
+    expect(screen.queryByText(/broken\.csv/i)).toBeNull()
+  })
+
+  it('scrolls the form into view and focuses the first field on Edit', () => {
+    const scrollIntoView = vi.fn()
+    Element.prototype.scrollIntoView = scrollIntoView
+    render(<ApplicationsPage jobs={JOBS} />)
+    fireEvent.click(screen.getAllByRole('button', { name: /^edit/i })[0])
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(screen.getByLabelText(/^Company/)).toHaveFocus()
+  })
+
+  it('wires the mobile list as a labelled tabpanel for the selected status tab', () => {
+    render(<ApplicationsPage jobs={JOBS} />)
+    const panel = document.querySelector('[data-list]')!
+    expect(panel.getAttribute('role')).toBe('tabpanel')
+    expect(panel.getAttribute('aria-labelledby')).toBe('status-tab-all')
+    fireEvent.click(screen.getByRole('tab', { name: /interviewing/i }))
+    expect(panel.getAttribute('aria-labelledby')).toBe('status-tab-interviewing')
+  })
+})
+
+function StatusTabsHarness({ initial }: { initial: StatusTabValue }) {
+  const [value, setValue] = React.useState<StatusTabValue>(initial)
+  const counts = Object.fromEntries(STATUS_TABS.map((tab) => [tab, 0])) as Record<
+    StatusTabValue,
+    number
+  >
+  return <StatusTabs value={value} onChange={setValue} counts={counts} />
+}
+
+describe('StatusTabs', () => {
+  it('moves focus and selection with ArrowRight/ArrowLeft, wrapping at the ends', () => {
+    render(<StatusTabsHarness initial="all" />)
+    const first = screen.getByRole('tab', { name: /^all/i })
+    first.focus()
+    fireEvent.keyDown(first, { key: 'ArrowRight' })
+    expect(screen.getByRole('tab', { name: /wishlist/i })).toHaveFocus()
+    expect(screen.getByRole('tab', { name: /wishlist/i }).getAttribute('aria-selected')).toBe(
+      'true'
+    )
+    fireEvent.keyDown(screen.getByRole('tab', { name: /wishlist/i }), { key: 'ArrowLeft' })
+    expect(screen.getByRole('tab', { name: /^all/i })).toHaveFocus()
+  })
+
+  it('jumps to the first and last tab on Home and End', () => {
+    render(<StatusTabsHarness initial="applied" />)
+    const current = screen.getByRole('tab', { name: /applied/i })
+    fireEvent.keyDown(current, { key: 'End' })
+    expect(screen.getByRole('tab', { name: /rejected/i })).toHaveFocus()
+    fireEvent.keyDown(screen.getByRole('tab', { name: /rejected/i }), { key: 'Home' })
+    expect(screen.getByRole('tab', { name: /^all/i })).toHaveFocus()
+  })
+
+  it('reaches every tab from the keyboard, not just the selected one', () => {
+    // Roving tabindex with no onKeyDown left five of six tabs unreachable by
+    // Tab -- this pins that arrow-key traversal actually visits all six.
+    render(<StatusTabsHarness initial="all" />)
+    let current = screen.getByRole('tab', { name: /^all/i })
+    current.focus()
+    const seen = new Set<string>()
+    for (let i = 0; i < STATUS_TABS.length; i += 1) {
+      seen.add(current.textContent ?? '')
+      fireEvent.keyDown(current, { key: 'ArrowRight' })
+      current = document.activeElement as HTMLElement
+    }
+    expect(seen.size).toBe(STATUS_TABS.length)
   })
 })
 

@@ -13,12 +13,12 @@ import { AlertCircleIcon } from '@/components/icons'
  * off.
  *
  * Goes through `useJobs()` rather than calling `jobService.getJobs()`
- * directly, because `JobsPage`, `JobForm` and `useJobStats` all read the same
- * react-query cache under the `['jobs', user?.id]` key. A separate
- * `useEffect` fetch here would be a second, cache-independent copy of the
- * list: edit an application on `/applications` and land back here, and the
- * KPI strip would show pre-edit numbers until a hard reload -- exactly what
- * mounting react-query is meant to prevent.
+ * directly, because `ApplicationsPage`, `ApplicationForm` and `useJobStats`
+ * all read the same react-query cache under the `['jobs', user?.id]` key. A
+ * separate `useEffect` fetch here would be a second, cache-independent copy
+ * of the list: edit an application on `/applications` and land back here,
+ * and the KPI strip would show pre-edit numbers until a hard reload --
+ * exactly what mounting react-query is meant to prevent.
  */
 export default function Page() {
   const { data: jobs = [], isLoading, error } = useJobs()
