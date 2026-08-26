@@ -65,7 +65,9 @@ describe('ApplicationRow', () => {
 
 describe('JobCard', () => {
   it('separates with a hairline border and no shadow', () => {
-    const { container } = render(<JobCard company="Acme" role="Engineer" status="offer" />)
+    const { container } = render(
+      <JobCard company="Acme" role="Engineer" status="offer" currency="USD" />
+    )
     const card = container.querySelector('article')!
     expect(card.className).toContain('border-border-subtle')
     expect(card.className).not.toMatch(/shadow-/)
