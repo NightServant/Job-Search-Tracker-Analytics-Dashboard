@@ -14,6 +14,13 @@ export type ResumeSnapshotMeta = {
   resume_id: string
   created_at: string
   label?: string
+  /**
+   * `resume_snapshots.version` -- monotonic per resume and stable across
+   * deletes of other snapshots. Nullable because the column was added after
+   * the table (migration `20260825040236`) and backfilled; rows written before
+   * that and never backfilled have none.
+   */
+  version?: number | null
 }
 
 const MAX_SNAPSHOTS_PER_RESUME = 10
@@ -52,7 +59,7 @@ export async function createSnapshot(
 export async function getSnapshots(resumeId: string, userId: string): Promise<ResumeSnapshotMeta[]> {
   const { data, error } = await supabase
     .from('resume_snapshots')
-    .select('id, resume_id, created_at')
+    .select('id, resume_id, version, created_at')
     .eq('resume_id', resumeId)
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
@@ -64,6 +71,7 @@ export async function getSnapshots(resumeId: string, userId: string): Promise<Re
     id: row.id,
     resume_id: row.resume_id,
     created_at: row.created_at,
+    version: (row as { version?: number | null }).version ?? null,
   }))
 }
 
@@ -116,27 +124,7 @@ export async function deleteSnapshot(snapshotId: string, userId: string): Promis
   if (error) throw new Error(`Failed to delete snapshot: ${error.message}`)
 }
 
-/**
- * Format a snapshot creation timestamp for display
- */
-export function formatSnapshotTime(timestamp: string): string {
-  try {
-    const date = new Date(timestamp)
-    if (Number.isNaN(date.getTime())) return 'Invalid date'
-
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-
-    return date.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-  } catch {
-    return 'Unknown time'
-  }
-}
+// `formatSnapshotTime` moved to `src/services/date.ts`. It is a pure string
+// formatter, and this module constructs the shared Supabase client at import
+// time -- keeping it here meant any component that only wanted to render a
+// timestamp could not be imported without real credentials.

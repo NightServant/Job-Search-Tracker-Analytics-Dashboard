@@ -1,0 +1,360 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import type { JSONContent } from '@tiptap/core'
+import { cn } from '@/lib/utils'
+import { PageHeader } from '@/components/ui/page-header'
+import { Button, buttonVariants } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
+import { supabase } from '@/lib/supabase'
+import { ResumeVersionHistory } from './ResumeVersionHistory'
+import { TemplatePresetSelector } from './TemplatePresetSelector'
+import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
+import { createSnapshot } from '@/services/resumeSnapshotService'
+import type { ResumeTemplate } from '@/services/resumeTemplateService'
+import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeService'
+import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
+
+const TOOLBAR =
+  'h-8 rounded-md border px-3 text-body-s transition-colors duration-[--duration-fast] ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
+
+function ToolbarButton({
+  onClick,
+  active,
+  disabled,
+  children,
+}: {
+  onClick: () => void
+  active?: boolean
+  disabled?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      className={cn(
+        TOOLBAR,
+        active
+          ? 'border-accent-default bg-accent-default text-accent-on-accent'
+          : 'border-border-default bg-bg-canvas text-text-secondary hover:bg-bg-inset'
+      )}
+      onClick={onClick}
+      disabled={disabled}
+    >
+      {children}
+    </button>
+  )
+}
+
+/**
+ * The document-style CV editor: Tiptap, autosave, snapshots and PDF export.
+ *
+ * Moved out of `src/screens/ResumePage.tsx` when that file was split into
+ * `/documents` and `/cv`. The engine is byte-for-byte what it was -- the same
+ * 1200ms save debounce, the same 5000ms snapshot debounce, the same
+ * `resume-export-pdf` call -- because the plan asked for the chrome to be
+ * restyled, not for the editor to be rewritten. What changed is the chrome:
+ * M4 tokens, hairline rules, 4px radius, and no lucide. Its `Save` and
+ * `Back` are text (two of the four glyphs the icon set eliminated), and
+ * `RotateCcw`/`Download` resolve to the drawn icons. Its five formatting
+ * buttons were already text-labelled, so dropping their glyphs cost nothing.
+ *
+ * Which draft is open now comes from `/cv?draft=<id>` rather than the deleted
+ * screen's local `activeDraftId` state, so the route -- not this component --
+ * decides what to render, and a CV is linkable.
+ */
+export interface WordResumeEditorProps {
+  draft: ResumeDraft
+  backHref: string
+  onDelete: (draftId: string) => void
+  onPersistDraft: (
+    draftId: string,
+    title: string,
+    mode: ResumeMode,
+    content: ResumeContent
+  ) => Promise<ResumeDraft>
+}
+
+export function WordResumeEditor({
+  draft,
+  backHref,
+  onDelete,
+  onPersistDraft,
+}: WordResumeEditorProps) {
+  const { user } = useAuth()
+  const { success, error: showError, info } = useToast()
+  const [title, setTitle] = useState(draft.title)
+  const [isSaving, setIsSaving] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isDirty, setIsDirty] = useState(false)
+  const [lastSavedAt, setLastSavedAt] = useState(draft.updated_at)
+  const autosaveTimerRef = useRef<number | null>(null)
+  const snapshotTimerRef = useRef<number | null>(null)
+
+  const editor = useEditor({
+    extensions: [StarterKit],
+    content: normalizeWordContent(draft.content),
+    editorProps: {
+      attributes: { class: 'focus:outline-none min-h-[10in] text-[15px] leading-7 text-zinc-900' },
+    },
+  })
+
+  useEffect(() => {
+    setTitle(draft.title)
+    setLastSavedAt(draft.updated_at)
+    setIsDirty(false)
+    editor?.commands.setContent(normalizeWordContent(draft.content))
+  }, [draft.id])
+
+  useEffect(() => {
+    if (!editor) return
+    const onUpdate = () => setIsDirty(true)
+    editor.on('update', onUpdate)
+    return () => {
+      editor.off('update', onUpdate)
+    }
+  }, [editor])
+
+  const saveDraft = async (notify = false) => {
+    if (!editor) return
+    setIsSaving(true)
+    try {
+      const updated = await onPersistDraft(
+        draft.id,
+        title.trim() || 'Untitled CV',
+        'word',
+        editor.getJSON()
+      )
+      setLastSavedAt(updated.updated_at)
+      setIsDirty(false)
+      if (notify) success('Draft saved', 'Your CV draft is saved to Supabase.')
+    } catch (err) {
+      showError('Save failed', err instanceof Error ? err.message : 'Unable to save draft')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const createSnapshotForAutosave = async () => {
+    if (!user || !editor) return
+    try {
+      await createSnapshot(draft.id, user.id, editor.getJSON())
+    } catch (err) {
+      // Silently fail for snapshots - don't interrupt user workflow
+      console.error('Snapshot failed:', err)
+    }
+  }
+
+  useEffect(() => {
+    if (!editor || !isDirty) return
+    if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current)
+    autosaveTimerRef.current = window.setTimeout(() => {
+      void saveDraft(false)
+    }, 1200)
+    return () => {
+      if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current)
+    }
+  }, [isDirty, title, editor])
+
+  useEffect(() => {
+    if (!isDirty) return
+    if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
+    snapshotTimerRef.current = window.setTimeout(() => {
+      void createSnapshotForAutosave()
+    }, 5000)
+    return () => {
+      if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
+    }
+  }, [isDirty, editor, user])
+
+  const exportPdf = async () => {
+    if (!editor) return
+    setIsExporting(true)
+    try {
+      await saveDraft(false)
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (!session?.access_token) throw new Error('No active session found')
+      const { url: supabaseUrl, anonKey: supabaseAnonKey } = readSupabaseConfig(currentEnvSource())
+      const response = await fetch(`${supabaseUrl}/functions/v1/resume-export-pdf`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          apikey: supabaseAnonKey,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: title.trim() || 'Untitled CV', content: editor.getJSON() }),
+      })
+      if (!response.ok) throw new Error((await response.text()) || `Export failed (${response.status})`)
+      const blob = await response.blob()
+      const safeName = (title.trim() || 'cv')
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeName || 'cv'}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+      success('PDF ready', 'Your CV PDF has been downloaded.')
+    } catch (err) {
+      showError('Export failed', err instanceof Error ? err.message : 'Could not export PDF')
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
+  const resetTemplate = () => {
+    editor?.commands.setContent(DEFAULT_WORD_CONTENT)
+    setIsDirty(true)
+    info('Template reset', 'The editor has been reset to the starter template.')
+  }
+
+  const applyTemplate = (template: ResumeTemplate) => {
+    if (template.mode !== 'word' || (template.content as { type?: string }).type === 'latex') {
+      showError('Invalid template', 'Cannot apply LaTeX template to Word editor')
+      return
+    }
+    editor?.commands.setContent(template.content as JSONContent)
+    setIsDirty(true)
+    success('Template applied', `"${template.name}" template has been applied.`)
+  }
+
+  const restoreSnapshot = async (content: unknown) => {
+    if (content && typeof content === 'object' && (content as { type?: string }).type === 'doc') {
+      editor?.commands.setContent(content as JSONContent)
+      setIsDirty(true)
+      await saveDraft(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-6">
+      <PageHeader
+        title="Word CV"
+        action={
+          <Link
+            href={backHref}
+            className={buttonVariants({ variant: 'ghost', size: 's' })}
+          >
+            Back
+          </Link>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
+        {user && (
+          <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
+        )}
+        <TemplatePresetSelector mode="word" onSelect={applyTemplate} />
+        <Button variant="secondary" size="s" onClick={resetTemplate} disabled={!editor}>
+          <RotateCcwIcon size={14} aria-hidden />
+          Reset
+        </Button>
+        <Button
+          variant="secondary"
+          size="s"
+          onClick={() => void saveDraft(true)}
+          disabled={!editor || isSaving}
+        >
+          {isSaving ? 'Saving...' : 'Save'}
+        </Button>
+        <Button size="s" onClick={exportPdf} disabled={!editor || isExporting}>
+          <DownloadIcon size={14} aria-hidden />
+          {isExporting ? 'Exporting...' : 'Export PDF'}
+        </Button>
+        <Button
+          variant="ghost"
+          size="s"
+          aria-label={`Delete ${draft.title}`}
+          onClick={() => onDelete(draft.id)}
+        >
+          <TrashIcon size={14} aria-hidden />
+          Delete
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_auto]">
+        <label className="block">
+          <span className="text-label-caps uppercase text-text-secondary">CV title</span>
+          <Input
+            value={title}
+            onChange={(e) => {
+              setTitle(e.target.value)
+              setIsDirty(true)
+            }}
+            placeholder="Untitled CV"
+            className="mt-1"
+          />
+        </label>
+        <p className="text-body-s text-text-muted md:text-right">
+          {formatSaveTime(lastSavedAt)}
+          {isDirty ? <span className="ml-2 text-amber-600">Unsaved changes</span> : null}
+        </p>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2 border-y border-border-subtle py-2">
+        <ToolbarButton
+          onClick={() => editor?.chain().focus().toggleBold().run()}
+          active={!!editor?.isActive('bold')}
+          disabled={!editor}
+        >
+          Bold
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor?.chain().focus().toggleItalic().run()}
+          active={!!editor?.isActive('italic')}
+          disabled={!editor}
+        >
+          Italic
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor?.chain().focus().toggleBulletList().run()}
+          active={!!editor?.isActive('bulletList')}
+          disabled={!editor}
+        >
+          Bullets
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+          active={!!editor?.isActive('heading', { level: 1 })}
+          disabled={!editor}
+        >
+          H1
+        </ToolbarButton>
+        <ToolbarButton
+          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+          active={!!editor?.isActive('heading', { level: 2 })}
+          disabled={!editor}
+        >
+          H2
+        </ToolbarButton>
+      </div>
+
+      {/* The page preview keeps its own white sheet and letter geometry: it is a
+          print proof, not app chrome, so it does not follow the app's theme. */}
+      <div className="overflow-x-auto bg-bg-inset p-4">
+        <div className="mx-auto min-h-[11in] w-full max-w-[8.5in] bg-white">
+          <EditorContent
+            editor={editor}
+            className="min-h-[11in] p-[0.8in] [&_.ProseMirror]:min-h-[9.4in] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
+          />
+        </div>
+      </div>
+
+      <p className="text-body-s text-text-muted">
+        Letter-style layout preview with 0.8in margins for a print-ready CV.
+      </p>
+    </div>
+  )
+}

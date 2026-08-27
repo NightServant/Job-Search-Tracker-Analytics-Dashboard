@@ -1,17 +1,37 @@
+'use client'
+
 import { useState, useEffect } from 'react'
-import { Clock, Trash2, RotateCcw, ChevronDown } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Spinner } from '@/components/ui/spinner'
+import { ChevronDownIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { useToast } from '@/contexts/ToastContext'
 import {
   getSnapshots,
   getSnapshot,
   deleteSnapshot,
-  formatSnapshotTime,
   type ResumeSnapshotMeta,
 } from '@/services/resumeSnapshotService'
+import { formatSnapshotTime } from '@/services/date'
 
+/**
+ * The editor's own version control: restore or delete a snapshot of the CV
+ * currently open.
+ *
+ * Moved out of `src/components/resume/` when `ResumePage` was split, and kept
+ * rather than deleted -- both editors render it, so the plan's instruction to
+ * delete it assumed the editors were going away too. `components/documents/
+ * VersionHistory` is the list-screen surface and is not a replacement: it can
+ * only tell you what versions exist. Restoring belongs here, where the thing
+ * about to be overwritten is on screen.
+ *
+ * Behaviour is unchanged from the original; the chrome is M4 -- hairline
+ * rules, 4px radius, no indigo `primary-*`, no shadow, and no lucide. `Clock`
+ * went with the four glyphs the icon set eliminated, so the trigger is text.
+ */
 interface ResumeVersionHistoryProps {
   resumeId: string
   userId: string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onRestore: (content: any) => Promise<void>
 }
 
@@ -68,71 +88,66 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
 
   return (
     <div className="relative inline-block">
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="s"
+        aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
-        className="btn-secondary inline-flex items-center gap-1.5"
-        title="View version history"
       >
-        <Clock className="w-4 h-4" />
         Versions
-        <ChevronDown className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-      </button>
+        <ChevronDownIcon size={14} aria-hidden className={isOpen ? 'rotate-180' : undefined} />
+      </Button>
 
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
-          <div className="absolute right-0 top-full mt-2 z-50 w-96 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 shadow-lg">
-            <div className="border-b border-zinc-200 dark:border-zinc-800 p-4">
-              <h3 className="font-semibold text-zinc-900 dark:text-white">Version History</h3>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1">
-                Restore previous versions of your resume. Auto-saves are kept for reference.
+          <div className="absolute right-0 top-full z-50 mt-2 w-96 rounded-md border border-border-default bg-bg-canvas">
+            <div className="border-b border-border-subtle p-4">
+              <h3 className="text-heading-s text-text-primary">Version history</h3>
+              <p className="mt-1 text-body-s text-text-muted">
+                Restore a previous version of this CV. Autosaves are kept for reference.
               </p>
             </div>
 
             {isLoading ? (
-              <div className="p-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                Loading versions...
+              <div className="flex justify-center p-4">
+                <Spinner size={20} className="text-text-muted" />
               </div>
             ) : snapshots.length === 0 ? (
-              <div className="p-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-                No version snapshots yet. Start editing to create versions.
-              </div>
+              <p className="p-4 text-body-s text-text-muted">
+                No versions yet. Editing this CV snapshots it automatically.
+              </p>
             ) : (
               <div className="max-h-96 overflow-y-auto">
                 {snapshots.map((snapshot, index) => (
-                  <div
-                    key={snapshot.id}
-                    className="border-b border-zinc-100 dark:border-zinc-900 p-3 hover:bg-zinc-50 dark:hover:bg-zinc-900/50 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-2 mb-2">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-zinc-900 dark:text-white">
-                          {index === 0 ? 'Latest' : `Version ${snapshots.length - index}`}
-                        </p>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
-                          {formatSnapshotTime(snapshot.created_at)}
-                        </p>
-                      </div>
+                  <div key={snapshot.id} className="border-b border-border-subtle p-3">
+                    <div className="mb-2">
+                      <p className="text-body-s text-text-primary">
+                        {index === 0 ? 'Latest' : `Version ${snapshots.length - index}`}
+                      </p>
+                      <p className="text-body-s text-text-muted">
+                        {formatSnapshotTime(snapshot.created_at)}
+                      </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
+                      <Button
+                        variant="secondary"
+                        size="s"
                         onClick={() => void handleRestore(snapshot.id)}
                         disabled={isRestoring || index === 0}
-                        className="text-xs px-2.5 py-1.5 rounded-md border border-primary-300 dark:border-primary-700 bg-primary-50 dark:bg-primary-950 text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center gap-1"
                       >
-                        <RotateCcw className="w-3 h-3" />
+                        <RotateCcwIcon size={14} aria-hidden />
                         {isRestoring ? 'Restoring...' : 'Restore'}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="s"
+                        aria-label="Remove this version"
                         onClick={() => void handleDelete(snapshot.id)}
-                        className="text-xs px-2.5 py-1.5 rounded-md border border-zinc-300 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 transition-colors inline-flex items-center gap-1"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <TrashIcon size={14} aria-hidden />
                         Remove
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 ))}
