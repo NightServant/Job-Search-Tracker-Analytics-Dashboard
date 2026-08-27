@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { ClockIcon } from '@/components/icons'
+import { ClockIcon, AlertCircleIcon } from '@/components/icons'
 import { sortActivityDescending, type ActivityEntry } from '@/services/activityLog'
 
 function formatOccurredAt(iso: string): string {
@@ -22,12 +22,23 @@ function formatOccurredAt(iso: string): string {
  * Separated by a hairline rule per entry, never a bordered card: five
  * panels on this page already read as boxes if any one of them draws its
  * own border.
+ *
+ * `error` is a third state, distinct from both loading (handled one level up
+ * by the route's combined spinner) and empty: a failed read must not render
+ * the same "no activity logged yet" copy a genuine empty list gets, or a
+ * network blip reads as proof nothing was ever logged.
  */
 export interface ActivityTimelineProps extends React.HTMLAttributes<HTMLElement> {
   activity: ActivityEntry[]
+  error?: boolean
 }
 
-export function ActivityTimeline({ activity, className, ...props }: ActivityTimelineProps) {
+export function ActivityTimeline({
+  activity,
+  error = false,
+  className,
+  ...props
+}: ActivityTimelineProps) {
   const sorted = sortActivityDescending(activity)
 
   return (
@@ -37,7 +48,12 @@ export function ActivityTimeline({ activity, className, ...props }: ActivityTime
       {...props}
     >
       <h2 className="text-heading-s text-text-primary">Activity</h2>
-      {sorted.length === 0 ? (
+      {error ? (
+        <p className="flex items-start gap-2 text-body-s text-status-rejected-mark">
+          <AlertCircleIcon size={16} className="mt-0.5 shrink-0" />
+          Could not load activity. Try refreshing the page.
+        </p>
+      ) : sorted.length === 0 ? (
         <p className="text-body-s text-text-muted">
           No activity logged yet. Notes you add here track what happened and when.
         </p>

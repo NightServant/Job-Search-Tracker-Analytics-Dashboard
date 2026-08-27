@@ -112,4 +112,51 @@ describe('Application detail route wrapper', () => {
     render(<Page />)
     expect(screen.getByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
   })
+
+  // A settled failure on a secondary read is not the same fact as a genuine
+  // empty read, and it must not render as one -- the same defect the panels'
+  // own empty states exist to prevent, one level up. The page itself must
+  // still render (the job and the other two panels loaded fine), so this is
+  // deliberately not folded into the not-found panel above.
+  it('shows the activity panel as failed, not empty, when the activity read errors', () => {
+    useParamsMock.mockReturnValue({ id: 'job-1' })
+    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useActivityMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('boom') })
+    useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useCvTextMock.mockReturnValue({ data: undefined })
+
+    render(<Page />)
+    expect(screen.getByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
+    expect(screen.getByText(/could not load activity/i)).toBeTruthy()
+    expect(screen.queryByText(/no activity logged yet/i)).toBeNull()
+  })
+
+  it('shows the linked CV panel as failed, not empty, when the document-links read errors', () => {
+    useParamsMock.mockReturnValue({ id: 'job-1' })
+    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useDocumentLinksMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('boom') })
+    useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useCvTextMock.mockReturnValue({ data: undefined })
+
+    render(<Page />)
+    expect(screen.getByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
+    expect(screen.getByText(/could not load the linked cv/i)).toBeTruthy()
+    expect(screen.queryByText(/no cv linked/i)).toBeNull()
+  })
+
+  it('shows the next-event panel as failed, not empty, when the events read errors', () => {
+    useParamsMock.mockReturnValue({ id: 'job-1' })
+    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useJobEventsMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('boom') })
+    useCvTextMock.mockReturnValue({ data: undefined })
+
+    render(<Page />)
+    expect(screen.getByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
+    expect(screen.getByText(/could not load the next event/i)).toBeTruthy()
+    expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
+  })
 })

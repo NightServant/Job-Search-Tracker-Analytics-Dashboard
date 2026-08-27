@@ -29,6 +29,14 @@ import Link from 'next/link'
  * activity, linked-CV and event panels never flash their empty state before
  * flipping to real content a moment later -- the same "blank is not the same
  * as loading" reasoning the panels' own empty states exist for.
+ *
+ * A settled failure on one of the three secondary reads is not blanked out
+ * to a page-level error (that would hide the two panels that loaded fine
+ * behind a fetch problem in the third), but it must not collapse into the
+ * same "no activity logged yet" / "no CV linked" / "nothing scheduled" copy
+ * a genuine empty read produces either -- so each `*Query.error` is passed
+ * down to its own panel as a distinct third state, one step further along
+ * the same reasoning.
  */
 export default function Page() {
   const params = useParams<{ id: string }>()
@@ -83,6 +91,15 @@ export default function Page() {
   }
 
   return (
-    <DetailPage job={job} activity={activity} links={links} nextEvent={nextEvent} match={match} />
+    <DetailPage
+      job={job}
+      activity={activity}
+      links={links}
+      nextEvent={nextEvent}
+      match={match}
+      activityError={!!activityQuery.error}
+      linksError={!!linksQuery.error}
+      nextEventError={!!eventsQuery.error}
+    />
   )
 }

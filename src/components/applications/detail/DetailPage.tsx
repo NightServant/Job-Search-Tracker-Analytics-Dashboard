@@ -46,6 +46,15 @@ export interface DetailPageProps {
   match?: KeywordMatch | null
   backHref?: string
   editHref?: string
+  /**
+   * Each flag marks its panel's own read as failed rather than empty --
+   * three independent secondary queries, three independent ways to fail,
+   * so a single page-level error boolean would blur which panel to blame
+   * and would wrongly flag the other two as broken too.
+   */
+  activityError?: boolean
+  linksError?: boolean
+  nextEventError?: boolean
 }
 
 export function DetailPage({
@@ -56,6 +65,9 @@ export function DetailPage({
   match = null,
   backHref = '/applications',
   editHref = '/applications',
+  activityError = false,
+  linksError = false,
+  nextEventError = false,
 }: DetailPageProps) {
   return (
     <div className="flex flex-col gap-6">
@@ -86,12 +98,12 @@ export function DetailPage({
       <div className="grid gap-x-10 md:grid-cols-[2fr_1fr]">
         <div className="flex flex-col">
           <JobDescription description={job.description} url={job.url} />
-          <ActivityTimeline activity={activity} />
+          <ActivityTimeline activity={activity} error={activityError} />
         </div>
         <div className="flex flex-col">
-          <NextEvent event={nextEvent} />
+          <NextEvent event={nextEvent} error={nextEventError} />
           <AtsPanel match={match} />
-          <LinkedCv links={links} />
+          <LinkedCv links={links} error={linksError} />
         </div>
       </div>
     </div>

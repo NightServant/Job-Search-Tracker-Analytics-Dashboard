@@ -64,6 +64,12 @@ describe('NextEvent', () => {
     expect(screen.getByText(/nothing scheduled/i)).toBeTruthy()
   })
 
+  it('says the read failed rather than claiming nothing is scheduled', () => {
+    render(<NextEvent event={null} error />)
+    expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
+    expect(screen.getByText(/could not load the next event/i)).toBeTruthy()
+  })
+
   it('renders the event kind and time when one is scheduled', () => {
     render(
       <NextEvent
@@ -103,6 +109,12 @@ describe('ActivityTimeline', () => {
     expect(screen.getByText(/no activity logged yet/i)).toBeTruthy()
   })
 
+  it('says the read failed rather than claiming nothing was logged', () => {
+    render(<ActivityTimeline activity={[]} error />)
+    expect(screen.queryByText(/no activity logged yet/i)).toBeNull()
+    expect(screen.getByText(/could not load activity/i)).toBeTruthy()
+  })
+
   it('lists entries newest first regardless of input order', () => {
     render(
       <ActivityTimeline
@@ -122,6 +134,12 @@ describe('LinkedCv', () => {
   it('says so plainly when no CV is linked', () => {
     render(<LinkedCv links={[]} />)
     expect(screen.getByText(/no cv linked/i)).toBeTruthy()
+  })
+
+  it('says the read failed rather than claiming no CV is linked', () => {
+    render(<LinkedCv links={[]} error />)
+    expect(screen.queryByText(/no cv linked/i)).toBeNull()
+    expect(screen.getByText(/could not load the linked cv/i)).toBeTruthy()
   })
 
   it('describes the linked CV', () => {
@@ -152,5 +170,19 @@ describe('DetailPage', () => {
     expect(screen.getByText(/no activity logged yet/i)).toBeTruthy()
     expect(screen.getByText(/no cv linked/i)).toBeTruthy()
     expect(screen.getByText(/nothing scheduled/i)).toBeTruthy()
+  })
+
+  it('passes each panel its own error flag without blanking the other panels', () => {
+    render(<DetailPage job={JOB} activityError linksError nextEventError />)
+    expect(screen.getByText(/could not load activity/i)).toBeTruthy()
+    expect(screen.getByText(/could not load the linked cv/i)).toBeTruthy()
+    expect(screen.getByText(/could not load the next event/i)).toBeTruthy()
+    // None of the three failures should print the empty-state copy instead.
+    expect(screen.queryByText(/no activity logged yet/i)).toBeNull()
+    expect(screen.queryByText(/no cv linked/i)).toBeNull()
+    expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
+    // The page itself still renders -- a secondary-read failure never blanks
+    // the whole screen.
+    expect(screen.getByRole('heading', { name: JOB.role })).toBeTruthy()
   })
 })

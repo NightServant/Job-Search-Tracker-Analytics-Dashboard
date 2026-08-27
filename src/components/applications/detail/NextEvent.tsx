@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { CalendarIcon } from '@/components/icons'
+import { CalendarIcon, AlertCircleIcon } from '@/components/icons'
 import type { CalendarEvent, EventKind } from '@/services/events'
 
 const KIND_LABELS: Record<EventKind, string> = {
@@ -27,12 +27,17 @@ function formatEventTime(iso: string): string {
  * list, so this component has nothing to sort or filter and cannot get
  * "soonest" wrong. A blank panel here would read as still loading, so the
  * no-event case says plainly that nothing is scheduled.
+ *
+ * `error` is a third state, distinct from both loading and empty: a failed
+ * read must not render the same "nothing scheduled" copy a genuinely
+ * event-free application gets.
  */
 export interface NextEventProps extends React.HTMLAttributes<HTMLElement> {
   event: CalendarEvent | null
+  error?: boolean
 }
 
-export function NextEvent({ event, className, ...props }: NextEventProps) {
+export function NextEvent({ event, error = false, className, ...props }: NextEventProps) {
   return (
     <section
       aria-label="Next event"
@@ -40,7 +45,12 @@ export function NextEvent({ event, className, ...props }: NextEventProps) {
       {...props}
     >
       <h2 className="text-heading-s text-text-primary">Next event</h2>
-      {event === null ? (
+      {error ? (
+        <p className="flex items-start gap-2 text-body-s text-status-rejected-mark">
+          <AlertCircleIcon size={16} className="mt-0.5 shrink-0" />
+          Could not load the next event. Try refreshing the page.
+        </p>
+      ) : event === null ? (
         <p className="text-body-s text-text-muted">Nothing scheduled for this application yet.</p>
       ) : (
         <div className="flex items-start gap-3">
