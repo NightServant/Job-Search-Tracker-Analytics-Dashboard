@@ -44,13 +44,14 @@ function formatDayHeading(key: string): string {
  * `companyByJobId` is the client-side join fix round 1 added: roadmap 5.7
  * requires the mobile agenda carry "time, duration, title and company", but
  * `CalendarEvent` (from `eventService.listUpcoming`) has no company of its
- * own -- only `job_id`. `Calendar` builds this map from `useJobs()`, the
- * same cache every other screen in this branch already reads, rather than
- * this component or its caller adding a second query. Without it, two
- * "Technical interview" events for two different companies on the same day
- * would render as identical rows -- the company line is what tells them
- * apart. `job_id` is nullable (a standalone event with no linked
- * application), and a job can also simply be missing from the map (still
+ * own -- only `job_id`. `src/app/(app)/calendar/page.tsx` builds this map
+ * from `useJobs()` -- the same `['jobs', user?.id]` cache every other screen
+ * in this branch already reads -- and threads it down through `Calendar`,
+ * rather than this component or `Calendar` itself adding a second query.
+ * Without it, two "Technical interview" events for two different companies
+ * on the same day would render as identical rows -- the company line is
+ * what tells them apart. `job_id` is nullable (a standalone event with no
+ * linked application), and a job can also simply be missing from the map (still
  * loading, or deleted) -- both cases render the row with no company line at
  * all rather than a "null"/"undefined" string or a stray leading separator.
  */

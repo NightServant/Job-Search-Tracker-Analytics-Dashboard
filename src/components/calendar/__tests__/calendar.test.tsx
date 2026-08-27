@@ -1,16 +1,6 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import type { CalendarEvent } from '@/services/events'
-import type { Job } from '@/types'
-
-// Calendar mounts useJobs() itself to join event.job_id -> company client-side
-// (fix round 1, item 1 -- roadmap 5.7 requires the mobile agenda carry
-// "time, duration, title and company", and Task 3 already established
-// useJobs() as how every screen in this branch reads jobs). Mocking the
-// module, rather than standing up AuthProvider/QueryClientProvider, matches
-// how dashboard/__tests__/page.test.tsx drives useJobs()'s states directly.
-const useJobsMock = vi.hoisted(() => vi.fn())
-vi.mock('@/hooks/useJobs', () => ({ useJobs: useJobsMock }))
 
 import { Calendar } from '../Calendar'
 import { Agenda } from '../Agenda'
@@ -30,45 +20,21 @@ const ev = (id: string, starts_at: string, job_id: string | null = 'job-1'): Cal
 
 const EVENTS: CalendarEvent[] = [ev('a', new Date().toISOString())]
 
-const job = (id: string, company: string): Job => ({
-  id,
-  user_id: 'user-1',
-  company,
-  role: 'Staff Engineer',
-  salary_min: null,
-  salary_max: null,
-  salary_currency: 'PHP',
-  url: null,
-  description: null,
-  status: 'applied',
-  date_applied: null,
-  notes: null,
-  contact_name: null,
-  contact_email: null,
-  contact_linkedin: null,
-  contact_notes: null,
-  location: null,
-  work_mode: null,
-  source: null,
-  is_referral: false,
-  tags: [],
-  tech_stack: [],
-  created_at: '2026-07-01T00:00:00.000Z',
-  updated_at: '2026-07-01T00:00:00.000Z',
-})
-
 describe('Calendar', () => {
+  // Fix round 2: Calendar no longer calls useJobs() itself (ruling R3 --
+  // a props-taking component, matching Dashboard/DetailPage). It takes
+  // companyByJobId as a plain prop built by the route, so no hook mock is
+  // needed here at all; that mock now lives in
+  // src/app/(app)/calendar/__tests__/page.test.tsx.
   it('is a month grid on desktop and a week strip plus agenda on mobile', () => {
     // 47px cells can show a dot but never an event, so mobile is a different
     // layout rather than a squeezed one.
-    useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     const { container } = render(<Calendar events={EVENTS} />)
     expect(container.querySelector('[data-month-grid]')!.className).toContain('hidden md:grid')
     expect(container.querySelector('[data-week-strip]')!.className).toContain('md:hidden')
   })
 
   it('marks today with an accent rule, not a filled chip', () => {
-    useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     const { container } = render(<Calendar events={EVENTS} />)
     const today = container.querySelector('[data-today]')!
     // R4: the plan's original assertion only proved the absence of a
@@ -81,18 +47,12 @@ describe('Calendar', () => {
   })
 
   it('renders a page header titled Calendar', () => {
-    useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     render(<Calendar events={EVENTS} />)
     expect(screen.getByRole('heading', { name: 'Calendar' })).toBeTruthy()
   })
 
-  it('joins event.job_id against useJobs() and carries the company into the agenda', () => {
-    useJobsMock.mockReturnValue({
-      data: [job('job-1', 'Acme Corp')],
-      isLoading: false,
-      error: null,
-    })
-    render(<Calendar events={EVENTS} />)
+  it('threads a companyByJobId prop through into the agenda, unmodified', () => {
+    render(<Calendar events={EVENTS} companyByJobId={{ 'job-1': 'Acme Corp' }} />)
     expect(screen.getByText('Acme Corp')).toBeTruthy()
   })
 })

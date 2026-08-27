@@ -4,7 +4,6 @@ import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { buildMonthGrid, weekOf } from '@/lib/calendar'
-import { useJobs } from '@/hooks/useJobs'
 import { MonthGrid } from './MonthGrid'
 import { WeekStrip } from './WeekStrip'
 import { Agenda } from './Agenda'
@@ -13,8 +12,23 @@ import type { CalendarEvent } from '@/services/events'
 /**
  * The calendar screen's body, over plain props -- same split as `Dashboard`
  * (Task 3) and `DetailPage` (Task 5), so it renders without Next routing or
- * react-query for its `events` prop. `src/app/(app)/calendar/page.tsx` owns
- * the `eventService.listUpcoming` read this screen needs.
+ * react-query. `src/app/(app)/calendar/page.tsx` owns both reads this screen
+ * needs: `useEvents()` (wrapping `eventService.listUpcoming`) for `events`,
+ * and `useJobs()` -- the same shared `['jobs', user?.id]` cache every other
+ * screen in this branch already reads -- to build `companyByJobId`, the
+ * `job_id -> company` map `Agenda` needs to satisfy roadmap 5.7's "time,
+ * duration, title and company" requirement. `CalendarEvent` itself only has
+ * `job_id`, no company.
+ *
+ * `useJobs()` was called directly inside this component in fix round 1; fix
+ * round 2 hoisted it back out to the route, matching `dashboard/page.tsx`
+ * and `applications/page.tsx` (both call their hooks at the route and pass
+ * data down as props). A component that fetches its own data is not what
+ * ruling R3 asked a props-taking `Calendar` for -- route-as-thin-wrapper,
+ * sections testable without Next routing -- and Tasks 8/9 would have had
+ * only this file to copy from. Component tests here no longer mock any
+ * hook; the route's own test (`__tests__/page.test.tsx`) is where that
+ * mocking now belongs, the same way it already does for `dashboard`.
  *
  * Desktop and mobile are genuinely different layouts, not one squeezed into
  * the other, per the roadmap's "Mobile Calendar deliberately diverges from
@@ -31,29 +45,13 @@ import type { CalendarEvent } from '@/services/events'
  * body header" convention Documents' `+ new cv` and Analytics' range picker
  * follow -- and are hidden below `md`, since nothing on the mobile layout
  * responds to them.
- *
- * `useJobs()` is called here directly, not threaded in as a prop from the
- * route -- it is the one exception to this component's "plain props" split.
- * Roadmap 5.7 requires the agenda carry each event's company, and
- * `CalendarEvent` has only `job_id`; `useJobs()` is the same shared
- * `['jobs', user?.id]` cache every other screen in this branch already
- * reads (Task 3's ruling for `Dashboard`), so this is a second read of data
- * already in cache, not a new query. Component tests mock `@/hooks/useJobs`
- * the same way `dashboard/__tests__/page.test.tsx` mocks it for the route,
- * rather than standing up `AuthProvider`/`QueryClientProvider`.
  */
 export interface CalendarProps {
   events: CalendarEvent[]
+  companyByJobId?: Record<string, string>
 }
 
-export function Calendar({ events }: CalendarProps) {
-  const { data: jobs = [] } = useJobs()
-  const companyByJobId = React.useMemo(() => {
-    const map: Record<string, string> = {}
-    for (const job of jobs) map[job.id] = job.company
-    return map
-  }, [jobs])
-
+export function Calendar({ events, companyByJobId = {} }: CalendarProps) {
   const today = React.useMemo(() => new Date(), [])
   const [cursor, setCursor] = React.useState(today)
 
