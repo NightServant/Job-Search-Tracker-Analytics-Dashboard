@@ -8,9 +8,8 @@ import { useJobEvents } from '@/hooks/useJobEvents'
 import { useCvText } from '@/hooks/useCvText'
 import { matchKeywords } from '@/services/atsMatch'
 import { DetailPage } from '@/components/applications/detail/DetailPage'
-import { Spinner } from '@/components/ui/spinner'
+import { RouteLoading, RouteError } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button'
-import { AlertCircleIcon } from '@/components/icons'
 import Link from 'next/link'
 
 /**
@@ -76,28 +75,25 @@ export default function Page() {
     cvTextQuery.isLoading
 
   if (loading) {
-    return (
-      <div className="flex justify-center py-24">
-        <Spinner size={24} />
-      </div>
-    )
+    return <RouteLoading />
   }
 
   // "Not found" covers a bad id and someone else's job identically -- RLS
   // already made those indistinguishable at the query, so the UI does not
-  // pretend to know which one happened.
+  // pretend to know which one happened. A reload of the same URL cannot fix
+  // either case, so this is the one call site that overrides RouteError's
+  // default retry action with a link back to the list instead.
   if (jobQuery.error || !job) {
     return (
-      <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <AlertCircleIcon size={32} className="text-status-rejected-mark" />
-        <p className="text-body-m text-text-primary">Could not find that application.</p>
-        <p className="text-body-s text-text-muted">
-          It may have been deleted, or the link may be wrong.
-        </p>
-        <Link href="/applications" className={buttonVariants({ variant: 'secondary', size: 's' })}>
-          Back to applications
-        </Link>
-      </div>
+      <RouteError
+        title="Could not find that application."
+        message="It may have been deleted, or the link may be wrong."
+        action={
+          <Link href="/applications" className={buttonVariants({ variant: 'secondary', size: 's' })}>
+            Back to applications
+          </Link>
+        }
+      />
     )
   }
 

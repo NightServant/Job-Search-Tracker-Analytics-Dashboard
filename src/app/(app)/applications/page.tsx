@@ -11,9 +11,7 @@ import {
 } from '@/hooks/useJobs'
 import { useToast } from '@/contexts/ToastContext'
 import { ApplicationsPage } from '@/components/applications/ApplicationsPage'
-import { Spinner } from '@/components/ui/spinner'
-import { Button } from '@/components/ui/button'
-import { AlertCircleIcon } from '@/components/icons'
+import { RouteLoading, RouteError } from '@/components/ui/route-states'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
 import type { Job, JobFormData, JobStatus } from '@/types'
 
@@ -50,27 +48,17 @@ export default function Page() {
   const { success, error: showError } = useToast()
 
   if (isLoading) {
-    return (
-      <div className="flex justify-center py-24">
-        <Spinner size={24} />
-      </div>
-    )
+    return <RouteLoading />
   }
 
   // An empty board and a failed fetch look identical, so the failure has to
   // say so rather than falling through to the "no applications yet" state.
   if (error) {
     return (
-      <div className="flex flex-col items-center gap-3 py-24 text-center">
-        <AlertCircleIcon size={32} className="text-status-rejected-mark" />
-        <p className="text-body-m text-text-primary">Could not load your applications.</p>
-        <p className="text-body-s text-text-muted">
-          {error instanceof Error ? error.message : 'An error occurred while loading them.'}
-        </p>
-        <Button variant="secondary" size="s" onClick={() => window.location.reload()}>
-          Retry
-        </Button>
-      </div>
+      <RouteError
+        title="Could not load your applications."
+        message={error instanceof Error ? error.message : 'An error occurred while loading them.'}
+      />
     )
   }
 
