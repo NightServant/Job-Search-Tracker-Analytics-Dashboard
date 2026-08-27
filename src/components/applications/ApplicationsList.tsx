@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ApplicationRow } from '@/components/ui/application-row'
 import { TrashIcon } from '@/components/icons'
+import { formatAppliedDate } from '@/services/date'
 import type { Job } from '@/types'
 
 /**
@@ -78,7 +79,7 @@ export function ApplicationsList({
                 salaryMin={job.salary_min}
                 salaryMax={job.salary_max}
                 currency={job.salary_currency}
-                date={job.date_applied ?? 'not applied'}
+                date={formatAppliedDate(job.date_applied)}
                 className="border-b-0"
               />
             </Link>

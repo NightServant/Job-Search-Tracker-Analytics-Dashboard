@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, within, cleanup } from '@testing-library/react'
 import type { Job } from '@/types'
 
 // This route reads through four hooks (job, activity, document links, events)
@@ -69,9 +69,9 @@ describe('Application detail route wrapper', () => {
   })
 
   // The job itself can resolve well before its activity log does -- these are
-  // four independent network reads -- so the spinner has to wait on all of
-  // them or the activity panel flashes "no activity logged yet" right before
-  // the real entries arrive.
+  // five independent network reads -- so the spinner has to wait on all of
+  // them or a panel flashes its empty state right before the real entries
+  // arrive.
   it('keeps showing the spinner while a secondary panel is still loading', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
     useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
@@ -158,5 +158,88 @@ describe('Application detail route wrapper', () => {
     expect(screen.getByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
     expect(screen.getByText(/could not load the next event/i)).toBeTruthy()
     expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
+  })
+
+  // Every test above stubs useCvText as { data: undefined }, which only ever
+  // exercises AtsPanel's null branch. useCvText genuinely cannot start until
+  // linksQuery resolves and hands it a resume id, so the loading gate has to
+  // wait on it too without waiting forever for an application with no linked
+  // CV, where the query never turns on at all.
+  it('keeps showing the spinner while the CV-text read is still loading', () => {
+    useParamsMock.mockReturnValue({ id: 'job-1' })
+    useJobMock.mockReturnValue({ data: makeJob({ description: 'Need React.' }), isLoading: false, error: null })
+    useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useDocumentLinksMock.mockReturnValue({
+      data: [{ resume_id: 'resume-1', title: 'CV', version: 1, sent_at: '2026-07-01' }],
+      isLoading: false,
+      error: null,
+    })
+    useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useCvTextMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
+
+    const { container } = render(<Page />)
+    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Staff Engineer' })).toBeNull()
+  })
+
+  it('does not wait forever on useCvText when the application has no linked CV', () => {
+    // enabled: false on the real hook means this never settles to
+    // isLoading: false through a fetch -- it starts false and stays false.
+    useParamsMock.mockReturnValue({ id: 'job-1' })
+    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useCvTextMock.mockReturnValue({ data: undefined, isLoading: false, error: null })
+
+    render(<Page />)
+    expect(screen.getByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
+  })
+
+  it('renders a real ATS score once the CV text read resolves, not the null-match copy', () => {
+    useParamsMock.mockReturnValue({ id: 'job-1' })
+    useJobMock.mockReturnValue({
+      data: makeJob({ description: 'Looking for React and Kubernetes.' }),
+      isLoading: false,
+      error: null,
+    })
+    useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useDocumentLinksMock.mockReturnValue({
+      data: [{ resume_id: 'resume-1', title: 'CV', version: 1, sent_at: '2026-07-01' }],
+      isLoading: false,
+      error: null,
+    })
+    useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useCvTextMock.mockReturnValue({ data: 'Five years of React experience.', isLoading: false, error: null })
+
+    render(<Page />)
+    // The job description panel renders the same posting text verbatim, so
+    // "kubernetes" legitimately appears twice on the page -- scope to the
+    // ATS panel itself rather than asserting on the whole document.
+    const atsPanel = screen.getByRole('region', { name: 'ATS match' })
+    expect(within(atsPanel).queryByText(/see how closely they match/i)).toBeNull()
+    expect(within(atsPanel).getByText(/kubernetes/i)).toBeTruthy()
+  })
+
+  it('shows the ATS panel as failed, not empty, when the CV-text read errors', () => {
+    useParamsMock.mockReturnValue({ id: 'job-1' })
+    useJobMock.mockReturnValue({
+      data: makeJob({ description: 'Looking for React and Kubernetes.' }),
+      isLoading: false,
+      error: null,
+    })
+    useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useDocumentLinksMock.mockReturnValue({
+      data: [{ resume_id: 'resume-1', title: 'CV', version: 1, sent_at: '2026-07-01' }],
+      isLoading: false,
+      error: null,
+    })
+    useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useCvTextMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('boom') })
+
+    render(<Page />)
+    expect(screen.getByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
+    expect(screen.getByText(/could not load your cv/i)).toBeTruthy()
+    expect(screen.queryByText(/see how closely they match/i)).toBeNull()
   })
 })

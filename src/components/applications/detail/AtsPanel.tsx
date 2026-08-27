@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { cn } from '@/lib/utils'
 import { AtsCheck, type AtsResult } from '@/components/ui/ats-check'
+import { PanelSection } from '@/components/ui/panel-section'
 import type { KeywordMatch } from '@/services/atsMatch'
 
 /**
@@ -23,25 +23,38 @@ function verdictFor(score: number): AtsResult {
  * `match` is `null` rather than a zeroed `KeywordMatch` when there is nothing
  * to compare: no linked CV, or no job description. Rendering a 0% in that
  * case would look like a genuinely bad match instead of an absent one.
+ *
+ * `error` is a third state, distinct from both loading and empty, matching
+ * `ActivityTimeline`/`LinkedCv`/`NextEvent`: a failed `resumes` read for the
+ * linked CV must not render the same "link a CV" copy an application with
+ * genuinely no linked CV gets.
+ *
+ * The score-plus-two-lists content below keeps its own `gap-4` wrapper
+ * rather than inheriting `PanelSection`'s section-level `gap-3` -- that gap is
+ * for spacing the title from a single block of content, not for spacing
+ * apart three stacked blocks of content, which is what this panel alone
+ * among the five has.
  */
 export interface AtsPanelProps extends React.HTMLAttributes<HTMLElement> {
   match: KeywordMatch | null
+  error?: boolean
 }
 
-export function AtsPanel({ match, className, ...props }: AtsPanelProps) {
+export function AtsPanel({ match, error = false, className, ...props }: AtsPanelProps) {
   return (
-    <section
+    <PanelSection
       aria-label="ATS match"
-      className={cn('flex flex-col gap-4 border-t border-border-subtle pt-6', className)}
+      title="ATS match"
+      error={error ? 'Could not load your CV to check the match. Try refreshing the page.' : undefined}
+      className={className}
       {...props}
     >
-      <h2 className="text-heading-s text-text-primary">ATS match</h2>
       {match === null ? (
         <p className="text-body-s text-text-muted">
           Link a CV and add a job description to see how closely they match.
         </p>
       ) : (
-        <>
+        <div className="flex flex-col gap-4">
           <AtsCheck result={verdictFor(match.score)} label={`${match.score}%`} />
           <div className="flex flex-col gap-1">
             <p className="text-label-caps uppercase text-text-secondary">Missing keywords</p>
@@ -59,8 +72,8 @@ export function AtsPanel({ match, className, ...props }: AtsPanelProps) {
               <p className="text-body-s text-text-muted">{match.matched.join(', ')}</p>
             </div>
           )}
-        </>
+        </div>
       )}
-    </section>
+    </PanelSection>
   )
 }

@@ -13,6 +13,14 @@ import { formatSalaryRange } from '@/services/salary'
  * Salary goes through M2's formatSalaryRange rather than being formatted here,
  * so a PHP figure can never be rendered with a dollar sign. Currency is stored
  * per job and never inferred.
+ *
+ * `date` is a display string the caller has already formatted, not a raw
+ * column value -- this component has no way to tell a bare `DATE` from a
+ * `TIMESTAMPTZ`, so a caller that forwards either one unformatted renders
+ * whatever that column looked like in Postgres. Callers reading a job's
+ * `date_applied` should go through `formatAppliedDate` in `@/services/date`
+ * so a null (not-yet-applied) date and a real one always read the same way
+ * wherever this row appears.
  */
 export interface ApplicationRowProps extends React.HTMLAttributes<HTMLDivElement> {
   company: string

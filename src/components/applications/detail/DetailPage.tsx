@@ -48,13 +48,16 @@ export interface DetailPageProps {
   editHref?: string
   /**
    * Each flag marks its panel's own read as failed rather than empty --
-   * three independent secondary queries, three independent ways to fail,
-   * so a single page-level error boolean would blur which panel to blame
-   * and would wrongly flag the other two as broken too.
+   * four independent secondary queries, four independent ways to fail, so a
+   * single page-level error boolean would blur which panel to blame and
+   * would wrongly flag the others as broken too. `atsError` covers the CV
+   * text read specifically: `match` alone can't distinguish "no CV to
+   * compare against" from "the CV read failed," so the route passes both.
    */
   activityError?: boolean
   linksError?: boolean
   nextEventError?: boolean
+  atsError?: boolean
 }
 
 export function DetailPage({
@@ -68,6 +71,7 @@ export function DetailPage({
   activityError = false,
   linksError = false,
   nextEventError = false,
+  atsError = false,
 }: DetailPageProps) {
   return (
     <div className="flex flex-col gap-6">
@@ -102,7 +106,7 @@ export function DetailPage({
         </div>
         <div className="flex flex-col">
           <NextEvent event={nextEvent} error={nextEventError} />
-          <AtsPanel match={match} />
+          <AtsPanel match={match} error={atsError} />
           <LinkedCv links={links} error={linksError} />
         </div>
       </div>

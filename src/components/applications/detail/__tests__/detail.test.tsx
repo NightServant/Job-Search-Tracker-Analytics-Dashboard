@@ -56,6 +56,21 @@ describe('AtsPanel', () => {
     render(<AtsPanel match={null} />)
     expect(screen.getByText(/see how closely they match/i)).toBeTruthy()
   })
+
+  it('says the CV read failed rather than claiming there is nothing to score', () => {
+    render(<AtsPanel match={null} error />)
+    expect(screen.queryByText(/see how closely they match/i)).toBeNull()
+    expect(screen.getByText(/could not load your cv/i)).toBeTruthy()
+  })
+
+  it('prefers the error state even when a match happens to be present', () => {
+    // A settled failure and a settled score can't both be true for the same
+    // read, but the panel should still resolve the ambiguity toward "failed"
+    // rather than silently trusting stale match data.
+    render(<AtsPanel match={{ score: 90, matched: ['react'], missing: [] }} error />)
+    expect(screen.getByText(/could not load your cv/i)).toBeTruthy()
+    expect(screen.queryByText('90%')).toBeNull()
+  })
 })
 
 describe('NextEvent', () => {
@@ -104,14 +119,17 @@ describe('JobDescription', () => {
 })
 
 describe('ActivityTimeline', () => {
-  it('says so plainly when nothing has been logged', () => {
+  it('says so plainly when nothing has been logged, without promising a composer nothing builds', () => {
     render(<ActivityTimeline activity={[]} />)
-    expect(screen.getByText(/no activity logged yet/i)).toBeTruthy()
+    expect(screen.getByText(/no activity logged for this application yet/i)).toBeTruthy()
+    // The old copy ("Notes you add here...") pointed at a note composer that
+    // no task through M5 builds.
+    expect(screen.queryByText(/notes you add here/i)).toBeNull()
   })
 
   it('says the read failed rather than claiming nothing was logged', () => {
     render(<ActivityTimeline activity={[]} error />)
-    expect(screen.queryByText(/no activity logged yet/i)).toBeNull()
+    expect(screen.queryByText(/no activity logged/i)).toBeNull()
     expect(screen.getByText(/could not load activity/i)).toBeTruthy()
   })
 
@@ -167,20 +185,22 @@ describe('DetailPage', () => {
 
   it('renders every panel with sensible defaults when only job is given', () => {
     render(<DetailPage job={JOB} />)
-    expect(screen.getByText(/no activity logged yet/i)).toBeTruthy()
+    expect(screen.getByText(/no activity logged for this application yet/i)).toBeTruthy()
     expect(screen.getByText(/no cv linked/i)).toBeTruthy()
     expect(screen.getByText(/nothing scheduled/i)).toBeTruthy()
   })
 
   it('passes each panel its own error flag without blanking the other panels', () => {
-    render(<DetailPage job={JOB} activityError linksError nextEventError />)
+    render(<DetailPage job={JOB} activityError linksError nextEventError atsError />)
     expect(screen.getByText(/could not load activity/i)).toBeTruthy()
     expect(screen.getByText(/could not load the linked cv/i)).toBeTruthy()
     expect(screen.getByText(/could not load the next event/i)).toBeTruthy()
-    // None of the three failures should print the empty-state copy instead.
-    expect(screen.queryByText(/no activity logged yet/i)).toBeNull()
+    expect(screen.getByText(/could not load your cv/i)).toBeTruthy()
+    // None of the four failures should print the empty-state copy instead.
+    expect(screen.queryByText(/no activity logged/i)).toBeNull()
     expect(screen.queryByText(/no cv linked/i)).toBeNull()
     expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
+    expect(screen.queryByText(/see how closely they match/i)).toBeNull()
     // The page itself still renders -- a secondary-read failure never blanks
     // the whole screen.
     expect(screen.getByRole('heading', { name: JOB.role })).toBeTruthy()

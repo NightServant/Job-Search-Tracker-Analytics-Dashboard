@@ -2,7 +2,9 @@ import * as React from 'react'
 import Link from 'next/link'
 import { ApplicationRow } from '@/components/ui/application-row'
 import { KpiStat } from '@/components/ui/kpi-stat'
+import { PanelSection } from '@/components/ui/panel-section'
 import { StatusMarker, STATUSES, type Status } from '@/components/ui/status-marker'
+import { formatAppliedDate } from '@/services/date'
 import type { Job } from '@/types'
 
 export interface DashboardBlocksProps {
@@ -18,15 +20,18 @@ interface BlockProps {
 
 function Block({ title, href, linkLabel, children }: BlockProps) {
   return (
-    <section data-dashboard-block className="flex flex-col gap-3 border-t border-border-subtle pt-5">
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-heading-m text-text-primary">{title}</h2>
+    <PanelSection
+      data-dashboard-block
+      title={title}
+      titleSize="m"
+      actions={
         <Link href={href} className="text-body-s text-accent-default hover:text-accent-hover">
           {linkLabel}
         </Link>
-      </div>
+      }
+    >
       {children}
-    </section>
+    </PanelSection>
   )
 }
 
@@ -40,14 +45,22 @@ function Block({ title, href, linkLabel, children }: BlockProps) {
  * no calendar or document list in `jobs` -- so those two are link-out cards
  * rather than fabricated numbers.
  *
- * Separation is a top hairline rule, not a border box. `job-card.tsx` is the
- * one bordered container in this system, and it earns the border because it
+ * Separation is a top hairline rule, not a border box, via the shared
+ * `PanelSection` the application detail screen's five panels also use --
+ * this file and that screen each wrote the same wrapper by hand before the
+ * whole-branch review pulled it into one place. `job-card.tsx` is the one
+ * bordered container in this system, and it earns the border because it
  * moves -- a kanban card being dragged needs a boundary. A static grouping on
  * a dashboard doesn't move, so by the same logic it gets a rule instead. A
  * top rule was chosen over column dividers because the grid collapses to one
  * column at mobile widths, where a vertical divider between columns has
  * nothing left to sit between; a top rule keeps working as a plain row
  * separator once the grid stacks.
+ *
+ * "Recent applications" links each row to that job's own detail route,
+ * matching the kanban card and the applications list's mobile row -- the
+ * dashboard predates that route and had been left pointing nowhere more
+ * specific than the unfiltered list.
  */
 export function DashboardBlocks({ jobs }: DashboardBlocksProps) {
   const recent = [...jobs]
@@ -81,16 +94,21 @@ export function DashboardBlocks({ jobs }: DashboardBlocksProps) {
         ) : (
           <div className="flex flex-col">
             {recent.map((job) => (
-              <ApplicationRow
+              <Link
                 key={job.id}
-                company={job.company}
-                role={job.role}
-                status={job.status}
-                salaryMin={job.salary_min}
-                salaryMax={job.salary_max}
-                currency={job.salary_currency}
-                date={job.date_applied ?? job.created_at}
-              />
+                href={`/applications/${job.id}`}
+                className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+              >
+                <ApplicationRow
+                  company={job.company}
+                  role={job.role}
+                  status={job.status}
+                  salaryMin={job.salary_min}
+                  salaryMax={job.salary_max}
+                  currency={job.salary_currency}
+                  date={formatAppliedDate(job.date_applied)}
+                />
+              </Link>
             ))}
           </div>
         )}

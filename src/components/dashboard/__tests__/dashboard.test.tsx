@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import { Dashboard } from '../Dashboard'
 import type { Job } from '@/types'
 
@@ -94,5 +94,38 @@ describe('Dashboard', () => {
       expect(el.className).toContain('border-t')
       expect(el.className).not.toMatch(/(^|\s)border(\s|$)/)
     }
+  })
+
+  it('links each row in Recent applications to that job\'s own detail route', () => {
+    // Task 5 built /applications/[id] after this dashboard shipped; every
+    // path off this page used to dead-end on the unfiltered list.
+    render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const link = screen.getByRole('link', { name: /Globex/i })
+    expect(link.getAttribute('href')).toBe('/applications/fresh-2')
+  })
+
+  it('shows "Not applied" for a wishlist job rather than a fabricated or raw timestamp', () => {
+    // date_applied is null for a job nobody has applied to yet. Falling back
+    // to created_at used to print that row's signup timestamp as if it were
+    // an applied date, and it was a full TIMESTAMPTZ string besides. Alone in
+    // the fixture so it is unambiguously the one "recent" row.
+    const wishlist = makeJob({
+      id: 'wishlist-1',
+      status: 'wishlist',
+      date_applied: null,
+      created_at: '2026-08-20T14:23:01.123456+00:00',
+    })
+    render(<Dashboard jobs={[wishlist]} />)
+    expect(screen.getByText('Not applied')).toBeTruthy()
+    expect(screen.queryByText(/2026-08-20T/)).toBeNull()
+  })
+
+  it('sends the follow-up nudge to the stale application\'s own detail route', () => {
+    // stale-1 also shows up in Recent applications, so this scopes the query
+    // to the nudge itself rather than risking a match on the other row.
+    const { container } = render(<Dashboard jobs={STALE_FIXTURE} />)
+    const nudge = container.querySelector('[data-follow-up]') as HTMLElement
+    const link = within(nudge).getByRole('link', { name: /Acme/i })
+    expect(link.getAttribute('href')).toBe('/applications/stale-1')
   })
 })

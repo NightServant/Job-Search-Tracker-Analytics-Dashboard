@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { formatShortDate } from '@/services/date'
 import type { StaleCandidate } from '@/services/followUp'
 
 /**
@@ -11,6 +12,11 @@ import type { StaleCandidate } from '@/services/followUp'
  * The rule is neutral, not a status colour: "needs chasing" is a property of
  * your attention, not of the application's status, and the five status hues
  * are spoken for.
+ *
+ * Links to the candidate's own detail route rather than the unfiltered list
+ * -- `candidate.id` is the job id, and this is the one element on the
+ * dashboard whose entire purpose is "go deal with THIS application," so
+ * landing anywhere less specific defeats it.
  */
 export function FollowUpNudge({ stale }: { stale: StaleCandidate[] }) {
   if (stale.length === 0) return null
@@ -22,17 +28,13 @@ export function FollowUpNudge({ stale }: { stale: StaleCandidate[] }) {
         {stale.map((candidate) => (
           <li key={candidate.id} className="flex items-center justify-between gap-4">
             <Link
-              href="/applications"
+              href={`/applications/${candidate.id}`}
               className="truncate text-body-m text-text-primary hover:text-accent-default"
             >
               {candidate.company} — {candidate.role}
             </Link>
             <time className="tabular shrink-0 text-body-s text-text-muted">
-              since{' '}
-              {new Date(candidate.last_touched_at).toLocaleDateString(undefined, {
-                month: 'short',
-                day: 'numeric',
-              })}
+              since {formatShortDate(candidate.last_touched_at)}
             </time>
           </li>
         ))}

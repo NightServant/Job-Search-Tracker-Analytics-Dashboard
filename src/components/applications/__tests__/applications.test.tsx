@@ -63,6 +63,16 @@ describe('ApplicationsPage', () => {
     expect(rows).toHaveLength(JOBS.filter((j) => j.status === 'interviewing').length)
   })
 
+  it('shows "Not applied" on the mobile row for a job with no applied date, never a raw fallback string', () => {
+    // Regression for the mobile list disagreeing with the dashboard about
+    // what an unset date_applied renders as -- both now go through the same
+    // formatAppliedDate rather than each inventing its own literal.
+    const notYetApplied = makeJob({ id: '7', status: 'wishlist', date_applied: null })
+    render(<ApplicationsPage jobs={[notYetApplied]} />)
+    expect(screen.getByText('Not applied')).toBeTruthy()
+    expect(screen.queryByText(/^not applied$/)).toBeNull()
+  })
+
   it('marks the selected tab for a screen reader, not just visually', () => {
     render(<ApplicationsPage jobs={JOBS} />)
     const tab = screen.getByRole('tab', { name: /interviewing/i })

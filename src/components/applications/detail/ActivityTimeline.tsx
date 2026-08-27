@@ -27,6 +27,11 @@ function formatOccurredAt(iso: string): string {
  * by the route's combined spinner) and empty: a failed read must not render
  * the same "no activity logged yet" copy a genuine empty list gets, or a
  * network blip reads as proof nothing was ever logged.
+ *
+ * The empty copy says only that nothing is logged, not that there is
+ * anywhere to log it from -- nothing in this codebase calls
+ * `activityService.create` yet, and no task through M5 adds a composer, so
+ * promising one here would point at a control that does not exist.
  */
 export interface ActivityTimelineProps extends React.HTMLAttributes<HTMLElement> {
   activity: ActivityEntry[]
@@ -50,9 +55,7 @@ export function ActivityTimeline({
       {...props}
     >
       {sorted.length === 0 ? (
-        <p className="text-body-s text-text-muted">
-          No activity logged yet. Notes you add here track what happened and when.
-        </p>
+        <p className="text-body-s text-text-muted">No activity logged for this application yet.</p>
       ) : (
         <ul className="flex flex-col">
           {sorted.map((entry) => (

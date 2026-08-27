@@ -16,8 +16,9 @@ import Link from 'next/link'
 /**
  * Thin route wrapper for one application, same split as `applications/page.tsx`:
  * `DetailPage` takes plain props so it renders without Next routing or
- * react-query, and this file owns the four reads the screen needs plus the
- * ATS match derived from two of them.
+ * react-query, and this file owns the five reads the screen needs (job,
+ * activity, document links, events, and the linked CV's text) plus the ATS
+ * match derived from two of them.
  *
  * `jobService.getJob` filters on `.eq('user_id', user.id)` before
  * `.maybeSingle()`, so a job that does not exist and a job that belongs to
@@ -25,18 +26,23 @@ import Link from 'next/link'
  * leaking whether the id is real. This route treats every error from
  * `useJob` the same way rather than trying to tell the two apart.
  *
- * The loading gate waits on all four reads, not just the job, so the
- * activity, linked-CV and event panels never flash their empty state before
+ * The loading gate waits on all five reads (including `useCvText`, gated
+ * behind `linksQuery` resolving first), not just the job, so the activity,
+ * linked-CV, event and ATS panels never flash their empty state before
  * flipping to real content a moment later -- the same "blank is not the same
- * as loading" reasoning the panels' own empty states exist for.
+ * as loading" reasoning the panels' own empty states exist for. `useCvText`
+ * only turns on once `linksQuery` has settled and produced a link to read, so
+ * an application with no linked CV never enables it -- its `isLoading` stays
+ * `false` for a query that was never asked to fetch, rather than blocking the
+ * gate forever.
  *
- * A settled failure on one of the three secondary reads is not blanked out
- * to a page-level error (that would hide the two panels that loaded fine
- * behind a fetch problem in the third), but it must not collapse into the
- * same "no activity logged yet" / "no CV linked" / "nothing scheduled" copy
- * a genuine empty read produces either -- so each `*Query.error` is passed
- * down to its own panel as a distinct third state, one step further along
- * the same reasoning.
+ * A settled failure on one of the four secondary reads is not blanked out to
+ * a page-level error (that would hide the panels that loaded fine behind a
+ * fetch problem in one of them), but it must not collapse into the same "no
+ * activity logged yet" / "no CV linked" / "nothing scheduled" / "link a CV"
+ * copy a genuine empty read produces either -- so each `*Query.error` is
+ * passed down to its own panel as a distinct third state, one step further
+ * along the same reasoning.
  */
 export default function Page() {
   const params = useParams<{ id: string }>()
@@ -56,13 +62,18 @@ export default function Page() {
     links.length > 0
       ? [...links].sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime())[0]
       : null
-  const { data: cvText } = useCvText(latestLink?.resume_id)
+  const cvTextQuery = useCvText(latestLink?.resume_id)
+  const cvText = cvTextQuery.data
 
   const nextEvent = events.find((event) => new Date(event.starts_at).getTime() >= Date.now()) ?? null
   const match = job?.description && cvText ? matchKeywords(cvText, job.description) : null
 
   const loading =
-    jobQuery.isLoading || activityQuery.isLoading || linksQuery.isLoading || eventsQuery.isLoading
+    jobQuery.isLoading ||
+    activityQuery.isLoading ||
+    linksQuery.isLoading ||
+    eventsQuery.isLoading ||
+    cvTextQuery.isLoading
 
   if (loading) {
     return (
@@ -100,6 +111,7 @@ export default function Page() {
       activityError={!!activityQuery.error}
       linksError={!!linksQuery.error}
       nextEventError={!!eventsQuery.error}
+      atsError={!!cvTextQuery.error}
     />
   )
 }
