@@ -53,7 +53,24 @@ export function LatexResumeEditor({
   const [title, setTitle] = useState(draft.title)
   const [latexSource, setLatexSource] = useState(normalizeLatexSource(draft.content))
   const [isSaving, setIsSaving] = useState(false)
-  const [isDirty, setIsDirty] = useState(false)
+  /**
+   * Dirtiness is a comparison between two counters, not a boolean.
+   *
+   * A boolean cannot survive the save round trip. The debounce captures the
+   * source as it is now, awaits the write, and then has to decide whether the
+   * editor is still clean -- and by then more keystrokes may have arrived.
+   * Clearing a boolean at that point marks work saved that was never sent, and
+   * the header says "Saved 3:42 PM" with no unsaved marker over content that
+   * exists only in the textarea. Stamping `savedRevision` with the revision
+   * that was actually written leaves the editor dirty for anything typed since.
+   *
+   * The same two counters are what let an edit that changes no other state
+   * re-arm the debounce, which a boolean could not do once it was already true.
+   */
+  const [revision, setRevision] = useState(0)
+  const [savedRevision, setSavedRevision] = useState(0)
+  const isDirty = revision !== savedRevision
+  const markDirty = () => setRevision((current) => current + 1)
   const [lastSavedAt, setLastSavedAt] = useState(draft.updated_at)
   const [cdnAvailable, setCdnAvailable] = useState(false)
   const cdnCheckRef = useRef(false)
@@ -100,7 +117,8 @@ export function LatexResumeEditor({
     setTitle(draft.title)
     setLatexSource(normalizeLatexSource(draft.content))
     setLastSavedAt(draft.updated_at)
-    setIsDirty(false)
+    setRevision(0)
+    setSavedRevision(0)
   }, [draft.id])
 
   const previewHtml = useMemo(
@@ -108,7 +126,10 @@ export function LatexResumeEditor({
     [latexSource, cdnAvailable]
   )
 
-  const saveDraft = async (notify = false) => {
+  /** Resolves to whether the write landed, matching the Word editor. */
+  const saveDraft = async (notify = false): Promise<boolean> => {
+    // Captured before the await: this is the revision the write carries.
+    const writing = revision
     setIsSaving(true)
     try {
       const updated = await onPersistDraft(draft.id, title.trim() || 'Untitled CV', 'latex', {
@@ -116,10 +137,14 @@ export function LatexResumeEditor({
         source: latexSource,
       })
       setLastSavedAt(updated.updated_at)
-      setIsDirty(false)
+      // Never rewind: an older overlapping save landing second must not
+      // un-save what the newer one already wrote.
+      setSavedRevision((current) => Math.max(current, writing))
       if (notify) success('Draft saved', 'Your LaTeX draft is saved to Supabase.')
+      return true
     } catch (err) {
       showError('Save failed', err instanceof Error ? err.message : 'Unable to save draft')
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -144,10 +169,15 @@ export function LatexResumeEditor({
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current)
     }
-  }, [isDirty, title, latexSource])
+  }, [revision, isDirty])
 
+  /**
+   * Keyed on `revision` alone -- see the Word editor's note. `isDirty` in here
+   * meant the 1200ms save cancelled the 5000ms snapshot every time, so version
+   * history was never written at all.
+   */
   useEffect(() => {
-    if (!isDirty) return
+    if (revision === 0) return
     if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
     snapshotTimerRef.current = window.setTimeout(() => {
       void createSnapshotForAutosave()
@@ -155,7 +185,7 @@ export function LatexResumeEditor({
     return () => {
       if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
     }
-  }, [isDirty, user, latexSource])
+  }, [revision])
 
   const copyLatex = async () => {
     try {
@@ -168,7 +198,7 @@ export function LatexResumeEditor({
 
   const resetTemplate = () => {
     setLatexSource(DEFAULT_LATEX_SOURCE)
-    setIsDirty(true)
+    markDirty()
     info('Template reset', 'The editor has been reset to the starter template.')
   }
 
@@ -178,14 +208,14 @@ export function LatexResumeEditor({
       return
     }
     setLatexSource((template.content as { source: string }).source)
-    setIsDirty(true)
+    markDirty()
     success('Template applied', `"${template.name}" template has been applied.`)
   }
 
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'latex') {
       setLatexSource((content as { source: string }).source)
-      setIsDirty(true)
+      markDirty()
       await saveDraft(false)
     }
   }
@@ -234,7 +264,7 @@ export function LatexResumeEditor({
             value={title}
             onChange={(e) => {
               setTitle(e.target.value)
-              setIsDirty(true)
+              markDirty()
             }}
             placeholder="Untitled CV"
             className="mt-1"
@@ -256,7 +286,7 @@ export function LatexResumeEditor({
             value={latexSource}
             onChange={(e) => {
               setLatexSource(e.target.value)
-              setIsDirty(true)
+              markDirty()
             }}
             className="h-[540px] w-full resize-y rounded-md border border-border-default bg-bg-canvas px-3 py-2 font-mono text-body-s text-text-primary focus-visible:border-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30"
             spellCheck={false}

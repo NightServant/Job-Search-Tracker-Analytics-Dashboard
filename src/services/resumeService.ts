@@ -167,10 +167,16 @@ export const resumeService = {
  * The highest version among a CV's snapshots, or null when it has none.
  *
  * `resume_snapshots.version` is monotonic per resume and UNIQUE (resume_id,
- * version), assigned on insert and stable across deletes of other snapshots.
- * Counting rows instead would renumber v3 back to v2 the moment v1 was pruned
- * by the ten-snapshot cap, so the answer to "which version is this CV on" has
- * to be the maximum, not the count.
+ * version), and it is assigned in application code by `createSnapshot` --
+ * there is no DEFAULT, trigger or sequence behind the column. It is stable
+ * across deletes of other snapshots, so counting rows instead would renumber
+ * v3 back to v2 the moment v1 was pruned by the ten-snapshot cap; the answer
+ * to "which version is this CV on" has to be the maximum, not the count.
+ *
+ * The `typeof === 'number'` filter is not defensive noise. Rows written before
+ * the column was backfilled, or by anything other than `createSnapshot`, carry
+ * a null, and a null must not be read as a version -- `Math.max` would coerce
+ * it to 0 and claim the CV is on v0.
  */
 function latestVersion(snapshots: { version: number | null }[] | null | undefined): number | null {
   const versions = (snapshots ?? [])

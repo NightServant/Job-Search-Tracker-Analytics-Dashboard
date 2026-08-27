@@ -90,10 +90,18 @@ describe('DocumentRow', () => {
     expect(screen.getByText(/not checked/i)).toBeTruthy()
   })
 
-  it('never wears an application status, because a document is not an application', () => {
-    // The five status hues mean one specific thing everywhere else in the app.
-    const { container } = render(<DocumentRow doc={DOC} />)
-    expect(container.querySelector('[data-status]')).toBeNull()
+  it('marks the row with an ATS verdict, never with an application status', () => {
+    // A document is not an application, so the row speaks the ATS Check
+    // vocabulary (pass/review/fail) and not the five-status one. Both halves
+    // are asserted: the verdict actually rendered has to be the one the linter
+    // returns for this CV, and no StatusMarker may appear beside it.
+    const clean = render(<DocumentRow doc={DOC} />)
+    expect(clean.container.querySelector('[data-ats]')!.getAttribute('data-ats')).toBe('pass')
+    expect(clean.container.querySelector('[data-status]')).toBeNull()
+    cleanup()
+
+    const thin = render(<DocumentRow doc={makeDoc({ sections: { ...STRUCTURED, skills: [] } })} />)
+    expect(thin.container.querySelector('[data-ats]')!.getAttribute('data-ats')).toBe('review')
   })
 
   it('reads updated_at in the viewer zone, because it is an instant and not a calendar day', () => {
@@ -160,9 +168,14 @@ describe('DocumentsPage', () => {
     expect(within(header).getByRole('link', { name: /new cv/i })).toBeTruthy()
   })
 
-  it('keeps + new cv out of the top bar, which is chrome and identical on five screens', () => {
+  it('offers exactly one way to start a CV, and it is the body header control', () => {
+    // Content controls belong to the content, not to the Top Bar, which is
+    // chrome and identical on five of the seven app screens. This fails both
+    // if the control leaves the header and if a second one appears elsewhere.
     const { container } = render(<DocumentsPage docs={[DOC]} />)
-    expect(container.querySelector('[data-top-bar]')).toBeNull()
+    const create = [...container.querySelectorAll('a[href="/cv?draft=new"]')]
+    expect(create).toHaveLength(1)
+    expect(container.querySelector('[data-body-header]')!.contains(create[0])).toBe(true)
   })
 
   it('renders one row per CV', () => {

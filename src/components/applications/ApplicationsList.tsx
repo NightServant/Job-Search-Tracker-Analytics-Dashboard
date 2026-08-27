@@ -4,6 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ApplicationRow } from '@/components/ui/application-row'
+import { IconButton } from '@/components/ui/icon-button'
 import { TrashIcon } from '@/components/icons'
 import { formatAppliedDate } from '@/services/date'
 import type { Job } from '@/types'
@@ -32,11 +33,6 @@ export interface ApplicationsListProps {
   role?: string
   'aria-labelledby'?: string
 }
-
-const CONTROL =
-  'grid h-7 w-9 shrink-0 place-items-center rounded-md text-text-muted ' +
-  'transition-colors duration-[--duration-fast] hover:bg-bg-inset hover:text-text-primary ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
 
 export function ApplicationsList({
   jobs,
@@ -86,24 +82,22 @@ export function ApplicationsList({
             {(onEdit || onDelete) && (
               <div className="flex shrink-0 flex-col justify-center gap-1 py-2">
                 {onEdit && (
-                  <button
-                    type="button"
+                  <IconButton
                     aria-label={`Edit ${job.role} at ${job.company}`}
                     onClick={() => onEdit(job)}
-                    className={cn(CONTROL, 'text-label-caps uppercase')}
+                    className="shrink-0 text-label-caps uppercase"
                   >
                     Edit
-                  </button>
+                  </IconButton>
                 )}
                 {onDelete && (
-                  <button
-                    type="button"
+                  <IconButton
                     aria-label={`Delete ${job.role} at ${job.company}`}
                     onClick={() => onDelete(job)}
-                    className={CONTROL}
+                    className="shrink-0"
                   >
                     <TrashIcon size={16} aria-hidden />
-                  </button>
+                  </IconButton>
                 )}
               </div>
             )}

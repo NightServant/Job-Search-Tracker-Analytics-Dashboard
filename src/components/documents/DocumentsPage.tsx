@@ -2,9 +2,9 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { buttonVariants } from '@/components/ui/button'
+import { IconButton } from '@/components/ui/icon-button'
 import { ChevronDownIcon, PlusIcon, TrashIcon } from '@/components/icons'
 import { DocumentRow } from './DocumentRow'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
@@ -12,11 +12,6 @@ import type { ResumeSummary } from '@/services/resumeService'
 
 /** Where `+ new cv` goes. `/cv` reads `draft=new` as "ask which editor, then create one". */
 export const NEW_CV_HREF = '/cv?draft=new'
-
-const CONTROL =
-  'grid h-7 w-9 shrink-0 place-items-center rounded-md text-text-muted ' +
-  'transition-colors duration-[--duration-fast] hover:bg-bg-inset hover:text-text-primary ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
 
 /**
  * The Documents screen's body, over plain props -- the same split as
@@ -87,11 +82,10 @@ export function DocumentsPage({
                 <div className="flex items-stretch gap-2">
                   <DocumentRow doc={doc} className="min-w-0 flex-1 border-b-0" />
                   <div className="flex shrink-0 flex-col justify-center gap-1 py-2">
-                    <button
-                      type="button"
+                    <IconButton
                       aria-expanded={open}
                       onClick={() => onToggleVersions?.(doc)}
-                      className={cn(CONTROL, 'w-auto gap-1 px-2 text-label-caps uppercase')}
+                      className="w-auto shrink-0 grid-flow-col gap-1 px-2 text-label-caps uppercase"
                     >
                       Versions
                       <ChevronDownIcon
@@ -99,15 +93,14 @@ export function DocumentsPage({
                         aria-hidden
                         className={open ? 'rotate-180' : undefined}
                       />
-                    </button>
-                    <button
-                      type="button"
+                    </IconButton>
+                    <IconButton
                       aria-label={`Delete ${doc.title}`}
                       onClick={() => onDelete?.(doc)}
-                      className={CONTROL}
+                      className="shrink-0"
                     >
                       <TrashIcon size={16} aria-hidden />
-                    </button>
+                    </IconButton>
                   </div>
                 </div>
                 {open && (

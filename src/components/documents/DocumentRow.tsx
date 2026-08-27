@@ -29,9 +29,15 @@ const MODE_LABELS: Record<ResumeSummary['mode'], string> = {
  * `resumes.sections`, which is null for every word and latex draft written
  * before the JSON Resume column existed -- those read "Not checked", because
  * telling someone their CV failed an ATS check that never ran is worse than
- * telling them nothing ran. Status colours never appear here: an ATS verdict
- * is not an application status, and the five status hues mean one specific
- * thing everywhere else.
+ * telling them nothing ran.
+ *
+ * The verdict is an `AtsCheck`, never a `StatusMarker`: a document has no
+ * application status, and the five-status vocabulary means one specific thing
+ * everywhere else. `AtsCheck` does paint its rule with `status-offer-mark` and
+ * `status-rejected-mark` -- M4 deliberately reuses those two marks for
+ * pass/fail rather than inventing a second green and red, the same way
+ * `route-states` uses `status-rejected-mark` for a generic page error. What
+ * must not appear here is a status, not a hue.
  *
  * `updated_at` is `TIMESTAMPTZ` -- a real instant, not a bare DATE -- so it
  * goes through `formatTouchedDate`, which reads it in the viewer's zone.

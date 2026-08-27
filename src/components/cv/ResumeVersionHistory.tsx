@@ -35,6 +35,19 @@ interface ResumeVersionHistoryProps {
   onRestore: (content: any) => Promise<void>
 }
 
+/**
+ * A snapshot's name is the number the database gave it, never its position in
+ * this list.
+ *
+ * Snapshots are capped at ten per CV and the oldest are pruned, so position
+ * and version diverge permanently the first time a CV passes ten. Numbering by
+ * position made this panel call a row "Version 10" while `/documents`, reading
+ * the same column, called it v12.
+ */
+function versionLabel(snapshot: ResumeSnapshotMeta): string {
+  return typeof snapshot.version === 'number' ? `v${snapshot.version}` : 'Unnumbered'
+}
+
 export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVersionHistoryProps) {
   const { success, error: showError } = useToast()
   const [snapshots, setSnapshots] = useState<ResumeSnapshotMeta[]>([])
@@ -123,7 +136,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
                   <div key={snapshot.id} className="border-b border-border-subtle p-3">
                     <div className="mb-2">
                       <p className="text-body-s text-text-primary">
-                        {index === 0 ? 'Latest' : `Version ${snapshots.length - index}`}
+                        {index === 0 ? `Latest \u00b7 ${versionLabel(snapshot)}` : versionLabel(snapshot)}
                       </p>
                       <p className="text-body-s text-text-muted">
                         {formatSnapshotTime(snapshot.created_at)}

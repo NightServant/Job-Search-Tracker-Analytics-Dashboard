@@ -52,7 +52,13 @@ vi.mock('@/services/resumeSnapshotService', () => ({
 // redacts the ones in .env, so the two modules that reach for it directly (the
 // PDF export call and its session read) get a stub instead.
 vi.mock('@/lib/supabase', () => ({
-  supabase: { auth: { getSession: vi.fn().mockResolvedValue({ data: { session: null } }) } },
+  supabase: {
+    auth: {
+      getSession: vi.fn().mockResolvedValue({
+        data: { session: { access_token: 'token-123' } },
+      }),
+    },
+  },
   hasValidSupabaseConfig: false,
 }))
 
@@ -245,5 +251,185 @@ describe('the editor chrome carries no lucide glyphs', () => {
     resolved(wordDraft())
     render(<Page />)
     expect(screen.getByRole('link', { name: /back/i }).getAttribute('href')).toBe('/documents')
+  })
+})
+
+/**
+ * A promise the test resolves by hand, so a save can be held in flight while
+ * more keystrokes arrive. Every earlier test in this file resolved the save in
+ * a microtask, which is why none of them could see the race below.
+ */
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+  return { promise, resolve, reject }
+}
+
+describe('keystrokes during an in-flight save are not lost', () => {
+  it('keeps the Word editor dirty when the document changed while the save was away', async () => {
+    // Type A, the debounce fires and captures A, type B while A is in flight.
+    // Marking the editor clean when A lands throws B away silently: the header
+    // reads "Saved 3:42 PM" with no unsaved-changes marker, and B exists only
+    // in the DOM.
+    vi.useFakeTimers()
+    params('cv-1')
+    resolved(wordDraft())
+    const inFlight = deferred<ReturnType<typeof wordDraft>>()
+    updateMutate.mockReturnValueOnce(inFlight.promise)
+    render(<Page />)
+
+    const titleField = screen.getByLabelText(/cv title/i)
+    fireEvent.change(titleField, { target: { value: 'A' } })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+
+    fireEvent.change(titleField, { target: { value: 'AB' } })
+    await act(async () => {
+      inFlight.resolve(wordDraft({ title: 'A', updated_at: '2026-08-20T11:00:00.000Z' }))
+    })
+
+    expect(screen.getByText(/unsaved changes/i)).toBeTruthy()
+
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenLastCalledWith({
+      id: 'cv-1',
+      patch: expect.objectContaining({ title: 'AB' }),
+    })
+  })
+
+  it('keeps the LaTeX editor dirty on the same race', async () => {
+    vi.useFakeTimers()
+    params('cv-2')
+    resolved(latexDraft())
+    const inFlight = deferred<ReturnType<typeof wordDraft>>()
+    updateMutate.mockReturnValueOnce(inFlight.promise)
+    render(<Page />)
+
+    const source = screen.getByLabelText('LaTeX source')
+    fireEvent.change(source, { target: { value: '\\section{A}' } })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+
+    fireEvent.change(source, { target: { value: '\\section{AB}' } })
+    await act(async () => {
+      inFlight.resolve(wordDraft())
+    })
+    expect(screen.getByText(/unsaved changes/i)).toBeTruthy()
+
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenLastCalledWith({
+      id: 'cv-2',
+      patch: expect.objectContaining({ content: { type: 'latex', source: '\\section{AB}' } }),
+    })
+  })
+})
+
+describe('the Word autosave keeps running after a failure', () => {
+  it('re-arms on a body edit that changes no other state', async () => {
+    // Reset rewrites the document and touches nothing else -- no title, no new
+    // editor instance. With the debounce keyed only on [isDirty, title,
+    // editor] and isDirty already true after a failed save, nothing re-armed
+    // it: one RLS denial and the editor stopped autosaving for the rest of the
+    // session while still looking like it was working.
+    vi.useFakeTimers()
+    params('cv-1')
+    resolved(wordDraft())
+    updateMutate.mockRejectedValueOnce(new Error('permission denied'))
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText(/cv title/i), { target: { value: 'Renamed' } })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /reset/i }))
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('snapshots survive the autosave that precedes them', () => {
+  it('still snapshots when the save resolves before the 5s timer', async () => {
+    // The save debounce is 1200ms and the snapshot debounce is 5000ms, so in
+    // any real session the save lands first. Clearing the snapshot timer as
+    // soon as the editor went clean meant the 5s timer was cancelled every
+    // time and version history was never written at all.
+    vi.useFakeTimers()
+    params('cv-1')
+    resolved(wordDraft())
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText(/cv title/i), { target: { value: 'Renamed' } })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(createSnapshotMock).not.toHaveBeenCalled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(3800)
+    })
+    expect(createSnapshotMock).toHaveBeenCalledWith('cv-1', 'user-1', expect.anything())
+  })
+})
+
+describe('PDF export does not paper over a failed save', () => {
+  // Export saves first and then posts the same content to the edge function.
+  // Both halves are asserted so the negative case cannot pass for some
+  // unrelated reason -- an absent session used to stop the request anyway.
+  function exportFetch() {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      blob: vi.fn().mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' })),
+    })
+    global.fetch = fetchMock
+    return fetchMock
+  }
+
+  it('stops rather than exporting a PDF of content the database rejected', async () => {
+    params('cv-1')
+    resolved(wordDraft())
+    updateMutate.mockRejectedValueOnce(new Error('permission denied'))
+    const fetchMock = exportFetch()
+    render(<Page />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /export pdf/i }))
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(screen.queryByText(/exporting/i)).toBeNull()
+  })
+
+  it('still exports when the save lands, so the guard is not just switching it off', async () => {
+    params('cv-1')
+    resolved(wordDraft())
+    const fetchMock = exportFetch()
+    global.URL.createObjectURL = vi.fn(() => 'blob:cv')
+    global.URL.revokeObjectURL = vi.fn()
+    render(<Page />)
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /export pdf/i }))
+    })
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining('/functions/v1/resume-export-pdf'),
+      expect.objectContaining({ method: 'POST' })
+    )
   })
 })

@@ -94,7 +94,27 @@ export function WordResumeEditor({
   const [title, setTitle] = useState(draft.title)
   const [isSaving, setIsSaving] = useState(false)
   const [isExporting, setIsExporting] = useState(false)
-  const [isDirty, setIsDirty] = useState(false)
+  /**
+   * Dirtiness is a comparison between two counters, not a boolean.
+   *
+   * A boolean cannot survive the save round trip. The debounce captures the
+   * document as it is now, awaits the write, and then has to decide whether the
+   * editor is still clean -- and by then more keystrokes may have arrived.
+   * Clearing a boolean at that point marks work saved that was never sent, and
+   * the header says "Saved 3:42 PM" with no unsaved marker over content that
+   * exists only in the DOM. Stamping `savedRevision` with the revision that
+   * was actually written leaves the editor dirty for anything typed since.
+   *
+   * It also fixes a second defect for free: `setIsDirty(true)` on an already
+   * true value is not a state change, so React skipped the render and the
+   * autosave effect never re-armed. A counter always changes, so an edit that
+   * touches nothing else -- a body edit, a template reset -- still re-arms the
+   * debounce. Without that, one failed save stopped autosave for the session.
+   */
+  const [revision, setRevision] = useState(0)
+  const [savedRevision, setSavedRevision] = useState(0)
+  const isDirty = revision !== savedRevision
+  const markDirty = () => setRevision((current) => current + 1)
   const [lastSavedAt, setLastSavedAt] = useState(draft.updated_at)
   const autosaveTimerRef = useRef<number | null>(null)
   const snapshotTimerRef = useRef<number | null>(null)
@@ -110,21 +130,25 @@ export function WordResumeEditor({
   useEffect(() => {
     setTitle(draft.title)
     setLastSavedAt(draft.updated_at)
-    setIsDirty(false)
+    setRevision(0)
+    setSavedRevision(0)
     editor?.commands.setContent(normalizeWordContent(draft.content))
   }, [draft.id])
 
   useEffect(() => {
     if (!editor) return
-    const onUpdate = () => setIsDirty(true)
+    const onUpdate = () => markDirty()
     editor.on('update', onUpdate)
     return () => {
       editor.off('update', onUpdate)
     }
   }, [editor])
 
-  const saveDraft = async (notify = false) => {
-    if (!editor) return
+  /** Resolves to whether the write landed, so a caller can stop on failure. */
+  const saveDraft = async (notify = false): Promise<boolean> => {
+    if (!editor) return false
+    // Captured before the await: this is the revision the write carries.
+    const writing = revision
     setIsSaving(true)
     try {
       const updated = await onPersistDraft(
@@ -134,10 +158,14 @@ export function WordResumeEditor({
         editor.getJSON()
       )
       setLastSavedAt(updated.updated_at)
-      setIsDirty(false)
+      // Never rewind: two saves can overlap, and the older one landing second
+      // must not un-save what the newer one already wrote.
+      setSavedRevision((current) => Math.max(current, writing))
       if (notify) success('Draft saved', 'Your CV draft is saved to Supabase.')
+      return true
     } catch (err) {
       showError('Save failed', err instanceof Error ? err.message : 'Unable to save draft')
+      return false
     } finally {
       setIsSaving(false)
     }
@@ -162,10 +190,21 @@ export function WordResumeEditor({
     return () => {
       if (autosaveTimerRef.current) window.clearTimeout(autosaveTimerRef.current)
     }
-  }, [isDirty, title, editor])
+  }, [revision, isDirty, editor])
 
+  /**
+   * Keyed on `revision` alone, deliberately.
+   *
+   * `isDirty` used to be in here, and going clean tore the timer down: the
+   * save debounce is 1200ms and this one is 5000ms, so in every real session
+   * the save landed first, cleared the flag, and cancelled the snapshot before
+   * it could fire. Version history was not merely sparse -- it was never
+   * written. `user` is out of the deps for the same reason (a re-run cancels);
+   * the (app) layout renders nothing until auth resolves, so this component
+   * cannot mount without one.
+   */
   useEffect(() => {
-    if (!isDirty) return
+    if (revision === 0) return
     if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
     snapshotTimerRef.current = window.setTimeout(() => {
       void createSnapshotForAutosave()
@@ -173,13 +212,16 @@ export function WordResumeEditor({
     return () => {
       if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
     }
-  }, [isDirty, editor, user])
+  }, [revision])
 
   const exportPdf = async () => {
     if (!editor) return
     setIsExporting(true)
     try {
-      await saveDraft(false)
+      // A PDF built from content the database refused is a PDF of something
+      // that does not exist. Without this the editor showed "Save failed" and
+      // "PDF ready" together and handed over the second one.
+      if (!(await saveDraft(false))) return
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -216,7 +258,7 @@ export function WordResumeEditor({
 
   const resetTemplate = () => {
     editor?.commands.setContent(DEFAULT_WORD_CONTENT)
-    setIsDirty(true)
+    markDirty()
     info('Template reset', 'The editor has been reset to the starter template.')
   }
 
@@ -226,14 +268,14 @@ export function WordResumeEditor({
       return
     }
     editor?.commands.setContent(template.content as JSONContent)
-    setIsDirty(true)
+    markDirty()
     success('Template applied', `"${template.name}" template has been applied.`)
   }
 
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'doc') {
       editor?.commands.setContent(content as JSONContent)
-      setIsDirty(true)
+      markDirty()
       await saveDraft(false)
     }
   }
@@ -291,7 +333,7 @@ export function WordResumeEditor({
             value={title}
             onChange={(e) => {
               setTitle(e.target.value)
-              setIsDirty(true)
+              markDirty()
             }}
             placeholder="Untitled CV"
             className="mt-1"

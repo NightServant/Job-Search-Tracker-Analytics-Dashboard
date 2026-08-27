@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { JobCard } from '@/components/ui/job-card'
 import { KanbanColumn } from '@/components/ui/kanban-column'
 import { STATUSES } from '@/components/ui/status-marker'
+import { IconButton } from '@/components/ui/icon-button'
 import { GripVerticalIcon, TrashIcon } from '@/components/icons'
 import type { Job, JobStatus } from '@/types'
 
@@ -30,11 +31,6 @@ const COLUMN_TITLES: Record<JobStatus, string> = {
   offer: 'Offer',
   rejected: 'Rejected',
 }
-
-const CONTROL =
-  'grid h-7 w-9 place-items-center rounded-md text-text-muted ' +
-  'transition-colors duration-[--duration-fast] hover:bg-bg-inset hover:text-text-primary ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
 
 function Card({
   job,
@@ -72,34 +68,30 @@ function Card({
         />
       </Link>
       <div className="absolute right-1 top-1 flex flex-col gap-1">
-        <button
-          type="button"
+        <IconButton
           aria-label={`Drag ${job.role} at ${job.company} to another column`}
-          className={cn(CONTROL, 'cursor-grab active:cursor-grabbing')}
+          className="cursor-grab active:cursor-grabbing"
           {...attributes}
           {...listeners}
         >
           <GripVerticalIcon size={16} aria-hidden />
-        </button>
+        </IconButton>
         {onEdit && (
-          <button
-            type="button"
+          <IconButton
             aria-label={`Edit ${job.role} at ${job.company}`}
             onClick={() => onEdit(job)}
-            className={cn(CONTROL, 'text-label-caps uppercase')}
+            className="text-label-caps uppercase"
           >
             Edit
-          </button>
+          </IconButton>
         )}
         {onDelete && (
-          <button
-            type="button"
+          <IconButton
             aria-label={`Delete ${job.role} at ${job.company}`}
             onClick={() => onDelete(job)}
-            className={CONTROL}
           >
             <TrashIcon size={16} aria-hidden />
-          </button>
+          </IconButton>
         )}
       </div>
     </div>
