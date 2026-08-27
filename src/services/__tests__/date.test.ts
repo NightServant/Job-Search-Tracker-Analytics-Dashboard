@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { formatShortDate, formatAppliedDate, formatTouchedDate, localDayKey } from '../date'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { formatShortDate, formatAppliedDate, formatTouchedDate, localDayKey, formatSnapshotTime } from '../date'
 
 describe('formatShortDate', () => {
   it('formats a bare DATE column without shifting the day', () => {
@@ -82,5 +82,35 @@ describe('localDayKey', () => {
   it('produces the same "YYYY-MM-DD" shape dayKey() builds from a Date', () => {
     process.env.TZ = 'UTC'
     expect(localDayKey('2026-01-05T12:00:00.000Z')).toBe('2026-01-05')
+  })
+})
+
+describe('formatSnapshotTime', () => {
+  afterEach(() => vi.useRealTimers())
+
+  function at(now: string) {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(now))
+  }
+
+  it('reads the most recent snapshot as just now rather than a timestamp', () => {
+    at('2026-08-20T10:00:00.000Z')
+    expect(formatSnapshotTime('2026-08-20T09:59:30.000Z')).toBe('Just now')
+  })
+
+  it('counts minutes, then hours, then days, so recency reads at a glance', () => {
+    at('2026-08-20T10:00:00.000Z')
+    expect(formatSnapshotTime('2026-08-20T09:30:00.000Z')).toBe('30m ago')
+    expect(formatSnapshotTime('2026-08-20T05:00:00.000Z')).toBe('5h ago')
+    expect(formatSnapshotTime('2026-08-18T10:00:00.000Z')).toBe('2d ago')
+  })
+
+  it('falls back to a real date once relative time stops being useful', () => {
+    at('2026-08-20T10:00:00.000Z')
+    expect(formatSnapshotTime('2026-07-01T10:00:00.000Z')).not.toMatch(/ago|Just now/)
+  })
+
+  it('says the timestamp is unreadable rather than rendering Invalid Date', () => {
+    expect(formatSnapshotTime('not a date')).toBe('Invalid date')
   })
 })

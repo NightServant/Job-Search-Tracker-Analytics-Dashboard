@@ -94,3 +94,41 @@ export function localDayKey(iso: string): string {
   const day = String(d.getDate()).padStart(2, '0')
   return `${y}-${m}-${day}`
 }
+
+/**
+ * How long ago a resume snapshot was taken.
+ *
+ * Relative for the first week, absolute after it: "3d ago" is the useful
+ * answer while you still remember the edit, and stops being one by the time
+ * the answer is "47d ago".
+ *
+ * It lives here rather than in `resumeSnapshotService`, where it was written,
+ * because that module constructs the shared Supabase client at import time.
+ * A pure string formatter kept in there drags a network client into every
+ * module that wants to render a timestamp -- which is exactly what it did:
+ * the Documents version list could not be imported in a test at all until
+ * this moved, since the client refuses to construct without real credentials.
+ * Nothing else in `resumeSnapshotService` is importable without them either,
+ * which is correct for the reads and writes and wrong for this.
+ */
+export function formatSnapshotTime(timestamp: string): string {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return 'Invalid date'
+
+  const diffMs = Date.now() - date.getTime()
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffMins < 1) return 'Just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+
+  return date.toLocaleDateString([], {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}

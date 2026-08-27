@@ -4,6 +4,7 @@ import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { buildMonthGrid, weekOf } from '@/lib/calendar'
+import { useJobs } from '@/hooks/useJobs'
 import { MonthGrid } from './MonthGrid'
 import { WeekStrip } from './WeekStrip'
 import { Agenda } from './Agenda'
@@ -12,8 +13,8 @@ import type { CalendarEvent } from '@/services/events'
 /**
  * The calendar screen's body, over plain props -- same split as `Dashboard`
  * (Task 3) and `DetailPage` (Task 5), so it renders without Next routing or
- * react-query. `src/app/(app)/calendar/page.tsx` owns the single
- * `eventService.listUpcoming` read this screen needs.
+ * react-query for its `events` prop. `src/app/(app)/calendar/page.tsx` owns
+ * the `eventService.listUpcoming` read this screen needs.
  *
  * Desktop and mobile are genuinely different layouts, not one squeezed into
  * the other, per the roadmap's "Mobile Calendar deliberately diverges from
@@ -30,12 +31,29 @@ import type { CalendarEvent } from '@/services/events'
  * body header" convention Documents' `+ new cv` and Analytics' range picker
  * follow -- and are hidden below `md`, since nothing on the mobile layout
  * responds to them.
+ *
+ * `useJobs()` is called here directly, not threaded in as a prop from the
+ * route -- it is the one exception to this component's "plain props" split.
+ * Roadmap 5.7 requires the agenda carry each event's company, and
+ * `CalendarEvent` has only `job_id`; `useJobs()` is the same shared
+ * `['jobs', user?.id]` cache every other screen in this branch already
+ * reads (Task 3's ruling for `Dashboard`), so this is a second read of data
+ * already in cache, not a new query. Component tests mock `@/hooks/useJobs`
+ * the same way `dashboard/__tests__/page.test.tsx` mocks it for the route,
+ * rather than standing up `AuthProvider`/`QueryClientProvider`.
  */
 export interface CalendarProps {
   events: CalendarEvent[]
 }
 
 export function Calendar({ events }: CalendarProps) {
+  const { data: jobs = [] } = useJobs()
+  const companyByJobId = React.useMemo(() => {
+    const map: Record<string, string> = {}
+    for (const job of jobs) map[job.id] = job.company
+    return map
+  }, [jobs])
+
   const today = React.useMemo(() => new Date(), [])
   const [cursor, setCursor] = React.useState(today)
 
@@ -77,7 +95,7 @@ export function Calendar({ events }: CalendarProps) {
 
       <div data-week-strip className="flex flex-col gap-6 md:hidden">
         <WeekStrip days={week} today={today} />
-        <Agenda events={events} />
+        <Agenda events={events} companyByJobId={companyByJobId} />
       </div>
     </div>
   )

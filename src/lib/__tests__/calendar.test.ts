@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { buildMonthGrid, weekOf, dayKey, parseDayKey } from '../calendar'
 
 describe('buildMonthGrid', () => {
@@ -48,6 +48,54 @@ describe('weekOf', () => {
     const sunday = new Date(2026, 7, 23)
     const week = weekOf(sunday)
     expect(week[0].getTime()).toBe(sunday.getTime())
+  })
+})
+
+describe('buildMonthGrid across a DST transition', () => {
+  const originalTz = process.env.TZ
+
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  // Every committed fixture up to this point was Asia/Manila (UTC+8) or
+  // Pacific/Midway (UTC-11) -- neither observes DST, so nothing here would
+  // fail if buildMonthGrid/weekOf/startOfWeek were refactored toward
+  // millisecond arithmetic (cursor = new Date(cursor.getTime() + 86_400_000))
+  // instead of the local `Date#setDate` this file actually uses.
+  //
+  // November, not March, is the direction that catches that refactor. DST
+  // ends (falls back an hour) at 2am on 1 Nov 2026 in America/New_York, so
+  // local midnight-to-midnight across that day spans 25 real hours, not 24.
+  // A cursor that adds a fixed 86_400_000ms lands an hour SHORT of the next
+  // local midnight -- 1 Nov 23:00 rather than 2 Nov 00:00 -- which still
+  // reads back as 1 Nov, producing a doubled day. (The reverse case, March's
+  // spring-forward, only overshoots past midnight into the correct next day
+  // and would not have caught this -- confirmed by construction against a
+  // naive ms-cursor implementation before writing this test.)
+  it('produces 42 distinct, consecutive local days across the November 2026 US fall-back, with no skipped or doubled day', () => {
+    process.env.TZ = 'America/New_York'
+    const days = buildMonthGrid(2026, 10).flat() // November
+
+    expect(days).toHaveLength(42)
+    expect(new Set(days.map((d) => dayKey(d))).size).toBe(42)
+
+    for (let i = 1; i < days.length; i++) {
+      const prevMidnight = new Date(
+        days[i - 1].getFullYear(),
+        days[i - 1].getMonth(),
+        days[i - 1].getDate()
+      ).getTime()
+      const currMidnight = new Date(
+        days[i].getFullYear(),
+        days[i].getMonth(),
+        days[i].getDate()
+      ).getTime()
+      // Rounds away the 23h/25h a DST-crossing local midnight-to-midnight
+      // span actually is in real elapsed time; every cell must still be
+      // exactly one CALENDAR day after the previous one.
+      expect(Math.round((currMidnight - prevMidnight) / 86_400_000)).toBe(1)
+    }
   })
 })
 
