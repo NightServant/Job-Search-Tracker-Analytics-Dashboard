@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { formatShortDate, formatAppliedDate, formatTouchedDate } from '../date'
+import { formatShortDate, formatAppliedDate, formatTouchedDate, localDayKey } from '../date'
 
 describe('formatShortDate', () => {
   it('formats a bare DATE column without shifting the day', () => {
@@ -58,5 +58,29 @@ describe('formatTouchedDate', () => {
   it('matches formatShortDate\'s output shape ("Mon D", no year)', () => {
     process.env.TZ = 'UTC'
     expect(formatTouchedDate('2026-08-20T12:00:00.000Z')).toBe('Aug 20')
+  })
+})
+
+describe('localDayKey', () => {
+  const originalTz = process.env.TZ
+
+  afterEach(() => {
+    process.env.TZ = originalTz
+  })
+
+  it('keys a TIMESTAMPTZ late in the UTC day under the LOCAL day ahead of UTC', () => {
+    process.env.TZ = 'Asia/Manila' // UTC+8, where Gabe is
+    // 20:00 UTC on the 26th is 04:00 on the 27th in Manila.
+    expect(localDayKey('2026-08-26T20:00:00.000Z')).toBe('2026-08-27')
+  })
+
+  it('keys a TIMESTAMPTZ early in the UTC day under the LOCAL day behind UTC', () => {
+    process.env.TZ = 'Pacific/Midway' // UTC-11
+    expect(localDayKey('2026-08-20T01:00:00.000Z')).toBe('2026-08-19')
+  })
+
+  it('produces the same "YYYY-MM-DD" shape dayKey() builds from a Date', () => {
+    process.env.TZ = 'UTC'
+    expect(localDayKey('2026-01-05T12:00:00.000Z')).toBe('2026-01-05')
   })
 })

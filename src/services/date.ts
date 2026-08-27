@@ -63,3 +63,34 @@ export function formatTouchedDate(iso: string): string {
     day: 'numeric',
   })
 }
+
+/**
+ * Buckets a TIMESTAMPTZ instant into its viewer-local calendar day, as a
+ * sortable "YYYY-MM-DD" key -- the same reasoning as `formatTouchedDate`
+ * above, applied to `events.starts_at` for `groupEventsByDay` in
+ * `src/services/events.ts`.
+ *
+ * That function used to key on `starts_at.slice(0, 10)`, the UTC day
+ * embedded in the ISO string. That is the same mistake `10f24b6` fixed for
+ * `last_touched_at`: `starts_at` is a `TIMESTAMPTZ`
+ * (`supabase/migrations/20260825040426_add_events.sql`), a real instant, and
+ * the calendar grid it gets bucketed into (`buildMonthGrid`/`weekOf` in
+ * `src/lib/calendar.ts`) is built from local `Date`s. Slicing the UTC string
+ * put a late-evening event in a zone ahead of UTC (Manila is UTC+8, where
+ * Gabe is) into the PREVIOUS day's cell relative to where it actually falls
+ * on the viewer's own calendar.
+ *
+ * Pairs with `dayKey` in `src/lib/calendar.ts`, which formats a grid cell's
+ * already-local `Date` into the identical "YYYY-MM-DD" shape so a cell can
+ * look its bucket up directly. Kept here, not there, because this function's
+ * input is an ISO *string* naming a TIMESTAMPTZ column -- the same kind of
+ * column-specific concern `formatTouchedDate` and `formatAppliedDate` each
+ * own -- while `dayKey` formats a `Date` object grid geometry already built.
+ */
+export function localDayKey(iso: string): string {
+  const d = new Date(iso)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
