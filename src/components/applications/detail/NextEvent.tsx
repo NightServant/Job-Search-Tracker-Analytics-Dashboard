@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { cn } from '@/lib/utils'
-import { CalendarIcon, AlertCircleIcon } from '@/components/icons'
+import { CalendarIcon } from '@/components/icons'
+import { PanelSection } from '@/components/ui/panel-section'
 import type { CalendarEvent, EventKind } from '@/services/events'
 
 const KIND_LABELS: Record<EventKind, string> = {
@@ -39,18 +39,14 @@ export interface NextEventProps extends React.HTMLAttributes<HTMLElement> {
 
 export function NextEvent({ event, error = false, className, ...props }: NextEventProps) {
   return (
-    <section
+    <PanelSection
       aria-label="Next event"
-      className={cn('flex flex-col gap-3 border-t border-border-subtle pt-6', className)}
+      title="Next event"
+      error={error ? 'Could not load the next event. Try refreshing the page.' : undefined}
+      className={className}
       {...props}
     >
-      <h2 className="text-heading-s text-text-primary">Next event</h2>
-      {error ? (
-        <p className="flex items-start gap-2 text-body-s text-status-rejected-mark">
-          <AlertCircleIcon size={16} className="mt-0.5 shrink-0" />
-          Could not load the next event. Try refreshing the page.
-        </p>
-      ) : event === null ? (
+      {event === null ? (
         <p className="text-body-s text-text-muted">Nothing scheduled for this application yet.</p>
       ) : (
         <div className="flex items-start gap-3">
@@ -63,6 +59,6 @@ export function NextEvent({ event, error = false, className, ...props }: NextEve
           </div>
         </div>
       )}
-    </section>
+    </PanelSection>
   )
 }

@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { cn } from '@/lib/utils'
-import { ClockIcon, AlertCircleIcon } from '@/components/icons'
+import { ClockIcon } from '@/components/icons'
+import { PanelSection } from '@/components/ui/panel-section'
 import { sortActivityDescending, type ActivityEntry } from '@/services/activityLog'
 
 function formatOccurredAt(iso: string): string {
@@ -42,18 +42,14 @@ export function ActivityTimeline({
   const sorted = sortActivityDescending(activity)
 
   return (
-    <section
+    <PanelSection
       aria-label="Activity"
-      className={cn('flex flex-col gap-3 border-t border-border-subtle pt-6', className)}
+      title="Activity"
+      error={error ? 'Could not load activity. Try refreshing the page.' : undefined}
+      className={className}
       {...props}
     >
-      <h2 className="text-heading-s text-text-primary">Activity</h2>
-      {error ? (
-        <p className="flex items-start gap-2 text-body-s text-status-rejected-mark">
-          <AlertCircleIcon size={16} className="mt-0.5 shrink-0" />
-          Could not load activity. Try refreshing the page.
-        </p>
-      ) : sorted.length === 0 ? (
+      {sorted.length === 0 ? (
         <p className="text-body-s text-text-muted">
           No activity logged yet. Notes you add here track what happened and when.
         </p>
@@ -73,6 +69,6 @@ export function ActivityTimeline({
           ))}
         </ul>
       )}
-    </section>
+    </PanelSection>
   )
 }

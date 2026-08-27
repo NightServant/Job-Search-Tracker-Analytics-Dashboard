@@ -1,6 +1,6 @@
 import * as React from 'react'
-import { cn } from '@/lib/utils'
 import { ExternalIcon } from '@/components/icons'
+import { PanelSection } from '@/components/ui/panel-section'
 
 /**
  * The posting text, verbatim.
@@ -20,14 +20,11 @@ export interface JobDescriptionProps extends React.HTMLAttributes<HTMLElement> {
 
 export function JobDescription({ description, url, className, ...props }: JobDescriptionProps) {
   return (
-    <section
+    <PanelSection
       aria-label="Job description"
-      className={cn('flex flex-col gap-3 border-t border-border-subtle pt-6', className)}
-      {...props}
-    >
-      <div className="flex items-center justify-between gap-4">
-        <h2 className="text-heading-s text-text-primary">Job description</h2>
-        {url && (
+      title="Job description"
+      actions={
+        url ? (
           <a
             href={url}
             target="_blank"
@@ -37,8 +34,11 @@ export function JobDescription({ description, url, className, ...props }: JobDes
             View posting
             <ExternalIcon size={14} />
           </a>
-        )}
-      </div>
+        ) : undefined
+      }
+      className={className}
+      {...props}
+    >
       {description ? (
         <p className="whitespace-pre-wrap text-body-m text-text-secondary">{description}</p>
       ) : (
@@ -47,6 +47,6 @@ export function JobDescription({ description, url, className, ...props }: JobDes
           against a CV.
         </p>
       )}
-    </section>
+    </PanelSection>
   )
 }
