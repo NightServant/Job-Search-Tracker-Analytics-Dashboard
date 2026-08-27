@@ -312,6 +312,47 @@ describe('createSnapshot and the unique constraint', () => {
   })
 })
 
+describe('pruning the oldest snapshots', () => {
+  function tenSnapshots() {
+    return Array.from({ length: 10 }, (_, index) => ({
+      id: `seed-${index}`,
+      version: index + 1,
+    }))
+  }
+
+  it('drops the oldest once a CV passes ten, keeping the cap', async () => {
+    // Snapshots are now written on every 5s typing pause, so this branch runs
+    // constantly in a real session. Nothing had ever entered it: no fixture
+    // reached eleven rows.
+    const table = install(fakeSnapshots(tenSnapshots()))
+    await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    expect(table.rows).toHaveLength(10)
+    expect(table.rows.find((row) => row.id === 'seed-0')).toBeUndefined()
+    expect(table.rows.find((row) => row.version === 11)).toBeDefined()
+  })
+
+  it('does not renumber what it kept, so a pruned number is never handed out twice', async () => {
+    // The retained rows keep the identity they were written with. Renumbering
+    // them by position is exactly what the ledger ruled against, and it would
+    // also collide with UNIQUE (resume_id, version) on the next insert.
+    const table = install(fakeSnapshots(tenSnapshots()))
+    await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    expect(table.rows.map((row) => row.version).sort((a, b) => Number(a) - Number(b))).toEqual([
+      2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
+    ])
+
+    const next = await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    expect(next.version).toBe(12)
+  })
+
+  it('leaves a CV under the cap alone', async () => {
+    const table = install(fakeSnapshots(tenSnapshots().slice(0, 9)))
+    await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    expect(table.rows).toHaveLength(10)
+    expect(table.rows.find((row) => row.id === 'seed-0')).toBeDefined()
+  })
+})
+
 describe('getSnapshots', () => {
   it('reads back the version the insert assigned, so the two surfaces agree', async () => {
     install(fakeSnapshots())

@@ -20,6 +20,8 @@ const createMutate = vi.hoisted(() => vi.fn())
 const updateMutate = vi.hoisted(() => vi.fn())
 const deleteMutate = vi.hoisted(() => vi.fn())
 const createSnapshotMock = vi.hoisted(() => vi.fn())
+const getSnapshotsMock = vi.hoisted(() => vi.fn())
+const getSnapshotMock = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useSearchParams: useSearchParamsMock,
@@ -43,8 +45,8 @@ vi.mock('@/contexts/ToastContext', () => ({
 
 vi.mock('@/services/resumeSnapshotService', () => ({
   createSnapshot: createSnapshotMock,
-  getSnapshots: vi.fn().mockResolvedValue([]),
-  getSnapshot: vi.fn(),
+  getSnapshots: getSnapshotsMock,
+  getSnapshot: getSnapshotMock,
   deleteSnapshot: vi.fn(),
 }))
 
@@ -102,6 +104,7 @@ beforeEach(() => {
     wordDraft({ title: patch.title ?? 'Backend CV', updated_at: '2026-08-20T11:00:00.000Z' })
   )
   createMutate.mockResolvedValue(wordDraft({ id: 'cv-new' }))
+  getSnapshotsMock.mockResolvedValue([])
   global.fetch = vi.fn().mockRejectedValue(new Error('offline'))
 })
 
@@ -431,5 +434,154 @@ describe('PDF export does not paper over a failed save', () => {
       expect.stringContaining('/functions/v1/resume-export-pdf'),
       expect.objectContaining({ method: 'POST' })
     )
+  })
+})
+
+describe('an overlapping pair of saves cannot un-save the newer one', () => {
+  // Revision 1 starts saving on a slow connection; a keystroke makes it
+  // revision 2, whose save overtakes it and lands first. When the older write
+  // finally resolves it must not stamp its own revision over the newer one --
+  // that flips a correctly-saved editor back to dirty and sends a redundant
+  // write of content the database already has. `Math.max` in saveDraft is the
+  // clause under test, and nothing exercised it until now.
+  async function overlap(draft: ReturnType<typeof wordDraft>, label: string, edit: (value: string) => void) {
+    vi.useFakeTimers()
+    params(draft.id)
+    resolved(draft)
+    const first = deferred<ReturnType<typeof wordDraft>>()
+    const second = deferred<ReturnType<typeof wordDraft>>()
+    updateMutate.mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+    render(<Page />)
+
+    edit(`${label}-1`)
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    edit(`${label}-2`)
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(2)
+
+    // Newer write lands first, then the older one.
+    await act(async () => {
+      second.resolve(wordDraft({ updated_at: '2026-08-20T12:00:00.000Z' }))
+    })
+    await act(async () => {
+      first.resolve(wordDraft({ updated_at: '2026-08-20T11:00:00.000Z' }))
+    })
+    return { first, second }
+  }
+
+  it('leaves the Word editor clean after the slower write finally lands', async () => {
+    await overlap(wordDraft(), 'Title', (value) =>
+      fireEvent.change(screen.getByLabelText(/cv title/i), { target: { value } })
+    )
+    expect(screen.queryByText(/unsaved changes/i)).toBeNull()
+
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(2)
+  })
+
+  it('leaves the LaTeX editor clean on the same overlap', async () => {
+    await overlap(latexDraft(), 'source', (value) =>
+      fireEvent.change(screen.getByLabelText('LaTeX source'), { target: { value } })
+    )
+    expect(screen.queryByText(/unsaved changes/i)).toBeNull()
+
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('the LaTeX editor snapshots on the same schedule as the Word editor', () => {
+  it('still snapshots when the save resolves before the 5s timer', async () => {
+    // The Word half of this fix was pinned; this half was not, so reverting the
+    // LaTeX snapshot effect to its pre-fix shape left the whole suite green.
+    // Both editors carry the identical fix for the identical bug.
+    vi.useFakeTimers()
+    params('cv-2')
+    resolved(latexDraft())
+    render(<Page />)
+
+    fireEvent.change(screen.getByLabelText('LaTeX source'), {
+      target: { value: '\\section{Edited}' },
+    })
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+    expect(createSnapshotMock).not.toHaveBeenCalled()
+
+    await act(async () => {
+      vi.advanceTimersByTime(3800)
+    })
+    expect(createSnapshotMock).toHaveBeenCalledWith('cv-2', 'user-1', {
+      type: 'latex',
+      source: '\\section{Edited}',
+    })
+  })
+})
+
+describe('restoring a version persists the version that was restored', () => {
+  async function restore(draftValue: ReturnType<typeof wordDraft>, content: unknown) {
+    vi.useFakeTimers()
+    params(draftValue.id)
+    resolved(draftValue)
+    getSnapshotsMock.mockResolvedValue([
+      { id: 's-2', resume_id: draftValue.id, version: 2, created_at: '2026-08-20T10:00:00.000Z' },
+      { id: 's-1', resume_id: draftValue.id, version: 1, created_at: '2026-08-19T10:00:00.000Z' },
+    ])
+    getSnapshotMock.mockResolvedValue({ id: 's-1', content })
+    render(<Page />)
+
+    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
+    await act(async () => {})
+    await act(async () => {
+      fireEvent.click(screen.getAllByRole('button', { name: /restore/i })[1])
+    })
+  }
+
+  it('writes the restored LaTeX source, not the source it replaced', async () => {
+    // saveDraft used to read `latexSource` from the render that preceded the
+    // restore, so the write carried the OLD source. It only ever reached the
+    // database because the restore also left the editor dirty by accident and
+    // the debounce re-sent it 1200ms later.
+    await restore(latexDraft(), { type: 'latex', source: '\\section{Restored}' })
+    expect(updateMutate).toHaveBeenCalledWith({
+      id: 'cv-2',
+      patch: expect.objectContaining({
+        content: { type: 'latex', source: '\\section{Restored}' },
+      }),
+    })
+  })
+
+  it('leaves the editor clean rather than re-sending the same content 1200ms later', async () => {
+    await restore(latexDraft(), { type: 'latex', source: '\\section{Restored}' })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/unsaved changes/i)).toBeNull()
+
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+  })
+
+  it('does the same for a restored Word document', async () => {
+    await restore(wordDraft(), {
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Restored body' }] }],
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
+    expect(screen.queryByText(/unsaved changes/i)).toBeNull()
+
+    await act(async () => {
+      vi.advanceTimersByTime(1200)
+    })
+    expect(updateMutate).toHaveBeenCalledTimes(1)
   })
 })

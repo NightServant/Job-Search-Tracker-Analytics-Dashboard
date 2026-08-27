@@ -62,6 +62,21 @@ describe('resumeService.list', () => {
     const { client } = fakeClient({ data: [{ ...ROW, resume_snapshots: [] }], error: null })
     const [doc] = await resumeService.list(client)
     expect(doc.version).toBeNull()
+    expect(doc.hasVersions).toBe(false)
+  })
+
+  it('separates "no snapshots" from "snapshots with no number on them"', async () => {
+    // A CV whose only snapshot predates the version backfill has history but
+    // no number for it. Collapsing the two made the row say "No versions"
+    // while expanding that same row listed one entry -- the two-surfaces-
+    // disagree defect this milestone has now hit three times.
+    const { client } = fakeClient({
+      data: [{ ...ROW, resume_snapshots: [{ version: null }] }],
+      error: null,
+    })
+    const [doc] = await resumeService.list(client)
+    expect(doc.version).toBeNull()
+    expect(doc.hasVersions).toBe(true)
   })
 
   it('reads latex mode through and settles every other value on word', async () => {

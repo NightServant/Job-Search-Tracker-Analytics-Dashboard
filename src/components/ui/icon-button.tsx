@@ -15,11 +15,13 @@ import { cn } from '@/lib/utils'
  * pushing the content it belongs to. Merging them would mean a size that is
  * wrong in one of the two places.
  *
- * `shrink-0` is deliberately NOT in the base. Two call sites sit in a flex row
- * and need it; the kanban drag handle is absolutely positioned and never had
- * it, and quietly adding it there would have been a layout change smuggled in
- * under a refactor. Callers that need it pass it, and `cn` merges width and
- * padding overrides for the one control that carries a word instead of a glyph.
+ * `shrink-0` is deliberately NOT in the base. Four of the seven call sites
+ * carry it -- both controls in `ApplicationsList` and both in `DocumentsPage`,
+ * all of which sit in a flex row. The three in `KanbanView` are absolutely
+ * positioned and never had it, so putting it in the base would have been a
+ * layout change smuggled in under a refactor. Callers that need it pass it,
+ * and `cn` merges width and padding overrides for the one control that carries
+ * a word instead of a glyph.
  */
 export type IconButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>
 

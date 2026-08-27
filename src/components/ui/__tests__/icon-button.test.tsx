@@ -25,9 +25,9 @@ describe('IconButton', () => {
   })
 
   it('leaves shrink-0 to the caller rather than baking it in', () => {
-    // Two of the three call sites this replaced sit in a flex row and need it;
-    // the kanban drag handle is absolutely positioned and never had it.
-    // Baking it into the base would have changed that third site silently.
+    // Four of the seven call sites this replaced sit in a flex row and need
+    // it; the three kanban controls are absolutely positioned and never had
+    // it. Baking it into the base would have changed those three silently.
     const { container } = render(<IconButton aria-label="Drag" />)
     expect(container.firstElementChild!.className).not.toMatch(/(^|\s)shrink-0(\s|$)/)
 

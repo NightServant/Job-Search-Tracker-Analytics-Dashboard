@@ -41,6 +41,7 @@ function makeDoc(overrides: Partial<ResumeSummary> = {}): ResumeSummary {
     updated_at: '2026-08-20T10:00:00.000Z',
     sections: STRUCTURED,
     version: 3,
+    hasVersions: true,
     ...overrides,
   }
 }
@@ -110,8 +111,17 @@ describe('DocumentRow', () => {
   })
 
   it('says a CV has no saved versions rather than calling it v0', () => {
-    render(<DocumentRow doc={makeDoc({ version: null })} />)
+    render(<DocumentRow doc={makeDoc({ version: null, hasVersions: false })} />)
     expect(screen.getByText(/no versions/i)).toBeTruthy()
+  })
+
+  it('calls a pre-backfill snapshot unnumbered, the same word its own panel uses', () => {
+    // Expanding this row lists one entry labelled "Unnumbered". The row saying
+    // "No versions" over the top of that is the two surfaces disagreeing about
+    // the same column.
+    render(<DocumentRow doc={makeDoc({ version: null, hasVersions: true })} />)
+    expect(screen.getByText(/unnumbered/i)).toBeTruthy()
+    expect(screen.queryByText(/no versions/i)).toBeNull()
   })
 
   it('names which editor a draft opens in', () => {

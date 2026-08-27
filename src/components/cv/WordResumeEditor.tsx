@@ -114,7 +114,21 @@ export function WordResumeEditor({
   const [revision, setRevision] = useState(0)
   const [savedRevision, setSavedRevision] = useState(0)
   const isDirty = revision !== savedRevision
-  const markDirty = () => setRevision((current) => current + 1)
+  /**
+   * `revisionRef` mirrors `revision` synchronously.
+   *
+   * `saveDraft` has to know which revision its write carries, and reading that
+   * from the `revision` state variable reads the value of the render it was
+   * created in. That is one behind for any caller that marks the editor dirty
+   * and then saves in the same tick -- `restoreSnapshot` does exactly that --
+   * so the write got stamped one revision short, the editor stayed dirty over
+   * content that was saved, and the debounce re-sent it 1200ms later.
+   */
+  const revisionRef = useRef(0)
+  const markDirty = () => {
+    revisionRef.current += 1
+    setRevision(revisionRef.current)
+  }
   const [lastSavedAt, setLastSavedAt] = useState(draft.updated_at)
   const autosaveTimerRef = useRef<number | null>(null)
   const snapshotTimerRef = useRef<number | null>(null)
@@ -130,6 +144,14 @@ export function WordResumeEditor({
   useEffect(() => {
     setTitle(draft.title)
     setLastSavedAt(draft.updated_at)
+    // Cross-file invariant: `cv/page.tsx` renders the editor with
+    // `key={draft.id}`, so switching CVs remounts rather than reusing this
+    // component and this reset is belt-and-braces. If that key is ever
+    // dropped, a save still in flight from the previous CV can land after the
+    // counters are zeroed and stamp `savedRevision` above `revision`, which
+    // strands the editor permanently dirty. Keep the key, or make this reset
+    // cancel the in-flight save.
+    revisionRef.current = 0
     setRevision(0)
     setSavedRevision(0)
     editor?.commands.setContent(normalizeWordContent(draft.content))
@@ -147,8 +169,9 @@ export function WordResumeEditor({
   /** Resolves to whether the write landed, so a caller can stop on failure. */
   const saveDraft = async (notify = false): Promise<boolean> => {
     if (!editor) return false
-    // Captured before the await: this is the revision the write carries.
-    const writing = revision
+    // Read from the ref, not the state: a caller that marked the editor dirty
+    // in this same tick has not re-rendered yet.
+    const writing = revisionRef.current
     setIsSaving(true)
     try {
       const updated = await onPersistDraft(

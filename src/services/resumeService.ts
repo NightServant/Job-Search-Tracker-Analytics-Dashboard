@@ -28,8 +28,23 @@ export interface ResumeSummary {
    * JSONB and nothing constrains what is in it); `lintSections` guards it.
    */
   sections: unknown | null
-  /** Highest `resume_snapshots.version` for this CV; null when never snapshotted. */
+  /**
+   * Highest `resume_snapshots.version` for this CV, or null when no snapshot
+   * carries a number.
+   *
+   * Null does not mean "no history" -- see `hasVersions`. A CV whose only
+   * snapshot predates the version backfill has one and no number for it.
+   */
   version: number | null
+  /**
+   * Whether the CV has any snapshots at all.
+   *
+   * Separate from `version` because the two answer different questions and
+   * collapsing them made the Documents row say "No versions" over an expanded
+   * panel that was listing one. The row now speaks the panel's vocabulary:
+   * a number, "Unnumbered", or "No versions".
+   */
+  hasVersions: boolean
 }
 
 export interface ResumeCreateInput {
@@ -114,6 +129,7 @@ export const resumeService = {
       updated_at: row.updated_at,
       sections: row.sections ?? null,
       version: latestVersion(row.resume_snapshots),
+      hasVersions: (row.resume_snapshots ?? []).length > 0,
     }))
   },
 

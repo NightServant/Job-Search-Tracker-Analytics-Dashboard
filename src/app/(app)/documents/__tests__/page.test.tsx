@@ -32,6 +32,7 @@ function makeDoc(overrides: Partial<ResumeSummary> = {}): ResumeSummary {
     updated_at: '2026-08-20T10:00:00.000Z',
     sections: null,
     version: 2,
+    hasVersions: true,
     ...overrides,
   }
 }

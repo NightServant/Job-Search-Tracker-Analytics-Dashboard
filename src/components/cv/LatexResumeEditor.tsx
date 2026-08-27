@@ -70,7 +70,37 @@ export function LatexResumeEditor({
   const [revision, setRevision] = useState(0)
   const [savedRevision, setSavedRevision] = useState(0)
   const isDirty = revision !== savedRevision
-  const markDirty = () => setRevision((current) => current + 1)
+  /**
+   * `revisionRef` mirrors `revision` synchronously.
+   *
+   * `saveDraft` has to know which revision its write carries, and reading that
+   * from the `revision` state variable reads the value of the render it was
+   * created in. That is one behind for any caller that marks the editor dirty
+   * and then saves in the same tick -- `restoreSnapshot` does exactly that --
+   * so the write got stamped one revision short, the editor stayed dirty over
+   * content that was saved, and the debounce re-sent it 1200ms later.
+   */
+  const revisionRef = useRef(0)
+  const markDirty = () => {
+    revisionRef.current += 1
+    setRevision(revisionRef.current)
+  }
+
+  /**
+   * `latexSourceRef` mirrors `latexSource` for the same reason, and closes a
+   * second defect of the same shape: `restoreSnapshot` set the source and then
+   * saved in the same tick, so the write carried the source the restore had
+   * just replaced. The restored version reached the database only because the
+   * stale revision stamp left the editor dirty and the debounce re-sent it.
+   * Fixing one without the other would have made the restore silently discard
+   * the version being restored.
+   */
+  const latexSourceRef = useRef(latexSource)
+  const setSource = (next: string) => {
+    latexSourceRef.current = next
+    setLatexSource(next)
+    markDirty()
+  }
   const [lastSavedAt, setLastSavedAt] = useState(draft.updated_at)
   const [cdnAvailable, setCdnAvailable] = useState(false)
   const cdnCheckRef = useRef(false)
@@ -115,8 +145,17 @@ export function LatexResumeEditor({
 
   useEffect(() => {
     setTitle(draft.title)
-    setLatexSource(normalizeLatexSource(draft.content))
+    latexSourceRef.current = normalizeLatexSource(draft.content)
+    setLatexSource(latexSourceRef.current)
     setLastSavedAt(draft.updated_at)
+    // Cross-file invariant: `cv/page.tsx` renders the editor with
+    // `key={draft.id}`, so switching CVs remounts rather than reusing this
+    // component and this reset is belt-and-braces. If that key is ever
+    // dropped, a save still in flight from the previous CV can land after the
+    // counters are zeroed and stamp `savedRevision` above `revision`, which
+    // strands the editor permanently dirty. Keep the key, or make this reset
+    // cancel the in-flight save.
+    revisionRef.current = 0
     setRevision(0)
     setSavedRevision(0)
   }, [draft.id])
@@ -128,13 +167,15 @@ export function LatexResumeEditor({
 
   /** Resolves to whether the write landed, matching the Word editor. */
   const saveDraft = async (notify = false): Promise<boolean> => {
-    // Captured before the await: this is the revision the write carries.
-    const writing = revision
+    // Both read from refs, not state: a caller that changed the source and
+    // marked the editor dirty in this same tick has not re-rendered yet.
+    const writing = revisionRef.current
+    const source = latexSourceRef.current
     setIsSaving(true)
     try {
       const updated = await onPersistDraft(draft.id, title.trim() || 'Untitled CV', 'latex', {
         type: 'latex',
-        source: latexSource,
+        source,
       })
       setLastSavedAt(updated.updated_at)
       // Never rewind: an older overlapping save landing second must not
@@ -153,7 +194,7 @@ export function LatexResumeEditor({
   const createSnapshotForAutosave = async () => {
     if (!user) return
     try {
-      await createSnapshot(draft.id, user.id, { type: 'latex', source: latexSource })
+      await createSnapshot(draft.id, user.id, { type: 'latex', source: latexSourceRef.current })
     } catch (err) {
       // Silently fail for snapshots - don't interrupt user workflow
       console.error('Snapshot failed:', err)
@@ -197,8 +238,7 @@ export function LatexResumeEditor({
   }
 
   const resetTemplate = () => {
-    setLatexSource(DEFAULT_LATEX_SOURCE)
-    markDirty()
+    setSource(DEFAULT_LATEX_SOURCE)
     info('Template reset', 'The editor has been reset to the starter template.')
   }
 
@@ -207,15 +247,13 @@ export function LatexResumeEditor({
       showError('Invalid template', 'Cannot apply Word template to LaTeX editor')
       return
     }
-    setLatexSource((template.content as { source: string }).source)
-    markDirty()
+    setSource((template.content as { source: string }).source)
     success('Template applied', `"${template.name}" template has been applied.`)
   }
 
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'latex') {
-      setLatexSource((content as { source: string }).source)
-      markDirty()
+      setSource((content as { source: string }).source)
       await saveDraft(false)
     }
   }
@@ -285,8 +323,7 @@ export function LatexResumeEditor({
           <textarea
             value={latexSource}
             onChange={(e) => {
-              setLatexSource(e.target.value)
-              markDirty()
+              setSource(e.target.value)
             }}
             className="h-[540px] w-full resize-y rounded-md border border-border-default bg-bg-canvas px-3 py-2 font-mono text-body-s text-text-primary focus-visible:border-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30"
             spellCheck={false}

@@ -39,6 +39,13 @@ const MODE_LABELS: Record<ResumeSummary['mode'], string> = {
  * `route-states` uses `status-rejected-mark` for a generic page error. What
  * must not appear here is a status, not a hue.
  *
+ * The version column has three answers for the same reason, and deliberately
+ * uses the words the expanded panel uses: a number, "Unnumbered" for a
+ * snapshot written before the version column was backfilled, and "No versions"
+ * only when the CV genuinely has no history. A row that said "No versions"
+ * above a panel listing one entry was the same two-surfaces-disagree defect as
+ * numbering snapshots by list position.
+ *
  * `updated_at` is `TIMESTAMPTZ` -- a real instant, not a bare DATE -- so it
  * goes through `formatTouchedDate`, which reads it in the viewer's zone.
  * Reading it in UTC would name yesterday for a third of every day at UTC+8.
@@ -79,10 +86,12 @@ export function DocumentRow({ doc, className, ...props }: DocumentRowProps) {
         ) : (
           <span className="text-body-s text-text-muted">Not checked</span>
         )}
-        {doc.version === null ? (
-          <span className="text-body-s text-text-muted">No versions</span>
-        ) : (
+        {doc.version !== null ? (
           <span className="tabular text-body-s text-text-secondary">v{doc.version}</span>
+        ) : doc.hasVersions ? (
+          <span className="text-body-s text-text-muted">Unnumbered</span>
+        ) : (
+          <span className="text-body-s text-text-muted">No versions</span>
         )}
         <time dateTime={doc.updated_at} className="tabular text-body-s text-text-muted">
           {formatTouchedDate(doc.updated_at)}
