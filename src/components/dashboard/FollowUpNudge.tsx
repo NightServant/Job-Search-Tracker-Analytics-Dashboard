@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { formatShortDate } from '@/services/date'
+import { formatTouchedDate } from '@/services/date'
 import type { StaleCandidate } from '@/services/followUp'
 
 /**
@@ -17,6 +17,12 @@ import type { StaleCandidate } from '@/services/followUp'
  * -- `candidate.id` is the job id, and this is the one element on the
  * dashboard whose entire purpose is "go deal with THIS application," so
  * landing anywhere less specific defeats it.
+ *
+ * `last_touched_at` is formatted with `formatTouchedDate`, not
+ * `formatShortDate`/`formatAppliedDate` -- it is typically a `TIMESTAMPTZ`
+ * instant (see that function's docblock in `services/date.ts`), and this
+ * card's whole job is telling the viewer how long it's been sitting, which a
+ * UTC read gets wrong for part of every day outside UTC.
  */
 export function FollowUpNudge({ stale }: { stale: StaleCandidate[] }) {
   if (stale.length === 0) return null
@@ -34,7 +40,7 @@ export function FollowUpNudge({ stale }: { stale: StaleCandidate[] }) {
               {candidate.company} — {candidate.role}
             </Link>
             <time className="tabular shrink-0 text-body-s text-text-muted">
-              since {formatShortDate(candidate.last_touched_at)}
+              since {formatTouchedDate(candidate.last_touched_at)}
             </time>
           </li>
         ))}

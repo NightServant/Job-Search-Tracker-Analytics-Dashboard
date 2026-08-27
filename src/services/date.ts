@@ -34,3 +34,32 @@ export function formatShortDate(iso: string): string {
 export function formatAppliedDate(dateApplied: string | null): string {
   return dateApplied ? formatShortDate(dateApplied) : 'Not applied'
 }
+
+/**
+ * The last-touched column specifically: `last_touched_at` (built in
+ * `Dashboard.tsx` as `job.updated_at || job.date_applied || job.created_at`)
+ * is, in the common case, `updated_at` -- a `TIMESTAMPTZ DEFAULT NOW()` (see
+ * `supabase/migrations/20260821042747_create_jobs_table_with_rls.sql`), a
+ * real instant, not a calendar day.
+ *
+ * That is the opposite of `date_applied`, the bare `DATE` that
+ * `formatAppliedDate` (via `formatShortDate`) deliberately reads in UTC so a
+ * dateless day never shifts. An instant has no such ambiguity to protect
+ * against -- it names a specific moment -- so converting it to a calendar day
+ * must use the *viewer's* local zone, or the day is simply wrong for anyone
+ * materially east or west of UTC. That distinction matters most here because
+ * `FollowUpNudge`'s whole point is "how long has this been sitting," and a
+ * UTC read flips to the wrong day for up to a third of the clock depending on
+ * the viewer's offset.
+ *
+ * Do not point this at `date_applied` or any other bare `DATE` column, and do
+ * not fold this back into `formatShortDate` -- the two column types need
+ * opposite zone handling, and collapsing them is the exact regression this
+ * function exists to undo.
+ */
+export function formatTouchedDate(iso: string): string {
+  return new Date(iso).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+  })
+}
