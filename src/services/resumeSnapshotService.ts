@@ -35,6 +35,112 @@ const MAX_SNAPSHOTS_PER_RESUME = 10
 /** Postgres `unique_violation`. The one error here that is worth retrying. */
 const UNIQUE_VIOLATION = '23505'
 
+export type SnapshotOutcome = 'written' | 'skipped-unchanged' | 'skipped-too-soon'
+
+/**
+ * Minimum gap between two autosave-triggered snapshots of the same resume.
+ *
+ * Autosave fires a snapshot on every 5-second typing pause (see commit
+ * `e407db1`), which is real database traffic that never existed before and
+ * retention that was nearly worthless: ten snapshots taken seconds apart cover
+ * roughly the last 50 seconds of editing. Five minutes between writes and a
+ * cap of ten (`MAX_SNAPSHOTS_PER_RESUME`, unchanged) yields close to 50
+ * minutes of recoverable history instead -- strictly better coverage and far
+ * fewer writes, which is why the two are not in tension here.
+ */
+const SNAPSHOT_FLOOR_MS = 5 * 60 * 1000
+
+/**
+ * Deep-equality that does not depend on object key order.
+ *
+ * `content` is JSONB and comes back parsed -- a tiptap document for Word, or
+ * `{type:'latex', source}` for LaTeX -- and Postgres does not promise to
+ * return object keys in the order they were written. `JSON.stringify(a) ===
+ * JSON.stringify(b)` would treat two payloads that differ only in key order
+ * as different documents, which would defeat the delta guard below on the
+ * first round trip. This recursively sorts object keys before stringifying;
+ * arrays keep their original order because position inside an array is
+ * meaningful (e.g. paragraph order in a tiptap doc), unlike key order in an
+ * object.
+ */
+function canonicalize(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(canonicalize)
+  if (value && typeof value === 'object') {
+    const sorted: Record<string, unknown> = {}
+    for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+      sorted[key] = canonicalize((value as Record<string, unknown>)[key])
+    }
+    return sorted
+  }
+  return value
+}
+
+function contentEquals(a: unknown, b: unknown): boolean {
+  return JSON.stringify(canonicalize(a)) === JSON.stringify(canonicalize(b))
+}
+
+/** The minimal surface `maybeCreateSnapshot` needs from a Supabase client. */
+type SnapshotReaderClient = Pick<typeof supabase, 'from'>
+
+async function latestSnapshot(
+  client: SnapshotReaderClient,
+  resumeId: string,
+  userId: string
+): Promise<{ created_at: string; content: unknown } | null> {
+  const { data, error } = await client
+    .from('resume_snapshots')
+    .select('created_at, content')
+    .eq('resume_id', resumeId)
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw new Error(`Failed to read the latest snapshot: ${error.message}`)
+
+  return data as { created_at: string; content: unknown } | null
+}
+
+/**
+ * The cadence policy in front of `createSnapshot`.
+ *
+ * Three rules, in order:
+ *
+ * 1. Delta guard -- never write a snapshot identical to the latest existing
+ *    one for this resume. A pause with no change is not a version.
+ * 2. Time floor -- at most one autosave-triggered snapshot per resume per
+ *    five minutes (`SNAPSHOT_FLOOR_MS`). The first snapshot of a session has
+ *    no predecessor, so it is read as `null` and never blocked.
+ * 3. `force: true` (an explicit Save) bypasses the floor, because a
+ *    deliberate save is a real checkpoint the user is telling us matters --
+ *    but it is still subject to the delta guard, since saving unchanged
+ *    content on purpose is still not a new version.
+ *
+ * Numbering, the max+1 read, and the ten-snapshot prune all stay inside
+ * `createSnapshot`: this function only decides whether to call it.
+ */
+export async function maybeCreateSnapshot(
+  client: SnapshotReaderClient,
+  resumeId: string,
+  userId: string,
+  content: JSONContent | { type: 'latex'; source: string },
+  options: { force?: boolean } = {}
+): Promise<SnapshotOutcome> {
+  const latest = await latestSnapshot(client, resumeId, userId)
+
+  if (latest) {
+    if (contentEquals(latest.content, content)) return 'skipped-unchanged'
+
+    if (!options.force) {
+      const elapsed = Date.now() - new Date(latest.created_at).getTime()
+      if (elapsed < SNAPSHOT_FLOOR_MS) return 'skipped-too-soon'
+    }
+  }
+
+  await createSnapshot(resumeId, userId, content)
+  return 'written'
+}
+
 /**
  * The number the next snapshot of this CV should carry.
  *

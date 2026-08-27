@@ -34,7 +34,7 @@ vi.mock('@/lib/supabase', () => ({
   ),
 }))
 
-import { createSnapshot, getSnapshots } from '../resumeSnapshotService'
+import { createSnapshot, getSnapshots, maybeCreateSnapshot } from '../resumeSnapshotService'
 
 interface FakeTable {
   rows: Row[]
@@ -360,5 +360,154 @@ describe('getSnapshots', () => {
     await createSnapshot('cv-1', 'user-1', { type: 'doc' })
     const metas = await getSnapshots('cv-1', 'user-1')
     expect(metas.map((meta) => meta.version).sort()).toEqual([1, 2])
+  })
+})
+
+/**
+ * `maybeCreateSnapshot` is the cadence policy in front of `createSnapshot`:
+ * never write a snapshot identical to the latest one, and never write an
+ * autosave-triggered one more than once per five minutes -- unless it is the
+ * very first snapshot of the session, which has no predecessor to compare or
+ * throttle against.
+ *
+ * Every test here fixes the clock with `vi.setSystemTime` and back-dates the
+ * seeded snapshot's `created_at` relative to it, because the floor is a real
+ * wall-clock comparison and the fake table's default timestamps are neither
+ * "now" nor consistently before it.
+ */
+describe('maybeCreateSnapshot applies the cadence policy', () => {
+  const NOW = new Date('2026-08-27T12:00:00.000Z').getTime()
+  const FIVE_MIN = 5 * 60_000
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('writes the first snapshot of a session, since there is no predecessor to block it', async () => {
+    const table = install(fakeSnapshots())
+    const outcome = await maybeCreateSnapshot(table.client, 'cv-1', 'user-1', { type: 'doc', body: 'A' })
+    expect(outcome).toBe('written')
+    expect(table.rows).toHaveLength(1)
+  })
+
+  it('skips a snapshot whose content is identical to the latest one', async () => {
+    const table = install(
+      fakeSnapshots([
+        {
+          id: 'a',
+          version: 1,
+          content: { type: 'doc', body: 'A' },
+          created_at: new Date(NOW - 6 * 60_000).toISOString(),
+        },
+      ])
+    )
+    const outcome = await maybeCreateSnapshot(table.client, 'cv-1', 'user-1', { type: 'doc', body: 'A' })
+    expect(outcome).toBe('skipped-unchanged')
+    expect(table.rows).toHaveLength(1)
+  })
+
+  it('treats key order as irrelevant when comparing content, since JSONB does not promise to preserve it', async () => {
+    const table = install(
+      fakeSnapshots([
+        {
+          id: 'a',
+          version: 1,
+          content: { body: 'A', type: 'doc' },
+          created_at: new Date(NOW - 6 * 60_000).toISOString(),
+        },
+      ])
+    )
+    const outcome = await maybeCreateSnapshot(table.client, 'cv-1', 'user-1', { type: 'doc', body: 'A' })
+    expect(outcome).toBe('skipped-unchanged')
+    expect(table.rows).toHaveLength(1)
+  })
+
+  it('blocks an autosave-triggered snapshot inside the 5-minute floor', async () => {
+    const table = install(
+      fakeSnapshots([
+        {
+          id: 'a',
+          version: 1,
+          content: { type: 'doc', body: 'A' },
+          created_at: new Date(NOW - 2 * 60_000).toISOString(),
+        },
+      ])
+    )
+    const outcome = await maybeCreateSnapshot(table.client, 'cv-1', 'user-1', { type: 'doc', body: 'B' })
+    expect(outcome).toBe('skipped-too-soon')
+    expect(table.rows).toHaveLength(1)
+  })
+
+  it('writes once the 5-minute floor has passed', async () => {
+    const table = install(
+      fakeSnapshots([
+        {
+          id: 'a',
+          version: 1,
+          content: { type: 'doc', body: 'A' },
+          created_at: new Date(NOW - FIVE_MIN - 1).toISOString(),
+        },
+      ])
+    )
+    const outcome = await maybeCreateSnapshot(table.client, 'cv-1', 'user-1', { type: 'doc', body: 'B' })
+    expect(outcome).toBe('written')
+    expect(table.rows).toHaveLength(2)
+  })
+
+  it('lets an explicit save bypass the floor', async () => {
+    const table = install(
+      fakeSnapshots([
+        {
+          id: 'a',
+          version: 1,
+          content: { type: 'doc', body: 'A' },
+          created_at: new Date(NOW - 2 * 60_000).toISOString(),
+        },
+      ])
+    )
+    const outcome = await maybeCreateSnapshot(
+      table.client,
+      'cv-1',
+      'user-1',
+      { type: 'doc', body: 'B' },
+      { force: true }
+    )
+    expect(outcome).toBe('written')
+    expect(table.rows).toHaveLength(2)
+  })
+
+  it('still applies the delta guard to a forced save, since a deliberate save of unchanged content is not a new version', async () => {
+    const table = install(
+      fakeSnapshots([
+        {
+          id: 'a',
+          version: 1,
+          content: { type: 'doc', body: 'A' },
+          created_at: new Date(NOW - 2 * 60_000).toISOString(),
+        },
+      ])
+    )
+    const outcome = await maybeCreateSnapshot(
+      table.client,
+      'cv-1',
+      'user-1',
+      { type: 'doc', body: 'A' },
+      { force: true }
+    )
+    expect(outcome).toBe('skipped-unchanged')
+    expect(table.rows).toHaveLength(1)
+  })
+
+  it('still prunes to ten once enough forced, distinct snapshots accumulate', async () => {
+    const table = install(fakeSnapshots())
+    for (let i = 0; i < 11; i += 1) {
+      await maybeCreateSnapshot(table.client, 'cv-1', 'user-1', { type: 'doc', body: `v${i}` }, { force: true })
+    }
+    expect(table.rows).toHaveLength(10)
   })
 })

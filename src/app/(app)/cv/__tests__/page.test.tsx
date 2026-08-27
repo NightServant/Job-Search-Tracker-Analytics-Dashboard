@@ -20,6 +20,7 @@ const createMutate = vi.hoisted(() => vi.fn())
 const updateMutate = vi.hoisted(() => vi.fn())
 const deleteMutate = vi.hoisted(() => vi.fn())
 const createSnapshotMock = vi.hoisted(() => vi.fn())
+const maybeCreateSnapshotMock = vi.hoisted(() => vi.fn())
 const getSnapshotsMock = vi.hoisted(() => vi.fn())
 const getSnapshotMock = vi.hoisted(() => vi.fn())
 
@@ -45,6 +46,7 @@ vi.mock('@/contexts/ToastContext', () => ({
 
 vi.mock('@/services/resumeSnapshotService', () => ({
   createSnapshot: createSnapshotMock,
+  maybeCreateSnapshot: maybeCreateSnapshotMock,
   getSnapshots: getSnapshotsMock,
   getSnapshot: getSnapshotMock,
   deleteSnapshot: vi.fn(),
@@ -208,7 +210,13 @@ describe('the editor still saves', () => {
     await act(async () => {
       vi.advanceTimersByTime(5000)
     })
-    expect(createSnapshotMock).toHaveBeenCalledWith('cv-1', 'user-1', expect.anything())
+    expect(maybeCreateSnapshotMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'cv-1',
+      'user-1',
+      expect.anything(),
+      {}
+    )
   })
 
   it('saves LaTeX as latex-shaped content, not as a tiptap document', async () => {
@@ -238,6 +246,38 @@ describe('the editor still saves', () => {
       fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
     })
     expect(updateMutate).toHaveBeenCalled()
+  })
+
+  it('forces a checkpoint snapshot on an explicit Save, bypassing the 5-minute floor', async () => {
+    params('cv-1')
+    resolved(wordDraft())
+    render(<Page />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    })
+    expect(maybeCreateSnapshotMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'cv-1',
+      'user-1',
+      expect.anything(),
+      { force: true }
+    )
+  })
+
+  it('forces a checkpoint snapshot on an explicit Save for LaTeX too', async () => {
+    params('cv-2')
+    resolved(latexDraft())
+    render(<Page />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
+    })
+    expect(maybeCreateSnapshotMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'cv-2',
+      'user-1',
+      expect.anything(),
+      { force: true }
+    )
   })
 })
 
@@ -382,12 +422,18 @@ describe('snapshots survive the autosave that precedes them', () => {
     await act(async () => {
       vi.advanceTimersByTime(1200)
     })
-    expect(createSnapshotMock).not.toHaveBeenCalled()
+    expect(maybeCreateSnapshotMock).not.toHaveBeenCalled()
 
     await act(async () => {
       vi.advanceTimersByTime(3800)
     })
-    expect(createSnapshotMock).toHaveBeenCalledWith('cv-1', 'user-1', expect.anything())
+    expect(maybeCreateSnapshotMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'cv-1',
+      'user-1',
+      expect.anything(),
+      {}
+    )
   })
 })
 
@@ -515,15 +561,21 @@ describe('the LaTeX editor snapshots on the same schedule as the Word editor', (
       vi.advanceTimersByTime(1200)
     })
     expect(updateMutate).toHaveBeenCalledTimes(1)
-    expect(createSnapshotMock).not.toHaveBeenCalled()
+    expect(maybeCreateSnapshotMock).not.toHaveBeenCalled()
 
     await act(async () => {
       vi.advanceTimersByTime(3800)
     })
-    expect(createSnapshotMock).toHaveBeenCalledWith('cv-2', 'user-1', {
-      type: 'latex',
-      source: '\\section{Edited}',
-    })
+    expect(maybeCreateSnapshotMock).toHaveBeenCalledWith(
+      expect.anything(),
+      'cv-2',
+      'user-1',
+      {
+        type: 'latex',
+        source: '\\section{Edited}',
+      },
+      {}
+    )
   })
 })
 

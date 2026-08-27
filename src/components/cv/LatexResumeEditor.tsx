@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { supabase } from '@/lib/supabase'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import { TemplatePresetSelector } from './TemplatePresetSelector'
 import {
@@ -16,7 +17,7 @@ import {
   formatSaveTime,
   normalizeLatexSource,
 } from './content'
-import { createSnapshot } from '@/services/resumeSnapshotService'
+import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
 import type { ResumeTemplate } from '@/services/resumeTemplateService'
 import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeService'
 
@@ -191,14 +192,33 @@ export function LatexResumeEditor({
     }
   }
 
-  const createSnapshotForAutosave = async () => {
+  /**
+   * Routes every snapshot write through the cadence policy in
+   * `resumeSnapshotService`: never write one identical to the latest, and
+   * never write an autosave-triggered one more than once per five minutes.
+   * `{ force: true }` -- passed only from the explicit Save handler below --
+   * bypasses the floor but not the delta guard.
+   */
+  const writeSnapshot = async (options: { force?: boolean } = {}) => {
     if (!user) return
     try {
-      await createSnapshot(draft.id, user.id, { type: 'latex', source: latexSourceRef.current })
+      await maybeCreateSnapshot(
+        supabase,
+        draft.id,
+        user.id,
+        { type: 'latex', source: latexSourceRef.current },
+        options
+      )
     } catch (err) {
       // Silently fail for snapshots - don't interrupt user workflow
       console.error('Snapshot failed:', err)
     }
+  }
+
+  /** The explicit Save button: persists the draft, then forces a checkpoint snapshot. */
+  const handleSave = async () => {
+    const saved = await saveDraft(true)
+    if (saved) void writeSnapshot({ force: true })
   }
 
   useEffect(() => {
@@ -221,7 +241,7 @@ export function LatexResumeEditor({
     if (revision === 0) return
     if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
     snapshotTimerRef.current = window.setTimeout(() => {
-      void createSnapshotForAutosave()
+      void writeSnapshot()
     }, 5000)
     return () => {
       if (snapshotTimerRef.current) window.clearTimeout(snapshotTimerRef.current)
@@ -278,7 +298,7 @@ export function LatexResumeEditor({
           <RotateCcwIcon size={14} aria-hidden />
           Reset
         </Button>
-        <Button variant="secondary" size="s" onClick={() => void saveDraft(true)} disabled={isSaving}>
+        <Button variant="secondary" size="s" onClick={() => void handleSave()} disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
         <Button variant="secondary" size="s" onClick={copyLatex}>
