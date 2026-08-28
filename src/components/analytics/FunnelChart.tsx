@@ -43,6 +43,8 @@ export interface FunnelStageDatum {
   stage: Status
   count: number
   percentage: number
+  /** See `ConversionFunnelMetric.isExit`. `true` only for 'rejected'. */
+  isExit: boolean
 }
 
 /**
@@ -50,17 +52,17 @@ export interface FunnelStageDatum {
  * chart's own, sorted into pipeline order (wishlist -> applied ->
  * interviewing -> offer -> rejected).
  *
- * The service's `stage` field is a capitalized string ('Applied',
- * 'Interviewing', 'Offer') and -- this is a real gap in the service, not a
- * simplification here -- it never reports `wishlist` or `rejected` at all.
- * `_computeTimeToStatus`'s caller (`getConversionFunnel`) computes a
- * `rejected` count internally and then never puts it in the array it
- * returns. Fixing that is an `analyticsService` change, which is explicitly
- * out of scope for this task (see the range-picker ruling); flagged for a
- * follow-up rather than worked around here. Stages the service does not
- * report are left out of the chart rather than fabricated as a zero bar --
- * the same "do not fake it" principle the range-picker ruling applied to
- * ranges, one layer further down.
+ * The service now reports all five stages (fixed in Task 8's fix round --
+ * previously `wishlist` was never computed and `rejected` was computed then
+ * silently discarded). Stages the service does not report are still left out
+ * of the chart rather than fabricated as a zero bar, the same "do not fake
+ * it" principle the range-picker ruling applied to ranges -- this only
+ * matters for a caller passing a partial fixture, since production always
+ * returns all five now.
+ *
+ * `rejected` sorts last here (STATUSES order), but `isExit` is what
+ * `FunnelChart` actually uses to keep it out of the monotonic chain visually
+ * -- position alone must never be read as chain membership.
  */
 export function normalizeFunnel(metrics: ConversionFunnelMetric[]): FunnelStageDatum[] {
   const byStage = new Map<Status, ConversionFunnelMetric>()
@@ -70,7 +72,7 @@ export function normalizeFunnel(metrics: ConversionFunnelMetric[]): FunnelStageD
   }
   return STATUSES.filter((stage) => byStage.has(stage)).map((stage) => {
     const metric = byStage.get(stage)!
-    return { stage, count: metric.count, percentage: metric.percentage }
+    return { stage, count: metric.count, percentage: metric.percentage, isExit: metric.isExit }
   })
 }
 
@@ -84,6 +86,12 @@ export interface FunnelChartProps {
  * shadows, no rounded cards -- and a labelled bar keeps the count tabular
  * and the stage colour a flat rule, consistent with `StatusMarker` and
  * `KpiStat` elsewhere on this screen.
+ *
+ * `isExit` stages (currently just 'rejected') render in their own group
+ * below a hairline divider rather than as the next bar in the list --
+ * visually as well as structurally, a rejection is an exit from the funnel,
+ * not the fifth rung of a chain that is supposed to read top-to-bottom as
+ * monotonically non-increasing.
  */
 export function FunnelChart({ data }: FunnelChartProps) {
   if (data.length === 0) {
@@ -91,25 +99,34 @@ export function FunnelChart({ data }: FunnelChartProps) {
   }
 
   const max = Math.max(...data.map((d) => d.count), 1)
+  const chain = data.filter((d) => !d.isExit)
+  const exits = data.filter((d) => d.isExit)
+
+  const bar = (d: FunnelStageDatum) => (
+    <div key={d.stage} data-stage={d.stage} data-exit={d.isExit ? 'true' : undefined} className="flex items-center gap-3">
+      <span className="w-28 shrink-0 text-body-s text-text-secondary">{LABELS[d.stage]}</span>
+      <div className="h-2 flex-1 bg-bg-inset">
+        <div
+          data-fill={STAGE_FILL[d.stage]}
+          className="h-2"
+          style={{
+            width: `${Math.max((d.count / max) * 100, 2)}%`,
+            backgroundColor: STAGE_FILL[d.stage],
+          }}
+        />
+      </div>
+      <span className="tabular w-10 shrink-0 text-right text-body-s text-text-primary">{d.count}</span>
+    </div>
+  )
 
   return (
     <div className="flex flex-col gap-3">
-      {data.map((d) => (
-        <div key={d.stage} data-stage={d.stage} className="flex items-center gap-3">
-          <span className="w-28 shrink-0 text-body-s text-text-secondary">{LABELS[d.stage]}</span>
-          <div className="h-2 flex-1 bg-bg-inset">
-            <div
-              data-fill={STAGE_FILL[d.stage]}
-              className="h-2"
-              style={{
-                width: `${Math.max((d.count / max) * 100, 2)}%`,
-                backgroundColor: STAGE_FILL[d.stage],
-              }}
-            />
-          </div>
-          <span className="tabular w-10 shrink-0 text-right text-body-s text-text-primary">{d.count}</span>
+      <div className="flex flex-col gap-3">{chain.map(bar)}</div>
+      {exits.length > 0 && (
+        <div data-funnel-exits className="flex flex-col gap-3 border-t border-border-subtle pt-3">
+          {exits.map(bar)}
         </div>
-      ))}
+      )}
     </div>
   )
 }

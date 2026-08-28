@@ -16,6 +16,22 @@ export interface ConversionFunnelMetric {
   count: number
   percentage: number
   avgDaysToStage: number
+  /**
+   * `false` for every stage in the monotonically non-increasing pipeline
+   * chain -- Wishlist -> Applied -> Interviewing -> Offer. `count` there
+   * means "jobs that have EVER reached this stage or a later one" (see
+   * `getConversionFunnel`), so a later chain stage's count can never exceed
+   * an earlier one's.
+   *
+   * `true` only for the 'Rejected' entry. A rejection is an EXIT from the
+   * funnel at whatever stage it happened -- it is NOT a fifth rung of the
+   * chain, its count is not constrained to be <= 'Offer', and it must never
+   * be treated as though it continues the chain's descent (e.g. appended to
+   * a bar chart in pipeline-order as if it were the next stage down).
+   * Consumers branch on this flag; they must not infer chain membership
+   * from array position alone.
+   */
+  isExit: boolean
 }
 
 export interface ConversionMetrics {
@@ -130,8 +146,21 @@ export const analyticsService = {
   },
 
   /**
-   * Compute conversion funnel: wishlist -> applied -> interviewing -> offer
-   * Shows how many jobs move through each stage
+   * Compute the conversion funnel: Wishlist -> Applied -> Interviewing ->
+   * Offer, a monotonically non-increasing chain, PLUS Rejected reported
+   * separately as an exit from the chain rather than a fifth rung (see
+   * `ConversionFunnelMetric.isExit`).
+   *
+   * Each chain stage's `count` is "jobs that have EVER reached this stage or
+   * a later one" -- cumulative, not current-status-only. A job now at Offer
+   * still counts at Applied and Interviewing, and a job rejected AFTER
+   * reaching Interviewing still counts at Applied and Interviewing too.
+   * Current status alone cannot answer "did this job ever reach stage X" --
+   * only `job_status_history` can -- so history drives the chain and current
+   * status is used only as a fallback for jobs with no history rows at all
+   * (rows written before history capture existed). A currently-rejected job
+   * with no supporting history cannot be credited with unverified progress
+   * through Applied/Interviewing/Offer, so it falls back to Wishlist only.
    */
   async getConversionFunnel(userId: string): Promise<ConversionFunnelMetric[]> {
     try {
@@ -152,36 +181,96 @@ export const analyticsService = {
       const jobList = jobs ?? []
       const totalJobs = jobList.length
 
-      // Count jobs at each stage
-      const stageCounts = {
-        applied: jobList.filter((j) => j.status === 'applied' || jobList.some((x) => x.id === j.id && x.status !== 'wishlist')).length,
-        interviewing: jobList.filter((j) => j.status === 'interviewing').length,
-        offer: jobList.filter((j) => j.status === 'offer').length,
-        rejected: jobList.filter((j) => j.status === 'rejected').length,
+      // "Ever reached stage X" can only come from history -- current status
+      // answers "is it at stage X right now", which is exactly the question
+      // that let a job at Offer disappear from the Interviewing count.
+      const { data: history, error: historyError } = await supabase
+        .from('job_status_history')
+        .select('job_id, to_status')
+        .eq('user_id', userId)
+
+      if (historyError) throw historyError
+
+      const PIPELINE: JobStatus[] = ['wishlist', 'applied', 'interviewing', 'offer']
+      const pipelineIndex = (status: string): number => PIPELINE.indexOf(status as JobStatus)
+
+      // Highest pipeline stage each job's history shows it ever reached. A
+      // 'rejected' to_status does not advance this -- rejection is an exit,
+      // not progress along the chain.
+      const maxIndexByJob = new Map<string, number>()
+      for (const change of history ?? []) {
+        const idx = pipelineIndex(change.to_status)
+        if (idx < 0) continue
+        const seen = maxIndexByJob.get(change.job_id)
+        if (seen === undefined || idx > seen) maxIndexByJob.set(change.job_id, idx)
       }
 
-      // Compute time to each stage
+      const stageCounts = { wishlist: 0, applied: 0, interviewing: 0, offer: 0, rejected: 0 }
+
+      for (const job of jobList) {
+        if (job.status === 'rejected') stageCounts.rejected += 1
+
+        let maxIndex = maxIndexByJob.get(job.id)
+        if (maxIndex === undefined) {
+          // No history row put this job at a pipeline stage -- it predates
+          // history capture, or was rejected directly with no intermediate
+          // stage ever recorded. Fall back to current status; see docblock.
+          const currentIdx = pipelineIndex(job.status)
+          maxIndex = currentIdx >= 0 ? currentIdx : 0
+        }
+
+        for (let i = 0; i <= maxIndex; i++) {
+          const stage = PIPELINE[i] as 'wishlist' | 'applied' | 'interviewing' | 'offer'
+          stageCounts[stage] += 1
+        }
+      }
+
+      // Compute time to each stage independently -- these must NOT share a
+      // value; Applied and Interviewing previously both read
+      // timeToInterviewMs, so they always rendered the identical number.
+      const timeToAppliedMs = await this._computeTimeToStatus(userId, 'applied')
       const timeToInterviewMs = await this._computeTimeToStatus(userId, 'interviewing')
       const timeToOfferMs = await this._computeTimeToStatus(userId, 'offer')
+      const timeToRejectedMs = await this._computeTimeToStatus(userId, 'rejected')
+
+      const toDays = (ms: number | null): number => (ms ? Math.round(ms / (1000 * 60 * 60 * 24)) : 0)
+      const percentOf = (count: number): number => (totalJobs > 0 ? (count / totalJobs) * 100 : 0)
 
       const funnel: ConversionFunnelMetric[] = [
         {
+          stage: 'Wishlist',
+          count: stageCounts.wishlist,
+          percentage: percentOf(stageCounts.wishlist),
+          avgDaysToStage: 0, // the starting stage -- nothing is "time to reach" it
+          isExit: false,
+        },
+        {
           stage: 'Applied',
           count: stageCounts.applied,
-          percentage: totalJobs > 0 ? (stageCounts.applied / totalJobs) * 100 : 0,
-          avgDaysToStage: timeToInterviewMs ? Math.round(timeToInterviewMs / (1000 * 60 * 60 * 24)) : 0,
+          percentage: percentOf(stageCounts.applied),
+          avgDaysToStage: toDays(timeToAppliedMs),
+          isExit: false,
         },
         {
           stage: 'Interviewing',
           count: stageCounts.interviewing,
-          percentage: totalJobs > 0 ? (stageCounts.interviewing / totalJobs) * 100 : 0,
-          avgDaysToStage: timeToInterviewMs ? Math.round(timeToInterviewMs / (1000 * 60 * 60 * 24)) : 0,
+          percentage: percentOf(stageCounts.interviewing),
+          avgDaysToStage: toDays(timeToInterviewMs),
+          isExit: false,
         },
         {
           stage: 'Offer',
           count: stageCounts.offer,
-          percentage: totalJobs > 0 ? (stageCounts.offer / totalJobs) * 100 : 0,
-          avgDaysToStage: timeToOfferMs ? Math.round(timeToOfferMs / (1000 * 60 * 60 * 24)) : 0,
+          percentage: percentOf(stageCounts.offer),
+          avgDaysToStage: toDays(timeToOfferMs),
+          isExit: false,
+        },
+        {
+          stage: 'Rejected',
+          count: stageCounts.rejected,
+          percentage: percentOf(stageCounts.rejected),
+          avgDaysToStage: toDays(timeToRejectedMs),
+          isExit: true,
         },
       ]
 

@@ -2,7 +2,10 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { Analytics, type MetricState } from '../Analytics'
 import { FunnelChart, normalizeFunnel, STAGE_FILL } from '../FunnelChart'
+import { TimeInStage } from '../TimeInStage'
+import { SourceTrends } from '../SourceTrends'
 import { RangePicker } from '../RangePicker'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type {
   TimeInStageMetric,
   ConversionFunnelMetric,
@@ -11,7 +14,18 @@ import type {
   ConversionMetrics,
 } from '@/services/analyticsService'
 
-afterEach(cleanup)
+// Real hook by default everywhere in this file (matchMedia is mocked to
+// `matches: false` in src/test/setup.ts, so the real hook already returns
+// false) -- mocked here only so the colour/motion tests below can force
+// both branches deterministically without depending on that setup detail.
+vi.mock('@/hooks/usePrefersReducedMotion', () => ({
+  usePrefersReducedMotion: vi.fn(() => false),
+}))
+
+afterEach(() => {
+  cleanup()
+  vi.mocked(usePrefersReducedMotion).mockReturnValue(false)
+})
 
 // jsdom has no layout engine, so every element measures 0x0 by default.
 // Recharts' ResponsiveContainer reads this to size its SVG and, at 0x0,
@@ -46,14 +60,26 @@ const TIME_IN_STAGE: TimeInStageMetric[] = [
   { status: 'interviewing', avgDays: 9, medianDays: 8, minDays: 2, maxDays: 20, count: 5 },
 ]
 
-// The real analyticsService.getConversionFunnel only ever emits
-// Applied/Interviewing/Offer -- see FunnelChart.tsx's normalizeFunnel
-// docblock -- so this fixture matches what the hook actually returns, not
-// the full five-stage pipeline.
+// analyticsService.getConversionFunnel returns all five stages: the four
+// chain stages (isExit: false) plus Rejected, reported separately as an
+// exit rather than a fifth rung -- see FunnelChart.tsx's normalizeFunnel
+// docblock and ConversionFunnelMetric.isExit.
 const FUNNEL: ConversionFunnelMetric[] = [
-  { stage: 'Applied', count: 12, percentage: 100, avgDaysToStage: 3 },
-  { stage: 'Interviewing', count: 6, percentage: 50, avgDaysToStage: 9 },
-  { stage: 'Offer', count: 2, percentage: 16.7, avgDaysToStage: 21 },
+  { stage: 'Wishlist', count: 20, percentage: 100, avgDaysToStage: 0, isExit: false },
+  { stage: 'Applied', count: 12, percentage: 60, avgDaysToStage: 3, isExit: false },
+  { stage: 'Interviewing', count: 6, percentage: 30, avgDaysToStage: 9, isExit: false },
+  { stage: 'Offer', count: 2, percentage: 10, avgDaysToStage: 21, isExit: false },
+  { stage: 'Rejected', count: 5, percentage: 25, avgDaysToStage: 11, isExit: true },
+]
+
+// A subset fixture matching what an older service version (or a caller
+// that only tracked the middle of the pipeline) might supply -- exercises
+// normalizeFunnel's "drop stages we weren't given" behaviour independent of
+// the full FUNNEL fixture above.
+const PARTIAL_FUNNEL: ConversionFunnelMetric[] = [
+  { stage: 'Applied', count: 12, percentage: 100, avgDaysToStage: 3, isExit: false },
+  { stage: 'Interviewing', count: 6, percentage: 50, avgDaysToStage: 9, isExit: false },
+  { stage: 'Offer', count: 2, percentage: 16.7, avgDaysToStage: 21, isExit: false },
 ]
 
 const TRENDS: SourceConversionTrend[] = [
@@ -156,9 +182,38 @@ describe('Analytics', () => {
   })
 
   it('colours the funnel with the status palette, in pipeline order', () => {
-    const { container } = render(<FunnelChart data={normalizeFunnel(FUNNEL)} />)
+    const { container } = render(<FunnelChart data={normalizeFunnel(PARTIAL_FUNNEL)} />)
     const stages = [...container.querySelectorAll('[data-stage]')].map((s) => s.getAttribute('data-stage'))
     expect(stages).toEqual(['applied', 'interviewing', 'offer'])
+  })
+
+  it('renders all five stages -- the real service return shape now that fix 1 has landed -- in pipeline order, with Rejected handled as an exit rather than the chain\'s fifth rung', () => {
+    // task-8-report.md claimed this proof already existed; it did not --
+    // every prior fixture here had exactly the three stages the unfixed
+    // service returned, so no test ever constructed a five-stage datum.
+    const { container } = render(<FunnelChart data={normalizeFunnel(FUNNEL)} />)
+
+    const stages = [...container.querySelectorAll('[data-stage]')].map((s) => s.getAttribute('data-stage'))
+    expect(stages).toEqual(['wishlist', 'applied', 'interviewing', 'offer', 'rejected'])
+
+    // Palette: every bar's fill is the token for its OWN stage, not a
+    // shared or mismatched one.
+    for (const stage of stages) {
+      const fill = container.querySelector(`[data-stage="${stage}"] [data-fill]`)!.getAttribute('data-fill')
+      expect(fill).toBe(STAGE_FILL[stage as keyof typeof STAGE_FILL])
+    }
+
+    // Rejected is structurally separated from the chain, not appended to it
+    // as though it were the next descending bar.
+    const rejectedBar = container.querySelector('[data-stage="rejected"]')!
+    expect(rejectedBar.closest('[data-funnel-exits]')).toBeTruthy()
+    expect(rejectedBar.getAttribute('data-exit')).toBe('true')
+
+    for (const stage of ['wishlist', 'applied', 'interviewing', 'offer']) {
+      const bar = container.querySelector(`[data-stage="${stage}"]`)!
+      expect(bar.closest('[data-funnel-exits]')).toBeNull()
+      expect(bar.getAttribute('data-exit')).toBeNull()
+    }
   })
 
   it('never bakes a resolved colour for a funnel stage -- always the CSS token', () => {
@@ -216,6 +271,76 @@ describe('Analytics', () => {
   })
 })
 
+describe('TimeInStage', () => {
+  // Recharts' Animate wrapper (react-smooth) defers a bar's first paint to
+  // requestAnimationFrame when isAnimationActive is true, so a synchronous
+  // render/act cycle produces NO <path> inside .recharts-bar-rectangle at
+  // all -- not a zero-sized one, none. With isAnimationActive false the
+  // path commits synchronously on the very first render. That is a real,
+  // observable side effect of the prop -- proven below by using it two
+  // ways: to disable animation so the colour assertion can read the `fill`
+  // attribute at all, and as the assertion itself for the reduced-motion
+  // gate.
+
+  it('never bakes a resolved colour into a bar fill -- always the CSS token', () => {
+    // Same trap as FunnelChart's "never bakes a resolved colour" test:
+    // jsdom's getComputedStyle returns '' for custom properties, so a
+    // resolved-colour assertion could never fail. This reads the literal
+    // `fill` attribute Recharts writes to the DOM instead, which fails if
+    // STAGE_FILL[status] is swapped for a hardcoded hex like '#2563eb'.
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(true) // animation off so the bar commits synchronously
+    const { container } = render(<TimeInStage data={TIME_IN_STAGE} />)
+    const fills = [...container.querySelectorAll('.recharts-bar-rectangle path')].map((el) => el.getAttribute('fill'))
+    expect(fills.length).toBeGreaterThan(0)
+    for (const fill of fills) {
+      expect(fill).toMatch(/^var\(--color-status-[a-z]+-mark\)$/)
+    }
+  })
+
+  it('gates bar animation on the reduced-motion preference', () => {
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(false)
+    const animating = render(<TimeInStage data={TIME_IN_STAGE} />)
+    expect(animating.container.querySelectorAll('.recharts-bar-rectangle path').length).toBe(0)
+    animating.unmount()
+
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(true)
+    const still = render(<TimeInStage data={TIME_IN_STAGE} />)
+    expect(still.container.querySelectorAll('.recharts-bar-rectangle path').length).toBeGreaterThan(0)
+  })
+})
+
+describe('SourceTrends', () => {
+  it('never bakes a resolved colour into a line stroke -- always the CSS token', () => {
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(true) // animation off so the line commits synchronously
+    const { container } = render(<SourceTrends data={TRENDS} />)
+    const strokes = [...container.querySelectorAll('.recharts-line-curve')].map((el) => el.getAttribute('stroke'))
+    expect(strokes.length).toBeGreaterThan(0)
+    for (const stroke of strokes) {
+      expect(stroke).toMatch(/^var\(--color-(accent-default|text-muted)\)$/)
+    }
+  })
+
+  it('gates line animation on the reduced-motion preference', () => {
+    // Recharts' Line uses a different animation mechanism than Bar --
+    // the <path> is present on the very first synchronous render either
+    // way, but react-smooth's "draw the line in" effect starts it at
+    // stroke-dasharray="0px 0px" (invisible) when isAnimationActive is
+    // true, and omits the attribute entirely (the full stroke, immediately)
+    // when it's false. This fails if isAnimationActive is hardcoded either
+    // way regardless of reducedMotion.
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(false)
+    const animating = render(<SourceTrends data={TRENDS} />)
+    const animatingCurve = animating.container.querySelector('.recharts-line-curve')!
+    expect(animatingCurve.getAttribute('stroke-dasharray')).toBe('0px 0px')
+    animating.unmount()
+
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(true)
+    const still = render(<SourceTrends data={TRENDS} />)
+    const stillCurve = still.container.querySelector('.recharts-line-curve')!
+    expect(stillCurve.getAttribute('stroke-dasharray')).toBeNull()
+  })
+})
+
 describe('RangePicker', () => {
   it('offers the four windows the range maths supports, in that order', () => {
     render(<RangePicker value="all" onChange={() => {}} />)
@@ -225,17 +350,27 @@ describe('RangePicker', () => {
 })
 
 describe('normalizeFunnel', () => {
-  it('drops stages the service never reports rather than fabricating zero counts', () => {
-    // getConversionFunnel only ever returns Applied/Interviewing/Offer --
-    // wishlist and rejected are computed internally but never included in
-    // its return value. Faking those two in would be exactly the kind of
-    // "control that lies" ruling C warned against, one layer down.
-    const result = normalizeFunnel(FUNNEL)
+  it('drops stages it is not given rather than fabricating zero counts', () => {
+    // Defensive behaviour for a caller passing a partial datum -- production
+    // getConversionFunnel always returns all five stages as of Task 8's fix
+    // round. Faking missing stages in would be exactly the kind of "control
+    // that lies" ruling C warned against, one layer down.
+    const result = normalizeFunnel(PARTIAL_FUNNEL)
     expect(result.map((r) => r.stage)).toEqual(['applied', 'interviewing', 'offer'])
   })
 
   it('sorts into pipeline order regardless of the input order', () => {
-    const shuffled: ConversionFunnelMetric[] = [FUNNEL[2], FUNNEL[0], FUNNEL[1]]
+    const shuffled: ConversionFunnelMetric[] = [PARTIAL_FUNNEL[2], PARTIAL_FUNNEL[0], PARTIAL_FUNNEL[1]]
     expect(normalizeFunnel(shuffled).map((r) => r.stage)).toEqual(['applied', 'interviewing', 'offer'])
+  })
+
+  it('carries isExit through from the service so Rejected never gets read as chain membership', () => {
+    const result = normalizeFunnel(FUNNEL)
+    const byStage = Object.fromEntries(result.map((r) => [r.stage, r.isExit]))
+    expect(byStage.wishlist).toBe(false)
+    expect(byStage.applied).toBe(false)
+    expect(byStage.interviewing).toBe(false)
+    expect(byStage.offer).toBe(false)
+    expect(byStage.rejected).toBe(true)
   })
 })
