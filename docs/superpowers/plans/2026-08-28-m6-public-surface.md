@@ -47,7 +47,7 @@ roadmap, the "Consequence" column says which wins.
 |---|---|---|
 | `components.json` | **Exists** (`style: base-nova`, `iconLibrary: "@/components/icons"`, `registries: {}`) | The roadmap's "shadcn is not initialised" is **stale — the repo wins**. Do not run `shadcn init`. But `registries` is empty, so `@skiper-ui/<id>` will not resolve until the registry is added. Task 1 handles it. |
 | `src/components/v1/` | **Does not exist** | No Skiper component has ever been installed. Tasks 1 and 4 create it. |
-| `skiper4` / `skiper26` | **Never adopted.** `src/components/ui/theme-toggle.tsx` was written against skiper4's *technique* and its docblock states why skiper26 was declined (it mounts a second theme provider and pulls lucide). | The roadmap's "All four adopted components" is **wrong about two of them — the repo wins**. Attribution handling in Task 1; open question at the end. |
+| `skiper4` / `skiper26` | **Never adopted.** `src/components/ui/theme-toggle.tsx` was written against skiper4's *technique* and its docblock states why skiper26 was declined (it mounts a second theme provider and pulls lucide). | The roadmap's "All four adopted components" is **wrong about two of them — the repo wins**. Attribution handling in Task 1; open question 1. |
 | `useThemeToggle()` | **Does not exist.** No such export anywhere in `src`. | The roadmap's 6.1 line "skiper4's button driven by 4.6's `useThemeToggle()`" is **wrong — the repo wins**. The primitive is `ThemeToggle` from `@/components/ui/theme-toggle`, props `{ size?: 32 \| 44 }`, marked with `data-theme-toggle`. |
 | `framer-motion` | `^13.1.1`, real dependency | Roadmap correct. Used by `ThemeToggle` and `Reveal`. |
 | `next-themes` | `^0.4.6`, real dependency; `ThemeProvider attribute="class" defaultTheme="system" enableSystem` in `src/app/providers.tsx` | Roadmap correct. |
@@ -70,7 +70,7 @@ roadmap, the "Consequence" column says which wins.
 | `public/` | Contains only `vite.svg`. **No hero video, no poster, no screenshots.** | Every image the landing page and README need has to be produced. Tasks 2 and 7 have steps for it. |
 | `src/lib/env.ts` | `readRuntimeFlags(source)` is pure and testable; `nextPublicEnv()` lists each `NEXT_PUBLIC_*` as a literal property access, with a docblock explaining that Next only substitutes the literal text | Task 6 adds `NEXT_PUBLIC_DEMO_USER_IDS` **as a literal** in that function. A computed key or a spread yields an empty value in the browser bundle. |
 | `next.config.ts` | `pageExtensions: ['tsx','ts']`, `eslint.ignoreDuringBuilds: true`, one redirect `/jobs → /applications` | Task 2 does not need a new redirect; it replaces the `/` route file. |
-| `tsconfig.json` | `exclude` contains `src/**/__tests__/**` and `src/**/*.test.ts(x)` | **`tsc --noEmit` never typechecks test files.** Three required-prop violations survived a clean typecheck during M5 because of this. Every task in M6 runs the un-excluded typecheck in its verify step. |
+| `tsconfig.json` | `exclude` contains `src/**/__tests__/**` and `src/**/*.test.ts(x)` | **`tsc --noEmit` never typechecks test files.** Four type errors reached `main` through this hole during M5. **Task 0 closes it before any M6 code is written**, so every later task's verify step is a plain `npx tsc --noEmit`. |
 | Test suite | 655 unit tests at `cf26dfc` per the M5 ledger; `7d5bdfb` added a migration only. Integration suite is 19 and runs separately via `npm run test:integration`. | Re-measure with `npx vitest run` before Task 1 and record the real number; do not carry 655 forward as a claim. |
 | Design system primitives available | `button` (primary/secondary/ghost × m/s, `data-variant`), `input` + `PasswordInput`, `field`, `page-header` (`[data-body-header]`), `panel-section`, `route-states`, `status-marker`, `segmented-control`, `icon-button`, `spinner`, `theme-toggle` (`[data-theme-toggle]`), `nav-item`, `sidebar`, `breadcrumb`, `kpi-stat`, `job-card`, `application-row`, `kanban-column`, `ats-check` | The public surface composes these. It writes no new styling of its own except where a task's Files block creates a `ui/` component with a test. |
 
@@ -131,6 +131,24 @@ roadmap. `allowTouchMove: false`, `simulateTouch: false`, `loop: false`,
 `autoplay` off, driven by Swiper's `setProgress(0..1)` from the pinned
 section's scroll progress — never `slideNext()` on thresholds.
 
+**Mobile does not pin.** Settled by Gabe on 2026-08-28, closing the roadmap's
+one explicitly open question in 6.1a. Below 768px — `PIN_MIN_WIDTH_PX`, the
+same `md` breakpoint the sidebar and the kanban constraint already use — the
+hero and carousel sit in normal document flow. Pinning costs a full viewport on
+a 375x812 screen and is jankier under touch, which is the roadmap's own
+reasoning for calling normal flow a legitimate answer. Tested, not merely
+omitted.
+
+**The demo's front door is one click.** Settled by Gabe on 2026-08-28. The
+landing CTA signs the visitor into the seeded account and lands them on
+`/dashboard` — no printed credentials, no pre-filled form. The credentials are
+public by design and named `NEXT_PUBLIC_*` to say so; the boundary is
+`is_demo()` and the RESTRICTIVE `demo_block_*` policies, not secrecy.
+
+**The typecheck exclusion is repaired before any M6 code is written.** Settled
+by Gabe on 2026-08-28, as Task 0. It is the reason no task in this plan carries
+a second hand-rolled `tsc` invocation.
+
 **Under `prefers-reduced-motion` the carousel becomes a conventional one.**
 Settled by the roadmap. Pinning off, sections in normal flow, `allowTouchMove:
 true`, `simulateTouch: true`, nothing driving `setProgress`. `loop` stays
@@ -154,8 +172,7 @@ currently redirects to `/dashboard`, so today a signed-in visitor never sees
 meant to see, and a redirect that hides it from the only person who has an
 account is perverse. The navbar's `sign in` / `sign up` controls stay as drawn
 regardless of session, because reading auth state in the public route means the
-landing page can no longer be statically rendered. Surfaced as an open
-question at the end.
+landing page can no longer be statically rendered. Open question 2.
 
 **The hero ships poster-only on both breakpoints; the video element is built
 and gated behind a src.** Figma draws a background video on desktop and a
@@ -170,14 +187,16 @@ later is then a one-line change, not a rework.
 field there is no caret to smooth — the characters are dots — so the technique
 buys nothing there, while the redrawn caret would have to coexist with
 `PasswordInput`'s absolutely-positioned reveal control inside the same box.
-Surfaced as an open question at the end.
+Open question 3.
 
 **Attribution ships in Task 1, not Task 7.** The roadmap's discipline is that
 every external component adopted gets a README line *when it is adopted*. A
 gate test enforces it from the first commit, so 6.5's README rewrite cannot
 silently drop it.
 
-**Task order is fixed and mostly serial.** Task 1 precedes 2 and 3 (they render
+**Task order is fixed and mostly serial.** Task 0 precedes everything and is a
+hard gate: it repairs the typecheck, and every later task's verify step assumes
+it has run. Task 1 precedes 2 and 3 (they render
 the carousel). Task 2 precedes 3 (pinning needs sections to pin). Tasks 4–7 are
 independent of 1–3 but are not run in parallel: the M5 ledger records two
 concrete incidents from parallel agents sharing one working tree — a staged
@@ -186,6 +205,179 @@ contended `.next` builds, one of which reported every route at 0 B while
 claiming success. If parallel dispatch is wanted anyway, each agent gets its own
 git worktree per `superpowers:using-git-worktrees`, and no two agents run
 `npm run build` at once.
+
+---
+
+### Task 0: Un-exclude test files from the typecheck
+
+**Prerequisite, not an M6 deliverable.** Numbered 0 rather than renumbering the
+rest because it repairs pre-existing debt from M1–M5 and produces nothing on
+the public surface. Gabe settled this on 2026-08-28: it runs before Task 1.
+
+The exclusion has let a type error reach `main` four times. Twice in M5 as a
+required-prop violation — `job-card.tsx`'s `currency` fix missed a call site
+and `tsc` said nothing; then again on the `hasVersions` fixture field in
+`documents/__tests__/page.test.tsx`, caught by hand. The ledger records a third
+at run 2 and treats it as "no longer a tidiness question". The fourth cost is
+this plan: every one of the seven M6 tasks was carrying a second, hand-rolled
+`tsc` invocation with a duplicated flag list, which is ugly, easy to forget,
+and drifts from `tsconfig.json` the moment either changes. Closing the hole
+deletes all seven.
+
+**Files:**
+- Modify: `tsconfig.json` (remove three entries from `exclude`)
+- Create: `src/__tests__/tsconfigGuard.test.ts`
+- Modify: whatever the un-excluded typecheck reports — expected to be roughly fifteen errors across test files, but the real list comes from Step 2, not from this plan
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: a `tsc --noEmit` that covers `src/**/__tests__/**`. Every later task's verify step depends on this and on nothing else from here.
+
+- [ ] **Step 1: Record the baseline before touching anything**
+
+```bash
+npx tsc --noEmit; echo "exit=$?"
+npx vitest run 2>&1 | tail -5
+```
+
+Expected: exit 0, and a test count. Write both down. If `tsc` is already
+failing, stop — this task cannot distinguish errors it surfaced from errors
+that were already there.
+
+- [ ] **Step 2: Remove the exclusions and see the real damage**
+
+In `tsconfig.json`, delete these three entries from `exclude`, keeping
+`"src/test"` if the run in Step 3 shows it is load-bearing:
+
+```json
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx",
+    "src/**/__tests__/**"
+```
+
+Then:
+
+```bash
+npx tsc --noEmit 2>&1 | tee /tmp/m6-task0-errors.txt | tail -40
+grep -c "error TS" /tmp/m6-task0-errors.txt
+```
+
+Expected: a non-zero count, roughly fifteen. **The real list is whatever this
+prints.** Do not work from the estimate — the estimate is an estimate, and a
+brief on this branch has asserted file-level specifics it had not re-read three
+times already. Paste the actual error list into the task report.
+
+- [ ] **Step 3: Fix them, one class at a time, smallest first**
+
+Work the list by error code, not by file, so the same mistake is fixed the same
+way everywhere. Expected classes, in the order they are cheapest to close:
+
+| Class | Likely fix |
+|---|---|
+| `TS2741` / `TS2739` missing property in a fixture object | Add the field. This is the class that hid a Critical in M5 — the fix is the field, never a cast. |
+| `TS2345` argument type on a mock | Type the mock against the real signature. |
+| `TS7006` implicit `any` on a callback parameter | Annotate it. |
+| `TS2554` wrong argument count on a `vi.fn()` | Give the mock its real arity. |
+
+**Two rules, and they are the whole point of the task.** No `as any`, no
+`@ts-expect-error`, and no widening a fixture's type to make an error go away.
+A fixture that no longer matches the type it claims to be is exactly the defect
+this exclusion was hiding — silencing the compiler instead of fixing the
+fixture reinstates the hole with extra steps. If an error genuinely cannot be
+fixed without a cast, stop and report it rather than casting; that is a finding,
+not a chore.
+
+Second: **do not change production code to satisfy a test file.** If a test
+reveals that a production type is wrong, that is a real finding and goes back
+to Gabe. This task fixes tests.
+
+- [ ] **Step 4: Write the guard test**
+
+A config that was wrong for five milestones will be wrong again. This makes
+re-adding the exclusion a red test rather than a silent regression.
+
+```ts
+// src/__tests__/tsconfigGuard.test.ts
+import { readFileSync } from 'node:fs'
+import { describe, it, expect } from 'vitest'
+
+/**
+ * tsconfig.json excluded every test file from `tsc --noEmit` for five
+ * milestones. Four type errors reached main through it, including a fixture
+ * missing a required field -- the same shape as the inline-literal fixtures
+ * that hid a Critical for an entire milestone. Re-adding any of these entries
+ * should be a deliberate, visible act, not something a tooling change does
+ * quietly.
+ */
+describe('tsconfig.json', () => {
+  const raw = readFileSync('tsconfig.json', 'utf8')
+  // The file carries comments in some editors' hands; strip line comments
+  // before parsing rather than assuming strict JSON.
+  const config = JSON.parse(raw.replace(/^\s*\/\/.*$/gm, ''))
+
+  it('has an exclude array at all', () => {
+    // Positive companion: without this, deleting `exclude` entirely would make
+    // every assertion below pass while changing nothing about the typecheck.
+    expect(Array.isArray(config.exclude)).toBe(true)
+  })
+
+  it('still typechecks the app source it always did', () => {
+    expect(config.include).toContain('src')
+  })
+
+  it('does not exclude test files from the typecheck', () => {
+    const excluded: string[] = config.exclude
+    for (const pattern of excluded) {
+      expect(pattern, `tsconfig.json excludes "${pattern}", which hides test files from tsc`)
+        .not.toMatch(/__tests__|\.test\.tsx?$/)
+    }
+  })
+})
+```
+
+- [ ] **Step 5: Run it and prove it can fail**
+
+```bash
+npx vitest run src/__tests__/tsconfigGuard.test.ts
+```
+
+Expected: PASS, 3 tests.
+
+Then prove it has teeth the way M5's reviewers proved theirs: put
+`"src/**/__tests__/**"` back into `exclude`, run again, watch the third test go
+red, remove it, confirm green, and confirm `git diff tsconfig.json` shows only
+the intended removal.
+
+- [ ] **Step 6: Verify the whole thing**
+
+```bash
+npx tsc --noEmit; echo "exit=$?"
+npx vitest run
+npm run lint
+rm -rf .next && npm run build
+```
+
+Expected: `tsc` exit 0 — now covering the test suite — and a test count equal
+to Step 1's baseline plus 3. **The count must not go down.** A test that
+disappeared while fixing type errors is a test that was deleted rather than
+repaired, which is how M5 ended up with 47 phantom tests inflating every
+completion claim.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add tsconfig.json src/__tests__/tsconfigGuard.test.ts
+git add -u src
+git commit -m "fix: typecheck test files and guard the exclusion from coming back"
+```
+
+Then confirm nothing was left behind:
+
+```bash
+git status --short
+```
+
+Expected: clean.
 
 ---
 
@@ -218,7 +410,7 @@ git worktree per `superpowers:using-git-worktrees`, and no two agents run
       shadow: false
     }
     ```
-  - `carouselOptionsFor(reduced: boolean): SwiperCarouselOptions`
+  - `carouselOptionsFor(scrollDriven: boolean): SwiperCarouselOptions`
   - `SKIPER_ATTRIBUTION: AttributionEntry[]` from `@/lib/attribution`, where
     ```ts
     export interface AttributionEntry {
@@ -395,9 +587,12 @@ describe('carousel options', () => {
     expect(REDUCED_MOTION_OPTIONS.simulateTouch).toBe(true)
   })
 
-  it('picks the mode from the preference', () => {
-    expect(carouselOptionsFor(false)).toEqual(SCROLL_DRIVEN_OPTIONS)
-    expect(carouselOptionsFor(true)).toEqual(REDUCED_MOTION_OPTIONS)
+  it('picks the mode from whether scroll is driving, not from the preference', () => {
+    // Three things turn scroll-driving off -- reduced motion, a viewport below
+    // the pin breakpoint, and no pin at all -- and they must not each grow
+    // their own branch here. The carousel only ever asks "am I being driven?"
+    expect(carouselOptionsFor(true)).toEqual(SCROLL_DRIVEN_OPTIONS)
+    expect(carouselOptionsFor(false)).toEqual(REDUCED_MOTION_OPTIONS)
   })
 
   it('never ships the creative effect shadow', () => {
@@ -420,11 +615,17 @@ Expected: FAIL — `Failed to resolve import "../carouselOptions"`.
 /**
  * The two Swiper configurations the landing carousel runs in.
  *
- * Touch is the only thing that differs, and it is what selects the mode. In
- * the scroll-driven mode page scroll advances the slides while the section is
- * pinned, so direct manipulation is off and would fight the scroll. Under
- * prefers-reduced-motion the pin is gone and nothing drives setProgress, so
- * touch is the only way through and must come back.
+ * Touch is the only thing that differs, and the selector is a single question:
+ * is scroll driving this carousel right now? When it is, the section is pinned
+ * and page scroll advances the slides, so direct manipulation is off and would
+ * only fight the scroll. When it is not -- under prefers-reduced-motion, or
+ * below the pin breakpoint, where mobile never pins at all -- nothing drives
+ * setProgress, so touch is the only way through and must come back.
+ *
+ * Keyed on `scrollDriven` rather than on `reduced` deliberately. Two separate
+ * conditions turn pinning off and a third could be added later; each one
+ * growing its own branch here is how the reduced-motion path and the mobile
+ * path drift into disagreeing about the same carousel.
  *
  * loop is false in both. The scroll-driven path needs a last slide so the pin
  * can release deterministically; a conventional carousel does not benefit
@@ -463,8 +664,8 @@ export const REDUCED_MOTION_OPTIONS: SwiperCarouselOptions = {
   shadow: false,
 }
 
-export function carouselOptionsFor(reduced: boolean): SwiperCarouselOptions {
-  return reduced ? REDUCED_MOTION_OPTIONS : SCROLL_DRIVEN_OPTIONS
+export function carouselOptionsFor(scrollDriven: boolean): SwiperCarouselOptions {
+  return scrollDriven ? SCROLL_DRIVEN_OPTIONS : REDUCED_MOTION_OPTIONS
 }
 ```
 
@@ -602,19 +803,18 @@ component's source ships here, so neither carries an attribution obligation;
 both are named because the ideas are theirs.
 ```
 
-- [ ] **Step 15: Run the whole suite and the un-excluded typecheck**
+- [ ] **Step 15: Run the whole suite, the typecheck and the build**
 
 ```bash
 npx vitest run
 npx tsc --noEmit
-npx tsc --noEmit --project /dev/null 2>/dev/null || npx tsc --noEmit src/lib/__tests__/attribution.test.ts --jsx react-jsx --moduleResolution bundler --module esnext --target es2020 --skipLibCheck --noEmit
 npm run build
 ```
 
-Expected: green, exit 0, clean build. The third command exists because
-`tsconfig.json` excludes `src/**/__tests__/**`, so the plain `tsc --noEmit`
-does not typecheck any test file — three required-prop violations survived a
-"clean typecheck" during M5 for exactly this reason. Record the new test count.
+Expected: green, exit 0, clean build. `tsc --noEmit` now covers the test files
+too, because Task 0 removed the `src/**/__tests__/**` exclusion — so a fixture
+missing a required field fails here rather than reaching `main`. Record the new
+test count.
 
 - [ ] **Step 16: Commit**
 
@@ -651,7 +851,7 @@ sees it — is the thing that exists before the pinned path is layered on top.
 
 **Interfaces:**
 - Consumes: `SKIPER_ATTRIBUTION` from `@/lib/attribution` (Task 1);
-  `carouselOptionsFor` from `@/components/landing/carouselOptions` (Task 1);
+  `carouselOptionsFor(scrollDriven)` from `@/components/landing/carouselOptions` (Task 1);
   the skiper51 component from `@/components/v1/skiper51` (Task 1);
   `Button` from `@/components/ui/button` (`variant: 'primary' | 'secondary' | 'ghost'`, `size: 'm' | 's'`, emits `data-variant`);
   `ThemeToggle` from `@/components/ui/theme-toggle` (`size?: 32 | 44`, emits `data-theme-toggle`);
@@ -986,9 +1186,11 @@ all of them enforced by the Global Constraints above:
   authenticated shell, where `TopBar` already owns that landmark and M5 Task 7
   correctly refused a second one.
 - `ScreenCarousel` renders the skiper51 component with
-  `{...carouselOptionsFor(reduced)}` and `onSwiper` forwarded to its own
+  `{...carouselOptionsFor(scrollDriven)}` and `onSwiper` forwarded to its own
   `onSwiper` prop, plus two arrow buttons labelled exactly
-  `Previous screen` / `Next screen`.
+  `Previous screen` / `Next screen`. In this task `scrollDriven` is always
+  `false` — nothing is pinned yet, so the carousel is conventional and
+  touchable. Task 3 is what starts passing `true`.
 - `SiteFooter` maps `SKIPER_ATTRIBUTION` to `<li>{entry.credit}</li>` and
   renders one `ThemeToggle`.
 - `Landing` composes: `StickyNavbar`, `Hero`, `ScreenCarousel`, `AtsSection`,
@@ -1037,24 +1239,16 @@ size. A 0 B route means a contended `.next` — the M5 ledger records that
 happening twice, both times reporting success while proving nothing. If any
 route reads 0 B, `rm -rf .next` and build again before believing it.
 
-- [ ] **Step 12: Run the whole suite and both typechecks**
+- [ ] **Step 12: Run the whole suite and the typecheck**
 
 ```bash
 npx vitest run
 npx tsc --noEmit
 ```
 
-Then typecheck the new test files explicitly, since `tsconfig.json` excludes
-them:
-
-```bash
-npx tsc --noEmit --jsx react-jsx --moduleResolution bundler --module esnext \
-  --target es2020 --strict --skipLibCheck --esModuleInterop \
-  --paths '{"@/*":["./src/*"]}' --baseUrl . \
-  src/components/landing/__tests__/*.tsx
-```
-
-Expected: green, exit 0 from both.
+Expected: green, exit 0. The typecheck covers
+`src/components/landing/__tests__/` as well as the components, because Task 0
+un-excluded test files from `tsconfig.json`.
 
 - [ ] **Step 13: Commit**
 
@@ -1078,6 +1272,25 @@ while scroll advances them, then unpin. The word "pin" appears in every
 identifier and comment in this task so nobody builds depth-layer parallax by
 mistake.
 
+**Settled: mobile does not pin.** Gabe decided this on 2026-08-28, closing the
+roadmap's one explicitly open question here. Below 768px the hero and carousel
+sit in normal document flow, exactly as they do under reduced motion. The
+roadmap's own reasoning stands: pinning costs a full viewport on a 375x812
+screen and is jankier under touch, and normal flow is a legitimate answer. This
+is a behavioural claim, so it is tested rather than merely omitted — an
+untested claim is the thing this milestone's history says rots.
+
+That decision also **removes work rather than adding it**. The roadmap turned
+touch off partly to resolve a scroll-versus-gesture conflict on mobile, where
+the vertical swipe that scrolls the page is the same gesture that would advance
+the carousel. With mobile never pinned, that conflict cannot arise: on mobile
+scroll never drives the carousel, so touch is simply on and the carousel is
+conventional. Nothing in this task needs a touch-arbitration path, a gesture
+threshold, or a `touch-action` override. `carouselOptionsFor` is keyed on
+`scrollDriven` for the same reason — three conditions now turn driving off
+(reduced motion, narrow viewport, not yet scrolled into the pin) and they
+collapse to one question rather than three branches.
+
 **Files:**
 - Create: `src/lib/pinnedScroll.ts`
 - Create: `src/lib/__tests__/pinnedScroll.test.ts`
@@ -1087,12 +1300,12 @@ mistake.
 - Create: `src/components/landing/__tests__/PinnedSequence.test.tsx`
 - Modify: `src/components/landing/Landing.tsx` (wrap Hero + ScreenCarousel in `PinnedSequence`)
 - Modify: `src/components/landing/Hero.tsx` (accept `unpinned` and pass it to `HeroMedia` as `paused`)
-- Modify: `src/components/landing/ScreenCarousel.tsx` (accept `onSwiper` and expose it upward)
+- Modify: `src/components/landing/ScreenCarousel.tsx` (accept `onSwiper` and `scrollDriven`, and expose the Swiper instance upward)
 
 **Interfaces:**
 - Consumes:
   - `usePrefersReducedMotion(): boolean` from `@/hooks/usePrefersReducedMotion` — already subscribes to `matchMedia` changes via `useSyncExternalStore`; this is the live read the roadmap requires and there must not be a second one.
-  - `carouselOptionsFor(reduced)`, `SCROLL_DRIVEN_OPTIONS`, `REDUCED_MOTION_OPTIONS` from Task 1.
+  - `carouselOptionsFor(scrollDriven)`, `SCROLL_DRIVEN_OPTIONS`, `REDUCED_MOTION_OPTIONS` from Task 1.
   - `Landing`'s `pinned` / `carouselProgress` / `heroUnpinned` props from Task 2.
   - `useScroll` and `useMotionValueEvent` from `framer-motion` ^13.1.1.
 - Produces:
@@ -1100,7 +1313,9 @@ mistake.
   // src/lib/pinnedScroll.ts
   export const HERO_HOLD_VIEWPORTS = 1
   export const CAROUSEL_HOLD_VIEWPORTS_PER_SLIDE = 0.8
+  export const PIN_MIN_WIDTH_PX = 768
   export function clamp01(n: number): number
+  export function shouldPin(reduced: boolean, viewportWidthPx: number): boolean
   export function heroPinHeightPx(viewportHeightPx: number): number
   export function carouselPinHeightPx(slideCount: number, viewportHeightPx: number): number
   export function carouselProgressFrom(sectionProgress: number): number
@@ -1115,9 +1330,14 @@ mistake.
   export function useCarouselProgress(
     swiper: DrivableSwiper | null,
     progress: number,
-    reduced: boolean
+    scrollDriven: boolean
   ): void
   ```
+  `PIN_MIN_WIDTH_PX` is 768 rather than a new number: it is the `md` breakpoint
+  the rest of this codebase already turns on, the same one that hides the
+  sidebar (`hidden md:flex`) and the one M5's "no kanban below 768px"
+  constraint uses. A landing-page-only breakpoint would be a second responsive
+  vocabulary.
   `DrivableSwiper` is our own structural type over the parts of Swiper's
   instance this code touches. It exists so tests can hand the hook a plain
   object; mounting Swiper in jsdom would test jsdom's lack of a layout engine,
@@ -1130,11 +1350,13 @@ mistake.
 import { describe, it, expect } from 'vitest'
 import {
   clamp01,
+  shouldPin,
   heroPinHeightPx,
   carouselPinHeightPx,
   carouselProgressFrom,
   navbarRevealed,
   CAROUSEL_HOLD_VIEWPORTS_PER_SLIDE,
+  PIN_MIN_WIDTH_PX,
 } from '../pinnedScroll'
 
 describe('clamp01', () => {
@@ -1147,6 +1369,35 @@ describe('clamp01', () => {
   it('clamps outside the range instead of extrapolating', () => {
     expect(clamp01(-3)).toBe(0)
     expect(clamp01(4)).toBe(1)
+  })
+})
+
+describe('shouldPin', () => {
+  it('pins a desktop viewport when motion is allowed', () => {
+    expect(shouldPin(false, 1440)).toBe(true)
+    expect(shouldPin(false, PIN_MIN_WIDTH_PX)).toBe(true)
+  })
+
+  it('never pins below the md breakpoint, whatever the motion preference', () => {
+    // Settled 2026-08-28: mobile does not pin. Pinning costs a full viewport
+    // on a 375x812 screen and is jankier under touch. Asserted rather than
+    // left untested -- an untested behavioural claim rots.
+    expect(shouldPin(false, 375)).toBe(false)
+    expect(shouldPin(true, 375)).toBe(false)
+    expect(shouldPin(false, PIN_MIN_WIDTH_PX - 1)).toBe(false)
+  })
+
+  it('never pins under reduced motion, whatever the viewport', () => {
+    // Scroll-jacking is a vestibular trigger. This is a hard requirement, and
+    // it must not be reachable around by resizing.
+    expect(shouldPin(true, 1440)).toBe(false)
+    expect(shouldPin(true, 3840)).toBe(false)
+  })
+
+  it('does not pin before the viewport width is known', () => {
+    // The width is 0 on the first render, before the measuring effect runs.
+    // Defaulting to pinned there would flash a pinned layout on a phone.
+    expect(shouldPin(false, 0)).toBe(false)
   })
 })
 
@@ -1254,6 +1505,36 @@ export function clamp01(n: number): number {
   return Math.min(1, Math.max(0, n))
 }
 
+/**
+ * The md breakpoint, and the only width this file knows about.
+ *
+ * Not a landing-page-specific number: it is what hides the sidebar
+ * (`hidden md:flex`) and where M5's "no kanban below 768px" constraint sits.
+ * A second responsive vocabulary for one page is how two parts of the same
+ * app disagree about what "mobile" means.
+ */
+export const PIN_MIN_WIDTH_PX = 768
+
+/**
+ * Whether the sequence pins at all.
+ *
+ * Two independent vetoes, and both are hard. prefers-reduced-motion is a
+ * vestibular accommodation and must not be reachable around by resizing. The
+ * width veto is a product decision settled 2026-08-28: mobile does not pin,
+ * because a hold costs a full viewport on a 375x812 screen and reads as jank
+ * under touch. It also removes the scroll-versus-gesture conflict outright --
+ * on mobile the carousel is simply conventional and touchable.
+ *
+ * A zero width means the measuring effect has not run yet. That resolves to
+ * NOT pinned, so the first paint on a phone is never a pinned layout that then
+ * collapses; the reverse default would flash exactly the wrong thing on the
+ * device this decision exists to protect.
+ */
+export function shouldPin(reduced: boolean, viewportWidthPx: number): boolean {
+  if (reduced) return false
+  return viewportWidthPx >= PIN_MIN_WIDTH_PX
+}
+
 export function heroPinHeightPx(viewportHeightPx: number): number {
   return viewportHeightPx * (1 + HERO_HOLD_VIEWPORTS)
 }
@@ -1292,7 +1573,7 @@ export function navbarRevealed(
 - [ ] **Step 4: Run it and watch it pass**
 
 Run: `npx vitest run src/lib/__tests__/pinnedScroll.test.ts`
-Expected: PASS, 10 tests.
+Expected: PASS, 14 tests.
 
 - [ ] **Step 5: Write the failing carousel-drive hook test**
 
@@ -1316,11 +1597,11 @@ function makeSwiper(): DrivableSwiper & { setProgress: ReturnType<typeof vi.fn> 
   }
 }
 
-describe('useCarouselProgress with motion allowed', () => {
+describe('useCarouselProgress while scroll is driving', () => {
   it('drives the carousel from the pinned section progress', () => {
     const swiper = makeSwiper()
     const { rerender } = renderHook(
-      ({ p }: { p: number }) => useCarouselProgress(swiper, p, false),
+      ({ p }: { p: number }) => useCarouselProgress(swiper, p, true),
       { initialProps: { p: 0 } }
     )
     expect(swiper.setProgress).toHaveBeenLastCalledWith(0)
@@ -1334,7 +1615,7 @@ describe('useCarouselProgress with motion allowed', () => {
 
   it('clamps rather than pushing Swiper past its last slide', () => {
     const swiper = makeSwiper()
-    renderHook(() => useCarouselProgress(swiper, 1.6, false))
+    renderHook(() => useCarouselProgress(swiper, 1.6, true))
     expect(swiper.setProgress).toHaveBeenLastCalledWith(1)
   })
 
@@ -1343,52 +1624,55 @@ describe('useCarouselProgress with motion allowed', () => {
     swiper.allowTouchMove = true
     swiper.params.allowTouchMove = true
     swiper.params.simulateTouch = true
-    renderHook(() => useCarouselProgress(swiper, 0, false))
+    renderHook(() => useCarouselProgress(swiper, 0, true))
     expect(swiper.allowTouchMove).toBe(false)
     expect(swiper.params.allowTouchMove).toBe(false)
     expect(swiper.params.simulateTouch).toBe(false)
   })
 })
 
-describe('useCarouselProgress under reduced motion', () => {
-  // The path that rots: nobody sees it unless they turn the setting on.
+describe('useCarouselProgress while scroll is NOT driving', () => {
+  // Reached three ways -- reduced motion, a viewport below 768px, and the
+  // moments before the section is pinned -- and the hook must not care which.
+  // This is the path that rots: on desktop with motion allowed, nobody sees it.
   it('stops driving progress entirely', () => {
     const swiper = makeSwiper()
     const { rerender } = renderHook(
-      ({ p, r }: { p: number; r: boolean }) => useCarouselProgress(swiper, p, r),
-      { initialProps: { p: 0.25, r: false } }
+      ({ p, d }: { p: number; d: boolean }) => useCarouselProgress(swiper, p, d),
+      { initialProps: { p: 0.25, d: true } }
     )
     expect(swiper.setProgress).toHaveBeenLastCalledWith(0.25)
     const callsBefore = swiper.setProgress.mock.calls.length
 
-    rerender({ p: 0.9, r: true })
+    rerender({ p: 0.9, d: false })
     expect(swiper.setProgress.mock.calls.length).toBe(callsBefore)
   })
 
   it('restores touch so the carousel is not frozen on slide one', () => {
-    // Without this, the users who opted out of motion get a carousel they
-    // cannot advance by any means.
+    // Without this, the users who opted out of motion -- and every mobile
+    // visitor, who never pins at all -- get a carousel they cannot advance by
+    // any means.
     const swiper = makeSwiper()
-    renderHook(() => useCarouselProgress(swiper, 0, true))
+    renderHook(() => useCarouselProgress(swiper, 0, false))
     expect(swiper.allowTouchMove).toBe(true)
     expect(swiper.params.allowTouchMove).toBe(true)
     expect(swiper.params.simulateTouch).toBe(true)
   })
 
-  it('flips touch back on when the preference changes mid-session', () => {
-    // Someone can change the OS setting with the page open. A value captured
-    // at mount silently strands them.
+  it('flips touch back on when driving stops mid-session', () => {
+    // Someone can change the OS motion setting with the page open, or rotate a
+    // tablet across the 768px line. A value captured at mount strands both.
     const swiper = makeSwiper()
     const { rerender } = renderHook(
-      ({ r }: { r: boolean }) => useCarouselProgress(swiper, 0.4, r),
-      { initialProps: { r: false } }
+      ({ d }: { d: boolean }) => useCarouselProgress(swiper, 0.4, d),
+      { initialProps: { d: true } }
     )
     expect(swiper.allowTouchMove).toBe(false)
 
-    rerender({ r: true })
+    rerender({ d: false })
     expect(swiper.allowTouchMove).toBe(true)
 
-    rerender({ r: false })
+    rerender({ d: true })
     expect(swiper.allowTouchMove).toBe(false)
   })
 })
@@ -1398,7 +1682,7 @@ describe('useCarouselProgress before Swiper has mounted', () => {
     // onSwiper fires after the first render, so the hook runs at least once
     // with null. Positive companion: the same hook with a real instance in the
     // tests above does call setProgress, so this is not vacuous.
-    expect(() => renderHook(() => useCarouselProgress(null, 0.5, false))).not.toThrow()
+    expect(() => renderHook(() => useCarouselProgress(null, 0.5, true))).not.toThrow()
   })
 })
 ```
@@ -1421,20 +1705,28 @@ import { carouselProgressFrom } from '@/lib/pinnedScroll'
  * Drives the PINNED carousel from the section's scroll progress, and switches
  * the whole component between its two modes.
  *
- * Scroll-driven mode: page scroll advances the slides while the section is
- * pinned, so direct manipulation is off -- a drag and a scroll are the same
- * gesture on touch and they would fight. setProgress(0..1) rather than
- * slideNext() on thresholds, because progress mapping is what makes the
- * movement track the scrollbar instead of snapping between slides.
+ * `scrollDriven` is the single question, not `reduced`. Three conditions turn
+ * driving off -- prefers-reduced-motion, a viewport below 768px (mobile does
+ * not pin, settled 2026-08-28), and simply not being inside the pin yet -- and
+ * the carousel behaves identically under all three. Branching on each would be
+ * three chances for the mobile path and the reduced-motion path to drift into
+ * disagreeing about the same component.
  *
- * Reduced-motion mode: the pin is gone, the section is in normal flow, nothing
- * drives progress, and touch comes back. Without that restoration the carousel
- * would be frozen on slide one for exactly the people who asked for less
- * motion.
+ * Driven: page scroll advances the slides while the section is pinned, so
+ * direct manipulation is off -- a drag and a scroll are the same gesture on
+ * touch and they would fight. setProgress(0..1) rather than slideNext() on
+ * thresholds, because progress mapping is what makes the movement track the
+ * scrollbar instead of snapping between slides.
  *
- * `reduced` arrives from usePrefersReducedMotion(), which subscribes to the
- * media query rather than reading it once, so changing the OS setting with the
- * page open re-runs both effects here.
+ * Not driven: the section is in normal flow, nothing drives progress, and touch
+ * comes back. Without that restoration the carousel would be frozen on slide
+ * one for everyone who asked for less motion AND every mobile visitor, which
+ * is most of them.
+ *
+ * The value ultimately derives from usePrefersReducedMotion() and a measured
+ * viewport width, both of which are subscribed rather than read once -- so
+ * changing the OS setting or crossing 768px with the page open re-runs both
+ * effects here.
  *
  * Swiper exposes allowTouchMove as an instance property that shadows
  * params.allowTouchMove; setting only the params object does not take effect
@@ -1449,19 +1741,19 @@ export interface DrivableSwiper {
 export function useCarouselProgress(
   swiper: DrivableSwiper | null,
   progress: number,
-  reduced: boolean
+  scrollDriven: boolean
 ): void {
   useEffect(() => {
     if (!swiper) return
-    swiper.allowTouchMove = reduced
-    swiper.params.allowTouchMove = reduced
-    swiper.params.simulateTouch = reduced
-  }, [swiper, reduced])
+    swiper.allowTouchMove = !scrollDriven
+    swiper.params.allowTouchMove = !scrollDriven
+    swiper.params.simulateTouch = !scrollDriven
+  }, [swiper, scrollDriven])
 
   useEffect(() => {
-    if (!swiper || reduced) return
+    if (!swiper || !scrollDriven) return
     swiper.setProgress(carouselProgressFrom(progress), 0)
-  }, [swiper, progress, reduced])
+  }, [swiper, progress, scrollDriven])
 }
 ```
 
@@ -1474,10 +1766,12 @@ lag the scrollbar, which is the snapping behaviour the roadmap rules out.
 Run: `npx vitest run src/components/landing/__tests__/useCarouselProgress.test.ts`
 Expected: PASS, 7 tests.
 
-Then prove the reduced-motion tests have teeth, the way M5's reviewers proved
-theirs: delete the `|| reduced` guard from the second effect, run again, and
-confirm "stops driving progress entirely" goes red. Restore, confirm green,
-confirm the file is byte-identical (`git diff --stat` shows nothing).
+Then prove the not-driven tests have teeth, the way M5's reviewers proved
+theirs: delete the `|| !scrollDriven` guard from the second effect, run again,
+and confirm "stops driving progress entirely" goes red. Restore, confirm green,
+confirm the file is byte-identical (`git diff --stat` shows nothing). That
+guard is what protects both the reduced-motion path and every mobile visitor,
+and neither is visible from a desktop browser with motion on.
 
 - [ ] **Step 9: Write the failing pinned-sequence test**
 
@@ -1529,11 +1823,11 @@ function installMatchMedia(initial = false) {
 
 afterEach(() => vi.clearAllMocks())
 
-describe('PinnedSequence with motion allowed', () => {
+describe('PinnedSequence on desktop with motion allowed', () => {
   it('pins both sections and allocates scroll distance for their holds', () => {
     const mm = installMatchMedia(false)
     render(
-      <PinnedSequence slideCount={5} viewportHeightPx={800}>
+      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={1440}>
         {() => <div>sections</div>}
       </PinnedSequence>
     )
@@ -1548,12 +1842,88 @@ describe('PinnedSequence with motion allowed', () => {
   })
 })
 
+describe('PinnedSequence on mobile', () => {
+  // Settled 2026-08-28: mobile does not pin. Asserted, not omitted -- "we
+  // decided not to do X" is a behavioural claim, and an untested one rots
+  // exactly the way this milestone's reduced-motion paths kept rotting.
+  it('never pins below the md breakpoint, even with motion allowed', () => {
+    const mm = installMatchMedia(false)
+    render(
+      <PinnedSequence slideCount={5} viewportHeightPx={812} viewportWidthPx={375}>
+        {() => <div>sections</div>}
+      </PinnedSequence>
+    )
+    const hero = screen.getByTestId('pinned-hero')
+    const carousel = screen.getByTestId('pinned-carousel')
+    expect(hero).toHaveAttribute('data-pinned', 'false')
+    expect(carousel).toHaveAttribute('data-pinned', 'false')
+    // Positive companion: the sections still render, they are just in flow.
+    expect(screen.getByText('sections')).toBeInTheDocument()
+    mm.restore()
+  })
+
+  it('allocates no extra scroll distance on mobile', () => {
+    // The whole cost of pinning on a 375x812 screen is the scroll distance.
+    // If the heights survive, the decision did not.
+    const mm = installMatchMedia(false)
+    render(
+      <PinnedSequence slideCount={5} viewportHeightPx={812} viewportWidthPx={375}>
+        {() => <div>sections</div>}
+      </PinnedSequence>
+    )
+    expect(screen.getByTestId('pinned-hero').style.height).toBe('')
+    expect(screen.getByTestId('pinned-carousel').style.height).toBe('')
+    mm.restore()
+  })
+
+  it('leaves the carousel touchable, because scroll is not driving it', () => {
+    // The roadmap turned touch off to resolve a scroll-versus-gesture conflict
+    // on mobile. With mobile never pinned that conflict cannot arise, so the
+    // carousel is simply conventional -- and this is the assertion that stops
+    // someone "restoring" the touch lock later for consistency with desktop.
+    const mm = installMatchMedia(false)
+    const seen: boolean[] = []
+    render(
+      <PinnedSequence slideCount={5} viewportHeightPx={812} viewportWidthPx={375}>
+        {(state) => {
+          seen.push(state.pinned)
+          return <div>sections</div>
+        }}
+      </PinnedSequence>
+    )
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen.every((pinned) => pinned === false)).toBe(true)
+    mm.restore()
+  })
+
+  it('starts pinning when a tablet crosses the breakpoint', () => {
+    // Positive companion to the three negatives above: proves the width gate
+    // is a gate and not a component that never pins at all.
+    const mm = installMatchMedia(false)
+    const { rerender } = render(
+      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={767}>
+        {() => <div>sections</div>}
+      </PinnedSequence>
+    )
+    expect(screen.getByTestId('pinned-hero')).toHaveAttribute('data-pinned', 'false')
+
+    rerender(
+      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={768}>
+        {() => <div>sections</div>}
+      </PinnedSequence>
+    )
+    expect(screen.getByTestId('pinned-hero')).toHaveAttribute('data-pinned', 'true')
+    mm.restore()
+  })
+})
+
 describe('PinnedSequence under reduced motion', () => {
   it('drops the pin entirely and lets the sections sit in normal flow', () => {
-    // Scroll-jacking is a vestibular trigger. This is a hard requirement.
+    // Scroll-jacking is a vestibular trigger. This is a hard requirement, and
+    // unlike the width gate it cannot be reached around by resizing.
     const mm = installMatchMedia(true)
     render(
-      <PinnedSequence slideCount={5} viewportHeightPx={800}>
+      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={1440}>
         {() => <div>sections</div>}
       </PinnedSequence>
     )
@@ -1568,7 +1938,7 @@ describe('PinnedSequence under reduced motion', () => {
   it('unpins live when the OS preference changes with the page open', () => {
     const mm = installMatchMedia(false)
     render(
-      <PinnedSequence slideCount={5} viewportHeightPx={800}>
+      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={1440}>
         {() => <div>sections</div>}
       </PinnedSequence>
     )
@@ -1592,7 +1962,7 @@ describe('PinnedSequence keyboard order', () => {
     // than on the CSS.
     const mm = installMatchMedia(false)
     render(
-      <PinnedSequence slideCount={2} viewportHeightPx={800}>
+      <PinnedSequence slideCount={2} viewportHeightPx={800} viewportWidthPx={1440}>
         {() => (
           <>
             <button>inside the pin</button>
@@ -1624,6 +1994,7 @@ import * as React from 'react'
 import { useScroll, useMotionValueEvent } from 'framer-motion'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import {
+  shouldPin,
   heroPinHeightPx,
   carouselPinHeightPx,
   carouselProgressFrom,
@@ -1641,10 +2012,18 @@ import {
  * framer-motion's useScroll is used ONLY to read a progress value inside an
  * already-pinned section; it never takes over scrolling.
  *
- * prefers-reduced-motion disables pinning entirely and the sections become
- * normal flow. Read live through usePrefersReducedMotion, which subscribes to
- * the media query -- someone can change the OS setting with the page open, and
- * a value captured at mount strands them.
+ * Two things disable pinning, and both are read live rather than captured at
+ * mount. prefers-reduced-motion, through usePrefersReducedMotion, which
+ * subscribes to the media query -- someone can change the OS setting with the
+ * page open. And viewport width: mobile does not pin (settled 2026-08-28),
+ * because a hold costs a full viewport on 375x812 and reads as jank under
+ * touch. Both funnel through shouldPin() so there is one answer, not two
+ * conditions that can disagree.
+ *
+ * Because mobile never pins, scroll never drives the carousel there, so the
+ * scroll-versus-gesture conflict the roadmap worried about on touch simply
+ * does not arise -- the carousel is conventional and touchable, with no
+ * arbitration logic anywhere in this file.
  *
  * The tall outer div is the scroll distance; the inner sticky div is what the
  * viewer sees held in place. Height comes from lib/pinnedScroll, not from the
@@ -1654,6 +2033,8 @@ export interface PinnedSequenceProps {
   slideCount: number
   /** Injectable so tests do not depend on jsdom's window size. */
   viewportHeightPx?: number
+  /** Injectable for the same reason. Below PIN_MIN_WIDTH_PX nothing pins. */
+  viewportWidthPx?: number
   children: (state: {
     pinned: boolean
     carouselProgress: number
@@ -1668,18 +2049,22 @@ export function PinnedSequence({
   children,
 }: PinnedSequenceProps) {
   const reduced = usePrefersReducedMotion()
-  const pinned = !reduced
 
-  const [measured, setMeasured] = React.useState(viewportHeightPx ?? 0)
+  // One resize subscription for both dimensions. Width decides whether we pin
+  // at all; height decides how much scroll a hold costs. Subscribed rather
+  // than read once, so rotating a tablet across 768px switches modes live.
+  const [measured, setMeasured] = React.useState({ w: 0, h: 0 })
   React.useEffect(() => {
-    if (viewportHeightPx !== undefined) return
-    const read = () => setMeasured(window.innerHeight)
+    if (viewportWidthPx !== undefined && viewportHeightPx !== undefined) return
+    const read = () => setMeasured({ w: window.innerWidth, h: window.innerHeight })
     read()
     window.addEventListener('resize', read)
     return () => window.removeEventListener('resize', read)
-  }, [viewportHeightPx])
+  }, [viewportWidthPx, viewportHeightPx])
 
-  const vh = viewportHeightPx ?? measured
+  const vh = viewportHeightPx ?? measured.h
+  const vw = viewportWidthPx ?? measured.w
+  const pinned = shouldPin(reduced, vw)
   const heroH = heroPinHeightPx(vh)
   const carouselH = carouselPinHeightPx(slideCount, vh)
 
@@ -1700,6 +2085,9 @@ export function PinnedSequence({
   const [revealed, setRevealed] = React.useState(false)
 
   useMotionValueEvent(carouselScroll, 'change', (v) => {
+    // Guarded rather than conditionally subscribed: hooks cannot be called
+    // conditionally, and a mobile viewport produces no meaningful progress
+    // anyway because nothing is sticky.
     if (!pinned) return
     setCarouselProgress(carouselProgressFrom(v))
     setRevealed(navbarRevealed(window.scrollY, heroH, carouselH))
@@ -1768,7 +2156,7 @@ still render.
 - [ ] **Step 12: Run the pinned-sequence test and watch it pass**
 
 Run: `npx vitest run src/components/landing/__tests__/PinnedSequence.test.tsx`
-Expected: PASS, 4 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 13: Write the failing hero-video pause test**
 
@@ -1832,17 +2220,27 @@ Then modify `Landing.tsx` to wrap `Hero` and `ScreenCarousel` in
 `carouselProgress` into `ScreenCarousel`, and `navbarRevealed` into
 `StickyNavbar`'s `revealed`. `ScreenCarousel` captures the Swiper instance via
 `onSwiper` into local state and calls
-`useCarouselProgress(swiper, carouselProgress, reduced)`.
+`useCarouselProgress(swiper, carouselProgress, scrollDriven)`.
 
-- [ ] **Step 15: Run the whole suite and both typechecks**
+**`scrollDriven` is `PinnedSequence`'s `pinned`, passed straight down — do not
+recompute it.** `ScreenCarousel` must not call `usePrefersReducedMotion()` or
+read a width itself. One component deciding it is pinned while another decides
+it is not is the same defect class as M5's sidebar and bottom nav each deriving
+their own active route and disagreeing, which needed a fix round; the ruling
+there was that the parent computes once and both consume. It applies here for
+the same reason.
+
+`StickyNavbar` also needs `revealed` to be `true` on mobile from the start: with
+no pin there is no "after the hero" moment, so a navbar that waits for one
+never appears. `PinnedSequence`'s unpinned branch already returns
+`navbarRevealed: true`; confirm `Landing` passes that through rather than
+recomputing from `window.scrollY`.
+
+- [ ] **Step 15: Run the whole suite, the typecheck and the build**
 
 ```bash
 npx vitest run
 npx tsc --noEmit
-npx tsc --noEmit --jsx react-jsx --moduleResolution bundler --module esnext \
-  --target es2020 --strict --skipLibCheck --esModuleInterop \
-  --paths '{"@/*":["./src/*"]}' --baseUrl . \
-  src/components/landing/__tests__/*.tsx src/lib/__tests__/pinnedScroll.test.ts
 rm -rf .next && npm run build
 ```
 
@@ -1862,8 +2260,13 @@ scroll-jacking. In a browser:
 3. Turn on Reduce Motion in the OS **with the page open**. The pin must drop,
    the sections must fall into normal flow, and touch and arrows must both
    work. Turn it off again; pinning must come back.
-4. Repeat at 375px. Record whether mobile pinning is acceptable — see the open
-   questions.
+4. Repeat at 375px, where **nothing should pin**. The hero and carousel scroll
+   past like ordinary sections, the carousel swipes under the thumb, the arrows
+   still work, and the navbar is present from the top rather than waiting for a
+   reveal that never comes. If the page feels identical to the desktop pinned
+   version, the width gate is not wired.
+5. Drag the browser window across 768px with the page open. The mode should
+   switch both ways without a reload.
 
 - [ ] **Step 17: Commit**
 
@@ -2217,18 +2620,16 @@ Expected: exactly two hits remain — `src/contexts/ToastContext.tsx:4` (the
 `src/components/ui/theme-toggle.tsx`. Deleting `LoginPage.tsx` retired four
 imports. **M6 must not add any.**
 
-- [ ] **Step 11: Run the whole suite and both typechecks**
+- [ ] **Step 11: Run the whole suite and the typecheck**
 
 ```bash
 npx vitest run
 npx tsc --noEmit
-npx tsc --noEmit --jsx react-jsx --moduleResolution bundler --module esnext \
-  --target es2020 --strict --skipLibCheck --esModuleInterop \
-  --paths '{"@/*":["./src/*"]}' --baseUrl . \
-  src/components/auth/__tests__/*.tsx "src/app/(auth)/__tests__/"*.tsx
 ```
 
-Expected: green, exit 0.
+Expected: green, exit 0. The typecheck now reaches
+`src/components/auth/__tests__/` and `src/app/(auth)/__tests__/` too, because
+Task 0 un-excluded test files.
 
 - [ ] **Step 12: Commit**
 
@@ -2418,19 +2819,41 @@ git commit -m "feat: add a recovering 404 and a privacy page written from the re
 
 ### Task 6: Demo mode
 
-A seeded, read-only account a stranger can open from the landing page. The
-security boundary already exists in RLS; this task adds the affordances and the
-runbook, and closes the SECURITY DEFINER hole class permanently rather than
-patching it a second time.
+A seeded, read-only account a stranger can open **in one click** from the
+landing page. The security boundary already exists in RLS; this task adds the
+front door, the affordances and the runbook, and closes the SECURITY DEFINER
+hole class permanently rather than patching it a second time.
+
+**Settled: the front door is a single button, not printed credentials and not a
+pre-filled login form.** Gabe decided this on 2026-08-28. The visitor clicks
+`try the live demo` and lands on `/dashboard` signed in. This matches the
+roadmap's stated position that the frictionless path is the one worth pushing
+for a portfolio piece — and every step between the click and the data is a step
+where a reviewer gives up.
+
+**The demo credentials are public on purpose, and the plan says so out loud.**
+They ship in `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD`, which
+means they are compiled into the client bundle and readable by anyone with
+devtools. That is not a leak and must not be written as though it were: the
+account is *designed* to be shared, and the boundary is `is_demo()` plus the
+RESTRICTIVE `demo_block_*` policies, which refuse every write no matter who
+holds the password. A reader six months from now must not "fix" this by moving
+the credentials server-side, so the naming (`NEXT_PUBLIC_`), the docblock and
+the README all state it. What would be a real leak is the service role key,
+which never reaches the browser and is not involved here.
 
 **Files:**
-- Modify: `src/lib/env.ts` (add `NEXT_PUBLIC_DEMO_USER_IDS` as a literal in `nextPublicEnv()`, and `demoUserIds: string[]` to `RuntimeFlags`)
+- Modify: `src/lib/env.ts` (add `NEXT_PUBLIC_DEMO_USER_IDS`, `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` as literals in `nextPublicEnv()`, and `demoUserIds: string[]` + `demoEmail: string` + `demoPassword: string` to `RuntimeFlags`)
 - Modify: `src/lib/__tests__/env.test.ts` (existing file; add the parsing cases)
 - Create: `src/hooks/useIsDemo.ts`
 - Create: `src/hooks/__tests__/useIsDemo.test.tsx`
 - Create: `src/components/shell/DemoBanner.tsx`
 - Create: `src/components/shell/__tests__/DemoBanner.test.tsx`
 - Modify: `src/components/shell/AppShell.tsx` (render `DemoBanner` above `main`)
+- Create: `src/components/landing/DemoSignInButton.tsx`
+- Create: `src/components/landing/__tests__/DemoSignInButton.test.tsx`
+- Modify: `src/components/landing/Hero.tsx` and `src/components/landing/StickyNavbar.tsx` (the demo CTAs become `DemoSignInButton` instead of links)
+- Modify: `src/components/settings/SettingsPage.tsx` (the danger zone's demo copy)
 - Modify: `src/app/(app)/applications/page.tsx` (gate the Add / import / export writes)
 - Modify: `src/app/(app)/settings/page.tsx` (gate the danger zone and the currency write)
 - Create: `supabase/__tests__/securityDefiner.test.ts`
@@ -2446,13 +2869,28 @@ patching it a second time.
   ```ts
   // added to RuntimeFlags in src/lib/env.ts
   demoUserIds: string[]
+  demoEmail: string
+  demoPassword: string
 
   // src/hooks/useIsDemo.ts
   export function useIsDemo(): boolean
 
   // src/components/shell/DemoBanner.tsx
   export function DemoBanner(props: { visible: boolean }): JSX.Element | null
+
+  // src/components/landing/DemoSignInButton.tsx
+  export interface DemoSignInButtonProps {
+    variant?: 'primary' | 'secondary'
+    className?: string
+    children: React.ReactNode
+  }
+  export function DemoSignInButton(props: DemoSignInButtonProps): JSX.Element
   ```
+  `DemoSignInButton` replaces the `try the live demo` and `open the demo`
+  links Task 2 built as `<Link href>`. Task 2's tests assert those are links
+  with an `href`; **this task updates those two assertions** to expect a
+  button, because the element genuinely changes. Say so in the commit rather
+  than leaving a reviewer to wonder why a Task 2 test moved.
 
 - [ ] **Step 1: Write the failing env-parsing test**
 
@@ -2483,6 +2921,29 @@ describe('readRuntimeFlags demoUserIds', () => {
     expect(flags.demoUserIds).toEqual(['x'])
   })
 })
+
+describe('readRuntimeFlags demo credentials', () => {
+  it('reads the published demo email and password', () => {
+    // Public by design: the demo account is meant to be shared, and the RLS
+    // demo_block_* policies refuse every write regardless of who holds the
+    // password. NEXT_PUBLIC_ is the correct prefix, not an oversight.
+    const flags = readRuntimeFlags({
+      NEXT_PUBLIC_DEMO_EMAIL: 'demo@worktrack.app',
+      NEXT_PUBLIC_DEMO_PASSWORD: 'published-on-purpose',
+    })
+    expect(flags.demoEmail).toBe('demo@worktrack.app')
+    expect(flags.demoPassword).toBe('published-on-purpose')
+  })
+
+  it('is empty strings when unconfigured, never undefined', () => {
+    // The button reads these directly; undefined would reach supabase-js as
+    // "undefined" and produce a confusing auth error instead of a clean
+    // "demo is not configured" state.
+    const flags = readRuntimeFlags({})
+    expect(flags.demoEmail).toBe('')
+    expect(flags.demoPassword).toBe('')
+  })
+})
 ```
 
 - [ ] **Step 2: Run it and watch it fail**
@@ -2492,26 +2953,51 @@ Expected: FAIL — `demoUserIds` does not exist on `RuntimeFlags`.
 
 - [ ] **Step 3: Add the field and the literal**
 
-In `nextPublicEnv()`, add — **written out in full**, because the docblock in
-that file explains that Next only substitutes the exact literal text and a
-computed key yields nothing in a browser bundle:
+In `nextPublicEnv()`, add all three — **written out in full**, because the
+docblock in that file explains that Next only substitutes the exact literal
+text and a computed key yields nothing in a browser bundle:
 
 ```ts
       NEXT_PUBLIC_DEMO_USER_IDS: process.env.NEXT_PUBLIC_DEMO_USER_IDS,
+      NEXT_PUBLIC_DEMO_EMAIL: process.env.NEXT_PUBLIC_DEMO_EMAIL,
+      NEXT_PUBLIC_DEMO_PASSWORD: process.env.NEXT_PUBLIC_DEMO_PASSWORD,
 ```
 
-In `RuntimeFlags` add `demoUserIds: string[]`, and in `readRuntimeFlags`:
+In `RuntimeFlags` add the three fields, and in `readRuntimeFlags`:
 
 ```ts
     demoUserIds: (source.NEXT_PUBLIC_DEMO_USER_IDS ?? '')
       .split(',')
       .map((id) => id.trim())
       .filter(Boolean),
+    // Public on purpose. See the note above readRuntimeFlags.
+    demoEmail: source.NEXT_PUBLIC_DEMO_EMAIL ?? '',
+    demoPassword: source.NEXT_PUBLIC_DEMO_PASSWORD ?? '',
 ```
 
-Add `NEXT_PUBLIC_DEMO_USER_IDS=` to `.env.example` with a comment saying it is
-the seeded demo account's `auth.users.id`, comma separated if there is more
-than one.
+Put this docblock above them, because the next person to read
+`NEXT_PUBLIC_DEMO_PASSWORD` will reach for a security fix otherwise:
+
+```ts
+/**
+ * The published demo account's credentials.
+ *
+ * NEXT_PUBLIC_ is deliberate: these are compiled into the client bundle and
+ * anyone can read them out of devtools. That is the design. The demo account
+ * exists to be shared, the landing page signs visitors in with one click, and
+ * the read-only boundary is public.is_demo() plus the RESTRICTIVE demo_block_*
+ * policies in 20260825043057 -- which refuse every write no matter who holds
+ * the password. Moving these server-side would protect nothing and would cost
+ * the one-click front door.
+ *
+ * This is not the pattern for any other credential. The service role key never
+ * reaches the browser.
+ */
+```
+
+Add all three to `.env.example` with those comments: `NEXT_PUBLIC_DEMO_USER_IDS`
+is the seeded account's `auth.users.id` (comma separated if there is ever more
+than one), and the email/password are the published demo login.
 
 - [ ] **Step 4: Run it and watch it pass**
 
@@ -2789,15 +3275,186 @@ M2 2.5) and stays parked.
 
 Re-run the seed after the change (remove from `demo_accounts`, seed, add back).
 
-- [ ] **Step 14: Point the landing page's demo CTAs at a real destination**
+- [ ] **Step 14: Build the one-click demo front door**
 
-`try the live demo` and `open the demo` currently need a target. Options are a
-pre-filled `/login?demo=1`, or a documented email/password shown on the landing
-page. Pick one and make the link land somewhere that works; a primary CTA that
-404s is worse than no CTA. Whichever is chosen, the credentials being public is
-the design — the RLS boundary is what makes that safe.
+Write the failing test first:
 
-- [ ] **Step 15: Run the whole suite and both typechecks**
+```tsx
+// src/components/landing/__tests__/DemoSignInButton.test.tsx
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+const push = vi.fn()
+const signIn = vi.fn()
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }) }))
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: null, session: null, loading: false, signIn, signUp: vi.fn(), signOut: vi.fn() }),
+}))
+vi.mock('@/lib/env', async (orig) => {
+  const actual = await orig<typeof import('@/lib/env')>()
+  return {
+    ...actual,
+    runtimeFlags: {
+      ...actual.runtimeFlags,
+      demoEmail: 'demo@worktrack.app',
+      demoPassword: 'published-on-purpose',
+    },
+  }
+})
+
+import { DemoSignInButton } from '../DemoSignInButton'
+
+beforeEach(() => vi.clearAllMocks())
+
+describe('the demo sign-in button', () => {
+  it('signs the visitor in and lands them on the dashboard in one click', async () => {
+    signIn.mockResolvedValue(undefined)
+    render(<DemoSignInButton>try the live demo</DemoSignInButton>)
+    await userEvent.click(screen.getByRole('button', { name: 'try the live demo' }))
+    expect(signIn).toHaveBeenCalledWith('demo@worktrack.app', 'published-on-purpose')
+    expect(push).toHaveBeenCalledWith('/dashboard')
+  })
+
+  it('says it is working rather than looking dead during the round trip', async () => {
+    let release: () => void = () => {}
+    signIn.mockImplementation(() => new Promise<void>((r) => { release = () => r() }))
+    render(<DemoSignInButton>try the live demo</DemoSignInButton>)
+    const button = screen.getByRole('button', { name: 'try the live demo' })
+    await userEvent.click(button)
+    expect(button).toBeDisabled()
+    expect(screen.getByText('Opening the demo')).toBeInTheDocument()
+    release()
+  })
+
+  it('explains a failure in place and stays clickable', async () => {
+    // A dead primary CTA on the landing page is the worst possible failure on
+    // the most-visited path in the portfolio.
+    signIn.mockRejectedValue(new Error('Failed to fetch'))
+    render(<DemoSignInButton>try the live demo</DemoSignInButton>)
+    const button = screen.getByRole('button', { name: 'try the live demo' })
+    await userEvent.click(button)
+    expect(await screen.findByText(/could not open the demo/i)).toBeInTheDocument()
+    expect(button).toBeEnabled()
+    expect(push).not.toHaveBeenCalled()
+  })
+})
+
+describe('the demo sign-in button when the demo is not configured', () => {
+  it('does not render a button that cannot work', async () => {
+    // Positive companion below: proves the component renders SOMETHING, so
+    // this is not a component that renders nothing in every case.
+    vi.resetModules()
+    vi.doMock('@/lib/env', async (orig) => {
+      const actual = await orig<typeof import('@/lib/env')>()
+      return { ...actual, runtimeFlags: { ...actual.runtimeFlags, demoEmail: '', demoPassword: '' } }
+    })
+    const { DemoSignInButton: Unconfigured } = await import('../DemoSignInButton')
+    render(<Unconfigured>try the live demo</Unconfigured>)
+    expect(screen.queryByRole('button', { name: 'try the live demo' })).toBeNull()
+    expect(screen.getByRole('link', { name: 'create account' })).toHaveAttribute('href', '/signup')
+    vi.doUnmock('@/lib/env')
+  })
+})
+```
+
+Run: `npx vitest run src/components/landing/__tests__/DemoSignInButton.test.tsx`
+Expected: FAIL — `Failed to resolve import "../DemoSignInButton"`.
+
+Then write it. `DemoSignInButton` renders `Button` from `@/components/ui/button`
+(no new styling), calls `signIn(runtimeFlags.demoEmail, runtimeFlags.demoPassword)`,
+pushes `/dashboard` on success, and on failure sets a message rendered next to
+the button. It disables itself only while the call is in flight and re-enables
+in a `finally`. When `demoEmail` or `demoPassword` is empty it degrades to the
+`create account` link rather than offering a control that cannot work — a
+build without the env vars is a real deployment state, not a hypothetical.
+
+Then replace the two CTAs from Task 2: the hero's `try the live demo` and the
+navbar's `open the demo` become `DemoSignInButton` with `variant="primary"` and
+`variant="secondary"` respectively, keeping the same visible text and the same
+`data-variant` values. **Update Task 2's two assertions** in
+`Landing.test.tsx` from `getByRole('link', …)` to `getByRole('button', …)` and
+drop the `href` checks on those two — the element changed, so the test changes
+with it. `create account` stays a `<Link>` to `/signup` and its assertion is
+untouched.
+
+- [ ] **Step 15: Decide what a demo visitor sees in the danger zone**
+
+`/settings` carries a Delete account button. For a demo visitor it must never
+reach the RPC, and if it somehow does, the refusal must read as an explanation
+rather than a crash. Two layers, because the first is an affordance and the
+second is the boundary:
+
+```tsx
+// in SettingsPage's danger zone, gated on the `demo` prop from useIsDemo()
+{demo ? (
+  <p className="text-body-s text-text-muted">
+    This is the shared demo account, so it cannot be deleted.{' '}
+    <Link href="/signup" className="underline">Create your own account</Link> to
+    try this.
+  </p>
+) : (
+  <Button variant="secondary" size="s" onClick={onDeleteAccount}>Delete account</Button>
+)}
+```
+
+Prose replacing the control, not a disabled button with a tooltip: a disabled
+destructive control invites a visitor to hunt for why it is disabled, and the
+answer here is genuinely interesting and worth just saying.
+
+The second layer covers the case the affordance cannot: if
+`NEXT_PUBLIC_DEMO_USER_IDS` is unset on a deploy, `useIsDemo()` is `false`, the
+button renders, and the RPC fires. `delete_own_account()` raises
+`insufficient_privilege` — Postgres error code `42501` — from the `is_demo()`
+guard added in `20260828090000`. Map it:
+
+```ts
+// src/app/(app)/settings/page.tsx, in the delete handler's error branch
+const isDemoRefusal =
+  (error as { code?: string })?.code === '42501' ||
+  /insufficient_privilege|demo/i.test(error.message)
+
+showError(
+  isDemoRefusal ? 'The demo account cannot be deleted' : 'Could not delete your account',
+  isDemoRefusal
+    ? 'This is the shared demo everyone uses. Create your own account to try this.'
+    : error.message
+)
+```
+
+Write the failing test for the mapping before the mapping:
+
+```tsx
+// append to src/app/(app)/settings/__tests__/page.test.tsx
+it('explains the demo refusal instead of showing a raw Postgres error', async () => {
+  // The single most-visited path in the portfolio. A generic failure toast
+  // reading "insufficient_privilege" is not an acceptable thing for a
+  // reviewer to meet there.
+  supabaseRpc.mockResolvedValue({
+    error: { code: '42501', message: 'permission denied: demo accounts cannot be deleted' },
+  })
+  render(<Page />)
+  await userEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+  expect(await screen.findByText('The demo account cannot be deleted')).toBeInTheDocument()
+  expect(screen.queryByText(/insufficient_privilege/)).toBeNull()
+})
+
+it('still surfaces a real failure for a normal account', async () => {
+  // Positive companion: proves the branch above is a branch, not a blanket
+  // rewrite that would now swallow every genuine deletion error.
+  supabaseRpc.mockResolvedValue({ error: { code: '08006', message: 'connection failure' } })
+  render(<Page />)
+  await userEvent.click(screen.getByRole('button', { name: 'Delete account' }))
+  expect(await screen.findByText('Could not delete your account')).toBeInTheDocument()
+  expect(screen.getByText('connection failure')).toBeInTheDocument()
+})
+```
+
+Read the existing `settings/__tests__/page.test.tsx` for how it mocks
+`supabase.rpc` before writing `supabaseRpc` — M5 Task 9 built that file and its
+mock shape is not guessed here.
+
+- [ ] **Step 16: Run the whole suite and the typecheck**
 
 ```bash
 npx vitest run
@@ -2805,14 +3462,15 @@ npx tsc --noEmit
 rm -rf .next && npm run build
 ```
 
-- [ ] **Step 16: Commit**
+- [ ] **Step 17: Commit**
 
 ```bash
 git add src/lib/env.ts src/lib/__tests__/env.test.ts src/hooks/useIsDemo.ts \
   src/hooks/__tests__/useIsDemo.test.tsx src/components/shell supabase/__tests__ \
   "src/app/(app)/applications/page.tsx" "src/app/(app)/settings/page.tsx" \
+  src/components/settings/SettingsPage.tsx src/components/landing \
   scripts/demoSeedData.mjs .env.example
-git commit -m "feat: demo mode affordances and a CI gate on SECURITY DEFINER guards"
+git commit -m "feat: one-click demo sign-in, read-only affordances, and a SECURITY DEFINER gate"
 ```
 
 Then check nothing was left behind — `git commit -- <pathspec>` does not pick
@@ -2895,8 +3553,15 @@ Sections, in order:
    analytics and a CV builder.
 2. **Project lineage** — keep the existing paragraph verbatim. It credits
    Ensues and is a standing obligation, not a stylistic choice.
-3. **Demo** — the live link, the demo credentials, and one sentence saying the
-   account is read-only and why (published credentials, enforced in RLS).
+3. **Demo** — the live link, and one sentence pointing at the `try the live
+   demo` button rather than reprinting credentials the visitor never needs to
+   type. Then two sentences of engineering honesty, because this is a portfolio
+   README and the reasoning is the interesting part: the demo account's
+   credentials ship in the client bundle deliberately, and the read-only
+   boundary is `public.is_demo()` plus RESTRICTIVE row-level-security policies
+   rather than a hidden password or a disabled button. Quote
+   `20260825043057`'s own comment — "a disabled button in the UI is an
+   affordance, not a boundary" — since it is the whole idea in one line.
 4. **Screenshots** — the five captures from Task 2, embedded.
 5. **Features** — rewritten against what M5 actually shipped: six authenticated
    routes (`/dashboard`, `/applications`, `/applications/[id]`, `/calendar`,
@@ -2937,15 +3602,16 @@ green; exit 0; lint clean; clean build with `/`, `/login`, `/signup`,
 only whatever M5 Task 10 has not yet removed (M6 must have added nothing);
 local == remote on migrations.
 
-Then typecheck every test file M6 added, since `tsconfig.json` excludes them
-and three violations survived a clean typecheck during M5:
+The `tsc --noEmit` above already covers every test file M6 added — Task 0
+removed the `src/**/__tests__/**` exclusion, so there is no second invocation
+to remember. Confirm the exclusion has not crept back:
 
 ```bash
-npx tsc --noEmit --jsx react-jsx --moduleResolution bundler --module esnext \
-  --target es2020 --strict --skipLibCheck --esModuleInterop \
-  --paths '{"@/*":["./src/*"]}' --baseUrl . \
-  $(git diff --name-only main...HEAD | grep -E '__tests__.*\.tsx?$')
+grep -n '__tests__' tsconfig.json
 ```
+
+Expected: no match under `exclude`. Task 0's own guard test asserts this, so a
+hit here means that test was deleted rather than that the config drifted.
 
 - [ ] **Step 6: Check the exit criterion by doing it**
 
@@ -2974,6 +3640,7 @@ git commit -m "docs: rewrite the README against what the app actually is"
 
 | Spec item | Task |
 |---|---|
+| *(not a spec item)* typecheck excludes test files | **Task 0**, prerequisite. Settled 2026-08-28; removes the workaround from all seven M6 tasks. |
 | 6.1 landing — hero, carousel, ATS section, footer | 2 |
 | 6.1 — skiper51 install, `swiper` + `framer-motion`, autoplay off | 1 |
 | 6.1 — Swiper CSS reconciled with M4 tokens, `shadow: true` killed | 1 (Steps 5–6) |
@@ -2994,7 +3661,7 @@ git commit -m "docs: rewrite the README against what the app actually is"
 | 6.1a — pin length scales with slide count | 3 (Step 1, the constant-pace invariant) |
 | 6.1a — pause the hero video once the hero unpins | 2 (`HeroMedia`), 3 (Step 13) |
 | 6.1a — navbar reveals at the carousel's end | 3 (`navbarRevealed`) |
-| 6.1a — decide whether mobile pins | **Open question 1.** Task 3 Step 16 gathers the evidence; the decision is Gabe's. |
+| 6.1a — decide whether mobile pins | **Settled: it does not.** Task 3 — `shouldPin(reduced, width)`, `PIN_MIN_WIDTH_PX = 768`, four tests asserting the mobile path is unpinned, and Step 16's manual check at 375px. |
 | 6.2 — skiper106, `dialkit` | 4 (Steps 1–2) |
 | 6.2 — name collision, take only `SmoothInput` | 4 (Step 2) |
 | 6.2 — verify against the four Figma Input states, run `ui-ux-pro-max` | 4 (Step 5) |
@@ -3004,11 +3671,12 @@ git commit -m "docs: rewrite the README against what the app actually is"
 | 6.2 — one focused field at a time; reveal control anchored to the field edge | **Already solved in M4.** Recorded in the Current-state table; Task 4 reuses `Input`/`PasswordInput` and its test proves the reveal works. |
 | 6.3 — custom 404 with recovery links; privacy page | 5 |
 | 6.4 — seeded read-only account, banner, write controls disabled | 6 |
+| 6.4 — the demo's front door | **Settled: one click.** Task 6 Steps 14–15 — `DemoSignInButton`, public-by-design credentials, and a demo-aware danger zone. |
 | 6.4 — `is_demo()` is enforced in RLS; SECURITY DEFINER bypasses RLS | 6 (Steps 10–11, the CI gate) |
 | 6.5 — README rewrite with live link and screenshots | 7 |
 | 6.5 — credit Skiper UI in README and landing footer, with upstreams | 1 (Steps 11–14), 2 (Step 4) |
 | Global — `grep -r lucide src/` | 4 (Step 10), 7 (Step 5). M5 Task 10 owns the uninstall; M6 adds nothing and retires four import sites. |
-| Global — attribution for `skiper4` / `skiper26` | **Conflict with the repo.** Neither was installed. Credited as influences in README prose; see open question 2. |
+| Global — attribution for `skiper4` / `skiper26` | **Conflict with the repo.** Neither was installed. Credited as influences in README prose; see open question 1. |
 
 Two roadmap lines have no task and deliberately so: the `skiper67` /
 `skiper3` / `skiper41` / `skiper89` "evaluate, do not assume" candidates are
@@ -3042,13 +3710,14 @@ of JSX in a plan document that would go stale on the first task.
 **3. Type consistency.**
 
 - `LandingScreen { src, alt, caption }` is defined in Task 2's `screens.ts` and used in Task 2's tests and Task 3's wiring. One shape, one name.
-- `SwiperCarouselOptions` is defined in Task 1 and consumed by Task 2's `ScreenCarousel` and Task 3's mode switch. `carouselOptionsFor(reduced: boolean)` has one signature throughout.
+- `SwiperCarouselOptions` is defined in Task 1 and consumed by Task 2's `ScreenCarousel` and Task 3's mode switch. `carouselOptionsFor(scrollDriven: boolean)` has one signature throughout, and `scrollDriven` is the same word in `useCarouselProgress`'s third parameter, in `ScreenCarousel`'s prop, and in `PinnedSequence`'s `pinned` state that feeds it — one concept, renamed at exactly one boundary, which Task 3 Step 14 names.
 - `DrivableSwiper` is defined in Task 3's Interfaces block and in `useCarouselProgress.ts`; the `onSwiper` prop Task 1 Step 5 adds to the vendor file is what supplies it. `setProgress`, `allowTouchMove` and `params.allowTouchMove` are the same three members everywhere they appear.
 - `AttributionEntry { id, name, href, credit }` is defined in Task 1 and consumed by Task 2's footer and Task 7's README tests. `credit` is the field asserted verbatim in three places.
 - `pinned` / `carouselProgress` / `heroUnpinned` are named identically in Task 2's `LandingProps`, Task 3's `PinnedSequence` render-prop state, and Task 3's Interfaces block. `heroUnpinned` becomes `HeroMedia`'s `paused` at exactly one boundary, which is stated in Task 3 Step 14.
 - `AuthMode = 'signin' | 'signup'` and `AuthScreenProps { mode, onSubmit }` are defined in Task 4 and used in both route files. `onSubmit(email, password): Promise<void>` matches `useAuth().signIn` / `.signUp`, both read from `src/contexts/AuthContext.tsx`.
 - `isDemoUser(userId, demoUserIds)` in Task 6 is the existing export, read from `src/services/demoMode.ts`, not a new one. `demoUserIds: string[]` is the same name on `RuntimeFlags` and in that call.
-- `usePrefersReducedMotion(): boolean` is the existing hook. There is exactly one `matchMedia` read in this milestone's production code, and it is inside `src/lib/motion.ts` where it already lives.
+- `usePrefersReducedMotion(): boolean` is the existing hook. There is exactly one `matchMedia` read in this milestone's production code, and it is inside `src/lib/motion.ts` where it already lives. `shouldPin(reduced, viewportWidthPx)` and `PIN_MIN_WIDTH_PX` are defined in Task 3's `lib/pinnedScroll.ts` and used only by `PinnedSequence` in the same task.
+- `demoUserIds: string[]`, `demoEmail: string` and `demoPassword: string` are added to `RuntimeFlags` in Task 6 Step 3 and read in Task 6 Steps 6 and 14 — the same three names in the interface, the parser, the tests and the `.env.example`.
 - Every icon named — `PlayIcon`, `ArrowRightIcon`, `ShieldIcon`, `TargetIcon`, `AnalyticsIcon`, `AlertCircleIcon` — was confirmed present in the 34 exports of `src/components/icons/index.tsx`.
 
 **4. Test-shape audit**, run explicitly against the five M5 failure modes:
@@ -3068,12 +3737,12 @@ Every one of these was verified by reading the file, not inferred.
 
 1. **"shadcn is not initialised. There is no `components.json`."** — `components.json` exists (created 2026-08-25, during M4). **Repo wins.** Do not run `shadcn init`; it would overwrite `iconLibrary: "@/components/icons"` and the CLI would start writing lucide imports. What *is* missing is a registry entry, and Task 1 Step 1 adds it.
 2. **"Use the M4 4.4 Theme Toggle primitive — skiper4's button driven by 4.6's `useThemeToggle()`."** — no `useThemeToggle` export exists anywhere in `src`. **Repo wins.** The primitive is `ThemeToggle` from `@/components/ui/theme-toggle`, whose docblock states it was written against skiper4's technique rather than installed from it. The View Transition wipe is inside its own `handleClick`, not a separate hook.
-3. **"All four adopted components — `skiper4`, `skiper26`, `skiper51`, `skiper106` — must credit Skiper UI."** — only two will ever be adopted. `src/components/v1/` does not exist and no Skiper source has been installed. By the roadmap's own rule ("attribution attaches to what ships, not to what is read"), skiper4 and skiper26 fall on the reference-only side alongside CVJunction. **Repo wins on the fact.** This plan credits them anyway, in accurate wording, because the ideas are theirs and the cost is one paragraph. Open question 2.
+3. **"All four adopted components — `skiper4`, `skiper26`, `skiper51`, `skiper106` — must credit Skiper UI."** — only two will ever be adopted. `src/components/v1/` does not exist and no Skiper source has been installed. By the roadmap's own rule ("attribution attaches to what ships, not to what is read"), skiper4 and skiper26 fall on the reference-only side alongside CVJunction. **Repo wins on the fact.** This plan credits them anyway, in accurate wording, because the ideas are theirs and the cost is one paragraph. Open question 1.
 4. **"`skiper26` pulls `lucide-react` transitively; edit the import out."** — skiper26 is not being installed, so this instruction has no target. The *rule* still binds and Task 1 Step 5 applies it to skiper51, where it does have one.
 5. **6.2's two "things that will bite when this is coded"** — the double-focused field and the reveal control that "sat off-canvas until repositioned" — **were both fixed during M4.** `Input`'s docblock says focus is deliberately not a prop precisely so the Figma frame's bug is unrepresentable, and `PasswordInput`'s says its `right-2` anchor is the fix for the 375px case. **Repo wins.** Task 4 reuses them; re-solving would be work already done.
 6. **The 26-icon set.** The roadmap's Global Constraint says 26. M5 Task 1 took it to 34 and the constraint text was never updated. This plan says 34, which is what `src/components/icons/index.tsx` exports.
 7. **"Hero (background video) desktop"** — no video asset exists and none can be produced by writing code. The plan ships poster-only with the video path built and tested behind a source. Not a disagreement so much as an unmet prerequisite; recorded because a reviewer comparing the shipped hero to the Figma frame will notice.
-8. **`src/app/page.tsx` redirects to `/dashboard`.** The roadmap assumes `/` is the landing page and never mentions the redirect. Task 2 removes it. Open question 3.
+8. **`src/app/page.tsx` redirects to `/dashboard`.** The roadmap assumes `/` is the landing page and never mentions the redirect. Task 2 removes it. Open question 2.
 9. **6.4's "seeded read-only account".** The substrate is further along than the roadmap implies: the table, `is_demo()`, the restrictive policies, the seed script, the pure `isDemoUser` helper and its tests all exist. What is missing is the wiring, the banner, the env variable, and the operational step of actually creating and registering the account.
 
 ## Corrections to the brief this plan was written from
@@ -3088,23 +3757,40 @@ things it did not.
 4. **"Is `shadcn` initialised — does `components.json` exist? The roadmap says it was not, as of M4 planning."** — it exists. The brief was right to ask.
 5. Minor: the brief says the icon set is 34 icons in `src/components/icons/index.tsx` — **correct**, verified. And that `lucide-react` is being removed in M5 Task 10 — **correct**, and still outstanding at `7d5bdfb`.
 
+## Settled by Gabe, 2026-08-28
+
+Three of the seven questions this plan opened have been answered. They are
+recorded here as well as folded into their tasks, so a reader who only skims
+the tail does not mistake a decision for a live question.
+
+1. **The typecheck exclusion is fixed first.** → **Task 0**, before Task 1.
+   It un-excludes `src/**/__tests__/**`, repairs what that surfaces, and adds a
+   guard test. Consequently every other task's verify step is a plain
+   `npx tsc --noEmit`; the hand-rolled second invocation is gone from all seven.
+2. **Mobile does not pin.** → **Task 3**, as `shouldPin(reduced, width)` with
+   `PIN_MIN_WIDTH_PX = 768`, asserted by four tests rather than left untested.
+   It also deleted work: with mobile never pinned the scroll-versus-gesture
+   conflict cannot arise, so there is no touch-arbitration path anywhere, and
+   `carouselOptionsFor` now keys on one `scrollDriven` question instead of
+   branching per condition.
+3. **The demo front door is one click.** → **Task 6**, as `DemoSignInButton`,
+   with the credentials published on purpose in `NEXT_PUBLIC_DEMO_*` and said
+   out loud in three places, and with the danger zone answering a demo visitor
+   in prose rather than a generic failure toast.
+
 ## Open questions for Gabe
 
 Decisions the roadmap does not settle, listed rather than settled unilaterally.
 
-1. **Does mobile pin at all?** The roadmap explicitly leaves this open: "the mobile frames carry the same section order so it can, but pinning costs a full viewport on a 375×812 screen and is jankier under touch. Normal flow on mobile is a legitimate answer." This plan builds `PinnedSequence` so it can be disabled by breakpoint in one place, and Task 3 Step 16 asks the implementer to try it at 375px and report. The decision is yours. Cost of pinning on mobile: a visitor spends four to five full viewport-heights of scrolling before reaching Features, on the device where thumb-scrolling is most expensive. Cost of not pinning: the mobile landing page is a different experience from the desktop one, which is a portfolio piece's weakest moment.
+1. **Do `skiper4` and `skiper26` get credited?** Neither ships. By the roadmap's own reference-only rule they carry no obligation, and the same line already keeps CVJunction out of the attribution list. This plan credits them in prose as influences (`toggles.dev` / Alfie Jones, `rudrodip/theme-toggle-effect`) while keeping them out of `SKIPER_ATTRIBUTION`, which is the licence-obligation list. If you would rather they were in the obligation list, it is one line in `src/lib/attribution.ts` and two in the README — but then the test asserts a credit for source that is not in the repo, which is a slightly dishonest gate.
 
-2. **Do `skiper4` and `skiper26` get credited?** Neither ships. By the roadmap's own reference-only rule they carry no obligation, and the same line already keeps CVJunction out of the attribution list. This plan credits them in prose as influences (`toggles.dev` / Alfie Jones, `rudrodip/theme-toggle-effect`) while keeping them out of `SKIPER_ATTRIBUTION`, which is the licence-obligation list. If you would rather they were in the obligation list, it is one line in `src/lib/attribution.ts` and two in the README — but then the test asserts a credit for source that is not in the repo, which is a slightly dishonest gate.
+2. **Should `/` still redirect signed-in visitors to `/dashboard`?** Today it redirects everyone. This plan makes `/` always render the landing page, on the argument that the landing page is the artefact a reviewer is meant to see and hiding it from the only person with an account is backwards. The alternative — read the session and redirect — makes the landing route dynamic, costs its static render, and means the page you are building for strangers is one you can never casually look at. Reversible either way, one file. Now slightly weightier than when first asked: with the one-click demo button settled, a signed-in visitor who lands on `/` and clicks `try the live demo` would be signed out of their own account and into the demo. Task 6's button should probably say something different when a session already exists, or the redirect answers it for free.
 
-3. **Should `/` still redirect signed-in visitors to `/dashboard`?** Today it redirects everyone. This plan makes `/` always render the landing page, on the argument that the landing page is the artefact a reviewer is meant to see and hiding it from the only person with an account is backwards. The alternative — read the session and redirect — makes the landing route dynamic, costs its static render, and means the page you are building for strangers is one you can never casually look at. Reversible either way, one file.
+3. **Does the smooth-caret input go on password fields too?** This plan uses `SmoothInput` for email and M4's `PasswordInput` for both password fields. On a masked field there is no visible caret to smooth, and skiper106's redrawn caret would have to share a box with `PasswordInput`'s absolutely-positioned reveal control. If you want the smooth caret on password fields, it needs `SmoothInput` and the reveal control merged into one component, which is a real piece of work and its own task.
 
-4. **Does the smooth-caret input go on password fields too?** This plan uses `SmoothInput` for email and M4's `PasswordInput` for both password fields. On a masked field there is no visible caret to smooth, and skiper106's redrawn caret would have to share a box with `PasswordInput`'s absolutely-positioned reveal control. If you want the smooth caret on password fields, it needs `SmoothInput` and the reveal control merged into one component, which is a real piece of work and its own task.
+4. **`resumes.sections` is never written by anything**, so the ATS panel reads "Not checked" for every real CV — including the demo's, whose seeded `sections` this plan's Task 6 Step 13 preserves but which the Word editor path does not populate. It is an M5 parked item (roadmap 1.7 / M2 2.5 territory) and does not block M6, but it will be visible in the Task 2 screenshots that go into the README. Worth knowing before those images ship.
 
-5. **What is the demo's front door?** Task 6 Step 14 needs a decision: a `/login?demo=1` that pre-fills the published credentials, or the credentials printed on the landing page, or a one-click server action that signs in as the demo. All three are safe — the RLS boundary is what makes public credentials fine — but they read very differently to a visitor. The one-click version is the strongest for a portfolio piece and the most work.
-
-6. **`tsconfig.json` excludes test files from `tsc --noEmit`.** This is the M5 parked item, and it bit three separate times: a missed required-prop call site, a fixture missing a new field, and a third the ledger records at run 2. Every task in this plan works around it with an explicit second `tsc` invocation over the test files, which is ugly and easy to forget. Fixing it properly — un-excluding `src/**/__tests__/**` and repairing whatever that surfaces — is its own task and should probably run before M6 rather than after. Say the word and it goes in front of Task 1.
-
-7. **The analytics funnel's cumulative shape and the `smoke.test.ts`-class dead tests** are both closed from M5, but two M5 items remain parked and touch M6's surface: `resumes.sections` is never written by anything (so ATS reads "Not checked" for every real CV, including the demo's), and `getConversionFunnel`'s `avgDaysToStage` computes the same number for two stages. Neither blocks M6; both will be visible in the screenshots Task 2 and Task 7 capture. Worth knowing before those images go into the README.
+   *Struck from this list:* `getConversionFunnel`'s duplicated `avgDaysToStage` was fixed in `12523c0` while this plan was being written — verified, not taken on trust: the commit body names it as defect (e) and `analyticsService.ts` now computes four distinct `timeTo*Ms` values with a comment at line 247 recording the old behaviour.
 
 ---
 
@@ -3116,4 +3802,9 @@ Plan complete and saved to `docs/superpowers/plans/2026-08-28-m6-public-surface.
 
 **2. Inline Execution** — execute tasks in this session using `superpowers:executing-plans`, batch execution with checkpoints for review.
 
-Whichever is chosen, tasks run **one at a time in one working tree**, or each in its own git worktree per `superpowers:using-git-worktrees`. The M5 ledger records two concrete incidents from parallel agents sharing a tree, and no two agents may run `npm run build` concurrently — a contended `.next` reports success while producing every route at 0 B, which is a green signal that proves nothing.
+**Task 0 runs first and alone**, whichever option is chosen: it rewrites
+`tsconfig.json` and touches test files across the whole tree, so a concurrent
+task would be typechecking against a moving configuration. Every later task's
+verify step assumes it has landed.
+
+Whichever is chosen, the remaining tasks run **one at a time in one working tree**, or each in its own git worktree per `superpowers:using-git-worktrees`. The M5 ledger records two concrete incidents from parallel agents sharing a tree, and no two agents may run `npm run build` concurrently — a contended `.next` reports success while producing every route at 0 B, which is a green signal that proves nothing.
