@@ -11,7 +11,7 @@
    by the semantic layer below; components use semantic names exclusively. That
    indirection is what makes dark mode a mode switch rather than a second design. */
 @theme {
-  --font-sans: Helvetica, "Helvetica Neue", Arial, sans-serif;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
 
   /* 01 Primitives -- do not use directly in components */
   --color-neutral-50: #fafafa;

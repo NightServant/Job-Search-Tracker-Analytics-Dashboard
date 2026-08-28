@@ -36,35 +36,6 @@ export const NAV: { href: string; label: string; icon: IconName }[] = [
  * same handling the deleted Layout.tsx had, so a network blip doesn't leave
  * someone still signed in with no idea why the click did nothing.
  */
-function SignOutButton() {
-  const { signOut } = useAuth()
-  const { error: showError } = useToast()
-  const [pending, setPending] = React.useState(false)
-
-  const handleClick = async () => {
-    setPending(true)
-    try {
-      await signOut()
-    } catch (error) {
-      console.error('Error signing out:', error)
-      const message = error instanceof Error ? error.message : 'Failed to sign out'
-      showError('Sign Out Failed', message)
-    } finally {
-      setPending(false)
-    }
-  }
-
-  return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={pending}
-      className="mx-3 rounded-md px-3 py-2 text-left text-body-m text-text-secondary transition-colors duration-[--duration-fast] hover:bg-bg-inset hover:text-text-primary disabled:opacity-50"
-    >
-      Sign out
-    </button>
-  )
-}
 
 export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
   pathname?: string
@@ -108,8 +79,6 @@ export function Sidebar({ pathname = '/dashboard', activeHref, className, ...pro
       <NavItem href="/settings" label="Settings" icon="Settings" active={settingsActive} />
 
       <div data-sidebar-spacer className="flex-1" />
-
-      <SignOutButton />
 
       <div className="px-3">
         <ThemeToggle />
