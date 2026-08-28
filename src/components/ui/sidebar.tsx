@@ -4,8 +4,6 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { NavItem } from '@/components/ui/nav-item'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { useAuth } from '@/contexts/AuthContext'
-import { useToast } from '@/contexts/ToastContext'
 import { activeNavHref, isUnder } from '@/lib/activeNav'
 import type { IconName } from '@/components/icons'
 
