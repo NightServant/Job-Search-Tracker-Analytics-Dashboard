@@ -1,0 +1,22 @@
+-- 20260828090000 revoked delete_own_account() from PUBLIC and granted it to
+-- authenticated. That is not sufficient on its own: Supabase configures
+-- ALTER DEFAULT PRIVILEGES so that functions created in `public` are granted
+-- EXECUTE to `anon` and `authenticated` directly. A grant held by a named role
+-- is not a grant held by PUBLIC, so `REVOKE ... FROM PUBLIC` leaves it in
+-- place -- verified against the live catalog after that migration applied:
+--
+--   proacl = postgres=X/postgres | anon=X/postgres
+--            | authenticated=X/postgres | service_role=X/postgres
+--
+-- The function is not exploitable through `anon` today, because it raises on
+-- `auth.uid() IS NULL` before reaching the DELETE. This is defence in depth,
+-- not an incident: an unauthenticated role should not hold EXECUTE on an
+-- account-deletion routine at all, and relying on the in-body guard alone
+-- means any future edit that reorders those statements silently becomes a
+-- remote-triggerable delete.
+--
+-- Kept as its own migration rather than an edit to 20260828090000, which has
+-- already been applied. Amending an applied migration makes a fresh
+-- `supabase db reset` and an existing database diverge; a follow-up migration
+-- converges both.
+REVOKE ALL ON FUNCTION public.delete_own_account() FROM anon;
