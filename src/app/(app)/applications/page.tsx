@@ -12,6 +12,7 @@ import {
 import { useToast } from '@/contexts/ToastContext'
 import { ApplicationsPage } from '@/components/applications/ApplicationsPage'
 import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
 import type { Job, JobFormData, JobStatus } from '@/types'
 
@@ -33,12 +34,16 @@ function message(err: unknown, fallback: string): string {
  * move the dashboard's KPI numbers too, and it does so by invalidating one key
  * rather than by anyone re-fetching.
  *
- * Default currency is `resolveDefaultCurrency(null)` -- PHP -- because nothing
- * reads the stored `user_preferences` row yet. Task 9 builds that read, and
- * this call is the single place it replaces.
+ * Default currency comes from `useUserPreferences`, the read half of the
+ * seam Task 4 deliberately left open: `resolveDefaultCurrency` already knows
+ * how to turn "no row yet" into PHP, so passing `prefsQuery.data ?? null`
+ * straight through covers both the loading state and a genuine first-time
+ * user without this route needing to gate the whole board on a preferences
+ * fetch the way it already gates on the jobs fetch below.
  */
 export default function Page() {
   const { data: jobs = [], isLoading, error } = useJobs()
+  const { data: prefs = null } = useUserPreferences()
   const createJob = useCreateJob()
   const createJobsBulk = useCreateJobsBulk()
   const updateJob = useUpdateJob()
@@ -116,7 +121,7 @@ export default function Page() {
   return (
     <ApplicationsPage
       jobs={jobs}
-      defaultCurrency={resolveDefaultCurrency(null)}
+      defaultCurrency={resolveDefaultCurrency(prefs)}
       onCreate={handleCreate}
       onUpdate={handleUpdate}
       onDelete={handleDelete}

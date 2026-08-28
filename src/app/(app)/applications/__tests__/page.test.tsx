@@ -10,6 +10,7 @@ const useJobsMock = vi.hoisted(() => vi.fn())
 const useCreateJobMock = vi.hoisted(() => vi.fn())
 const useUpdateJobMock = vi.hoisted(() => vi.fn())
 const useCreateJobsBulkMock = vi.hoisted(() => vi.fn())
+const useUserPreferencesMock = vi.hoisted(() => vi.fn())
 const idleMutation = vi.hoisted(() => () => ({ mutateAsync: vi.fn(), isPending: false }))
 
 vi.mock('@/hooks/useJobs', () => ({
@@ -22,6 +23,14 @@ vi.mock('@/hooks/useJobs', () => ({
   useAutofillJobFromUrl: idleMutation,
 }))
 
+// The currency seam this route used to leave open: resolveDefaultCurrency
+// was always called with a hardcoded null, so a stored preference could
+// never reach the form. Mocking the read half of that seam lets the tests
+// below prove a stored preference actually gets there now.
+vi.mock('@/hooks/useUserPreferences', () => ({
+  useUserPreferences: useUserPreferencesMock,
+}))
+
 vi.mock('@/contexts/ToastContext', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }))
@@ -32,6 +41,7 @@ beforeEach(() => {
   useCreateJobMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   useUpdateJobMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   useCreateJobsBulkMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
+  useUserPreferencesMock.mockReturnValue({ data: null, isLoading: false, error: null })
 })
 
 afterEach(() => cleanup())
@@ -120,5 +130,33 @@ describe('Applications route wrapper', () => {
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
     expect(screen.getByText(/jobs\.csv/i)).toBeTruthy()
+  })
+
+  // Task 9's whole point: this route used to call
+  // resolveDefaultCurrency(null) unconditionally, so a stored preference
+  // could never reach the form -- a user could set USD in Settings and every
+  // new application still opened at PHP. These two tests prove the read half
+  // of that seam is actually wired, not just that resolveDefaultCurrency
+  // itself works in isolation.
+  it('defaults a new application to PHP when the user has no stored preference', () => {
+    useUserPreferencesMock.mockReturnValue({ data: null, isLoading: false, error: null })
+    useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    render(<Page />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByLabelText(/^Currency/)).toHaveValue('PHP')
+  })
+
+  it('defaults a new application to the stored preference instead of PHP', () => {
+    useUserPreferencesMock.mockReturnValue({
+      data: { user_id: 'user-1', default_currency: 'USD', created_at: 'x', updated_at: 'x' },
+      isLoading: false,
+      error: null,
+    })
+    useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    render(<Page />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
+    expect(screen.getByLabelText(/^Currency/)).toHaveValue('USD')
   })
 })
