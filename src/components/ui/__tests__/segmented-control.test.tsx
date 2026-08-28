@@ -85,4 +85,48 @@ describe('SegmentedControl', () => {
     const radios = screen.getAllByRole('radio')
     expect(radios.map((r) => r.getAttribute('value'))).toEqual(['PHP', 'USD', 'EUR'])
   })
+
+  // A regression this component already tried and reverted: putting the
+  // caller's id on the selected option so a Field's `<label htmlFor>` would
+  // have something real to click made that option's *accessible name*
+  // become the label text ("Default currency") instead of its own value
+  // ("PHP") -- a `<label for>` wins over a button's own text content in the
+  // accname algorithm. Each option's accessible name has to stay its own
+  // label regardless of which one is selected or how a caller renders a
+  // visible heading above the group.
+  it('keeps each option\'s own accessible name regardless of which one is selected', () => {
+    render(<SegmentedControl options={OPTIONS} value="PHP" onChange={vi.fn()} aria-label="Currency" />)
+    expect(screen.getByRole('radio', { name: 'PHP' }).getAttribute('aria-checked')).toBe('true')
+    expect(screen.getByRole('radio', { name: 'USD' })).toBeTruthy()
+    expect(screen.getByRole('radio', { name: 'EUR' })).toBeTruthy()
+  })
+
+  describe('disabled', () => {
+    it('marks the group aria-disabled and every option natively disabled', () => {
+      render(<SegmentedControl options={OPTIONS} value="PHP" onChange={vi.fn()} aria-label="Currency" disabled />)
+      expect(screen.getByRole('radiogroup', { name: 'Currency' }).getAttribute('aria-disabled')).toBe('true')
+      for (const radio of screen.getAllByRole('radio')) {
+        expect((radio as HTMLButtonElement).disabled).toBe(true)
+      }
+    })
+
+    it('does not call onChange on click while disabled', () => {
+      const onChange = vi.fn()
+      render(<SegmentedControl options={OPTIONS} value="PHP" onChange={onChange} aria-label="Currency" disabled />)
+      fireEvent.click(screen.getByRole('radio', { name: 'EUR' }))
+      expect(onChange).not.toHaveBeenCalled()
+    })
+
+    // The exact regression this guards: a greyed-out, aria-disabled control
+    // that still issues a write because pointer-events-none only blocks
+    // pointer hit-testing, not keyboard activation of an already-focused
+    // element.
+    it('does not call onChange on ArrowRight while disabled, even when an option already has focus', () => {
+      const onChange = vi.fn()
+      render(<SegmentedControl options={OPTIONS} value="PHP" onChange={onChange} aria-label="Currency" disabled />)
+      const selected = screen.getByRole('radio', { name: 'PHP' })
+      fireEvent.keyDown(selected, { key: 'ArrowRight' })
+      expect(onChange).not.toHaveBeenCalled()
+    })
+  })
 })

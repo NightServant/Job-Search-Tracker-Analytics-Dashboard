@@ -104,4 +104,24 @@ describe('SettingsPage', () => {
       expect(group.innerHTML).not.toMatch(/shadow/)
     }
   })
+
+  // Regression for the concurrent-write bug the review round caught: a
+  // CSS-only "disabled" look (pointer-events-none + aria-disabled) still let
+  // a focused option fire onChange on an arrow key, because pointer-events
+  // only blocks pointer hit-testing, not keyboard activation. This exercises
+  // the guard through the composed screen, not just the SegmentedControl
+  // primitive in isolation.
+  it('does not fire a second currency change from the keyboard while a write is already in flight', () => {
+    const onDefaultCurrencyChange = vi.fn()
+    render(
+      <SettingsPage
+        prefs={null}
+        savingCurrency
+        onDefaultCurrencyChange={onDefaultCurrencyChange}
+      />
+    )
+    const selected = screen.getByRole('radio', { name: 'PHP' })
+    fireEvent.keyDown(selected, { key: 'ArrowRight' })
+    expect(onDefaultCurrencyChange).not.toHaveBeenCalled()
+  })
 })

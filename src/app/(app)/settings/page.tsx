@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useUserPreferences, useSetDefaultCurrency } from '@/hooks/useUserPreferences'
 import { SettingsPage } from '@/components/settings/SettingsPage'
+import { toError } from '@/services/supabaseHelpers'
 import type { SupportedCurrency } from '@/services/userPreferences'
 
 /**
@@ -57,8 +58,15 @@ export default function Page() {
 
   const handleDeleteAccount = async () => {
     try {
+      // supabase.rpc() resolves { error } as a plain Postgrest error shape
+      // ({message, details, hint, code}), not an Error instance -- that only
+      // happens when .throwOnError() is chained, which this call does not
+      // do. toError() normalizes it the same way userPreferencesService and
+      // every other M2 service already do, so the real message (e.g. "The
+      // demo account cannot be deleted") reaches the toast instead of
+      // silently falling through to "Unknown error".
       const { error } = await supabase.rpc('delete_own_account')
-      if (error) throw error
+      if (error) throw toError(error)
       await signOut()
     } catch (err) {
       showError('Could not delete account', err instanceof Error ? err.message : 'Unknown error')

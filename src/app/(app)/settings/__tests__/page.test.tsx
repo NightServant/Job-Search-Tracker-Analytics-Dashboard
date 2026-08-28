@@ -10,14 +10,19 @@ const useAuthMock = vi.hoisted(() => vi.fn())
 const useUserPreferencesMock = vi.hoisted(() => vi.fn())
 const useSetDefaultCurrencyMock = vi.hoisted(() => vi.fn())
 const rpcMock = vi.hoisted(() => vi.fn())
+const showErrorMock = vi.hoisted(() => vi.fn())
+const showSuccessMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: useAuthMock }))
 vi.mock('@/hooks/useUserPreferences', () => ({
   useUserPreferences: useUserPreferencesMock,
   useSetDefaultCurrency: useSetDefaultCurrencyMock,
 }))
+// error/success are hoisted mocks, not inline vi.fn()s, so a failure-path
+// test can assert on the actual message a real Supabase error produces --
+// not just that some toast fired.
 vi.mock('@/contexts/ToastContext', () => ({
-  useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
+  useToast: () => ({ success: showSuccessMock, error: showErrorMock, info: vi.fn() }),
 }))
 vi.mock('@/lib/supabase', () => ({
   supabase: { rpc: rpcMock },
@@ -26,7 +31,11 @@ vi.mock('@/lib/supabase', () => ({
 
 import Page from '../page'
 
-afterEach(() => cleanup())
+afterEach(() => {
+  cleanup()
+  showErrorMock.mockClear()
+  showSuccessMock.mockClear()
+})
 
 function setup({
   email = 'gabe@example.com',
@@ -86,13 +95,48 @@ describe('Settings route wrapper', () => {
     vi.mocked(window.confirm).mockRestore()
   })
 
-  it('does not sign out when the RPC itself fails', async () => {
+  // CRITICAL from the review round: supabase.rpc() resolves { error } as a
+  // plain Postgrest error object ({message, details, hint, code}), not an
+  // Error instance -- that conversion only happens when .throwOnError() is
+  // chained, which this call site does not do. `throw error` on that plain
+  // object made `err instanceof Error` false in the catch block, so the
+  // toast always read "Unknown error" no matter what Postgres actually
+  // said. Both tests below assert on the real message reaching showError,
+  // not just that signOut was skipped -- the original test only checked the
+  // latter and could not see the bug even though it exercised the exact
+  // failure path.
+  it('surfaces the demo-account guard\'s real message, not "Unknown error"', async () => {
     const { signOut } = setup()
-    rpcMock.mockResolvedValue({ error: { message: 'boom' } })
+    rpcMock.mockResolvedValue({
+      error: {
+        message: 'The demo account cannot be deleted',
+        code: '42501',
+        details: null,
+        hint: null,
+      },
+    })
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Page />)
     fireEvent.click(screen.getByRole('button', { name: /delete account/i }))
     await waitFor(() => expect(rpcMock).toHaveBeenCalled())
+    expect(showErrorMock).toHaveBeenCalledWith(
+      'Could not delete account',
+      'The demo account cannot be deleted'
+    )
+    expect(signOut).not.toHaveBeenCalled()
+    vi.mocked(window.confirm).mockRestore()
+  })
+
+  it('surfaces a generic RPC failure\'s real message too', async () => {
+    const { signOut } = setup()
+    rpcMock.mockResolvedValue({
+      error: { message: 'boom', code: 'XX000', details: null, hint: null },
+    })
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<Page />)
+    fireEvent.click(screen.getByRole('button', { name: /delete account/i }))
+    await waitFor(() => expect(rpcMock).toHaveBeenCalled())
+    expect(showErrorMock).toHaveBeenCalledWith('Could not delete account', 'boom')
     expect(signOut).not.toHaveBeenCalled()
     vi.mocked(window.confirm).mockRestore()
   })
