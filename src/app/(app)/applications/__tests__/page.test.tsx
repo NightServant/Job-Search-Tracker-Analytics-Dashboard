@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import type { Job } from '@/types'
+import { makeJob } from '@/test/fixtures'
 
 // Every read and write on this route goes through the useJobs hooks so they
 // all land on the same ['jobs', user?.id] cache entry the dashboard reads.
@@ -27,37 +27,6 @@ vi.mock('@/contexts/ToastContext', () => ({
 }))
 
 import Page from '../page'
-
-function makeJob(overrides: Partial<Job> & Pick<Job, 'id' | 'status'>): Job {
-  const now = '2026-08-01T00:00:00.000Z'
-  return {
-    id: overrides.id,
-    user_id: 'user-1',
-    company: 'Acme',
-    role: 'Engineer',
-    salary_min: 90000,
-    salary_max: 120000,
-    salary_currency: 'PHP',
-    url: null,
-    description: null,
-    status: overrides.status,
-    date_applied: '2026-07-20',
-    notes: null,
-    contact_name: null,
-    contact_email: null,
-    contact_linkedin: null,
-    contact_notes: null,
-    location: null,
-    work_mode: null,
-    source: null,
-    is_referral: false,
-    tags: [],
-    tech_stack: [],
-    created_at: now,
-    updated_at: now,
-    ...overrides,
-  }
-}
 
 beforeEach(() => {
   useCreateJobMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })

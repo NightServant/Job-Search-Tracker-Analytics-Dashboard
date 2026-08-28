@@ -1,40 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { Dashboard } from '../Dashboard'
+import { makeJob } from '@/test/fixtures'
 import type { Job } from '@/types'
 
 const DAY_MS = 24 * 60 * 60 * 1000
-
-function makeJob(overrides: Partial<Job> & Pick<Job, 'id' | 'status'>): Job {
-  const now = new Date().toISOString()
-  return {
-    id: overrides.id,
-    user_id: 'user-1',
-    company: 'Acme',
-    role: 'Engineer',
-    salary_min: 90000,
-    salary_max: 120000,
-    salary_currency: 'USD',
-    url: null,
-    description: null,
-    status: overrides.status,
-    date_applied: now,
-    notes: null,
-    contact_name: null,
-    contact_email: null,
-    contact_linkedin: null,
-    contact_notes: null,
-    location: null,
-    work_mode: null,
-    source: null,
-    is_referral: false,
-    tags: [],
-    tech_stack: [],
-    created_at: now,
-    updated_at: now,
-    ...overrides,
-  }
-}
 
 // A live application gone quiet for a month is well past the 14-day
 // follow-up threshold, whatever day the suite happens to run.

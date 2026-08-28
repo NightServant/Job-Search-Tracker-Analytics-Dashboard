@@ -4,38 +4,8 @@ import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/re
 import { ApplicationsPage } from '../ApplicationsPage'
 import { ApplicationForm } from '../ApplicationForm'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from '../StatusTabs'
+import { makeJob } from '@/test/fixtures'
 import type { Job } from '@/types'
-
-function makeJob(overrides: Partial<Job> & Pick<Job, 'id' | 'status'>): Job {
-  const now = '2026-08-01T00:00:00.000Z'
-  return {
-    id: overrides.id,
-    user_id: 'user-1',
-    company: 'Acme',
-    role: 'Engineer',
-    salary_min: 90000,
-    salary_max: 120000,
-    salary_currency: 'PHP',
-    url: null,
-    description: null,
-    status: overrides.status,
-    date_applied: '2026-07-20',
-    notes: null,
-    contact_name: null,
-    contact_email: null,
-    contact_linkedin: null,
-    contact_notes: null,
-    location: null,
-    work_mode: null,
-    source: null,
-    is_referral: false,
-    tags: [],
-    tech_stack: [],
-    created_at: now,
-    updated_at: now,
-    ...overrides,
-  }
-}
 
 const JOBS: Job[] = [
   makeJob({ id: '1', status: 'wishlist', company: 'Initech' }),

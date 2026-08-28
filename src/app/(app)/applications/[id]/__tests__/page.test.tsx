@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, within, cleanup } from '@testing-library/react'
-import type { Job } from '@/types'
+import { makeJob } from '@/test/fixtures'
 
 // This route reads through four hooks (job, activity, document links, events)
 // plus a fifth for CV text, so the fetch state, the not-found state and the
@@ -21,37 +21,6 @@ vi.mock('@/hooks/useJobEvents', () => ({ useJobEvents: useJobEventsMock }))
 vi.mock('@/hooks/useCvText', () => ({ useCvText: useCvTextMock }))
 
 import Page from '../page'
-
-function makeJob(overrides: Partial<Job> = {}): Job {
-  const now = '2026-08-01T00:00:00.000Z'
-  return {
-    id: 'job-1',
-    user_id: 'user-1',
-    company: 'Acme',
-    role: 'Staff Engineer',
-    salary_min: 90000,
-    salary_max: 120000,
-    salary_currency: 'PHP',
-    url: null,
-    description: null,
-    status: 'applied',
-    date_applied: '2026-07-20',
-    notes: null,
-    contact_name: null,
-    contact_email: null,
-    contact_linkedin: null,
-    contact_notes: null,
-    location: null,
-    work_mode: null,
-    source: null,
-    is_referral: false,
-    tags: [],
-    tech_stack: [],
-    created_at: now,
-    updated_at: now,
-    ...overrides,
-  }
-}
 
 afterEach(() => cleanup())
 
@@ -74,7 +43,7 @@ describe('Application detail route wrapper', () => {
   // arrive.
   it('keeps showing the spinner while a secondary panel is still loading', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
-    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useJobMock.mockReturnValue({ data: makeJob({ id: 'job-1', status: 'applied' }), isLoading: false, error: null })
     useActivityMock.mockReturnValue({ data: undefined, isLoading: true })
     useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false })
     useJobEventsMock.mockReturnValue({ data: [], isLoading: false })
@@ -103,7 +72,7 @@ describe('Application detail route wrapper', () => {
 
   it('renders the application once every read resolves', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
-    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useJobMock.mockReturnValue({ data: makeJob({ id: 'job-1', status: 'applied' }), isLoading: false, error: null })
     useActivityMock.mockReturnValue({ data: [], isLoading: false })
     useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false })
     useJobEventsMock.mockReturnValue({ data: [], isLoading: false })
@@ -120,7 +89,7 @@ describe('Application detail route wrapper', () => {
   // deliberately not folded into the not-found panel above.
   it('shows the activity panel as failed, not empty, when the activity read errors', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
-    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useJobMock.mockReturnValue({ data: makeJob({ id: 'job-1', status: 'applied' }), isLoading: false, error: null })
     useActivityMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('boom') })
     useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false, error: null })
     useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
@@ -134,7 +103,7 @@ describe('Application detail route wrapper', () => {
 
   it('shows the linked CV panel as failed, not empty, when the document-links read errors', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
-    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useJobMock.mockReturnValue({ data: makeJob({ id: 'job-1', status: 'applied' }), isLoading: false, error: null })
     useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
     useDocumentLinksMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('boom') })
     useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
@@ -148,7 +117,7 @@ describe('Application detail route wrapper', () => {
 
   it('shows the next-event panel as failed, not empty, when the events read errors', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
-    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useJobMock.mockReturnValue({ data: makeJob({ id: 'job-1', status: 'applied' }), isLoading: false, error: null })
     useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
     useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false, error: null })
     useJobEventsMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('boom') })
@@ -167,7 +136,7 @@ describe('Application detail route wrapper', () => {
   // CV, where the query never turns on at all.
   it('keeps showing the spinner while the CV-text read is still loading', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
-    useJobMock.mockReturnValue({ data: makeJob({ description: 'Need React.' }), isLoading: false, error: null })
+    useJobMock.mockReturnValue({ data: makeJob({ id: 'job-1', status: 'applied', description: 'Need React.' }), isLoading: false, error: null })
     useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
     useDocumentLinksMock.mockReturnValue({
       data: [{ resume_id: 'resume-1', title: 'CV', version: 1, sent_at: '2026-07-01' }],
@@ -186,7 +155,7 @@ describe('Application detail route wrapper', () => {
     // enabled: false on the real hook means this never settles to
     // isLoading: false through a fetch -- it starts false and stays false.
     useParamsMock.mockReturnValue({ id: 'job-1' })
-    useJobMock.mockReturnValue({ data: makeJob(), isLoading: false, error: null })
+    useJobMock.mockReturnValue({ data: makeJob({ id: 'job-1', status: 'applied' }), isLoading: false, error: null })
     useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
     useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false, error: null })
     useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
@@ -199,7 +168,7 @@ describe('Application detail route wrapper', () => {
   it('renders a real ATS score once the CV text read resolves, not the null-match copy', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
     useJobMock.mockReturnValue({
-      data: makeJob({ description: 'Looking for React and Kubernetes.' }),
+      data: makeJob({ id: 'job-1', status: 'applied', description: 'Looking for React and Kubernetes.' }),
       isLoading: false,
       error: null,
     })
@@ -224,7 +193,7 @@ describe('Application detail route wrapper', () => {
   it('shows the ATS panel as failed, not empty, when the CV-text read errors', () => {
     useParamsMock.mockReturnValue({ id: 'job-1' })
     useJobMock.mockReturnValue({
-      data: makeJob({ description: 'Looking for React and Kubernetes.' }),
+      data: makeJob({ id: 'job-1', status: 'applied', description: 'Looking for React and Kubernetes.' }),
       isLoading: false,
       error: null,
     })

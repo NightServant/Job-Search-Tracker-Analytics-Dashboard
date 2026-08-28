@@ -1,8 +1,8 @@
 'use client'
 
 import * as React from 'react'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
@@ -52,37 +52,6 @@ function normalizePostingUrl(value: string): string {
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed)) return trimmed
   if (/^[\w.-]+\.[a-z]{2,}(?:\/|$)/i.test(trimmed)) return `https://${trimmed}`
   return trimmed
-}
-
-function Field({
-  id,
-  label,
-  required,
-  hint,
-  span,
-  children,
-}: {
-  id: string
-  label: string
-  required?: boolean
-  hint?: string
-  span?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <div className={cn('flex flex-col gap-1.5', span && 'sm:col-span-2')}>
-      <label htmlFor={id} className="text-label-caps uppercase text-text-secondary">
-        {label}
-        {required && (
-          <span aria-hidden className="text-text-muted">
-            {' *'}
-          </span>
-        )}
-      </label>
-      {children}
-      {hint && <p className="text-body-s text-text-muted">{hint}</p>}
-    </div>
-  )
 }
 
 /**
