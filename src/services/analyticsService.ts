@@ -158,9 +158,15 @@ export const analyticsService = {
    * Current status alone cannot answer "did this job ever reach stage X" --
    * only `job_status_history` can -- so history drives the chain and current
    * status is used only as a fallback for jobs with no history rows at all
-   * (rows written before history capture existed). A currently-rejected job
-   * with no supporting history cannot be credited with unverified progress
-   * through Applied/Interviewing/Offer, so it falls back to Wishlist only.
+   * (rows written before history capture existed).
+   *
+   * A currently-rejected job with no supporting history is credited with
+   * Applied, not just Wishlist: Applied is a FLOOR for a rejection, not an
+   * assumption -- a job cannot be rejected from a posting it was never
+   * applied to. It is NOT credited with Interviewing, which is genuinely
+   * unknowable without a history row and is left uncounted rather than
+   * inferred. (Gabe's ruling, Task 8 fix round 2 -- supersedes the more
+   * conservative Wishlist-only fallback fix round 1 shipped.)
    */
   async getConversionFunnel(userId: string): Promise<ConversionFunnelMetric[]> {
     try {
@@ -214,9 +220,20 @@ export const analyticsService = {
         if (maxIndex === undefined) {
           // No history row put this job at a pipeline stage -- it predates
           // history capture, or was rejected directly with no intermediate
-          // stage ever recorded. Fall back to current status; see docblock.
+          // stage ever recorded. Fall back to current status.
           const currentIdx = pipelineIndex(job.status)
-          maxIndex = currentIdx >= 0 ? currentIdx : 0
+          if (currentIdx >= 0) {
+            maxIndex = currentIdx
+          } else {
+            // job.status === 'rejected' with no history at all. Applied is
+            // a FLOOR, not an assumption -- a job cannot be rejected from a
+            // posting it was never applied to -- so it is credited there
+            // even without a history row proving it. Interviewing is NOT
+            // credited: that is genuinely unknowable without history, and
+            // inferring it would fabricate progress the data cannot
+            // support.
+            maxIndex = pipelineIndex('applied')
+          }
         }
 
         for (let i = 0; i <= maxIndex; i++) {

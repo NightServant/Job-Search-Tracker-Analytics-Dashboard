@@ -80,8 +80,11 @@ describe('analyticsService', () => {
       // j5: applied -> interviewing -> rejected -- a rejection after
       //     interviewing must still count at applied and interviewing.
       // j6: currently rejected with NO history rows at all (predates
-      //     capture) -- falls back to current status, credited only at
-      //     wishlist since unverified progress cannot be fabricated.
+      //     capture) -- falls back to current status. Applied is a FLOOR
+      //     for a rejection (you cannot be rejected from a posting you
+      //     never applied to), so it is credited at wishlist AND applied,
+      //     but NOT interviewing -- that is genuinely unknowable without
+      //     history and must not be inferred.
       clientRef.current = fakeSupabase({
         jobs: [
           { id: 'j1', user_id: 'user-1', status: 'wishlist', created_at: EPOCH },
@@ -122,8 +125,12 @@ describe('analyticsService', () => {
       // counting current status alone drops j4 out of `interviewing`,
       // making this assertion (and the loop above, for this pair) fail.
       expect(byStage.Interviewing).toBeGreaterThanOrEqual(byStage.Offer)
-      expect(byStage.Applied).toBe(4) // j2, j3, j4, j5 -- not j1, not j6
-      expect(byStage.Interviewing).toBe(3) // j3, j4, j5
+      // j6 (rejected, no history) is credited at Applied via the floor
+      // rule, not just Wishlist -- the specific behaviour this fix round
+      // added. If the floor rule regresses back to "wishlist only", this
+      // drops to 4 and the assertion catches it.
+      expect(byStage.Applied).toBe(5) // j2, j3, j4, j5, j6
+      expect(byStage.Interviewing).toBe(3) // j3, j4, j5 -- NOT j6: unknowable without history
       expect(byStage.Offer).toBe(1) // j4 only
       expect(byStage.Wishlist).toBe(6) // every job
 
