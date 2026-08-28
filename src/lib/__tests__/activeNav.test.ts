@@ -8,8 +8,12 @@ describe('activeNavHref', () => {
     )
   })
 
-  it('highlights nothing on settings', () => {
-    expect(activeNavHref('/settings', ['/dashboard', '/applications'])).toBeNull()
+  it('highlights nothing on settings, even if a caller includes it in hrefs', () => {
+    // Without the settings clause, '/settings' would be a valid match here
+    // (isUnder('/settings', '/settings') is true) and the sort would pick it.
+    // The clause exists precisely to override that: settings is chrome, not
+    // a nav destination, no matter what the caller passes.
+    expect(activeNavHref('/settings', ['/dashboard', '/applications', '/settings'])).toBeNull()
   })
 
   it('does not match a prefix that is not a path segment', () => {

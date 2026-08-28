@@ -13,6 +13,11 @@ import { describeLink, type DocumentLinkSummary } from '@/services/applicationDo
  * `error` is a third state, distinct from both loading and empty: a failed
  * read must not render the same "no CV linked" copy an application that
  * genuinely has none gets.
+ *
+ * The empty copy says only that no CV is linked, not that there is anywhere
+ * to link one from -- `documentLinkService.pin` and `.unpin` have zero
+ * callers in `src`, and `DocumentRow` renders no pin affordance, so promising
+ * one here would point at a control that does not exist.
  */
 export interface LinkedCvProps extends React.HTMLAttributes<HTMLElement> {
   links: DocumentLinkSummary[]
@@ -29,10 +34,7 @@ export function LinkedCv({ links, error = false, className, ...props }: LinkedCv
       {...props}
     >
       {links.length === 0 ? (
-        <p className="text-body-s text-text-muted">
-          No CV linked to this application yet. Pin one from Documents to track which version
-          you sent.
-        </p>
+        <p className="text-body-s text-text-muted">No CV linked to this application yet.</p>
       ) : (
         <ul className="flex flex-col">
           {links.map((link) => (

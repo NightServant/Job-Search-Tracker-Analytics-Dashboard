@@ -154,6 +154,14 @@ describe('LinkedCv', () => {
     expect(screen.getByText(/no cv linked/i)).toBeTruthy()
   })
 
+  it('does not instruct the user to pin a CV from a control that does not exist', () => {
+    render(<LinkedCv links={[]} />)
+    // documentLinkService.pin/.unpin have zero callers in src, and DocumentRow
+    // renders no pin affordance -- promising one here would send the user to
+    // /documents to find nothing to click.
+    expect(screen.queryByText(/pin one from documents/i)).toBeNull()
+  })
+
   it('says the read failed rather than claiming no CV is linked', () => {
     render(<LinkedCv links={[]} error />)
     expect(screen.queryByText(/no cv linked/i)).toBeNull()
