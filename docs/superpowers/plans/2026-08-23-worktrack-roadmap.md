@@ -30,7 +30,13 @@ framework, against a schema that already exists.
 - **Icons:** the custom 26-icon set from Figma. Never Lucide. `skiper26` pulls
   `lucide-react` transitively; because shadcn copies source in-tree, edit the
   import out rather than accepting it. `grep -r lucide src/` must come back
-  empty once 4.3 lands.
+  empty once 4.3 lands. **Discharged in M5 Task 10, not 4.3** — the icon set
+  was short twelve glyphs at 4.3 (see
+  `docs/superpowers/notes/2026-08-25-icon-gap.md`), so the gate moved to M5,
+  where it landed once the screens holding the last Lucide imports were
+  rewritten. `lucide-react` is uninstalled and no file under `src/` imports
+  it; the gate checks import statements rather than the bare package name, so
+  prose documenting the decision does not itself trip it.
 - **Radius caps at 4px.** Separation is hairline rules, not card borders.
 - **Every migration is idempotent** and lands in `supabase/migrations/` with the
   version recorded remotely. `supabase migration list --linked` must show

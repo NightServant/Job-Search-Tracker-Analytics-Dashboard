@@ -50,10 +50,11 @@ export function ThemeToggle({ size = 32, className, onClick, ...props }: ThemeTo
    * The wipe is decoration; the theme change is the feature.
    *
    * Written against next-themes rather than installing skiper26, which pulls
-   * lucide-react and mounts a second theme provider beside the one M3 already
-   * has. Three paths, and the two that skip the animation are the ones that
-   * matter: reduced motion, and any browser without View Transitions -- Safari
-   * and Firefox both shipped late. In both the theme still flips, instantly.
+   * in the icon package this codebase forbids and mounts a second theme
+   * provider beside the one M3 already has. Three paths, and the two that
+   * skip the animation are the ones that matter: reduced motion, and any
+   * browser without View Transitions -- Safari and Firefox both shipped late.
+   * In both the theme still flips, instantly.
    */
   const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     onClick?.(e)

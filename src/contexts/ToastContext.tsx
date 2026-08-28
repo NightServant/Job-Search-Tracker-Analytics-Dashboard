@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useCallback, useContext, useMemo, useState } from 'react'
-import { X } from 'lucide-react'
+import { CloseIcon } from '@/components/icons'
 
 export type ToastType = 'success' | 'error' | 'info'
 
@@ -112,7 +112,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
                   className="p-1 rounded-md text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 dark:hover:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
                   aria-label="Dismiss"
                 >
-                  <X className="w-4 h-4" />
+                  <CloseIcon size={16} />
                 </button>
               </div>
             </div>
