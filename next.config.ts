@@ -21,6 +21,12 @@ const nextConfig: NextConfig = {
     // Lint remains a separate gate; revisit when M5 rewrites those files anyway.
     ignoreDuringBuilds: true,
   },
+  // The Applications screen moved from /jobs to /applications in M5; the old
+  // URL is live in production (bookmarks, shared links), so it redirects
+  // rather than 404ing.
+  async redirects() {
+    return [{ source: '/jobs', destination: '/applications', permanent: true }]
+  },
 }
 
 export default nextConfig

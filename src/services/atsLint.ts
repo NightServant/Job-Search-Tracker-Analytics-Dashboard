@@ -1,4 +1,4 @@
-import type { CvDocument } from './cvSchema'
+import { isValidCvDocument, type CvDocument } from './cvSchema'
 
 export type AtsVerdict = 'pass' | 'review' | 'fail'
 
@@ -62,4 +62,28 @@ export function lintForAts(doc: CvDocument): AtsLintResult {
     return { verdict: 'review', reasons: advisory }
   }
   return { verdict: 'pass', reasons: [] }
+}
+
+/**
+ * The verdict for a value read straight out of `resumes.sections`, or `null`
+ * when there is nothing lintable there.
+ *
+ * `null` is a third answer, not a fourth verdict: a legacy word or latex draft
+ * has no structured CV at all, and rendering that as `fail` would tell someone
+ * their CV is unreadable by an ATS when in truth nothing was ever checked.
+ * The Documents list needs exactly this distinction for its ATS column.
+ *
+ * The column is nullable JSONB with nothing constraining its contents, and
+ * `isValidCvDocument` only guards the top level -- `basics.name` can still be
+ * a number, which `lintForAts` would call `.trim()` on. A throw here would
+ * take down a whole list of CVs over one malformed row, so it resolves to the
+ * same "nothing to check" answer instead.
+ */
+export function lintSections(sections: unknown): AtsVerdict | null {
+  if (!isValidCvDocument(sections)) return null
+  try {
+    return lintForAts(sections as CvDocument).verdict
+  } catch {
+    return null
+  }
 }

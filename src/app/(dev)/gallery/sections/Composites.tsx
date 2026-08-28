@@ -55,14 +55,14 @@ export function Composites() {
       <Row title="Job Card and Kanban Column" note="A card only because it moves. No shadow, 4px radius.">
         <div className="flex gap-6 overflow-x-auto pb-2">
           <KanbanColumn title="Wishlist" count={2}>
-            <JobCard company="Vercel" role="DX Engineer" status="wishlist" salaryMin={140000} salaryMax={175000} />
-            <JobCard company="Linear" role="Frontend Engineer" status="wishlist" />
+            <JobCard company="Vercel" role="DX Engineer" status="wishlist" salaryMin={140000} salaryMax={175000} currency="USD" />
+            <JobCard company="Linear" role="Frontend Engineer" status="wishlist" currency="USD" />
           </KanbanColumn>
           <KanbanColumn title="Applied" count={1}>
             <JobCard company="Grab" role="Product Engineer" status="applied" salaryMin={1800000} salaryMax={2400000} currency="PHP" />
           </KanbanColumn>
           <KanbanColumn title="Interviewing" count={1}>
-            <JobCard company="Canonical" role="Senior Frontend Engineer" status="interviewing" salaryMin={95000} salaryMax={130000} />
+            <JobCard company="Canonical" role="Senior Frontend Engineer" status="interviewing" salaryMin={95000} salaryMax={130000} currency="USD" />
           </KanbanColumn>
         </div>
       </Row>
@@ -86,7 +86,7 @@ export function Composites() {
 
       <Row title="Sidebar" note="Logo, nav, divider, settings, spacer, toggle, footer -- that order is from Figma.">
         <div className="h-[520px] w-60 overflow-hidden rounded-md border border-border-subtle">
-          <Sidebar pathname="/jobs" className="border-r-0" />
+          <Sidebar pathname="/applications" className="border-r-0" />
         </div>
       </Row>
     </section>

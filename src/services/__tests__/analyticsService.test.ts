@@ -11,9 +11,168 @@ import * as Sentry from '@sentry/react'
 
 vi.mock('@sentry/react')
 
+/**
+ * `getConversionFunnel`'s fix round exists because every test below this
+ * point in the file (pre-existing) constructs its expected `funnel` /
+ * `cohorts` / `trends` arrays as inline literals and asserts against them --
+ * the exact defect class that let a quadratic self-scan, a silently-dropped
+ * `rejected` count, a never-computed `wishlist` count, and two stages
+ * sharing one `avgDaysToStage` value all ship green. None of those tests
+ * ever calls `analyticsService.getConversionFunnel` itself.
+ *
+ * This fake models `jobs` and `job_status_history` well enough to drive the
+ * real function: `.from(table).select(...).eq(...).eq(...)` filters an
+ * in-memory row array and resolves like a PostgREST response. `.order()` is
+ * a no-op (`_computeTimeToStatus`'s callers only ever look at whole result
+ * sets here, not order).
+ */
+const clientRef = vi.hoisted(() => ({ current: null as unknown as { from: (table: string) => unknown } }))
+
+vi.mock('@/lib/supabase', () => ({
+  supabase: new Proxy(
+    {},
+    { get: (_target, prop: string) => (clientRef.current as unknown as Record<string, unknown>)[prop] }
+  ),
+}))
+
+type FakeRow = Record<string, unknown>
+
+function fakeSupabase(tables: Record<string, FakeRow[]>) {
+  return {
+    from(table: string) {
+      const rows = tables[table] ?? []
+      let filtered = rows.slice()
+      const builder: PromiseLike<{ data: FakeRow[]; error: null }> & Record<string, unknown> = {
+        select: () => builder,
+        eq: (col: string, val: unknown) => {
+          filtered = filtered.filter((r) => r[col] === val)
+          return builder
+        },
+        order: () => builder,
+        then: (onFulfilled: any, onRejected?: any) =>
+          Promise.resolve({ data: filtered, error: null }).then(onFulfilled, onRejected),
+      } as any
+      return builder
+    },
+  }
+}
+
+/** Minutes-precision ISO timestamp `n` days after a fixed epoch. */
+function daysAfter(epochIso: string, days: number): string {
+  return new Date(new Date(epochIso).getTime() + days * 24 * 60 * 60 * 1000).toISOString()
+}
+
 describe('analyticsService', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+  })
+
+  describe('getConversionFunnel -- real computation, not literal fixtures', () => {
+    const EPOCH = '2026-01-01T00:00:00.000Z'
+
+    it('is monotonically non-increasing across wishlist -> applied -> interviewing -> offer, crediting a job at a later stage with every earlier stage it passed through', async () => {
+      // j1: never left wishlist, no history.
+      // j2: applied only.
+      // j3: applied -> interviewing.
+      // j4: applied -> interviewing -> offer -- the exact case that used to
+      //     be invisible at "interviewing" under current-status-only counting,
+      //     which could render interviewing LOWER than offer.
+      // j5: applied -> interviewing -> rejected -- a rejection after
+      //     interviewing must still count at applied and interviewing.
+      // j6: currently rejected with NO history rows at all (predates
+      //     capture) -- falls back to current status. Applied is a FLOOR
+      //     for a rejection (you cannot be rejected from a posting you
+      //     never applied to), so it is credited at wishlist AND applied,
+      //     but NOT interviewing -- that is genuinely unknowable without
+      //     history and must not be inferred.
+      clientRef.current = fakeSupabase({
+        jobs: [
+          { id: 'j1', user_id: 'user-1', status: 'wishlist', created_at: EPOCH },
+          { id: 'j2', user_id: 'user-1', status: 'applied', created_at: EPOCH },
+          { id: 'j3', user_id: 'user-1', status: 'interviewing', created_at: EPOCH },
+          { id: 'j4', user_id: 'user-1', status: 'offer', created_at: EPOCH },
+          { id: 'j5', user_id: 'user-1', status: 'rejected', created_at: EPOCH },
+          { id: 'j6', user_id: 'user-1', status: 'rejected', created_at: EPOCH },
+        ],
+        job_status_history: [
+          { job_id: 'j2', user_id: 'user-1', to_status: 'applied', changed_at: daysAfter(EPOCH, 1) },
+          { job_id: 'j3', user_id: 'user-1', to_status: 'applied', changed_at: daysAfter(EPOCH, 1) },
+          { job_id: 'j3', user_id: 'user-1', to_status: 'interviewing', changed_at: daysAfter(EPOCH, 5) },
+          { job_id: 'j4', user_id: 'user-1', to_status: 'applied', changed_at: daysAfter(EPOCH, 1) },
+          { job_id: 'j4', user_id: 'user-1', to_status: 'interviewing', changed_at: daysAfter(EPOCH, 5) },
+          { job_id: 'j4', user_id: 'user-1', to_status: 'offer', changed_at: daysAfter(EPOCH, 20) },
+          { job_id: 'j5', user_id: 'user-1', to_status: 'applied', changed_at: daysAfter(EPOCH, 1) },
+          { job_id: 'j5', user_id: 'user-1', to_status: 'interviewing', changed_at: daysAfter(EPOCH, 5) },
+          { job_id: 'j5', user_id: 'user-1', to_status: 'rejected', changed_at: daysAfter(EPOCH, 9) },
+          // j6 has no history rows at all.
+        ],
+      })
+
+      const result = await analyticsService.getConversionFunnel('user-1')
+
+      const chain = result.filter((r) => !r.isExit)
+      expect(chain.map((r) => r.stage)).toEqual(['Wishlist', 'Applied', 'Interviewing', 'Offer'])
+      const byStage = Object.fromEntries(chain.map((r) => [r.stage, r.count]))
+
+      // The invariant, not five hand-written numbers: each stage's count is
+      // <= the previous stage's, for the whole chain.
+      for (let i = 1; i < chain.length; i++) {
+        expect(chain[i].count).toBeLessThanOrEqual(chain[i - 1].count)
+      }
+
+      // The specific regression this exists to catch: j4 is currently at
+      // Offer, and must still be counted at Interviewing. Reverting to
+      // counting current status alone drops j4 out of `interviewing`,
+      // making this assertion (and the loop above, for this pair) fail.
+      expect(byStage.Interviewing).toBeGreaterThanOrEqual(byStage.Offer)
+      // j6 (rejected, no history) is credited at Applied via the floor
+      // rule, not just Wishlist -- the specific behaviour this fix round
+      // added. If the floor rule regresses back to "wishlist only", this
+      // drops to 4 and the assertion catches it.
+      expect(byStage.Applied).toBe(5) // j2, j3, j4, j5, j6
+      expect(byStage.Interviewing).toBe(3) // j3, j4, j5 -- NOT j6: unknowable without history
+      expect(byStage.Offer).toBe(1) // j4 only
+      expect(byStage.Wishlist).toBe(6) // every job
+
+      const rejected = result.find((r) => r.stage === 'Rejected')!
+      expect(rejected.isExit).toBe(true)
+      expect(rejected.count).toBe(2) // j5, j6 -- current status, not chain membership
+      expect(chain.every((r) => r.isExit === false)).toBe(true)
+    })
+
+    it('reports Wishlist and Rejected, not just the three stages the old code returned', async () => {
+      clientRef.current = fakeSupabase({
+        jobs: [
+          { id: 'j1', user_id: 'user-1', status: 'wishlist', created_at: EPOCH },
+          { id: 'j2', user_id: 'user-1', status: 'rejected', created_at: EPOCH },
+        ],
+        job_status_history: [{ job_id: 'j2', user_id: 'user-1', to_status: 'rejected', changed_at: daysAfter(EPOCH, 2) }],
+      })
+
+      const result = await analyticsService.getConversionFunnel('user-1')
+
+      expect(result).toHaveLength(5)
+      expect(result.map((r) => r.stage)).toEqual(['Wishlist', 'Applied', 'Interviewing', 'Offer', 'Rejected'])
+      expect(result.find((r) => r.stage === 'Rejected')?.count).toBe(1)
+    })
+
+    it('computes a distinct avgDaysToStage for Applied and Interviewing instead of reusing the same value', async () => {
+      clientRef.current = fakeSupabase({
+        jobs: [{ id: 'j1', user_id: 'user-1', status: 'interviewing', created_at: EPOCH }],
+        job_status_history: [
+          { job_id: 'j1', user_id: 'user-1', to_status: 'applied', changed_at: daysAfter(EPOCH, 2) },
+          { job_id: 'j1', user_id: 'user-1', to_status: 'interviewing', changed_at: daysAfter(EPOCH, 10) },
+        ],
+      })
+
+      const result = await analyticsService.getConversionFunnel('user-1')
+      const applied = result.find((r) => r.stage === 'Applied')!
+      const interviewing = result.find((r) => r.stage === 'Interviewing')!
+
+      expect(applied.avgDaysToStage).toBe(2)
+      expect(interviewing.avgDaysToStage).toBe(10)
+      expect(applied.avgDaysToStage).not.toBe(interviewing.avgDaysToStage)
+    })
   })
 
   describe('getTimeInStageMetrics', () => {
@@ -88,18 +247,21 @@ describe('analyticsService', () => {
           count: 50,
           percentage: 100,
           avgDaysToStage: 0,
+          isExit: false,
         },
         {
           stage: 'Interviewing',
           count: 15,
           percentage: 30,
           avgDaysToStage: 7,
+          isExit: false,
         },
         {
           stage: 'Offer',
           count: 3,
           percentage: 6,
           avgDaysToStage: 21,
+          isExit: false,
         },
       ]
 
@@ -112,9 +274,9 @@ describe('analyticsService', () => {
     it('computes conversion percentages at each stage', () => {
       const totalJobs = 100
       const funnel: ConversionFunnelMetric[] = [
-        { stage: 'Applied', count: 100, percentage: 100, avgDaysToStage: 0 },
-        { stage: 'Interviewing', count: 30, percentage: 30, avgDaysToStage: 7 },
-        { stage: 'Offer', count: 5, percentage: 5, avgDaysToStage: 21 },
+        { stage: 'Applied', count: 100, percentage: 100, avgDaysToStage: 0, isExit: false },
+        { stage: 'Interviewing', count: 30, percentage: 30, avgDaysToStage: 7, isExit: false },
+        { stage: 'Offer', count: 5, percentage: 5, avgDaysToStage: 21, isExit: false },
       ]
 
       expect(funnel[1]?.percentage).toBe(30)
@@ -123,9 +285,9 @@ describe('analyticsService', () => {
 
     it('computes average time to each stage', () => {
       const funnel: ConversionFunnelMetric[] = [
-        { stage: 'Applied', count: 100, percentage: 100, avgDaysToStage: 0 },
-        { stage: 'Interviewing', count: 30, percentage: 30, avgDaysToStage: 10 },
-        { stage: 'Offer', count: 5, percentage: 5, avgDaysToStage: 35 },
+        { stage: 'Applied', count: 100, percentage: 100, avgDaysToStage: 0, isExit: false },
+        { stage: 'Interviewing', count: 30, percentage: 30, avgDaysToStage: 10, isExit: false },
+        { stage: 'Offer', count: 5, percentage: 5, avgDaysToStage: 35, isExit: false },
       ]
 
       expect(funnel[1]?.avgDaysToStage).toBe(10)
@@ -134,7 +296,7 @@ describe('analyticsService', () => {
 
     it('shows time-to-interview metric', () => {
       const funnel: ConversionFunnelMetric[] = [
-        { stage: 'Interviewing', count: 25, percentage: 25, avgDaysToStage: 14 },
+        { stage: 'Interviewing', count: 25, percentage: 25, avgDaysToStage: 14, isExit: false },
       ]
 
       expect(funnel[0]?.avgDaysToStage).toBe(14)
@@ -142,7 +304,7 @@ describe('analyticsService', () => {
 
     it('shows time-to-offer metric', () => {
       const funnel: ConversionFunnelMetric[] = [
-        { stage: 'Offer', count: 5, percentage: 5, avgDaysToStage: 42 },
+        { stage: 'Offer', count: 5, percentage: 5, avgDaysToStage: 42, isExit: false },
       ]
 
       expect(funnel[0]?.avgDaysToStage).toBe(42)

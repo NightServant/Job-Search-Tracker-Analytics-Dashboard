@@ -1,4 +1,6 @@
 export interface DocumentLinkSummary {
+  /** The resume this link points at, needed to read its content for ATS matching. */
+  resume_id: string
   title: string
   version: number | null
   sent_at: string

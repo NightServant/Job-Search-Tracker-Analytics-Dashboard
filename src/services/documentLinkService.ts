@@ -56,7 +56,7 @@ export const documentLinkService = {
   async listForJob(client: SupabaseClient, jobId: string): Promise<DocumentLinkSummary[]> {
     const { data, error } = await client
       .from('application_documents')
-      .select('sent_at, resumes(title), resume_snapshots(version)')
+      .select('resume_id, sent_at, resumes(title), resume_snapshots(version)')
       .eq('job_id', jobId)
     if (error) throw toError(error)
 
@@ -64,6 +64,7 @@ export const documentLinkService = {
       const resume = row.resumes as unknown as { title: string } | null
       const snapshot = row.resume_snapshots as unknown as { version: number | null } | null
       return {
+        resume_id: row.resume_id as string,
         title: resume?.title ?? 'untitled cv',
         version: snapshot?.version ?? null,
         sent_at: row.sent_at as string,

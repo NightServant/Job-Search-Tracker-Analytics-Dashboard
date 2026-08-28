@@ -1,29 +1,21 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 import { render, cleanup, screen } from '@testing-library/react'
+import { ApplicationForm } from '@/components/applications/ApplicationForm'
 
-// Mock hooks used by JobForm to avoid network calls and react-query complexity.
-vi.mock('@/hooks/useJobs', () => ({
-  useAutofillJobFromUrl: () => ({
-    mutateAsync: async (_url: string) => ({ values: {}, warnings: [] }),
-    isPending: false,
-  }),
-  useJobStatusHistory: (_jobId?: string) => ({ data: [], isLoading: false }),
-}))
-
-import JobForm from '@/components/jobs/JobForm'
+// ApplicationForm needs no hook mocks: it is a pure component over props, and
+// the auto-fill mutation the old JobForm reached for directly now arrives as a
+// callback the route supplies. That is why this file no longer mocks
+// @/hooks/useJobs -- there is nothing left here to mock.
 
 describe('accessibility checks', () => {
-  afterEach(() => {
-    cleanup()
-    vi.restoreAllMocks()
-  })
+  afterEach(() => cleanup())
 
-  it('JobForm basic accessibility checks (labels, button names)', async () => {
-    const onSubmit = vi.fn(async () => {})
-    render(<JobForm isOpen={true} onClose={() => {}} onSubmit={onSubmit} />)
+  it('ApplicationForm basic accessibility checks (labels, button names)', () => {
+    render(<ApplicationForm defaultCurrency="PHP" onSubmit={async () => {}} />)
 
     // Ensure all form controls with ids have associated labels
     const controls = document.querySelectorAll('input[id], select[id], textarea[id]')
+    expect(controls.length).toBeGreaterThan(0)
     for (const el of Array.from(controls)) {
       const id = el.getAttribute('id')
       if (!id) continue
@@ -38,7 +30,7 @@ describe('accessibility checks', () => {
       expect(name.trim().length, 'Buttons should have accessible names').toBeGreaterThan(0)
     }
 
-    // Sanity: dialog header exists
+    // Sanity: the form names itself
     expect(screen.getByRole('heading', { level: 2 })).toBeTruthy()
   })
 })

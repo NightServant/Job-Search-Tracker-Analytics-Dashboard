@@ -1,0 +1,211 @@
+'use client'
+
+import * as React from 'react'
+import { PageHeader } from '@/components/ui/page-header'
+import { PanelSection } from '@/components/ui/panel-section'
+import { KpiStat } from '@/components/ui/kpi-stat'
+import { Spinner } from '@/components/ui/spinner'
+import { RangePicker } from './RangePicker'
+import { FunnelChart, normalizeFunnel } from './FunnelChart'
+import { TimeInStage } from './TimeInStage'
+import { SourceTrends } from './SourceTrends'
+import { CohortTable } from './CohortTable'
+import { filterByMonth, rangeLabel, type RangeOption } from '@/lib/analyticsRange'
+import type {
+  TimeInStageMetric,
+  ConversionFunnelMetric,
+  SourceConversionTrend,
+  CohortAnalysis,
+  ConversionMetrics,
+} from '@/services/analyticsService'
+
+/**
+ * One query's worth of state, mirroring what a react-query result carries.
+ * Kept as a plain shape (rather than importing `UseQueryResult`) so this
+ * component has no react-query dependency of its own -- `page.tsx` is the
+ * only file that touches the hooks, matching ruling D.
+ */
+export interface MetricState<T> {
+  data: T | null
+  isLoading: boolean
+  error: unknown
+}
+
+export interface AnalyticsProps {
+  timeInStage: MetricState<TimeInStageMetric[]>
+  conversionFunnel: MetricState<ConversionFunnelMetric[]>
+  sourceConversionTrends: MetricState<SourceConversionTrend[]>
+  cohortAnalysis: MetricState<CohortAnalysis[]>
+  conversionMetrics: MetricState<ConversionMetrics>
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : 'Could not load this metric.'
+}
+
+function Span({ children }: { children: React.ReactNode }) {
+  return <span className="text-body-s text-text-muted">{children}</span>
+}
+
+function PanelBody({
+  state,
+  empty,
+  render,
+}: {
+  state: MetricState<unknown>
+  empty: boolean
+  render: () => React.ReactNode
+}) {
+  if (state.isLoading) {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner size={20} />
+      </div>
+    )
+  }
+  if (empty) {
+    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+  }
+  return <>{render()}</>
+}
+
+function Overview({ data }: { data: ConversionMetrics | null }) {
+  const metrics = data ?? {
+    totalJobs: 0,
+    timeToFirstInterview: null,
+    timeToOffer: null,
+    conversionRate: 0,
+    conversionBySource: {},
+  }
+  return (
+    <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+      <KpiStat label="Total applications" value={metrics.totalJobs} />
+      <KpiStat
+        label="Time to first interview"
+        value={metrics.timeToFirstInterview === null ? '—' : `${metrics.timeToFirstInterview}d`}
+      />
+      <KpiStat label="Time to offer" value={metrics.timeToOffer === null ? '—' : `${metrics.timeToOffer}d`} />
+      <KpiStat label="Conversion rate" value={`${Math.round(metrics.conversionRate)}%`} />
+    </div>
+  )
+}
+
+/**
+ * The analytics screen's body, over plain props -- same split as `Dashboard`
+ * (Task 3) and `Calendar` (Task 6), so it renders without Next routing or
+ * react-query. `src/app/(app)/analytics/page.tsx` owns all five reads this
+ * screen needs, one hook per metric.
+ *
+ * Deliberately NOT wired through `useAnalytics()`, the aggregator hook
+ * already in `src/hooks/useAnalytics.ts`. Its `loading` is true if any of
+ * the five underlying queries is loading, and its `error` is the first
+ * non-null one of the five -- so one slow or failed metric blanks a page
+ * that has four other panels with something to show. That is the exact
+ * defect Task 5's review found and fixed for the application detail screen
+ * ("secondary fetch errors read as empty states"), so this screen takes the
+ * same five hooks individually instead and gives each panel its own state
+ * via `PanelSection`'s `error` prop -- with `PanelBody` additionally telling
+ * "still loading" and "loaded but genuinely empty" apart, which `error`
+ * alone does not cover.
+ *
+ * The range picker only reaches two of five panels. Every `analyticsService`
+ * method takes just `userId` -- no date range -- and of the five return
+ * shapes only `SourceConversionTrend` (`month`) and `CohortAnalysis`
+ * (`cohort`) carry a time dimension at all. `TimeInStageMetric`,
+ * `ConversionFunnelMetric` and `ConversionMetrics` cannot be range-filtered,
+ * even client-side, so their panels read "All time" instead of silently
+ * ignoring a control that would otherwise appear to govern them. See the
+ * pre-flight ruling in
+ * `.superpowers/sdd/2026-08-25-m5-application-screens/progress.md` for why
+ * this is the shipped shape rather than a placeholder -- adding a range
+ * parameter to `analyticsService` is parked as M2 work.
+ */
+export function Analytics({
+  timeInStage,
+  conversionFunnel,
+  sourceConversionTrends,
+  cohortAnalysis,
+  conversionMetrics,
+}: AnalyticsProps) {
+  const [range, setRange] = React.useState<RangeOption>('all')
+
+  const filteredTrends = React.useMemo(
+    () =>
+      sourceConversionTrends.data
+        ? filterByMonth(sourceConversionTrends.data, (t) => t.month, range)
+        : [],
+    [sourceConversionTrends.data, range]
+  )
+  const filteredCohorts = React.useMemo(
+    () => (cohortAnalysis.data ? filterByMonth(cohortAnalysis.data, (c) => c.cohort, range) : []),
+    [cohortAnalysis.data, range]
+  )
+
+  const funnelData = React.useMemo(
+    () => normalizeFunnel(conversionFunnel.data ?? []),
+    [conversionFunnel.data]
+  )
+
+  return (
+    <div className="flex flex-col gap-8">
+      <PageHeader title="Analytics" action={<RangePicker value={range} onChange={setRange} />} />
+
+      <PanelSection
+        title="Overview"
+        titleSize="m"
+        actions={<Span>All time</Span>}
+        error={conversionMetrics.error ? errorMessage(conversionMetrics.error) : undefined}
+      >
+        <PanelBody state={conversionMetrics} empty={false} render={() => <Overview data={conversionMetrics.data} />} />
+      </PanelSection>
+
+      <PanelSection
+        title="Conversion funnel"
+        actions={<Span>All time</Span>}
+        error={conversionFunnel.error ? errorMessage(conversionFunnel.error) : undefined}
+      >
+        <PanelBody
+          state={conversionFunnel}
+          empty={funnelData.length === 0}
+          render={() => <FunnelChart data={funnelData} />}
+        />
+      </PanelSection>
+
+      <PanelSection
+        title="Time in stage"
+        actions={<Span>All time</Span>}
+        error={timeInStage.error ? errorMessage(timeInStage.error) : undefined}
+      >
+        <PanelBody
+          state={timeInStage}
+          empty={(timeInStage.data ?? []).length === 0}
+          render={() => <TimeInStage data={timeInStage.data ?? []} />}
+        />
+      </PanelSection>
+
+      <PanelSection
+        title="Source trends"
+        actions={<Span>{rangeLabel(range)}</Span>}
+        error={sourceConversionTrends.error ? errorMessage(sourceConversionTrends.error) : undefined}
+      >
+        <PanelBody
+          state={sourceConversionTrends}
+          empty={filteredTrends.length === 0}
+          render={() => <SourceTrends data={filteredTrends} />}
+        />
+      </PanelSection>
+
+      <PanelSection
+        title="Cohort analysis"
+        actions={<Span>{rangeLabel(range)}</Span>}
+        error={cohortAnalysis.error ? errorMessage(cohortAnalysis.error) : undefined}
+      >
+        <PanelBody
+          state={cohortAnalysis}
+          empty={filteredCohorts.length === 0}
+          render={() => <CohortTable data={filteredCohorts} />}
+        />
+      </PanelSection>
+    </div>
+  )
+}

@@ -9,6 +9,11 @@ import { formatSalaryRange } from '@/services/salary'
  * Radius stays at 4px and separation is still a hairline border, not a shadow.
  * A drop shadow would be the only elevation anywhere in the system, which is
  * how a flat design quietly acquires a second visual language.
+ *
+ * `currency` has no default. Currency is stored per job and never inferred,
+ * and a fallback value is exactly the inference that rule forbids -- a card
+ * that quietly renders a peso figure as USD because a call site forgot the
+ * prop is a wrong-by-55x number that still looks plausible.
  */
 export interface JobCardProps extends React.HTMLAttributes<HTMLDivElement> {
   company: string
@@ -16,7 +21,7 @@ export interface JobCardProps extends React.HTMLAttributes<HTMLDivElement> {
   status: Status
   salaryMin?: number | null
   salaryMax?: number | null
-  currency?: string
+  currency: string
 }
 
 export function JobCard({
@@ -25,7 +30,7 @@ export function JobCard({
   status,
   salaryMin = null,
   salaryMax = null,
-  currency = 'USD',
+  currency,
   className,
   ...props
 }: JobCardProps) {

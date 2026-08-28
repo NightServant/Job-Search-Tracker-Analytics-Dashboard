@@ -1,10 +1,11 @@
+import React from 'react'
 import { describe, it, expect } from 'vitest'
 import { render } from '@testing-library/react'
-import { icons, SunIcon, ClockIcon } from '../index'
+import { icons, SunIcon } from '../index'
 
 describe('the icon set', () => {
-  it('exports all 26 icons from the Figma set', () => {
-    expect(Object.keys(icons)).toHaveLength(26)
+  it('exports every icon in the Figma set', () => {
+    expect(Object.keys(icons)).toHaveLength(34)
   })
 
   it('takes currentColor so semantic tokens drive the colour', () => {
@@ -24,15 +25,17 @@ describe('the icon set', () => {
     expect(svg?.getAttribute('viewBox')).toBe('0 0 20 20')
   })
 
-  it('keeps ring-and-path icons concentric at any size', () => {
-    // Sun and Clock draw a circle plus a path. In Figma their rings were pinned
-    // with MIN constraints and drifted off-centre when scaled; a viewBox has no
-    // such concept, so the circle must sit at the icon's centre by construction.
-    for (const Icon of [SunIcon, ClockIcon]) {
-      const { container } = render(<Icon />)
-      const circle = container.querySelector('circle')
-      expect(circle?.getAttribute('cx')).toBe('10')
-      expect(circle?.getAttribute('cy')).toBe('10')
+  it('keeps concentric rings concentric', () => {
+    // Sun, Search and Clock drifted off-centre in Figma under MIN constraints.
+    // Target is the new icon with the same two-ring construction, and it is the
+    // one that would show the drift most plainly.
+    for (const name of ['Sun', 'Clock', 'Target'] as const) {
+      const { container, unmount } = render(React.createElement(icons[name]))
+      for (const circle of container.querySelectorAll('circle')) {
+        expect(circle.getAttribute('cx'), name).toBe('10')
+        expect(circle.getAttribute('cy'), name).toBe('10')
+      }
+      unmount()
     }
   })
 

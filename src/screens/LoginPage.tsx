@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { runtimeFlags } from '@/lib/env'
-import { Mail, Lock, Briefcase, AlertCircle } from 'lucide-react'
+import { MailIcon, LockIcon, BriefcaseIcon, AlertCircleIcon } from '@/components/icons'
 import { useAuth } from '@/contexts/AuthContext'
 import { useTheme } from 'next-themes'
 import { hasValidSupabaseConfig } from '@/lib/supabase'
@@ -72,7 +72,7 @@ export default function LoginPage() {
       <div className="hidden lg:flex lg:w-1/2 bg-primary-600 dark:bg-primary-900 p-12 flex-col justify-between">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-            <Briefcase className="w-6 h-6 text-white" />
+            <BriefcaseIcon size={24} className="text-white" />
           </div>
           <span className="text-xl font-bold text-white">Job Search Tracker</span>
         </div>
@@ -105,7 +105,7 @@ export default function LoginPage() {
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <div className="w-10 h-10 rounded-xl bg-primary-600 flex items-center justify-center">
-              <Briefcase className="w-6 h-6 text-white" />
+              <BriefcaseIcon size={24} className="text-white" />
             </div>
             <span className="text-xl font-bold text-zinc-900 dark:text-white">
               Job Search Tracker
@@ -124,7 +124,7 @@ export default function LoginPage() {
           {/* Error message */}
           {error && (
             <div className="flex items-center gap-2 p-3 mb-6 text-sm text-red-600 bg-red-50 dark:bg-red-950 dark:text-red-400 rounded-lg">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
+              <AlertCircleIcon size={16} className="flex-shrink-0" />
               {error}
             </div>
           )}
@@ -135,7 +135,7 @@ export default function LoginPage() {
                 Email
               </label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                <MailIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   type="email"
                   id="email"
@@ -152,7 +152,7 @@ export default function LoginPage() {
                 Password
               </label>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                <LockIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                 <input
                   type="password"
                   id="password"
@@ -170,7 +170,7 @@ export default function LoginPage() {
                   Confirm Password
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-400" />
+                  <LockIcon size={20} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
                   <input
                     type="password"
                     id="confirmPassword"

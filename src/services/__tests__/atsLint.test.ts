@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { lintForAts } from '../atsLint'
+import { lintForAts, lintSections } from '../atsLint'
 import { emptyCvDocument, type CvDocument } from '../cvSchema'
 
 function completeCv(): CvDocument {
@@ -85,5 +85,31 @@ describe('lintForAts', () => {
     const result = lintForAts(doc)
     expect(result.verdict).toBe('fail')
     expect(result.reasons.length).toBeGreaterThan(1)
+  })
+})
+
+describe('lintSections', () => {
+  it('lints a stored structured CV down to the one verdict a list column can show', () => {
+    expect(lintSections(completeCv())).toBe('pass')
+  })
+
+  it('has no verdict for a legacy word or latex draft, whose sections column is null', () => {
+    // "Not checked" and "failed the check" are different facts, and a list
+    // that renders the first as the second accuses every pre-sections CV of
+    // being unreadable by an ATS.
+    expect(lintSections(null)).toBeNull()
+  })
+
+  it('has no verdict for JSONB that is not a CV document at all', () => {
+    expect(lintSections({ type: 'doc', content: [] })).toBeNull()
+    expect(lintSections('a string')).toBeNull()
+  })
+
+  it('has no verdict rather than throwing when the shape passes the guard but the fields are wrong', () => {
+    // The column is nullable JSONB with nothing constraining it, and
+    // isValidCvDocument only checks the top-level shape -- basics.name can
+    // still be a number, which would throw inside the linter and take the
+    // whole Documents list down with it.
+    expect(lintSections({ basics: {}, work: [], education: [], skills: [], projects: [], awards: [] })).toBeNull()
   })
 })

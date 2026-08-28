@@ -231,7 +231,75 @@ export function SunIcon({ size = 20, ...props }: IconProps) {
 export function MoonIcon({ size = 20, ...props }: IconProps) {
   return (
     <svg {...svgProps(size)} {...props}>
-      <path d="M 10 1.4 C 6.7 2.5 4.3 5.6 4.3 9.2 C 4.3 10.8 4.8 12.3 5.6 13.6 C 2.4 13 0 10.2 0 6.9 C 0 3.1 3.1 0 6.9 0 C 8 0 9.1 0.5 10 1.4 Z" transform="translate(2.99 5.3) rotate(-19.8 2.99 5.3)" />
+      <path d="M 10 1.4 C 6.7 2.5 4.3 5.6 4.3 9.2 C 4.3 10.8 4.8 12.3 5.6 13.6 C 2.4 13 0 10.2 0 6.9 C 0 3.1 3.1 0 6.9 0 C 8 0 9.1 0.5 10 1.4 Z" transform="translate(2.9922 5.2957) rotate(-19.8 2.9922 5.2957)" />
+    </svg>
+  )
+}
+
+export function AlertCircleIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <circle cx="10" cy="10" r="6.125" />
+      <path d="M 0 0 L 0 4.25 M 0 6.995 L 0 7.005" transform="translate(10 6.5)" />
+    </svg>
+  )
+}
+
+export function BriefcaseIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <path d="M 4.5 1.5 L 4.5 0 L 9.5 0 L 9.5 1.5 M 1 1.5 L 13 1.5 C 13.5523 1.5 14 1.9477 14 2.5 L 14 10.5 C 14 11.0523 13.5523 11.5 13 11.5 L 1 11.5 C 0.4477 11.5 0 11.0523 0 10.5 L 0 2.5 C 0 1.9477 0.4477 1.5 1 1.5 Z" transform="translate(3 5)" />
+    </svg>
+  )
+}
+
+export function ChevronDownIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <path d="M 0 0 L 4.5 4.5 L 9 0" transform="translate(5.5 8)" />
+    </svg>
+  )
+}
+
+export function GripVerticalIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <path d="M 0 0 L 0 0.01 M 4 0 L 4 0.01 M 0 4.5 L 0 4.51 M 4 4.5 L 4 4.51 M 0 9 L 0 9.01 M 4 9 L 4 9.01" transform="translate(8 5.495)" />
+    </svg>
+  )
+}
+
+export function TrashIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <path d="M 0 2 L 13 2 M 2 2 L 2 12 L 11 12 L 11 2 M 4.5 2 L 4.5 0 L 8.5 0 L 8.5 2" transform="translate(3.5 3.5)" />
+    </svg>
+  )
+}
+
+export function UserIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <circle cx="10" cy="7" r="3.25" />
+      <path d="M 0 6 C 0 2.6863 2.6863 0 6 0 C 9.3137 0 12 2.6863 12 6" transform="translate(4 10.5)" />
+    </svg>
+  )
+}
+
+export function TargetIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <circle cx="10" cy="10" r="6.125" />
+      <circle cx="10" cy="10" r="2.75" />
+      <path d="M 0 0 L 0 0.01" transform="translate(10 9.995)" />
+    </svg>
+  )
+}
+
+export function RotateCcwIcon({ size = 20, ...props }: IconProps) {
+  return (
+    <svg {...svgProps(size)} {...props}>
+      <path d="M 0 7 C 0 10.0612 2.136 12.7076 5.1283 13.3536 C 8.1206 13.9996 11.1581 12.4702 12.4211 9.6816 C 13.684 6.893 12.83 3.6012 10.3708 1.7782 C 7.9115 -0.0448 4.5136 0.0953 2.2127 2.1144 M 0 0 L 0 4 L 4 4" transform="translate(3.5 3)" />
     </svg>
   )
 }
@@ -264,6 +332,14 @@ export const icons = {
   Play: PlayIcon,
   Sun: SunIcon,
   Moon: MoonIcon,
+  AlertCircle: AlertCircleIcon,
+  Briefcase: BriefcaseIcon,
+  ChevronDown: ChevronDownIcon,
+  GripVertical: GripVerticalIcon,
+  Trash: TrashIcon,
+  User: UserIcon,
+  Target: TargetIcon,
+  RotateCcw: RotateCcwIcon,
 } as const
 
 export type IconName = keyof typeof icons
