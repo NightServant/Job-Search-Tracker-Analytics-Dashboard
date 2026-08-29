@@ -26,7 +26,7 @@ describe('isValidCvDocument', () => {
   })
 
   it('rejects a document missing basics', () => {
-    const doc = emptyCvDocument() as Record<string, unknown>
+    const doc = emptyCvDocument() as unknown as Record<string, unknown>
     delete doc.basics
     expect(isValidCvDocument(doc)).toBe(false)
   })

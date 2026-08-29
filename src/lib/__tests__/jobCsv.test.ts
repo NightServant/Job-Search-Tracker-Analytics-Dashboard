@@ -1,3 +1,4 @@
+import { describe, it, expect } from 'vitest'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText } from '../jobCsv'
 
 describe('jobCsv utilities', () => {

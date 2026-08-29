@@ -272,7 +272,6 @@ describe('analyticsService', () => {
     })
 
     it('computes conversion percentages at each stage', () => {
-      const totalJobs = 100
       const funnel: ConversionFunnelMetric[] = [
         { stage: 'Applied', count: 100, percentage: 100, avgDaysToStage: 0, isExit: false },
         { stage: 'Interviewing', count: 30, percentage: 30, avgDaysToStage: 7, isExit: false },

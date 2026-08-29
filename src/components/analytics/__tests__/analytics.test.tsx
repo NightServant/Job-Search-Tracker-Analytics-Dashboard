@@ -264,7 +264,7 @@ describe('Analytics', () => {
   })
 
   it('scrolls the cohort table inside its own container rather than the page body', () => {
-    const { container } = render(<Analytics {...fullProps()} />)
+    render(<Analytics {...fullProps()} />)
     const heading = screen.getByRole('heading', { name: 'Cohort analysis' })
     const table = heading.closest('section')!.querySelector('table')!
     expect(table.closest('.overflow-x-auto')).toBeTruthy()

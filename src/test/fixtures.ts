@@ -35,7 +35,6 @@ import type { Job } from '@/types'
 export function makeJob(overrides: Partial<Job> & Pick<Job, 'id' | 'status'>): Job {
   const now = new Date().toISOString()
   return {
-    id: overrides.id,
     user_id: 'user-1',
     company: 'Acme',
     role: 'Staff Engineer',
@@ -44,7 +43,6 @@ export function makeJob(overrides: Partial<Job> & Pick<Job, 'id' | 'status'>): J
     salary_currency: 'PHP',
     url: null,
     description: null,
-    status: overrides.status,
     date_applied: '2026-07-20',
     notes: null,
     contact_name: null,

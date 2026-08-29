@@ -133,7 +133,6 @@ describe('Auth Context and RLS Enforcement', () => {
     })
 
     it('enforces RLS on update operations', () => {
-      const jobId = 'job1'
       const currentUserId = 'user1'
       const jobOwnerId = 'user1'
 
@@ -143,7 +142,6 @@ describe('Auth Context and RLS Enforcement', () => {
     })
 
     it('enforces RLS on delete operations', () => {
-      const jobId = 'job1'
       const currentUserId = 'user1'
       const jobOwnerId = 'user1'
 

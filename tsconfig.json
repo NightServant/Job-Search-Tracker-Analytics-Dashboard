@@ -35,14 +35,10 @@
   },
   "include": [
     "src",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "supabase/functions/deno.d.ts"
   ],
-  "exclude": [
-    "src/**/*.test.ts",
-    "src/**/*.test.tsx",
-    "src/test",
-    "src/**/__tests__/**"
-  ],
+  "exclude": [],
   "references": [
     {
       "path": "./tsconfig.node.json"
