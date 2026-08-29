@@ -4,7 +4,7 @@ import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { PanelSection } from '@/components/ui/panel-section'
 import { KpiStat } from '@/components/ui/kpi-stat'
-import { Spinner } from '@/components/ui/spinner'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { RangePicker } from './RangePicker'
 import { FunnelChart, normalizeFunnel } from './FunnelChart'
 import { TimeInStage } from './TimeInStage'
@@ -59,7 +59,7 @@ function PanelBody({
   if (state.isLoading) {
     return (
       <div className="flex justify-center py-8">
-        <Spinner size={20} />
+        <CssSpinner size={20} />
       </div>
     )
   }

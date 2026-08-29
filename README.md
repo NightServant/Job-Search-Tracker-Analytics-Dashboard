@@ -45,11 +45,14 @@ Active development. The database schema, migrations, and test suite are current;
 
 | Layer | Technology |
 |---|---|
-| UI | React 18, TypeScript, Next.js |
-| Styling | Tailwind CSS, shadcn-style semantic tokens |
+| UI | React 19, TypeScript, Next.js |
+| Components | shadcn/ui (`base-nova` style, built on Base UI) |
+| Icons | AnimateIcons |
+| Styling | Tailwind CSS v4, semantic design tokens |
+| Motion | motion (formerly framer-motion) |
 | Data fetching | TanStack Query v5 |
 | Editor | Tiptap |
-| Charts | Recharts |
+| Charts | Recharts 3 |
 | Database | PostgreSQL (Supabase) |
 | Auth | Supabase Auth |
 | Server-side | Supabase Edge Functions (Deno) |
@@ -184,6 +187,16 @@ texts/              Design and reference documentation
 - [ ] Design system pass (shadcn/ui + motion)
 - [ ] Grammar and spelling checks in the CV editor
 - [ ] AI-assisted CV tailoring against a job description
+
+---
+
+## Attribution
+
+Third-party components and assets vendored into this repository, credited when adopted:
+
+- **shadcn/ui** — MIT, [ui.shadcn.com](https://ui.shadcn.com). Component source copied into `src/components/ui/` under the `base-nova` style and edited to this project's tokens.
+- **AnimateIcons** — MIT, [github.com/Avijit07x/animateicons](https://github.com/Avijit07x/animateicons). Icon components vendored via the shadcn CLI into `src/components/icons/`.
+- **Arimo** — SIL Open Font License 1.1, self-hosted via `next/font`. The metric-compatible fallback for Helvetica Neue, which is licensed and cannot be self-hosted.
 
 ---
 

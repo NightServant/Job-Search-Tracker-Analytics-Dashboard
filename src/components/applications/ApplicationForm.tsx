@@ -6,7 +6,7 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Spinner } from '@/components/ui/spinner'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { STATUSES } from '@/components/ui/status-marker'
 import { assertJobFormDataValid, jobValidation } from '@/services/jobValidation'
 import {
@@ -365,7 +365,7 @@ export function ApplicationForm({
                 disabled={autofilling}
                 className="shrink-0"
               >
-                {autofilling && <Spinner size={14} />}
+                {autofilling && <CssSpinner size={14} />}
                 {autofilling ? 'Reading' : 'Auto-fill'}
               </Button>
             )}
@@ -492,7 +492,7 @@ export function ApplicationForm({
 
       <div className="flex items-center gap-3 border-t border-border-subtle pt-6">
         <Button type="submit" disabled={saving}>
-          {saving && <Spinner size={14} />}
+          {saving && <CssSpinner size={14} />}
           {saving ? 'Saving' : submitLabel}
         </Button>
         {onCancel && (

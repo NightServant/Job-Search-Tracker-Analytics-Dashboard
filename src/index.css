@@ -11,7 +11,13 @@
    by the semantic layer below; components use semantic names exclusively. That
    indirection is what makes dark mode a mode switch rather than a second design. */
 @theme {
-  --font-sans: "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Helvetica Neue is licensed and cannot be self-hosted; Mac visitors have it
+     and nobody else does. Arimo is metric-compatible with Arial (which is
+     metric-compatible with Helvetica), so line breaks do not move, and it ships
+     a real 700 -- which matters now that the scale sets weights and
+     `font-synthesis: none` below forbids a faked bold. Wired up by next/font in
+     src/app/layout.tsx, which self-hosts it at build time. */
+  --font-sans: "Helvetica Neue", Helvetica, Arial, var(--font-fallback), sans-serif;
 
   /* 01 Primitives -- do not use directly in components */
   --color-neutral-50: #fafafa;
@@ -71,6 +77,54 @@
   --color-accent-subtle: var(--color-accent-50);
   --color-accent-on-accent: var(--color-base-white);
 
+  /* --- shadcn semantic aliases ----------------------------------------------
+     shadcn components are copied into this tree and reference `bg-primary`,
+     `bg-destructive`, `rounded-lg` and so on. Mapping them onto the semantic
+     layer means an unedited component is right by default rather than
+     transparent -- `--color-primary` did not exist, so `bg-primary` emitted
+     nothing, while the LEGACY `--color-primary-600` (indigo #4f46e5) did exist
+     and would have been the nearest thing an author reached for.
+
+     `accent` is the one name that cannot be aliased here. In shadcn `accent` is
+     the subtle hover surface; in this system it is the orange brand colour,
+     reached only through `--color-accent-default` / `-hover` / `-subtle` /
+     `-on-accent`. Both cannot be true of `bg-accent`, so installed components
+     are edited to use `bg-bg-inset` / `text-text-primary`, and the bare
+     `--color-accent` is reconciled where it is defined -- in the legacy block
+     below -- to shadcn's meaning, not to orange. Enforced by
+     src/__tests__/shadcnHouseRules.test.ts. */
+  --color-primary: var(--color-accent-default);
+  --color-primary-foreground: var(--color-accent-on-accent);
+  --color-secondary: var(--color-bg-inset);
+  --color-secondary-foreground: var(--color-text-primary);
+  --color-destructive: var(--color-status-rejected-solid);
+  --color-destructive-foreground: var(--color-base-white);
+
+  /* shadcn's `sidebar` ships its own ten-variable palette. Aliased here so the
+     sidebar is the same surface as the rest of the app rather than a second,
+     slightly different neutral. */
+  --color-sidebar: var(--color-bg-canvas);
+  --color-sidebar-foreground: var(--color-text-secondary);
+  --color-sidebar-primary: var(--color-accent-default);
+  --color-sidebar-primary-foreground: var(--color-accent-on-accent);
+  --color-sidebar-accent: var(--color-bg-inset);
+  --color-sidebar-accent-foreground: var(--color-text-primary);
+  --color-sidebar-border: var(--color-border-subtle);
+  --color-sidebar-ring: var(--color-accent-default);
+
+  /* The cap, stated once. shadcn derives rounded-sm/md/lg from this via
+     calc(--radius - 4px) / -2px / +0px, giving 0px / 2px / 4px. rounded-xl
+     would be 8px and is banned by grep instead, because a variable cannot stop
+     an author typing a literal. */
+  --radius: 4px;
+
+  /* Motion values the Figma Motion Specification (node 43:492) names and this
+     stylesheet never had. Durations existed; easings and the skeleton cycle
+     did not. */
+  --duration-skeleton: 1200ms;
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
+
   --color-status-wishlist-fill: var(--color-status-wishlist-tint);
   --color-status-wishlist-mark: var(--color-status-wishlist-solid);
   --color-status-applied-fill: var(--color-status-applied-tint);
@@ -97,43 +151,59 @@
   --text-display-xl: 56px;
   --text-display-xl--line-height: 1;
   --text-display-xl--letter-spacing: -0.03em;
+  --text-display-xl--font-weight: 700;
   --text-display-l: 40px;
   --text-display-l--line-height: 1.05;
   --text-display-l--letter-spacing: -0.025em;
+  --text-display-l--font-weight: 700;
   --text-display-m: 28px;
   --text-display-m--line-height: 1.1;
   --text-display-m--letter-spacing: -0.02em;
+  --text-display-m--font-weight: 700;
   --text-heading-l: 20px;
   --text-heading-l--line-height: 1.3;
   --text-heading-l--letter-spacing: -0.01em;
+  --text-heading-l--font-weight: 700;
   --text-heading-m: 16px;
   --text-heading-m--line-height: 1.4;
   --text-heading-m--letter-spacing: -0.005em;
+  --text-heading-m--font-weight: 700;
   --text-heading-s: 14px;
   --text-heading-s--line-height: 1.4;
+  --text-heading-s--font-weight: 700;
   --text-body-l: 16px;
   --text-body-l--line-height: 1.6;
+  --text-body-l--font-weight: 400;
   --text-body-m: 14px;
   --text-body-m--line-height: 1.55;
+  --text-body-m--font-weight: 400;
   --text-body-s: 13px;
   --text-body-s--line-height: 1.5;
+  --text-body-s--font-weight: 400;
   --text-label-m: 13px;
   --text-label-m--line-height: 1.4;
+  --text-label-m--font-weight: 400;
   --text-label-caps: 11px;
   --text-label-caps--line-height: 1.3;
   --text-label-caps--letter-spacing: 0.06em;
+  --text-label-caps--font-weight: 700;
   --text-caption: 12px;
   --text-caption--line-height: 1.4;
+  --text-caption--font-weight: 500;
   --text-data-xl: 40px;
   --text-data-xl--line-height: 1;
   --text-data-xl--letter-spacing: -0.02em;
+  --text-data-xl--font-weight: 400;
   --text-data-l: 24px;
   --text-data-l--line-height: 1.1;
   --text-data-l--letter-spacing: -0.01em;
+  --text-data-l--font-weight: 400;
   --text-data-m: 14px;
   --text-data-m--line-height: 1.4;
+  --text-data-m--font-weight: 400;
   --text-data-s: 12px;
   --text-data-s--line-height: 1.4;
+  --text-data-s--font-weight: 400;
 
   /* Motion durations, consumed by the M4 Task 6 layer */
   --duration-instant: 100ms;
@@ -174,24 +244,50 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The Figma motion spec (node 43:523) names 1200ms ease-in-out for skeleton
+   loading. Tailwind's own animate-pulse is 2s cubic-bezier(0.4, 0, 0.6, 1). */
+@utility animate-pulse {
+  animation: pulse var(--duration-skeleton) var(--ease-standard) infinite;
+}
+
 /* --- Legacy v3 tokens -------------------------------------------------------
    The screens still in the tree were built against these and are rewritten in
    M5. Kept so M4 does not have to redesign screens it is not responsible for;
    delete with the last old screen. */
 @theme {
-  --color-background: hsl(var(--background));
-  --color-foreground: hsl(var(--foreground));
-  --color-card: hsl(var(--card));
-  --color-card-foreground: hsl(var(--card-foreground));
-  --color-popover: hsl(var(--popover));
-  --color-popover-foreground: hsl(var(--popover-foreground));
-  --color-muted: hsl(var(--muted));
-  --color-muted-foreground: hsl(var(--muted-foreground));
-  --color-accent: hsl(var(--accent));
-  --color-accent-foreground: hsl(var(--accent-foreground));
-  --color-border: hsl(var(--border));
-  --color-input: hsl(var(--input));
-  --color-ring: hsl(var(--ring));
+  /* RECONCILED 2026-08-29 (M5.5 Task 2). These thirteen names were the pre-M4
+     palette -- `hsl(var(--accent))` was `210 40% 96.1%`, a pale blue-grey, and
+     `--ring` was `221.2 83.2% 53.3%`, blue. They are ALSO the names every
+     installed shadcn component paints itself with, and `@layer base` applies
+     two of them app-wide (`* { border-border }`, `body { bg-background
+     text-foreground }`). Left alone, 58 new components would have rendered in
+     the palette M4 replaced, one character away from the tokens that carry the
+     real one.
+
+     So they are repointed at the semantic layer here, once, rather than being
+     patched per component. The raw `--background` / `--accent` / `--ring` HSL
+     triples in :root below are NOT deleted -- ::selection still reads --ring,
+     and the legacy utility classes still read the zinc ramp -- but nothing
+     resolves a colour through them any more.
+
+     `--color-accent` deliberately lands on the inset surface, which is
+     SHADCN's meaning of the word (a subtle hover fill). This system's accent is
+     orange and is reached only through --color-accent-default and friends;
+     src/__tests__/shadcnHouseRules.test.ts bans bare `bg-accent` inside
+     src/components/ui/ so the two can never be confused at a call site. */
+  --color-background: var(--color-bg-canvas);
+  --color-foreground: var(--color-text-primary);
+  --color-card: var(--color-bg-canvas);
+  --color-card-foreground: var(--color-text-primary);
+  --color-popover: var(--color-bg-canvas);
+  --color-popover-foreground: var(--color-text-primary);
+  --color-muted: var(--color-bg-inset);
+  --color-muted-foreground: var(--color-text-muted);
+  --color-accent: var(--color-bg-inset);
+  --color-accent-foreground: var(--color-text-primary);
+  --color-border: var(--color-border-subtle);
+  --color-input: var(--color-border-default);
+  --color-ring: var(--color-accent-default);
   --color-primary-50: #eef2ff;
   --color-primary-100: #e0e7ff;
   --color-primary-200: #c7d2fe;

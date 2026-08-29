@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { Spinner } from '@/components/ui/spinner'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { Button } from '@/components/ui/button'
 import { AlertCircleIcon } from '@/components/icons'
 
@@ -36,7 +36,7 @@ import { AlertCircleIcon } from '@/components/icons'
 export function RouteLoading() {
   return (
     <div className="flex justify-center py-24">
-      <Spinner size={24} />
+      <CssSpinner size={24} />
     </div>
   )
 }

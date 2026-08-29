@@ -1,7 +1,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { PanelSection } from '@/components/ui/panel-section'
-import { Spinner } from '@/components/ui/spinner'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { buttonVariants } from '@/components/ui/button'
 import { formatSnapshotTime } from '@/services/date'
 
@@ -51,7 +51,7 @@ export function VersionHistory({
       error={error ? 'Could not load the saved versions of this CV.' : undefined}
     >
       {loading ? (
-        <Spinner size={20} className="text-text-muted" />
+        <CssSpinner size={20} className="text-text-muted" />
       ) : versions.length === 0 ? (
         <p className="text-body-s text-text-muted">
           No versions saved yet. Editing this CV snapshots it automatically.

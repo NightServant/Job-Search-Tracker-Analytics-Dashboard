@@ -1,24 +1,31 @@
-import { cn } from '@/lib/utils'
+import { cn } from "@/lib/utils"
+import { LoaderCircleIcon } from "@/components/icons/loader-circle"
 
 /**
- * A pending state with no glyph.
+ * base-nova ships this as the registry's icon shim, resolving to lucide's
+ * Loader2.
+ * Resolved to AnimateIcons' loader-circle, whose root element is a <div>
+ * wrapping the <svg> -- so the props type is the icon's, not
+ * React.ComponentProps<"svg">, and the size class is paired with its
+ * descendant form so it reaches the glyph rather than the wrapper.
  *
- * Lucide's Loader2 existed only to be rotated, so it was a drawing that carried
- * no information a bordered circle does not. The visible label is screen-reader
- * only: sighted users read the motion, and a spinner captioned "Loading" beside
- * a button that already says "Saving" is a duplicate.
+ * M4's CSS-border spinner survives as CssSpinner in css-spinner.tsx; it is
+ * still the right thing inside a pending button, where a 14px animated icon
+ * is not.
  */
-export function Spinner({ size = 16, className }: { size?: number; className?: string }) {
+function Spinner({
+  className,
+  ...props
+}: React.ComponentProps<typeof LoaderCircleIcon>) {
   return (
-    <span
+    <LoaderCircleIcon
+      data-slot="spinner"
       role="status"
-      style={{ width: size, height: size, borderWidth: Math.max(2, Math.round(size / 8)) }}
-      className={cn(
-        'inline-block animate-spin rounded-full border-current border-t-transparent align-middle',
-        className
-      )}
-    >
-      <span className="sr-only">Loading</span>
-    </span>
+      aria-label="Loading"
+      className={cn("size-4 [&_svg]:size-4 animate-spin", className)}
+      {...props}
+    />
   )
 }
+
+export { Spinner }
