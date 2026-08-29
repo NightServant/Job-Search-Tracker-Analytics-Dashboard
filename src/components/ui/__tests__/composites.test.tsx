@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { KpiStat } from '../kpi-stat'
 import { ApplicationRow } from '../application-row'
 import { JobCard } from '../job-card'
@@ -167,12 +167,16 @@ describe('Sidebar', () => {
 
   it('paints the active item in the accent colour with a full-height rule', () => {
     // Figma: active is an orange left bar plus accent text. The M5 version
-    // used text-text-primary and inset the rule by 4px top and bottom.
+    // used text-text-primary and inset the rule by 4px top and bottom. The
+    // rule is a real w-[2px] h-full flex child (Figma's Active Bar), not an
+    // absolutely-positioned overlay -- see the "offsets the index" test below
+    // for why that distinction is load-bearing.
     const { container } = render(<Sidebar pathname="/applications" />)
     const active = container.querySelector('[data-nav-item][data-active]')!
     expect(active.className).toContain('text-accent-default')
     const rule = active.querySelector('[data-nav-rule]')!
-    expect(rule.className).toContain('inset-y-0')
+    expect(rule.className).toContain('h-full')
+    expect(rule.className).toContain('bg-accent-default')
   })
 
   it('never fills a nav item background', () => {
@@ -182,5 +186,79 @@ describe('Sidebar', () => {
     for (const item of container.querySelectorAll('[data-nav-item]')) {
       expect(item.className, `${item.textContent} has a background fill`).not.toMatch(/\bbg-/)
     }
+  })
+
+  it('reserves space for the accent bar on inactive rows too, so nothing jogs sideways on navigation', () => {
+    // Figma node 19:20/19:24: Active Bar is a real w-[2px] h-full flex child
+    // in every row (bg-transparent when inactive), not an absolutely
+    // positioned overlay that only appears on the active row.
+    const { container } = render(<Sidebar pathname="/applications" />)
+    const items = [...container.querySelectorAll('[data-nav-item]')]
+    expect(items.length).toBeGreaterThanOrEqual(6) // five sections + settings
+    for (const item of items) {
+      const rule = item.querySelector('[data-nav-rule]')
+      expect(rule, `${item.textContent} has no reserved rule slot`).toBeTruthy()
+    }
+    const inactive = items.filter((i) => !i.hasAttribute('data-active'))
+    expect(inactive.length).toBeGreaterThan(0)
+    for (const item of inactive) {
+      expect(item.querySelector('[data-nav-rule]')!.className).toContain('bg-transparent')
+    }
+  })
+
+  it('offsets the index from the accent bar by the bar width plus one gap, not flush against it', () => {
+    // Figma 19:20: Active Bar (w-2) then gap-[12px] then the "01" text -- 14px
+    // total from the item's left edge to where the index starts.
+    const { container } = render(<Sidebar pathname="/applications" />)
+    const item = container.querySelector('[data-nav-item][data-active]')!
+    const rule = item.querySelector('[data-nav-rule]')!
+    const index = item.querySelector('[data-nav-index]')!
+    // The rule must be a normal flow sibling ahead of the index (not an
+    // absolutely-positioned overlay sitting under it at the same x=0).
+    expect(rule.className).not.toMatch(/\babsolute\b/)
+    expect(rule.compareDocumentPosition(index) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('collapses to an icon rail: icons stay, indices and visible labels go, and nothing loses its accessible name', () => {
+    // Gabe: "collapsing currently hides the whole nav and leaves an empty
+    // column." Collapsed must keep every destination reachable, not blank
+    // the sidebar out.
+    render(<Sidebar pathname="/dashboard" />)
+    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }))
+
+    const links = screen.getAllByRole('link')
+    const overview = links.find((l) => l.getAttribute('href') === '/dashboard')!
+    expect(overview.querySelector('[data-nav-index]'), 'index should be hidden in the rail').toBeNull()
+    expect(overview.querySelector('svg'), 'icon should still render').toBeTruthy()
+    // The label is visually hidden (sr-only) but still in the DOM, so the
+    // link keeps a real accessible name instead of depending on the tooltip.
+    expect(overview.textContent).toContain('overview')
+    expect(overview.className).not.toMatch(/\bbg-/)
+
+    const settings = links.find((l) => l.getAttribute('href') === '/settings')!
+    expect(settings, 'settings should still be reachable when collapsed').toBeTruthy()
+  })
+
+  it('shows a light/dark label beside the theme toggle, reflecting the current theme', () => {
+    // Not in Figma (109:2402 is a bare hairline square, no text) -- Gabe
+    // asked for an indicator so the icon is not orphaned. Chrome, so
+    // lowercase, not an acronym.
+    render(<Sidebar pathname="/dashboard" />)
+    // next-themes is mocked resolvedTheme: 'light' at the top of this file.
+    expect(screen.getByText('light')).toBeTruthy()
+  })
+
+  it('gives the theme section the same divider-and-section rhythm as settings', () => {
+    const { container } = render(<Sidebar pathname="/dashboard" />)
+    const nav = container.querySelector('nav')!
+    const kids = Array.from(nav.children)
+    const dividers = kids.filter((k) => k.tagName === 'HR')
+    // One above settings (existing, data-sidebar-divider), one above the
+    // theme section -- the same rhythm settings gets below the nav group.
+    expect(dividers.length).toBeGreaterThanOrEqual(2)
+    const themeLabelIdx = kids.findIndex((k) => k.textContent?.includes('light'))
+    const lastDividerIdx = kids.map((k) => k.tagName === 'HR').lastIndexOf(true)
+    expect(lastDividerIdx).toBeGreaterThan(-1)
+    expect(themeLabelIdx).toBeGreaterThan(lastDividerIdx)
   })
 })
