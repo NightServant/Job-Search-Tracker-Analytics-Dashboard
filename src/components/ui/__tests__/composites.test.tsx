@@ -148,4 +148,39 @@ describe('Sidebar', () => {
     expect(active).toHaveLength(1)
     expect(active[0].getAttribute('href')).toBe('/applications')
   })
+
+  it('shows the mark beside the wordmark', () => {
+    // Item 1: the Figma Logo (19:4) is a 23px 2x2 mark plus the wordmark. The
+    // M5 sidebar rendered the word alone.
+    const { container } = render(<Sidebar pathname="/dashboard" />)
+    const logo = container.querySelector('[data-sidebar-logo]')!
+    expect(logo.querySelector('svg'), 'the brand mark is missing').toBeTruthy()
+    expect(logo.textContent).toContain('worktrack')
+  })
+
+  it('offers a control that collapses it', () => {
+    // Not in the Figma -- Gabe asked for it, and it comes from shadcn's
+    // SidebarTrigger. Asserted here so it cannot quietly disappear.
+    render(<Sidebar pathname="/dashboard" />)
+    expect(screen.getByRole('button', { name: /toggle sidebar/i })).toBeTruthy()
+  })
+
+  it('paints the active item in the accent colour with a full-height rule', () => {
+    // Figma: active is an orange left bar plus accent text. The M5 version
+    // used text-text-primary and inset the rule by 4px top and bottom.
+    const { container } = render(<Sidebar pathname="/applications" />)
+    const active = container.querySelector('[data-nav-item][data-active]')!
+    expect(active.className).toContain('text-accent-default')
+    const rule = active.querySelector('[data-nav-rule]')!
+    expect(rule.className).toContain('inset-y-0')
+  })
+
+  it('never fills a nav item background', () => {
+    // The Figma Nav Item description: "no filled background, which would spend
+    // colour the status system needs." M5 added hover:bg-bg-inset.
+    const { container } = render(<Sidebar pathname="/dashboard" />)
+    for (const item of container.querySelectorAll('[data-nav-item]')) {
+      expect(item.className, `${item.textContent} has a background fill`).not.toMatch(/\bbg-/)
+    }
+  })
 })
