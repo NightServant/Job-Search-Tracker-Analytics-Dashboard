@@ -85,7 +85,7 @@ export function Composites() {
       </Row>
 
       <Row title="Sidebar" note="Logo, nav, divider, settings, spacer, toggle, footer -- that order is from Figma.">
-        <div className="h-[520px] w-60 overflow-hidden rounded-md border border-border-subtle">
+        <div className="flex h-[520px] w-60 overflow-hidden rounded-md border border-border-subtle">
           <Sidebar pathname="/applications" className="border-r-0" />
         </div>
       </Row>

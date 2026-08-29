@@ -33,6 +33,16 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
  * sideways by 14px the moment a route becomes current. An `absolute` bar
  * sitting at the same x=0 as the index (the M5.5 first pass) reads as the
  * index and the bar overlapping.
+ *
+ * `*:focus-visible` (src/index.css) gives every element in the app a 2px
+ * `ring-ring` outline -- `--color-ring` resolves to the accent orange, so an
+ * unmodified nav item shows a boxed ring the moment it is focused. That is
+ * exactly the "boxed treatment" the design forbids ("no background fill and
+ * no border in any state"), so it is suppressed here (`outline-none`) and
+ * replaced with the same bar-plus-colour vocabulary the active state
+ * already uses: `group-focus-visible:` lights up the bar and the text/icon
+ * colour instead of drawing a box, which keeps keyboard focus visible
+ * without inventing a second visual language.
  */
 export interface NavItemProps {
   href: string
@@ -66,25 +76,6 @@ export function NavItem({
   const bottom = variant === 'bottom'
   const rail = !bottom && collapsed
 
-  const rule = bottom ? (
-    active && (
-      <span
-        data-nav-rule
-        aria-hidden
-        className="absolute inset-x-2 top-0 h-[2px] rounded-none bg-accent-default"
-      />
-    )
-  ) : (
-    <span
-      data-nav-rule
-      aria-hidden
-      className={cn(
-        'h-full w-[2px] shrink-0 rounded-none',
-        active ? 'bg-accent-default' : 'bg-transparent'
-      )}
-    />
-  )
-
   const link = (
     <Link
       href={href}
@@ -92,17 +83,54 @@ export function NavItem({
       data-nav-item
       data-active={active ? '' : undefined}
       className={cn(
-        'group relative flex items-center gap-3 transition-colors duration-[--duration-fast]',
-        active ? 'text-accent-default' : 'text-text-secondary hover:text-text-primary',
+        'group relative flex items-center gap-3 outline-none transition-colors duration-[--duration-fast]',
+        active
+          ? 'text-accent-default'
+          : 'text-text-secondary group-focus-visible:text-accent-default hover:text-text-primary focus-visible:text-accent-default',
         bottom
           ? 'h-11 min-w-11 flex-1 flex-col justify-center gap-1'
           : rail
-            ? 'h-9 w-9 justify-center'
+            ? 'h-9 w-9'
             : 'h-9 pr-4',
         className
       )}
     >
-      {rule}
+      {/* Sidebar (expanded): a real flex child ahead of the index, reserving
+          its own width so the row never reflows when it becomes active.
+          Sidebar (rail): pinned absolute at the item's own left edge per the
+          collapsed-rail spec -- there is no index to protect from reflow, so
+          it does not need to sit in-flow. Bottom bar: unchanged, an overlay
+          top rule that only exists when active. */}
+      {bottom ? (
+        active && (
+          <span
+            data-nav-rule
+            aria-hidden
+            className="absolute inset-x-2 top-0 h-[2px] rounded-none bg-accent-default"
+          />
+        )
+      ) : rail ? (
+        <span
+          data-nav-rule
+          aria-hidden
+          className={cn(
+            'absolute inset-y-0 left-0 w-[2px] rounded-none',
+            active ? 'bg-accent-default' : 'bg-transparent',
+            !active && 'group-focus-visible:bg-accent-default'
+          )}
+        />
+      ) : (
+        <span
+          data-nav-rule
+          aria-hidden
+          className={cn(
+            'h-full w-[2px] shrink-0 rounded-none',
+            active ? 'bg-accent-default' : 'bg-transparent',
+            !active && 'group-focus-visible:bg-accent-default'
+          )}
+        />
+      )}
+
       {!bottom && !rail && index !== undefined && (
         <span
           data-nav-index
@@ -111,7 +139,15 @@ export function NavItem({
           {String(index).padStart(2, '0')}
         </span>
       )}
-      <Icon size={20} />
+
+      {rail ? (
+        <span className="flex h-full w-full items-center justify-center">
+          <Icon size={20} />
+        </span>
+      ) : (
+        <Icon size={20} />
+      )}
+
       <span
         className={cn(
           bottom ? 'text-label-caps' : 'text-body-m',

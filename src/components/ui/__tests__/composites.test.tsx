@@ -261,4 +261,79 @@ describe('Sidebar', () => {
     expect(lastDividerIdx).toBeGreaterThan(-1)
     expect(themeLabelIdx).toBeGreaterThan(lastDividerIdx)
   })
+
+  it('aligns every rail row on one axis: identical fixed-width boxes, not independently centred content', () => {
+    // Gabe: "the brand mark sits hard against the left edge while the
+    // trigger and the nav icons below it are centred... Everything in the
+    // rail must centre on one axis, in identically-sized hit boxes."
+    render(<Sidebar pathname="/dashboard" />)
+    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }))
+
+    const logoBox = document.querySelector('[data-sidebar-logo]')!.parentElement!
+    const overview = screen.getAllByRole('link').find((l) => l.getAttribute('href') === '/dashboard')!
+    const trigger = screen.getByRole('button', { name: /toggle sidebar/i })
+    const themeToggle = document.querySelector('[data-theme-toggle]')!.parentElement!
+
+    // Every rail row is the same 36px (w-9) box -- the expanded state's pl-6
+    // must not leak into the collapsed state and give the mark a different
+    // offset than everything below it.
+    for (const [name, el] of [
+      ['logo', logoBox],
+      ['trigger', trigger.parentElement!],
+      ['nav item', overview],
+      ['theme toggle', themeToggle],
+    ] as const) {
+      expect(el.className.split(' '), `${name} row is not a w-9 box`).toContain('w-9')
+    }
+  })
+
+  it('never boxes the collapsed rail active state -- a left-edge bar and an accent icon, no ring', () => {
+    // Gabe: the screenshot showed "an orange rounded-rectangle outline",
+    // which reads as a focus ring, not the design's vocabulary. src/index.css
+    // gives every element a `ring-2 ring-ring` on :focus-visible, and
+    // --color-ring is the accent orange -- exactly that box. Nav items
+    // suppress it and reuse the bar instead.
+    render(<Sidebar pathname="/applications" />)
+    fireEvent.click(screen.getByRole('button', { name: /toggle sidebar/i }))
+    const active = document.querySelector('[data-nav-item][data-active]')!
+    expect(active.className).toContain('outline-none')
+    expect(active.className.split(' ').some((c) => c.startsWith('ring-'))).toBe(false)
+    const rule = active.querySelector('[data-nav-rule]')!
+    expect(rule.className.split(' ')).toContain('absolute')
+    expect(rule.className).toContain('left-0')
+    expect(rule.className).toContain('bg-accent-default')
+  })
+
+  it('sizes the column to the viewport, not to the row it sits in, so a long page cannot stretch it', () => {
+    // Reported broken twice: AppShell's row is `min-h-screen`, and its OTHER
+    // flex item is the scrollable main. On /analytics (2560px in Figma) or
+    // the /applications kanban, the row's own resolved height is the
+    // CONTENT height, and a stretched sidebar stretches to match it --
+    // thousands of pixels tall, with the theme control and footer far below
+    // the fold. Verified live (this repo's real stylesheet, a real
+    // 900px-tall AppShell-shaped DOM tree): with these classes, <nav>
+    // measured exactly 900px (window.innerHeight) whether its sibling <main>
+    // was 200px or 3000px tall -- the classes below are what produced that,
+    // and jsdom cannot do real layout to re-check the pixels itself, so this
+    // pins the CSS contract instead: sticky + a real viewport-height unit
+    // (not a percentage that depends on an ancestor's resolved height) +
+    // shrink-0 so a wide main cannot squeeze it + overflow-y-auto as the
+    // fallback for a viewport shorter than the nav's own content.
+    const { container } = render(<Sidebar pathname="/dashboard" />)
+    const nav = container.querySelector('nav')!
+    const classes = nav.className.split(' ')
+    expect(classes, 'sticky').toContain('sticky')
+    expect(classes, 'top-0').toContain('top-0')
+    expect(classes, 'h-screen').toContain('h-screen')
+    expect(classes, 'shrink-0').toContain('shrink-0')
+    expect(classes, 'overflow-y-auto').toContain('overflow-y-auto')
+    expect(
+      classes.some((c) => c.includes('dvh')),
+      'a dvh fallback for mobile browser chrome'
+    ).toBe(true)
+    // A percentage height here would silently reintroduce the original bug:
+    // it depends on an ancestor having a *definite* height, which
+    // AppShell's min-h-screen row does not reliably give on a long page.
+    expect(classes.some((c) => c === 'h-full')).toBe(false)
+  })
 })
