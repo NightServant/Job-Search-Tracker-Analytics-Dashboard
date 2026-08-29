@@ -1,12 +1,14 @@
 'use client'
 
-import { Suspense, useEffect } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCreateResume, useDeleteResume, useResume, useUpdateResume } from '@/hooks/useResumes'
 import { useToast } from '@/contexts/ToastContext'
 import { RouteError, RouteLoading } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button'
+import { AppDialog } from '@/components/ui/app-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ModeChooser } from '@/components/cv/ModeChooser'
 import { WordResumeEditor } from '@/components/cv/WordResumeEditor'
 import { LatexResumeEditor } from '@/components/cv/LatexResumeEditor'
@@ -53,6 +55,7 @@ function CvRoute() {
   const createResume = useCreateResume()
   const updateResume = useUpdateResume()
   const deleteResume = useDeleteResume()
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!draftParam) router.replace(DOCUMENTS)
@@ -74,14 +77,19 @@ function CvRoute() {
     }
   }
 
-  const deleteDraft = async (draftId: string) => {
-    if (!window.confirm('Delete this CV? This cannot be undone.')) return
+  const deleteDraft = (draftId: string) => setPendingDeleteId(draftId)
+
+  const confirmDeleteDraft = async () => {
+    if (!pendingDeleteId) return
+    const draftId = pendingDeleteId
     try {
       await deleteResume.mutateAsync(draftId)
       success('CV deleted', 'The draft was removed.')
       router.replace(DOCUMENTS)
     } catch (err) {
       showError('Delete failed', err instanceof Error ? err.message : 'Could not delete the CV')
+    } finally {
+      setPendingDeleteId(null)
     }
   }
 
@@ -95,12 +103,22 @@ function CvRoute() {
   if (!draftParam) return <RouteLoading />
 
   if (isNew) {
+    // Nothing else on this route has anything behind it -- /cv?draft=new is
+    // only ever reached as a deep link (a bookmark, a back button) once the
+    // trigger itself moved onto DocumentsPage as a dialog opened without
+    // navigating away. Closing this one has nowhere to return to but
+    // Documents, so it replaces the URL instead of leaving /cv?draft=new
+    // sitting in history with nothing open.
     return (
-      <ModeChooser
-        backHref={DOCUMENTS}
-        creating={createResume.isPending}
-        onChoose={(mode) => void createDraft(mode)}
-      />
+      <AppDialog
+        open
+        onOpenChange={(open) => {
+          if (!open) router.replace(DOCUMENTS)
+        }}
+        title="New CV"
+      >
+        <ModeChooser creating={createResume.isPending} onChoose={(mode) => void createDraft(mode)} />
+      </AppDialog>
     )
   }
 
@@ -140,13 +158,26 @@ function CvRoute() {
 
   const Editor = draft.mode === 'latex' ? LatexResumeEditor : WordResumeEditor
   return (
-    <Editor
-      key={draft.id}
-      draft={draft}
-      backHref={DOCUMENTS}
-      onDelete={(id) => void deleteDraft(id)}
-      onPersistDraft={persistDraft}
-    />
+    <>
+      <Editor
+        key={draft.id}
+        draft={draft}
+        backHref={DOCUMENTS}
+        onDelete={(id) => deleteDraft(id)}
+        onPersistDraft={persistDraft}
+      />
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null)
+        }}
+        title="Delete this CV?"
+        body="This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDeleteDraft}
+      />
+    </>
   )
 }
 

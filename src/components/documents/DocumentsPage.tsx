@@ -1,16 +1,22 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import { PageHeader } from '@/components/ui/page-header'
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
+import { AppDialog } from '@/components/ui/app-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { ChevronDownIcon, PlusIcon, TrashIcon } from '@/components/icons'
+import { ModeChooser } from '@/components/cv/ModeChooser'
 import { DocumentRow } from './DocumentRow'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
 import type { ResumeSummary } from '@/services/resumeService'
 
-/** Where `+ new cv` goes. `/cv` reads `draft=new` as "ask which editor, then create one". */
+/**
+ * `/cv?draft=new` still works as a deep link -- `src/app/(app)/cv/page.tsx`
+ * opens the same `ModeChooser` dialog directly when it lands there with
+ * nothing else to sit behind it. `+ new cv` itself no longer navigates: see
+ * the dialog below.
+ */
 export const NEW_CV_HREF = '/cv?draft=new'
 
 /**
@@ -39,6 +45,9 @@ export interface DocumentsPageProps {
   versions?: VersionEntry[]
   versionsLoading?: boolean
   versionsError?: boolean
+  /** Fires once a mode is chosen in the New CV dialog; the caller owns the write and the navigation. */
+  onCreateDraft?: (mode: 'word' | 'latex') => void
+  creatingDraft?: boolean
 }
 
 export function DocumentsPage({
@@ -49,16 +58,20 @@ export function DocumentsPage({
   versions = [],
   versionsLoading = false,
   versionsError = false,
+  onCreateDraft,
+  creatingDraft = false,
 }: DocumentsPageProps) {
+  const [newCvOpen, setNewCvOpen] = React.useState(false)
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
         title="Documents"
         action={
-          <Link href={NEW_CV_HREF} className={buttonVariants({ size: 's' })}>
+          <Button size="s" onClick={() => setNewCvOpen(true)}>
             <PlusIcon size={16} aria-hidden />
             New CV
-          </Link>
+          </Button>
         }
       />
 
@@ -69,9 +82,9 @@ export function DocumentsPage({
             Write one in the document editor or in LaTeX, then pin it to the applications you send
             it to.
           </p>
-          <Link href={NEW_CV_HREF} className={buttonVariants({ variant: 'secondary', size: 's' })}>
+          <Button variant="secondary" size="s" onClick={() => setNewCvOpen(true)}>
             New CV
-          </Link>
+          </Button>
         </div>
       ) : (
         <div>
@@ -117,6 +130,10 @@ export function DocumentsPage({
           })}
         </div>
       )}
+
+      <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="New CV">
+        <ModeChooser creating={creatingDraft} onChoose={(mode) => onCreateDraft?.(mode)} />
+      </AppDialog>
     </div>
   )
 }

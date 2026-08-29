@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, within, cleanup, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ResumeSummary } from '@/services/resumeService'
 import { formatTouchedDate } from '@/services/date'
 import { DocumentRow } from '../DocumentRow'
@@ -175,7 +176,7 @@ describe('DocumentsPage', () => {
   it('carries + new cv in the body header, matching Applications Add', () => {
     render(<DocumentsPage docs={[DOC]} />)
     const header = document.querySelector('[data-body-header]') as HTMLElement
-    expect(within(header).getByRole('link', { name: /new cv/i })).toBeTruthy()
+    expect(within(header).getByRole('button', { name: /new cv/i })).toBeTruthy()
   })
 
   it('offers exactly one way to start a CV, and it is the body header control', () => {
@@ -183,9 +184,31 @@ describe('DocumentsPage', () => {
     // chrome and identical on five of the seven app screens. This fails both
     // if the control leaves the header and if a second one appears elsewhere.
     const { container } = render(<DocumentsPage docs={[DOC]} />)
-    const create = [...container.querySelectorAll('a[href="/cv?draft=new"]')]
-    expect(create).toHaveLength(1)
-    expect(container.querySelector('[data-body-header]')!.contains(create[0])).toBe(true)
+    const header = container.querySelector('[data-body-header]')!
+    const triggers = within(header as HTMLElement).getAllByRole('button', { name: /new cv/i })
+    expect(triggers).toHaveLength(1)
+  })
+
+  it('opens the mode chooser as a dialog over the list, not a new page', async () => {
+    // Item 2's second half: M5 turned this into a full page at
+    // /cv?draft=new, reasoning a dialog would float over nothing. Gabe
+    // overruled that. Opening it here, without navigating away, is what
+    // makes the Documents list the thing the dialog actually sits over.
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={[DOC]} />)
+    await user.click(screen.getByRole('button', { name: /new cv/i }))
+    expect(screen.getByRole('dialog', { name: 'New CV' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /word editor/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /latex editor/i })).toBeTruthy()
+  })
+
+  it('reports the chosen mode to the caller, which owns the write and the navigation', async () => {
+    const onCreateDraft = vi.fn()
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={[DOC]} onCreateDraft={onCreateDraft} />)
+    await user.click(screen.getByRole('button', { name: /new cv/i }))
+    await user.click(screen.getByRole('button', { name: /latex editor/i }))
+    expect(onCreateDraft).toHaveBeenCalledWith('latex')
   })
 
   it('renders one row per CV', () => {
@@ -198,7 +221,7 @@ describe('DocumentsPage', () => {
   it('offers a way to start one rather than an empty page when there are no CVs', () => {
     render(<DocumentsPage docs={[]} />)
     expect(screen.getByText(/no cvs yet/i)).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: /new cv/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /new cv/i }).length).toBeGreaterThan(0)
   })
 
   it('shows one CV version history at a time, beside the row it belongs to', () => {

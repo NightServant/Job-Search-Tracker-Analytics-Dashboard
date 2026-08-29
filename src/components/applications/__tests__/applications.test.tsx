@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { ApplicationsPage } from '../ApplicationsPage'
 import { ApplicationForm } from '../ApplicationForm'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from '../StatusTabs'
@@ -139,13 +140,70 @@ describe('ApplicationsPage', () => {
     expect(screen.queryByText(/broken\.csv/i)).toBeNull()
   })
 
-  it('scrolls the form into view and focuses the first field on Edit', () => {
-    const scrollIntoView = vi.fn()
-    Element.prototype.scrollIntoView = scrollIntoView
+  it('moves focus into the dialog and onto the first field on Edit, with no scroll compensation needed', async () => {
+    // A card low on a five-column board used to be off-screen from where the
+    // inline section opened, so ApplicationsPage carried its own
+    // scrollIntoView + .focus() effect to compensate. A dialog is centred in
+    // the viewport regardless of where its trigger sits, and Base UI's own
+    // focus trap moves focus in on open -- so that compensation is gone, and
+    // this pins the dialog's own behaviour rather than assuming it.
+    const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    fireEvent.click(screen.getAllByRole('button', { name: /^edit/i })[0])
-    expect(scrollIntoView).toHaveBeenCalled()
+    await user.click(screen.getAllByRole('button', { name: /^edit/i })[0])
     expect(screen.getByLabelText(/^Company/)).toHaveFocus()
+  })
+
+  it('returns focus to the Edit trigger that opened the dialog once it closes', async () => {
+    const user = userEvent.setup()
+    render(<ApplicationsPage jobs={JOBS} />)
+    const trigger = screen.getAllByRole('button', { name: /^edit/i })[0]
+    await user.click(trigger)
+    expect(screen.getByLabelText(/^Company/)).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(trigger).toHaveFocus()
+  })
+
+  it('asks before discarding a dirty form on Escape, an overlay click or the header close button', async () => {
+    const user = userEvent.setup()
+    render(<ApplicationsPage jobs={JOBS} />)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.type(screen.getByLabelText(/^Company/), 'Acme')
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('alertdialog', { name: /discard/i })).toBeTruthy()
+    // The form dialog is still open and the typed field is still intact --
+    // Escape did not drop it, it only raised the question.
+    expect(screen.getByLabelText(/^Company/)).toHaveValue('Acme')
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.getByLabelText(/^Company/)).toHaveValue('Acme')
+
+    await user.keyboard('{Escape}')
+    await user.click(screen.getByRole('button', { name: 'Discard' }))
+    expect(screen.queryByLabelText(/^Company/)).toBeNull()
+  })
+
+  it('closes an untouched form immediately on Escape, with no discard prompt', async () => {
+    const user = userEvent.setup()
+    render(<ApplicationsPage jobs={JOBS} />)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.queryByLabelText(/^Company/)).toBeNull()
+  })
+
+  it('still lets Cancel close a dirty form immediately, the same as it always has', async () => {
+    // Cancel predates the dialog and was never a defect Gabe raised -- only
+    // the three dismiss paths a dialog adds (Escape, overlay, header close)
+    // get the discard prompt.
+    const user = userEvent.setup()
+    render(<ApplicationsPage jobs={JOBS} />)
+    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.type(screen.getByLabelText(/^Company/), 'Acme')
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    expect(screen.queryByLabelText(/^Company/)).toBeNull()
   })
 
   it('wires the mobile list as a labelled tabpanel for the selected status tab', () => {

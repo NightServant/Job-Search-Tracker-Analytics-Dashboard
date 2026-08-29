@@ -139,6 +139,14 @@ export function WordResumeEditor({
     editorProps: {
       attributes: { class: 'focus:outline-none min-h-[10in] text-[15px] leading-7 text-zinc-900' },
     },
+    // Tiptap v3 renders eagerly by default, including on the server. This
+    // component is 'use client', but App Router still server-renders a
+    // client component for its initial HTML -- /cv is statically
+    // prerendered (confirmed in the build output), so `useEditor` really
+    // does run server-side. Without this, tiptap throws "SSR has been
+    // detected, please set `immediatelyRender` explicitly to `false`" and
+    // the whole route crashes with a client-side exception on load.
+    immediatelyRender: false,
   })
 
   useEffect(() => {

@@ -85,6 +85,15 @@ export interface ApplicationFormProps {
   onCancel?: () => void
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   autofilling?: boolean
+  /**
+   * Reports whether the typed payload has diverged from what the form
+   * mounted with, so the dialog around it (Task 4, M5.5) can gate the
+   * dismiss paths a modal adds -- Escape, an overlay click, the header close
+   * button -- that the old inline section never had. Compared against a
+   * snapshot taken once on mount, not against `touched`, so reverting a
+   * field back to its original value clears the flag again.
+   */
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 export function ApplicationForm({
@@ -95,6 +104,7 @@ export function ApplicationForm({
   onCancel,
   onAutofill,
   autofilling = false,
+  onDirtyChange,
 }: ApplicationFormProps) {
   const [company, setCompany] = React.useState(job?.company ?? '')
   const [role, setRole] = React.useState(job?.role ?? '')
@@ -166,6 +176,18 @@ export function ApplicationForm({
 
   const blur = (field: string) => () => setTouched((prev) => ({ ...prev, [field]: true }))
 
+  const initialPayloadRef = React.useRef<JobFormData | null>(null)
+  if (initialPayloadRef.current === null) initialPayloadRef.current = payload
+  const isDirty = JSON.stringify(payload) !== JSON.stringify(initialPayloadRef.current)
+
+  React.useEffect(() => {
+    onDirtyChange?.(isDirty)
+    // Only isDirty needs to re-fire this -- onDirtyChange is a fresh closure
+    // on every parent render and including it would report on every keystroke
+    // regardless of whether dirtiness actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty])
+
   const handleAutofill = async () => {
     if (!onAutofill) return
     const normalized = normalizePostingUrl(url)
@@ -214,10 +236,6 @@ export function ApplicationForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <h2 className="text-heading-m text-text-primary">
-        {job ? `Edit ${job.role} at ${job.company}` : 'New application'}
-      </h2>
-
       <div className="grid gap-5 sm:grid-cols-2">
         <Field id="company" label="Company" required>
           <Input

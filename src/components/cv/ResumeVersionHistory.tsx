@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { CssSpinner } from '@/components/ui/css-spinner'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ChevronDownIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { useToast } from '@/contexts/ToastContext'
 import {
@@ -54,6 +55,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
   const [isLoading, setIsLoading] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const loadSnapshots = async () => {
     setIsLoading(true)
@@ -87,15 +89,19 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
     }
   }
 
-  const handleDelete = async (snapshotId: string) => {
-    if (!window.confirm('Delete this version? This cannot be undone.')) return
+  const handleDelete = (snapshotId: string) => setPendingDeleteId(snapshotId)
 
+  const confirmDelete = async () => {
+    if (!pendingDeleteId) return
+    const snapshotId = pendingDeleteId
     try {
       await deleteSnapshot(snapshotId, userId)
       setSnapshots((prev) => prev.filter((s) => s.id !== snapshotId))
       success('Version deleted', 'The snapshot has been removed.')
     } catch (err) {
       showError('Delete failed', err instanceof Error ? err.message : 'Could not delete version')
+    } finally {
+      setPendingDeleteId(null)
     }
   }
 
@@ -156,7 +162,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
                         variant="ghost"
                         size="s"
                         aria-label="Remove this version"
-                        onClick={() => void handleDelete(snapshot.id)}
+                        onClick={() => handleDelete(snapshot.id)}
                       >
                         <TrashIcon size={14} aria-hidden />
                         Remove
@@ -169,6 +175,18 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={pendingDeleteId !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDeleteId(null)
+        }}
+        title="Delete this version?"
+        body="This cannot be undone."
+        confirmLabel="Delete"
+        destructive
+        onConfirm={confirmDelete}
+      />
     </div>
   )
 }

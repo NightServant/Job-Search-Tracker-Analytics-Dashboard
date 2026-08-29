@@ -3,6 +3,8 @@
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { AppDialog } from '@/components/ui/app-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PlusIcon } from '@/components/icons'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
 import { ApplicationsList } from './ApplicationsList'
@@ -81,21 +83,29 @@ export function ApplicationsPage({
   const [search, setSearch] = React.useState('')
   const [tab, setTab] = React.useState<StatusTabValue>('all')
   const [form, setForm] = React.useState<FormState>(null)
+  const [formDirty, setFormDirty] = React.useState(false)
+  const [discardOpen, setDiscardOpen] = React.useState(false)
   const [csv, setCsv] = React.useState<CsvImport | null>(null)
   const [skipDuplicates, setSkipDuplicates] = React.useState(true)
   const [parsingCsv, setParsingCsv] = React.useState(false)
-  const formSectionRef = React.useRef<HTMLElement | null>(null)
 
-  // A card low on a five-column board is off-screen from the header the form
-  // opens under, and nothing else moves the viewport or focus there. Without
-  // this, pressing Edit on such a card looks like it did nothing.
-  React.useEffect(() => {
-    if (!form) return
-    const node = formSectionRef.current
-    if (!node) return
-    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    node.querySelector<HTMLElement>('input, select, textarea')?.focus()
-  }, [form])
+  // A dialog adds three ways to dismiss the old inline section never had --
+  // Escape, an overlay click, the header's own close button -- and all three
+  // report through this one handler (Base UI routes every one of them
+  // through onOpenChange). A clean form closes immediately; a dirty one asks
+  // first, so none of the three can silently drop nineteen typed fields the
+  // way an unconditional setForm(null) after a rejected save used to.
+  //
+  // The form's own Cancel button is deliberately NOT routed through this --
+  // it is an explicit "abandon this" action that predates the dialog and
+  // behaved the same way (immediate, no confirmation) in the inline section.
+  const closeForm = () => {
+    if (formDirty) {
+      setDiscardOpen(true)
+      return
+    }
+    setForm(null)
+  }
 
   const searched = React.useMemo(() => {
     const needle = search.trim().toLowerCase()
@@ -205,25 +215,46 @@ export function ApplicationsPage({
         }
       />
 
-      {form && (
-        <section
-          ref={formSectionRef}
-          data-application-form
-          aria-label={form.job ? 'Edit application' : 'New application'}
-          className="border-y border-border-subtle py-6"
-        >
-          <ApplicationForm
-            key={form.job?.id ?? 'new'}
-            defaultCurrency={defaultCurrency}
-            job={form.job}
-            saving={saving}
-            onSubmit={submit}
-            onCancel={() => setForm(null)}
-            onAutofill={onAutofill}
-            autofilling={autofilling}
-          />
-        </section>
-      )}
+      <AppDialog
+        open={form !== null}
+        onOpenChange={(open) => {
+          if (!open) closeForm()
+        }}
+        size="l"
+        title={
+          form?.job ? `Edit ${form.job.role} at ${form.job.company}` : 'New application'
+        }
+      >
+        <div data-application-form>
+          {form && (
+            <ApplicationForm
+              key={form.job?.id ?? 'new'}
+              defaultCurrency={defaultCurrency}
+              job={form.job}
+              saving={saving}
+              onSubmit={submit}
+              onCancel={() => setForm(null)}
+              onAutofill={onAutofill}
+              autofilling={autofilling}
+              onDirtyChange={setFormDirty}
+            />
+          )}
+        </div>
+      </AppDialog>
+
+      <ConfirmDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        title="Discard unsaved changes?"
+        body="This application has edits that have not been saved. Closing now discards them."
+        confirmLabel="Discard"
+        destructive
+        onConfirm={() => {
+          setDiscardOpen(false)
+          setFormDirty(false)
+          setForm(null)
+        }}
+      />
 
       <ApplicationsToolbar
         search={search}

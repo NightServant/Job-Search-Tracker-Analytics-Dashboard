@@ -1,12 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 const getSnapshotsMock = vi.hoisted(() => vi.fn())
+const deleteSnapshotMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/services/resumeSnapshotService', () => ({
   getSnapshots: getSnapshotsMock,
   getSnapshot: vi.fn(),
-  deleteSnapshot: vi.fn(),
+  deleteSnapshot: deleteSnapshotMock,
   createSnapshot: vi.fn(),
 }))
 
@@ -21,7 +23,10 @@ function open() {
   fireEvent.click(screen.getByRole('button', { name: /versions/i }))
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  deleteSnapshotMock.mockResolvedValue(undefined)
+})
 afterEach(() => cleanup())
 
 describe('the editor version panel names versions the way the database does', () => {
@@ -69,5 +74,39 @@ describe('the editor version panel names versions the way the database does', ()
     getSnapshotsMock.mockResolvedValue([])
     open()
     await waitFor(() => expect(screen.getByText(/no versions yet/i)).toBeTruthy())
+  })
+})
+
+describe('deleting a snapshot', () => {
+  // Task 4 (M5.5): window.confirm here is the same defect class as the
+  // dialogs Gabe asked back for -- unstyled, unthemeable, untestable without
+  // stubbing a global.
+  it('confirms before deleting, and does not delete on Cancel', async () => {
+    getSnapshotsMock.mockResolvedValue([
+      { id: 's-2', resume_id: 'cv-1', version: 2, created_at: '2026-08-20T10:00:00.000Z' },
+      { id: 's-1', resume_id: 'cv-1', version: 1, created_at: '2026-08-19T10:00:00.000Z' },
+    ])
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByText(/v2/)).toBeTruthy())
+
+    await user.click(screen.getAllByRole('button', { name: /remove this version/i })[0])
+    expect(screen.getByRole('alertdialog', { name: /delete this version/i })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(deleteSnapshotMock).not.toHaveBeenCalled()
+  })
+
+  it('deletes the named snapshot once the confirm is accepted', async () => {
+    getSnapshotsMock.mockResolvedValue([
+      { id: 's-2', resume_id: 'cv-1', version: 2, created_at: '2026-08-20T10:00:00.000Z' },
+      { id: 's-1', resume_id: 'cv-1', version: 1, created_at: '2026-08-19T10:00:00.000Z' },
+    ])
+    const user = userEvent.setup()
+    open()
+    await waitFor(() => expect(screen.getByText(/v1/)).toBeTruthy())
+
+    await user.click(screen.getAllByRole('button', { name: /remove this version/i })[1])
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(deleteSnapshotMock).toHaveBeenCalledWith('s-1', 'user-1'))
   })
 })

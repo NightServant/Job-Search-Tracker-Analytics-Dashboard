@@ -133,7 +133,15 @@ export function LatexResumeEditor({
       } catch {
         if (mounted && attemptCount < maxAttempts) {
           attemptCount++
-          setTimeout(checkCdn, 1000) // Retry after 1 second
+          // The scheduling check above only guards the moment the retry is
+          // queued -- the callback itself ran unconditionally 1000ms later
+          // even after unmount, calling whatever `fetch` happened to be
+          // global at that later point. In production that is a wasted
+          // request; in tests it is a leaked call that lands against a
+          // different test's fetch mock and fails an unrelated assertion.
+          setTimeout(() => {
+            if (mounted) void checkCdn()
+          }, 1000)
         }
       }
     }

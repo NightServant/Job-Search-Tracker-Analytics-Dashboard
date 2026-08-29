@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { makeJob } from '@/test/fixtures'
 
 // Every read and write on this route goes through the useJobs hooks so they
@@ -11,6 +12,7 @@ const useCreateJobMock = vi.hoisted(() => vi.fn())
 const useUpdateJobMock = vi.hoisted(() => vi.fn())
 const useCreateJobsBulkMock = vi.hoisted(() => vi.fn())
 const useUserPreferencesMock = vi.hoisted(() => vi.fn())
+const deleteJobMutate = vi.hoisted(() => vi.fn())
 const idleMutation = vi.hoisted(() => () => ({ mutateAsync: vi.fn(), isPending: false }))
 
 vi.mock('@/hooks/useJobs', () => ({
@@ -18,7 +20,7 @@ vi.mock('@/hooks/useJobs', () => ({
   useCreateJob: useCreateJobMock,
   useCreateJobsBulk: useCreateJobsBulkMock,
   useUpdateJob: useUpdateJobMock,
-  useDeleteJob: idleMutation,
+  useDeleteJob: () => ({ mutateAsync: deleteJobMutate, isPending: false }),
   useUpdateJobStatus: idleMutation,
   useAutofillJobFromUrl: idleMutation,
 }))
@@ -42,6 +44,7 @@ beforeEach(() => {
   useUpdateJobMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   useCreateJobsBulkMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   useUserPreferencesMock.mockReturnValue({ data: null, isLoading: false, error: null })
+  deleteJobMutate.mockReset().mockResolvedValue(undefined)
 })
 
 afterEach(() => cleanup())
@@ -158,5 +161,35 @@ describe('Applications route wrapper', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Add' }))
     expect(screen.getByLabelText(/^Currency/)).toHaveValue('USD')
+  })
+
+  // Item 2's second half: window.confirm is the same defect class as the
+  // dialog Gabe asked back for, and it guarded a destructive action, so the
+  // replacement has to keep that guard rather than just re-skin it.
+  it('asks before deleting, naming the application, and does not delete on Cancel', async () => {
+    const job = makeJob({ id: '1', status: 'applied', company: 'Initech', role: 'Engineer' })
+    useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
+    const user = userEvent.setup()
+    render(<Page />)
+
+    await user.click(screen.getAllByRole('button', { name: /^delete/i })[0])
+    expect(
+      screen.getByRole('alertdialog', { name: 'Delete Engineer at Initech?' })
+    ).toBeTruthy()
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    expect(deleteJobMutate).not.toHaveBeenCalled()
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+  })
+
+  it('deletes the named application once the confirm is accepted', async () => {
+    const job = makeJob({ id: '1', status: 'applied', company: 'Initech', role: 'Engineer' })
+    useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
+    const user = userEvent.setup()
+    render(<Page />)
+
+    await user.click(screen.getAllByRole('button', { name: /^delete/i })[0])
+    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await waitFor(() => expect(deleteJobMutate).toHaveBeenCalledWith('1'))
   })
 })
