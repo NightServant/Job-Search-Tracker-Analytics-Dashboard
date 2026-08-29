@@ -63,7 +63,11 @@ export function TimeInStage({ data }: TimeInStageProps) {
               border: '1px solid var(--color-border-default)',
               borderRadius: 4,
             }}
-            formatter={(value: number) => [`${value} days`, 'Avg. time in stage']}
+            // recharts 3 types a Tooltip formatter's first argument as
+            // `ValueType | undefined`, so the `(value: number) =>` signature
+            // this had under recharts 2 no longer typechecks. The narrowing is
+            // done here rather than by widening the tuple's element types.
+            formatter={(value) => [`${Number(value)} days`, 'Avg. time in stage']}
           />
           <Bar dataKey="avgDays" isAnimationActive={!reducedMotion} radius={[2, 2, 0, 0]}>
             {chartData.map((d) => (
