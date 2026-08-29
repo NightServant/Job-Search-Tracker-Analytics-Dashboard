@@ -5,10 +5,14 @@ import { icons } from '@/components/icons'
 /**
  * Every icon at three sizes.
  *
- * 20 is the authored size; 18 and 44 are the sizes the chrome actually uses on
- * desktop and mobile. Rendering all three is deliberate -- the Sun and Search
- * rings drifted off-centre only when scaled away from 20, so a gallery that
- * shows one size would have missed it.
+ * 20 is this app's authored default; 18 and 44 are the sizes the chrome
+ * actually uses on desktop and mobile.
+ *
+ * The custom 34-icon set drawn in Figma (node 103:2066) was replaced wholesale
+ * on 2026-08-29 (Task 2b) with AnimateIcons (MIT, vendored via the shadcn
+ * CLI). "Match the Figma" is no longer the acceptance test for icons -- every
+ * frame still draws the old glyphs. See docs/superpowers/notes/2026-08-25-icon-gap.md
+ * for the full record.
  */
 const SIZES = [18, 20, 44] as const
 
@@ -17,8 +21,8 @@ export function Icons() {
     <section className="space-y-4">
       <h2 className="text-heading-l">Icons</h2>
       <p className="text-body-s text-text-muted">
-        {Object.keys(icons).length} icons, drawn in Figma, generated from the export. They inherit
-        colour from the text around them.
+        {Object.keys(icons).length} icons from AnimateIcons (MIT), vendored via the shadcn CLI. They
+        inherit colour from the text around them.
       </p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">

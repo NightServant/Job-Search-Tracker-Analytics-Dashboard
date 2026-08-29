@@ -37,6 +37,20 @@ describe('PanelSection', () => {
     expect(screen.getByText(/could not load activity/i)).toBeTruthy()
   })
 
+  it('does not nest the AnimateIcons <div> wrapper inside a <p>, which is invalid HTML', () => {
+    // AlertCircleIcon's root is a <div> (AnimateIcons, not the old hand-drawn
+    // <svg>-only set). A <p> containing it is invalid HTML and a React
+    // hydration error -- caught here rather than only in a console warning.
+    render(
+      <PanelSection title="Activity" error="Could not load activity.">
+        <p>Real content</p>
+      </PanelSection>
+    )
+    const errorContainer = screen.getByText(/could not load activity/i).closest('p, div')!
+    expect(errorContainer.tagName).not.toBe('P')
+    expect(errorContainer.querySelector('div')).toBeTruthy()
+  })
+
   it('renders an action next to the title', () => {
     render(
       <PanelSection title="Job description" actions={<a href="/x">View posting</a>}>
