@@ -52,9 +52,21 @@ const MODE_LABELS: Record<ResumeSummary['mode'], string> = {
  */
 export interface DocumentRowProps extends React.HTMLAttributes<HTMLDivElement> {
   doc: ResumeSummary
+  /**
+   * The row's own controls, rendered as a fifth grid cell.
+   *
+   * These used to hang outside the grid, in a `flex items-stretch` wrapper
+   * that put a vertical stack of two icon buttons beside the row. That is what
+   * made the columns look unaligned: the grid's `1fr` first column was
+   * measured from a width the stack had already eaten, so the four content
+   * columns landed at a different x on every row. Passing them in as a cell
+   * with a fixed track means the grid measures them like everything else and
+   * every row lines up.
+   */
+  actions?: React.ReactNode
 }
 
-export function DocumentRow({ doc, className, ...props }: DocumentRowProps) {
+export function DocumentRow({ doc, actions, className, ...props }: DocumentRowProps) {
   const ats = lintSections(doc.sections)
 
   return (
@@ -62,7 +74,10 @@ export function DocumentRow({ doc, className, ...props }: DocumentRowProps) {
       data-document-row
       className={cn(
         'grid grid-cols-1 gap-2 border-b border-border-subtle py-3',
-        'md:grid-cols-[1fr_7rem_6rem_6rem] md:items-center md:gap-4',
+        // Figma 48:548 is an 80px row; py-3 around ~40px of content made 68px,
+        // which is what left the controls looking cramped against cells that
+        // are vertically centred.
+        'md:grid-cols-[1fr_7rem_6rem_6rem_auto] md:items-center md:gap-4 md:py-5',
         className
       )}
       {...props}
@@ -84,19 +99,25 @@ export function DocumentRow({ doc, className, ...props }: DocumentRowProps) {
         {ats ? (
           <AtsCheck result={ats} className="w-16 shrink-0" />
         ) : (
-          <span className="text-body-s text-text-muted">Not checked</span>
+          <span className="text-body-s text-text-muted">not checked</span>
         )}
         {doc.version !== null ? (
           <span className="tabular text-body-s text-text-secondary">v{doc.version}</span>
         ) : doc.hasVersions ? (
-          <span className="text-body-s text-text-muted">Unnumbered</span>
+          <span className="text-body-s text-text-muted">unnumbered</span>
         ) : (
-          <span className="text-body-s text-text-muted">No versions</span>
+          <span className="text-body-s text-text-muted">no versions</span>
         )}
         <time dateTime={doc.updated_at} className="tabular text-body-s text-text-muted">
           {formatTouchedDate(doc.updated_at)}
         </time>
       </div>
+
+      {actions ? (
+        <div data-row-actions className="flex items-center gap-1 md:justify-end">
+          {actions}
+        </div>
+      ) : null}
     </div>
   )
 }

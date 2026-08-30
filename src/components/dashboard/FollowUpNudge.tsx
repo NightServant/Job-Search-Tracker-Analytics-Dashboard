@@ -29,7 +29,7 @@ export function FollowUpNudge({ stale }: { stale: StaleCandidate[] }) {
 
   return (
     <section data-follow-up className="border-l-2 border-border-strong pl-4">
-      <h2 className="text-label-caps uppercase text-text-muted">Needs a follow-up</h2>
+      <h2 className="text-label-caps uppercase text-text-muted">needs a follow-up</h2>
       <ul className="mt-2 flex flex-col gap-2">
         {stale.map((candidate) => (
           <li key={candidate.id} className="flex items-center justify-between gap-4">

@@ -20,7 +20,7 @@ export const RANGE_OPTIONS: { value: RangeOption; label: string }[] = [
   { value: '3m', label: 'Last 3 months' },
   { value: '6m', label: 'Last 6 months' },
   { value: '12m', label: 'Last 12 months' },
-  { value: 'all', label: 'All time' },
+  { value: 'all', label: 'all time' },
 ]
 
 const MONTHS_BY_RANGE: Record<Exclude<RangeOption, 'all'>, number> = {
@@ -66,5 +66,5 @@ export function filterByMonth<T>(
 }
 
 export function rangeLabel(range: RangeOption): string {
-  return RANGE_OPTIONS.find((option) => option.value === range)?.label ?? 'All time'
+  return RANGE_OPTIONS.find((option) => option.value === range)?.label ?? 'all time'
 }

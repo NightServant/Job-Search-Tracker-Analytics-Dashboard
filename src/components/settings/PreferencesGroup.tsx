@@ -1,5 +1,5 @@
 import { PanelSection } from '@/components/ui/panel-section'
-import { Field } from '@/components/ui/field'
+import { SettingsRow } from './SettingsRow'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { SUPPORTED_CURRENCIES, type SupportedCurrency } from '@/services/userPreferences'
 
@@ -43,20 +43,25 @@ export function PreferencesGroup({
 }: PreferencesGroupProps) {
   return (
     <div data-settings-group="preferences">
-      <PanelSection title="Preferences" titleSize="m">
-        <Field
-          id="default-currency"
-          label="Default currency"
-          hint="Seeds the currency for every new application. Existing applications keep the currency they were saved in."
-        >
-          <SegmentedControl
-            options={CURRENCY_OPTIONS}
-            value={defaultCurrency}
-            onChange={(code) => onDefaultCurrencyChange?.(code)}
-            aria-label="Default currency"
-            disabled={saving}
-          />
-        </Field>
+      <PanelSection title="preferences" titleSize="m">
+        {/* SettingsRow, not Field: this was the only settings group not using
+            it, which is why it sat differently from account and danger zone.
+            `wide` is the roadmap's 5.7 mobile rule -- the currency selector is
+            genuinely wide, so it stacks below its label at 375px. */}
+        <SettingsRow
+          label="default currency"
+          description="seeds the currency for every new application. existing applications keep the currency they were saved in."
+          wide
+          control={
+            <SegmentedControl
+              options={CURRENCY_OPTIONS}
+              value={defaultCurrency}
+              onChange={(code) => onDefaultCurrencyChange?.(code)}
+              aria-label="Default currency"
+              disabled={saving}
+            />
+          }
+        />
       </PanelSection>
     </div>
   )

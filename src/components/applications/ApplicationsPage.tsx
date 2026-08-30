@@ -3,15 +3,25 @@
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { AppDialog } from '@/components/ui/app-dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PlusIcon } from '@/components/icons'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
-import { ApplicationsList } from './ApplicationsList'
-import { KanbanView } from './KanbanView'
+import { ApplicationsTable } from './ApplicationsTable'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from './StatusTabs'
 import { ApplicationForm } from './ApplicationForm'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
-import type { Job, JobAutofillResult, JobFormData, JobStatus } from '@/types'
+import type { Job, JobAutofillResult, JobFormData } from '@/types'
 
 interface CsvImport {
   fileName: string
@@ -22,6 +32,13 @@ interface CsvImport {
 }
 
 type FormState = { job: Job | null } | null
+
+/**
+ * M5 Task 4's removed pagination was 20 a page. Ten instead: at twenty, an
+ * account with a dozen applications never sees pagination at all and cannot
+ * tell whether it exists -- which is exactly how it read on review.
+ */
+const PAGE_SIZE = 10
 
 function downloadCsv(fileName: string, text: string) {
   const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' })
@@ -39,15 +56,34 @@ function downloadCsv(fileName: string, text: string) {
  * of through Next routing and react-query. Every mutation arrives as a
  * callback; the route owns the hooks.
  *
- * Two views over one list, chosen by width rather than by a toggle. The old
- * screen had a list/kanban switch, and keeping it would have meant a control
- * that does nothing on mobile (where kanban is forbidden) and duplicates the
- * board on desktop. 5.4 states the rule directly: kanban desktop, list plus
- * status tabs on mobile.
+ * One list, narrowed by the status tabs. There is no board.
  *
- * Search narrows both views; the status tabs narrow only the list, because the
- * board already separates by status and a tab that hides four of five columns
- * is a filter arguing with a layout.
+ * The kanban was removed on Gabe's instruction (M5.5 Item 3, 2026-08-29).
+ * His original complaint was that it "would not be able to display all
+ * applications properly based on sorting", and after two narrower readings
+ * from me he was explicit: *"I said remove the sorting itself, not redesign
+ * it!"* The board's grouping into five status columns IS that sorting, so
+ * the whole board goes rather than its styling. The tabs are its
+ * replacement, not an addition beside it.
+ *
+ * - `all` -> every application, ungrouped.
+ * - any single status -> the same list, filtered to that status.
+ *
+ * No columns at any width, which retires the old "no kanban below 768px"
+ * constraint as moot: desktop and mobile are now the same surface, and the
+ * only thing that changes with width is how much of a row fits. Search
+ * narrows the list at every width, same as before.
+ *
+ * The status tabs themselves are also a deliberate departure from the design
+ * rather than a restoration of it -- desktop Figma frame `31:174` has no
+ * tabs at all. Gabe asked for them explicitly.
+ *
+ * WHAT THIS COST, recorded rather than discovered later: dragging a card
+ * between columns was the only way to change a status without opening the
+ * edit dialog, and it died with the board. Status is still fully editable
+ * through the dialog, so this is a lost convenience, not a lost capability
+ * -- but if a per-row status control is wanted back, that is a new task with
+ * a frame behind it, not something to reintroduce as a side effect.
  */
 export interface ApplicationsPageProps {
   jobs: Job[]
@@ -55,7 +91,6 @@ export interface ApplicationsPageProps {
   onCreate?: (data: JobFormData) => Promise<boolean>
   onUpdate?: (id: string, data: JobFormData) => Promise<boolean>
   onDelete?: (job: Job) => void
-  onStatusChange?: (job: Job, status: JobStatus) => void
   onImport?: (rows: JobFormData[]) => Promise<boolean>
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   onCsvError?: (message: string) => void
@@ -70,7 +105,6 @@ export function ApplicationsPage({
   onCreate,
   onUpdate,
   onDelete,
-  onStatusChange,
   onImport,
   onAutofill,
   onCsvError,
@@ -80,23 +114,40 @@ export function ApplicationsPage({
 }: ApplicationsPageProps) {
   const [search, setSearch] = React.useState('')
   const [tab, setTab] = React.useState<StatusTabValue>('all')
+  const [page, setPage] = React.useState(1)
   const [form, setForm] = React.useState<FormState>(null)
+  const [formDirty, setFormDirty] = React.useState(false)
+  const [discardOpen, setDiscardOpen] = React.useState(false)
   const [csv, setCsv] = React.useState<CsvImport | null>(null)
   const [skipDuplicates, setSkipDuplicates] = React.useState(true)
   const [parsingCsv, setParsingCsv] = React.useState(false)
-  const formSectionRef = React.useRef<HTMLElement | null>(null)
 
-  // A card low on a five-column board is off-screen from the header the form
-  // opens under, and nothing else moves the viewport or focus there. Without
-  // this, pressing Edit on such a card looks like it did nothing.
-  React.useEffect(() => {
-    if (!form) return
-    const node = formSectionRef.current
-    if (!node) return
-    node.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    node.querySelector<HTMLElement>('input, select, textarea')?.focus()
-  }, [form])
+  // A dialog adds three ways to dismiss the old inline section never had --
+  // Escape, an overlay click, the header's own close button -- and all three
+  // report through this one handler (Base UI routes every one of them
+  // through onOpenChange). A clean form closes immediately; a dirty one asks
+  // first, so none of the three can silently drop nineteen typed fields the
+  // way an unconditional setForm(null) after a rejected save used to.
+  //
+  // The form's own Cancel button is deliberately NOT routed through this --
+  // it is an explicit "abandon this" action that predates the dialog and
+  // behaved the same way (immediate, no confirmation) in the inline section.
+  const closeForm = () => {
+    if (formDirty) {
+      setDiscardOpen(true)
+      return
+    }
+    setForm(null)
+  }
 
+  // Sorted most-recently-created first. This predates Task 5 and Task 5 does
+  // not change it, but it is worth naming now that a single status renders as
+  // a flat list where order is the only structure left: `created_at` is when
+  // the row was added to Worktrack, which is not the same field as
+  // `date_applied` (when the application itself went out) -- "most recently
+  // applied first" is what a user reading this list would expect, and this
+  // is "most recently added" instead. A date-sort toggle was dropped in M5
+  // and Gabe still wants it back; that is its own task, not folded in here.
   const searched = React.useMemo(() => {
     const needle = search.trim().toLowerCase()
     const matched = needle
@@ -121,6 +172,28 @@ export function ApplicationsPage({
   }, [searched])
 
   const listed = tab === 'all' ? searched : searched.filter((job) => job.status === tab)
+
+  // Pagination. M5 Task 4 removed the original 20-per-page pagination along
+  // with the advanced filters; Gabe asked for it back.
+  const pageCount = Math.max(1, Math.ceil(listed.length / PAGE_SIZE))
+  // Clamp rather than store a page that no longer exists: deleting the last
+  // row of page 3, or narrowing the search, would otherwise leave the user on
+  // an empty page with no way back except paging.
+  const current = Math.min(page, pageCount)
+  const paged = listed.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+
+  // Search and tab both change the result set, so the page index they were
+  // valid for is meaningless afterwards.
+  React.useEffect(() => {
+    setPage(1)
+  }, [search, tab])
+
+  // A status tab at zero is a real, expected state (nobody has an offer on
+  // day one), not a search yielding nothing -- so it gets its own sentence
+  // rather than the generic "nothing matches these filters" the search box
+  // produces, which would misname the cause.
+  const emptyListMessage =
+    tab === 'all' ? undefined : `no ${tab} applications${search.trim() ? ' match this search' : ' yet'}.`
 
   const handleCsvFile = async (file: File) => {
     setParsingCsv(true)
@@ -196,34 +269,55 @@ export function ApplicationsPage({
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Applications"
+        title="applications"
         action={
           <Button size="s" onClick={() => setForm({ job: null })}>
             <PlusIcon size={16} aria-hidden />
-            Add
+            add
           </Button>
         }
       />
 
-      {form && (
-        <section
-          ref={formSectionRef}
-          data-application-form
-          aria-label={form.job ? 'Edit application' : 'New application'}
-          className="border-y border-border-subtle py-6"
-        >
-          <ApplicationForm
-            key={form.job?.id ?? 'new'}
-            defaultCurrency={defaultCurrency}
-            job={form.job}
-            saving={saving}
-            onSubmit={submit}
-            onCancel={() => setForm(null)}
-            onAutofill={onAutofill}
-            autofilling={autofilling}
-          />
-        </section>
-      )}
+      <AppDialog
+        open={form !== null}
+        onOpenChange={(open) => {
+          if (!open) closeForm()
+        }}
+        size="l"
+        title={
+          form?.job ? `Edit ${form.job.role} at ${form.job.company}` : 'New application'
+        }
+      >
+        <div data-application-form>
+          {form && (
+            <ApplicationForm
+              key={form.job?.id ?? 'new'}
+              defaultCurrency={defaultCurrency}
+              job={form.job}
+              saving={saving}
+              onSubmit={submit}
+              onCancel={() => setForm(null)}
+              onAutofill={onAutofill}
+              autofilling={autofilling}
+              onDirtyChange={setFormDirty}
+            />
+          )}
+        </div>
+      </AppDialog>
+
+      <ConfirmDialog
+        open={discardOpen}
+        onOpenChange={setDiscardOpen}
+        title="discard unsaved changes?"
+        body="This application has edits that have not been saved. Closing now discards them."
+        confirmLabel="Discard"
+        destructive
+        onConfirm={() => {
+          setDiscardOpen(false)
+          setFormDirty(false)
+          setForm(null)
+        }}
+      />
 
       <ApplicationsToolbar
         search={search}
@@ -252,14 +346,14 @@ export function ApplicationsPage({
               onChange={(e) => setSkipDuplicates(e.target.checked)}
               className="h-4 w-4 rounded-none border-border-default accent-accent-default"
             />
-            Skip rows already tracked
+            skip rows already tracked
           </label>
           <div className="flex items-center gap-2">
             <Button size="s" onClick={runImport} disabled={importing}>
               Import {skipDuplicates ? csv.importable.length : csv.rows.length}
             </Button>
             <Button variant="ghost" size="s" onClick={() => setCsv(null)} disabled={importing}>
-              Cancel
+              cancel
             </Button>
           </div>
         </section>
@@ -267,14 +361,14 @@ export function ApplicationsPage({
 
       {jobs.length === 0 ? (
         <div className="flex flex-col items-start gap-3 border-t border-border-subtle py-12">
-          <h2 className="text-heading-m text-text-primary">No applications yet</h2>
+          <h2 className="text-heading-m text-text-primary">no applications yet</h2>
           <p className="max-w-prose text-body-m text-text-muted">
             Add the first one by hand, or import the spreadsheet you have been keeping
             instead. Company and role are the only columns an import needs.
           </p>
           <Button onClick={() => setForm({ job: null })}>
             <PlusIcon size={16} aria-hidden />
-            Add your first application
+            add your first application
           </Button>
         </div>
       ) : (
@@ -284,22 +378,73 @@ export function ApplicationsPage({
             onChange={setTab}
             counts={counts}
             panelId="applications-list"
-            className="md:hidden border-b border-border-subtle"
+            className="border-b border-border-subtle"
           />
-          <ApplicationsList
-            id="applications-list"
-            role="tabpanel"
-            aria-labelledby={`status-tab-${tab}`}
-            jobs={listed}
-            onEdit={(job) => setForm({ job })}
-            onDelete={onDelete}
-          />
-          <KanbanView
-            jobs={searched}
-            onStatusChange={onStatusChange}
-            onEdit={(job) => setForm({ job })}
-            onDelete={onDelete}
-          />
+          <Card>
+            <CardContent>
+              <ApplicationsTable
+                id="applications-list"
+                role="tabpanel"
+                aria-labelledby={`status-tab-${tab}`}
+                jobs={paged}
+                emptyMessage={emptyListMessage}
+                onEdit={(job) => setForm({ job })}
+                onDelete={onDelete}
+              />
+            </CardContent>
+          </Card>
+
+          {listed.length > 0 && (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-body-s text-text-muted">
+                {(current - 1) * PAGE_SIZE + 1}&ndash;
+                {Math.min(current * PAGE_SIZE, listed.length)} of {listed.length}
+              </p>
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      aria-disabled={current === 1}
+                      className={current === 1 ? 'pointer-events-none opacity-50' : undefined}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.max(1, p - 1))
+                      }}
+                    />
+                  </PaginationItem>
+                  {pageCount > 1 &&
+                    Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+                      <PaginationItem key={n}>
+                        <PaginationLink
+                        href="#"
+                        isActive={n === current}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setPage(n)
+                        }}
+                      >
+                        {n}
+                      </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      aria-disabled={current === pageCount}
+                      className={
+                        current === pageCount ? 'pointer-events-none opacity-50' : undefined
+                      }
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.min(pageCount, p + 1))
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
+          )}
         </>
       )}
     </div>

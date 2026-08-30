@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { SettingsPage } from '../SettingsPage'
 
 afterEach(() => cleanup())
@@ -8,7 +9,7 @@ describe('SettingsPage', () => {
   it('has exactly three groups, in order: account, preferences, danger zone', () => {
     render(<SettingsPage prefs={null} />)
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Account', 'Preferences', 'Danger zone'])
+    expect(headings).toEqual(['account', 'preferences', 'danger zone'])
   })
 
   it('keeps the danger zone last among the data-settings-group containers', () => {
@@ -25,13 +26,13 @@ describe('SettingsPage', () => {
     render(<SettingsPage prefs={null} />)
     expect(screen.queryByText(/appearance/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /theme/i })).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Account' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'account' })).toBeTruthy()
   })
 
   it('has no export control -- /applications owns CSV', () => {
     render(<SettingsPage prefs={null} />)
     expect(screen.queryByRole('button', { name: /export/i })).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Preferences' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'preferences' })).toBeTruthy()
   })
 
   it('offers the six currencies from the CHECK constraint, PHP selected when there is no stored preference', () => {
@@ -77,23 +78,26 @@ describe('SettingsPage', () => {
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
 
-  it('does not delete the account on a single click -- it asks for confirmation first', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+  it('does not delete the account on a single click -- it asks for confirmation first', async () => {
+    // Task 4 (M5.5): window.confirm is the same defect class as the dialogs
+    // Gabe asked back for -- unstyled, unthemeable, untestable without
+    // stubbing a global -- so this guard is now a ConfirmDialog instead.
     const onDeleteAccount = vi.fn()
+    const user = userEvent.setup()
     render(<SettingsPage prefs={null} onDeleteAccount={onDeleteAccount} />)
-    fireEvent.click(screen.getByRole('button', { name: /delete account/i }))
-    expect(confirmSpy).toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /delete account/i }))
+    expect(screen.getByRole('alertdialog', { name: /delete your account/i })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(onDeleteAccount).not.toHaveBeenCalled()
-    confirmSpy.mockRestore()
   })
 
-  it('calls onDeleteAccount once the confirmation is accepted', () => {
-    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+  it('calls onDeleteAccount once the confirmation is accepted', async () => {
     const onDeleteAccount = vi.fn()
+    const user = userEvent.setup()
     render(<SettingsPage prefs={null} onDeleteAccount={onDeleteAccount} />)
-    fireEvent.click(screen.getByRole('button', { name: /delete account/i }))
+    await user.click(screen.getByRole('button', { name: /delete account/i }))
+    await user.click(screen.getByRole('button', { name: 'delete account' }))
     expect(onDeleteAccount).toHaveBeenCalledTimes(1)
-    confirmSpy.mockRestore()
   })
 
   it('renders no shadow and no rounded card border on any of the three groups', () => {

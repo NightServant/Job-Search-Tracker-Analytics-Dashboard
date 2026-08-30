@@ -1,16 +1,19 @@
 'use client'
 
 import * as React from 'react'
-import { useResumes, useResumeVersions, useDeleteResume } from '@/hooks/useResumes'
+import { useRouter } from 'next/navigation'
+import { useResumes, useResumeVersions, useDeleteResume, useCreateResume } from '@/hooks/useResumes'
 import { useToast } from '@/contexts/ToastContext'
 import { RouteError, RouteLoading } from '@/components/ui/route-states'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DocumentsPage } from '@/components/documents/DocumentsPage'
-import type { ResumeSummary } from '@/services/resumeService'
+import { DEFAULT_LATEX_SOURCE, DEFAULT_WORD_CONTENT } from '@/components/cv/content'
+import type { ResumeContent, ResumeMode, ResumeSummary } from '@/services/resumeService'
 
 /**
  * Thin route wrapper, the same split as `applications/page.tsx`: the screen
  * takes plain props so it renders without Next routing or react-query, and
- * this file owns the reads and the one write.
+ * this file owns the reads and the writes.
  *
  * Two reads, not one. The CV list is the page; a CV's snapshots are fetched
  * only once a row has been expanded, because loading every CV's version
@@ -23,22 +26,52 @@ import type { ResumeSummary } from '@/services/resumeService'
  * would tell someone their history is empty when it is merely unreachable --
  * so it is passed down as its own state, the same distinction the application
  * detail panels make.
+ *
+ * `onCreateDraft` mirrors `cv/page.tsx`'s own `createDraft` -- same default
+ * content, same title strings, same toast copy -- because Task 4 (M5.5) put
+ * the New CV dialog's trigger back on this screen instead of behind a
+ * navigation to `/cv?draft=new`. The two routes duplicate this dozen lines
+ * rather than share a hook for it: this plan's Global Constraints rule out
+ * touching `src/hooks/` or `src/services/`, and both routes already had their
+ * own `useCreateResume()` call before this task.
  */
 export default function Page() {
+  const router = useRouter()
   const { data: docs = [], isLoading, error } = useResumes()
   const [openVersionsFor, setOpenVersionsFor] = React.useState<string | null>(null)
   const versionsQuery = useResumeVersions(openVersionsFor)
   const deleteResume = useDeleteResume()
-  const { success, error: showError } = useToast()
+  const createResume = useCreateResume()
+  const { success, error: showError, info } = useToast()
+  const [pendingDelete, setPendingDelete] = React.useState<ResumeSummary | null>(null)
 
-  const handleDelete = async (doc: ResumeSummary) => {
-    if (!window.confirm(`Delete ${doc.title}? This cannot be undone.`)) return
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    const doc = pendingDelete
     try {
       await deleteResume.mutateAsync(doc.id)
       if (openVersionsFor === doc.id) setOpenVersionsFor(null)
       success('CV deleted', 'The draft was removed.')
     } catch (err) {
       showError('Delete failed', err instanceof Error ? err.message : 'Could not delete the CV')
+    } finally {
+      setPendingDelete(null)
+    }
+  }
+
+  const createDraft = async (mode: ResumeMode) => {
+    const content: ResumeContent =
+      mode === 'latex' ? { type: 'latex', source: DEFAULT_LATEX_SOURCE } : DEFAULT_WORD_CONTENT
+    try {
+      const created = await createResume.mutateAsync({
+        mode,
+        title: mode === 'latex' ? 'Untitled LaTeX CV' : 'Untitled CV',
+        content,
+      })
+      info('Draft created', `${mode === 'latex' ? 'LaTeX' : 'Word'} CV ready.`)
+      router.push(`/cv?draft=${created.id}`)
+    } catch (err) {
+      showError('Create failed', err instanceof Error ? err.message : 'Could not create the CV')
     }
   }
 
@@ -51,27 +84,42 @@ export default function Page() {
   if (error) {
     return (
       <RouteError
-        title="Could not load your CVs."
+        title="could not load your CVs."
         message={error instanceof Error ? error.message : 'An error occurred while loading them.'}
       />
     )
   }
 
   return (
-    <DocumentsPage
-      docs={docs}
-      onDelete={(doc) => void handleDelete(doc)}
-      onToggleVersions={(doc) =>
-        setOpenVersionsFor((current) => (current === doc.id ? null : doc.id))
-      }
-      openVersionsFor={openVersionsFor}
-      versions={(versionsQuery.data ?? []).map((snapshot) => ({
-        id: snapshot.id,
-        version: snapshot.version ?? null,
-        created_at: snapshot.created_at,
-      }))}
-      versionsLoading={versionsQuery.isLoading}
-      versionsError={!!versionsQuery.error}
-    />
+    <>
+      <DocumentsPage
+        docs={docs}
+        onDelete={(doc) => setPendingDelete(doc)}
+        onToggleVersions={(doc) =>
+          setOpenVersionsFor((current) => (current === doc.id ? null : doc.id))
+        }
+        openVersionsFor={openVersionsFor}
+        versions={(versionsQuery.data ?? []).map((snapshot) => ({
+          id: snapshot.id,
+          version: snapshot.version ?? null,
+          created_at: snapshot.created_at,
+        }))}
+        versionsLoading={versionsQuery.isLoading}
+        versionsError={!!versionsQuery.error}
+        onCreateDraft={(mode) => void createDraft(mode)}
+        creatingDraft={createResume.isPending}
+      />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null)
+        }}
+        title={pendingDelete ? `Delete ${pendingDelete.title}?` : ''}
+        body="This cannot be undone."
+        confirmLabel="delete"
+        destructive
+        onConfirm={confirmDelete}
+      />
+    </>
   )
 }

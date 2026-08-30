@@ -1,20 +1,21 @@
 'use client'
 
+import * as React from 'react'
 import {
   useJobs,
   useCreateJob,
   useCreateJobsBulk,
   useUpdateJob,
   useDeleteJob,
-  useUpdateJobStatus,
   useAutofillJobFromUrl,
 } from '@/hooks/useJobs'
 import { useToast } from '@/contexts/ToastContext'
 import { ApplicationsPage } from '@/components/applications/ApplicationsPage'
 import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
-import type { Job, JobFormData, JobStatus } from '@/types'
+import type { Job, JobFormData } from '@/types'
 
 function message(err: unknown, fallback: string): string {
   const raw = err instanceof Error ? err.message : String(err)
@@ -48,9 +49,9 @@ export default function Page() {
   const createJobsBulk = useCreateJobsBulk()
   const updateJob = useUpdateJob()
   const deleteJob = useDeleteJob()
-  const updateStatus = useUpdateJobStatus()
   const autofill = useAutofillJobFromUrl()
   const { success, error: showError } = useToast()
+  const [pendingDelete, setPendingDelete] = React.useState<Job | null>(null)
 
   if (isLoading) {
     return <RouteLoading />
@@ -61,7 +62,7 @@ export default function Page() {
   if (error) {
     return (
       <RouteError
-        title="Could not load your applications."
+        title="could not load your applications."
         message={error instanceof Error ? error.message : 'An error occurred while loading them.'}
       />
     )
@@ -89,21 +90,18 @@ export default function Page() {
     }
   }
 
-  const handleDelete = async (job: Job) => {
-    if (!window.confirm(`Delete ${job.role} at ${job.company}?`)) return
+  const handleDelete = (job: Job) => setPendingDelete(job)
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return
+    const job = pendingDelete
     try {
       await deleteJob.mutateAsync(job.id)
       success('Application deleted')
     } catch (err) {
       showError('Could not delete the application', message(err, 'Unknown error'))
-    }
-  }
-
-  const handleStatusChange = async (job: Job, status: JobStatus) => {
-    try {
-      await updateStatus.mutateAsync({ id: job.id, status })
-    } catch (err) {
-      showError('Could not move the application', message(err, 'Unknown error'))
+    } finally {
+      setPendingDelete(null)
     }
   }
 
@@ -119,19 +117,31 @@ export default function Page() {
   }
 
   return (
-    <ApplicationsPage
-      jobs={jobs}
-      defaultCurrency={resolveDefaultCurrency(prefs)}
-      onCreate={handleCreate}
-      onUpdate={handleUpdate}
-      onDelete={handleDelete}
-      onStatusChange={handleStatusChange}
-      onImport={handleImport}
-      onAutofill={(url) => autofill.mutateAsync(url)}
-      onCsvError={(msg) => showError('CSV import failed', msg)}
-      saving={createJob.isPending || updateJob.isPending}
-      importing={createJobsBulk.isPending}
-      autofilling={autofill.isPending}
-    />
+    <>
+      <ApplicationsPage
+        jobs={jobs}
+        defaultCurrency={resolveDefaultCurrency(prefs)}
+        onCreate={handleCreate}
+        onUpdate={handleUpdate}
+        onDelete={handleDelete}
+        onImport={handleImport}
+        onAutofill={(url) => autofill.mutateAsync(url)}
+        onCsvError={(msg) => showError('CSV import failed', msg)}
+        saving={createJob.isPending || updateJob.isPending}
+        importing={createJobsBulk.isPending}
+        autofilling={autofill.isPending}
+      />
+      <ConfirmDialog
+        open={pendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null)
+        }}
+        title={pendingDelete ? `Delete ${pendingDelete.role} at ${pendingDelete.company}?` : ''}
+        body="This cannot be undone."
+        confirmLabel="delete"
+        destructive
+        onConfirm={confirmDelete}
+      />
+    </>
   )
 }

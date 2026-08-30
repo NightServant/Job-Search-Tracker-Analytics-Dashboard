@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { runtimeFlags } from '@/lib/env'
 import { MailIcon, LockIcon, BriefcaseIcon, AlertCircleIcon } from '@/components/icons'
 import { useAuth } from '@/contexts/AuthContext'
-import { useTheme } from 'next-themes'
 import { hasValidSupabaseConfig } from '@/lib/supabase'
 
 export default function LoginPage() {
@@ -17,7 +16,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
 
   const { signIn, signUp } = useAuth()
-  const { resolvedTheme: theme } = useTheme()
   const router = useRouter()
 
   const hasSupabaseConfig = hasValidSupabaseConfig
@@ -66,8 +64,15 @@ export default function LoginPage() {
     }
   }
 
+  // No local `dark` class here. next-themes runs with attribute="class", so
+  // it puts `dark` on <html>, and this project's variant is
+  // `&:where(.dark, .dark *)` -- the whole page is already covered. Adding it
+  // here changed nothing visually and broke hydration: the server cannot know
+  // the stored theme, so it rendered "min-h-screen flex " while the client
+  // rendered "min-h-screen flex dark". That mismatch was the one real error
+  // in this page's console.
   return (
-    <div className={`min-h-screen flex ${theme === 'dark' ? 'dark' : ''}`}>
+    <div className="min-h-screen flex">
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary-600 dark:bg-primary-900 p-12 flex-col justify-between">
         <div className="flex items-center gap-3">

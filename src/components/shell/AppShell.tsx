@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { Sidebar, NAV } from '@/components/ui/sidebar'
+import { AppBackground } from './AppBackground'
 import { activeNavHref, isUnder } from '@/lib/activeNav'
 import { TopBar } from './TopBar'
 import { BottomNav } from './BottomNav'
@@ -20,7 +21,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const settingsActive = isUnder(pathname, '/settings')
 
   return (
-    <div className="flex min-h-screen bg-bg-canvas">
+    // NO bg-* on this container, deliberately. It used to carry
+    // `bg-bg-canvas`, which is the same colour body already paints
+    // (--color-background IS --color-bg-canvas) -- but painting it here made
+    // the backdrop permanently invisible at any opacity. Within a stacking
+    // context, negative z-index children paint BEFORE in-flow block
+    // backgrounds, so this div's opaque fill covered the fixed -z-10 backdrop
+    // every time. Two "raise the opacity" fixes could never have worked.
+    <div className="flex min-h-screen">
+      <AppBackground />
       <Sidebar pathname={pathname} activeHref={active} className="hidden md:flex" />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar settingsActive={settingsActive} />

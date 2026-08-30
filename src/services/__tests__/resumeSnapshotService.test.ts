@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 /**
  * These tests drive `createSnapshot` through a stand-in for the
@@ -35,13 +35,24 @@ vi.mock('@/lib/supabase', () => ({
 }))
 
 import { createSnapshot, getSnapshots, maybeCreateSnapshot } from '../resumeSnapshotService'
+import type { ResumeSnapshot, SnapshotReaderClient } from '../resumeSnapshotService'
+
+/**
+ * `createSnapshot`'s `.select().single<ResumeSnapshot>()` selects every
+ * column (no explicit list), so the row it returns always carries `version`
+ * even though `ResumeSnapshot` doesn't declare it -- unlike `getSnapshot`,
+ * which explicitly names its column list and leaves `version` out. These
+ * tests assert on that real column; this retypes the value locally to what
+ * `createSnapshot` actually returns, without touching the production type.
+ */
+type CreatedSnapshot = ResumeSnapshot & { version: number | null }
 
 interface FakeTable {
   rows: Row[]
   inserts: number
   /** Fails the next insert with this PostgREST error, once. */
   failNextInsert: (error: { code?: string; message: string }, alsoInsert?: Row) => void
-  client: { from: (table: string) => unknown }
+  client: SnapshotReaderClient
 }
 
 function fakeSnapshots(initial: Partial<Row>[] = []): FakeTable {
@@ -59,7 +70,7 @@ function fakeSnapshots(initial: Partial<Row>[] = []): FakeTable {
     rows,
     inserts: 0,
     failNextInsert: () => {},
-    client: { from: () => builder() },
+    client: { from: (() => builder()) as unknown as SnapshotReaderClient['from'] },
   }
 
   const failures: { error: { code?: string; message: string }; alsoInsert?: Row }[] = []
@@ -132,7 +143,12 @@ function fakeSnapshots(initial: Partial<Row>[] = []): FakeTable {
     )
 
     if (state.orderCol) {
-      const col = state.orderCol as keyof Row
+      // Only 'version' and 'created_at' are ever ordered on (see
+      // resumeSnapshotService.ts's four `.order(...)` call sites) --
+      // narrower than `keyof Row` on purpose, because `content: unknown`
+      // being reachable through the wider cast is what made `av`/`bv` below
+      // possibly-undefined to the compiler.
+      const col = state.orderCol as 'version' | 'created_at'
       const nullsFirst = state.nullsFirst ?? !state.ascending
       matched = [...matched].sort((a, b) => {
         const av = a[col]
@@ -225,7 +241,7 @@ describe('createSnapshot assigns a version', () => {
     // (migration 20260825040236 added it and backfilled once), so if the
     // insert does not name a number, nothing else will.
     const table = install(fakeSnapshots())
-    const snapshot = await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    const snapshot = (await createSnapshot('cv-1', 'user-1', { type: 'doc' })) as CreatedSnapshot
     expect(snapshot.version).toBe(1)
     expect(table.rows[0].version).toBe(1)
   })
@@ -245,13 +261,13 @@ describe('createSnapshot assigns a version', () => {
       fakeSnapshots([{ id: 'a', version: 8 }, { id: 'b', version: 9 }, { id: 'c', version: 10 }])
     )
     table.rows.splice(0, 1) // v8 pruned
-    const snapshot = await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    const snapshot = (await createSnapshot('cv-1', 'user-1', { type: 'doc' })) as CreatedSnapshot
     expect(snapshot.version).toBe(11)
   })
 
   it('numbers each CV independently, since the constraint is per resume', async () => {
     const table = install(fakeSnapshots([{ id: 'a', resume_id: 'cv-1', version: 4 }]))
-    const snapshot = await createSnapshot('cv-2', 'user-1', { type: 'doc' })
+    const snapshot = (await createSnapshot('cv-2', 'user-1', { type: 'doc' })) as CreatedSnapshot
     expect(snapshot.version).toBe(1)
     expect(table.rows.find((row) => row.resume_id === 'cv-2')!.version).toBe(1)
   })
@@ -261,7 +277,7 @@ describe('createSnapshot assigns a version', () => {
     // latest version without saying NULLS LAST reads null off a pre-backfill
     // row, restarts at 1, and collides with the real v1.
     install(fakeSnapshots([{ id: 'legacy', version: null }, { id: 'b', version: 3 }]))
-    const snapshot = await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    const snapshot = (await createSnapshot('cv-1', 'user-1', { type: 'doc' })) as CreatedSnapshot
     expect(snapshot.version).toBe(4)
   })
 })
@@ -283,7 +299,7 @@ describe('createSnapshot and the unique constraint', () => {
         created_at: '2026-08-20T10:00:00.000Z',
       }
     )
-    const snapshot = await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    const snapshot = (await createSnapshot('cv-1', 'user-1', { type: 'doc' })) as CreatedSnapshot
     expect(snapshot.version).toBe(3)
     expect(table.inserts).toBe(2)
   })
@@ -341,7 +357,7 @@ describe('pruning the oldest snapshots', () => {
       2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
     ])
 
-    const next = await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+    const next = (await createSnapshot('cv-1', 'user-1', { type: 'doc' })) as CreatedSnapshot
     expect(next.version).toBe(12)
   })
 

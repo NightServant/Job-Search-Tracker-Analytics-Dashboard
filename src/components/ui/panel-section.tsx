@@ -58,10 +58,10 @@ export function PanelSection({
         {actions}
       </div>
       {error ? (
-        <p className="flex items-start gap-2 text-body-s text-status-rejected-mark">
+        <div className="flex items-start gap-2 text-body-s text-status-rejected-mark">
           <AlertCircleIcon size={16} className="mt-0.5 shrink-0" />
           {error}
-        </p>
+        </div>
       ) : (
         children
       )}

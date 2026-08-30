@@ -86,11 +86,11 @@ export default function Page() {
   if (jobQuery.error || !job) {
     return (
       <RouteError
-        title="Could not find that application."
+        title="could not find that application."
         message="It may have been deleted, or the link may be wrong."
         action={
           <Link href="/applications" className={buttonVariants({ variant: 'secondary', size: 's' })}>
-            Back to applications
+            back to applications
           </Link>
         }
       />

@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { STATUSES, type Status } from '@/components/ui/status-marker'
+import { EmptyState } from '@/components/ui/empty-state'
 import type { ConversionFunnelMetric } from '@/services/analyticsService'
 
 const LABELS: Record<Status, string> = {
@@ -45,6 +46,17 @@ export interface FunnelStageDatum {
   percentage: number
   /** See `ConversionFunnelMetric.isExit`. `true` only for 'rejected'. */
   isExit: boolean
+  /**
+   * Mean days taken to reach this stage. The service has always returned it
+   * and this chart used to discard it, which is why the panel had a bar, a
+   * count and a percentage and still could not answer "how long does this
+   * take" -- the one question a funnel is usually read for.
+   *
+   * `0` on the starting stage, where "time to reach" is meaningless, and `0`
+   * on any stage nobody has reached. Both render as a dash rather than "0d",
+   * which would claim the step is instant.
+   */
+  avgDaysToStage: number
 }
 
 /**
@@ -72,7 +84,13 @@ export function normalizeFunnel(metrics: ConversionFunnelMetric[]): FunnelStageD
   }
   return STATUSES.filter((stage) => byStage.has(stage)).map((stage) => {
     const metric = byStage.get(stage)!
-    return { stage, count: metric.count, percentage: metric.percentage, isExit: metric.isExit }
+    return {
+      stage,
+      count: metric.count,
+      percentage: metric.percentage,
+      isExit: metric.isExit,
+      avgDaysToStage: metric.avgDaysToStage,
+    }
   })
 }
 
@@ -93,38 +111,133 @@ export interface FunnelChartProps {
  * not the fifth rung of a chain that is supposed to read top-to-bottom as
  * monotonically non-increasing.
  */
+/**
+ * The timing line under a stage's bar.
+ *
+ * A dash, not "0d". Zero means either the starting stage (nothing precedes it)
+ * or a stage nobody has reached yet -- printing "0d to reach" for either would
+ * read as "this step takes no time", which is the opposite of the truth in the
+ * second case.
+ */
+function StageTiming({ days, show }: { days: number; show: boolean }) {
+  if (!show) return null
+  return (
+    <p className="pl-27 text-body-s text-text-muted">
+      {days > 0 ? `${Math.round(days)}d to reach` : '\u2014'}
+    </p>
+  )
+}
+
 export function FunnelChart({ data }: FunnelChartProps) {
   if (data.length === 0) {
-    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+    return (
+      <EmptyState icon="Analytics">
+        not enough data yet. this fills in as applications move through the pipeline.
+      </EmptyState>
+    )
   }
 
-  const max = Math.max(...data.map((d) => d.count), 1)
   const chain = data.filter((d) => !d.isExit)
   const exits = data.filter((d) => d.isExit)
-
-  const bar = (d: FunnelStageDatum) => (
-    <div key={d.stage} data-stage={d.stage} data-exit={d.isExit ? 'true' : undefined} className="flex items-center gap-3">
-      <span className="w-28 shrink-0 text-body-s text-text-secondary">{LABELS[d.stage]}</span>
-      <div className="h-2 flex-1 bg-bg-inset">
-        <div
-          data-fill={STAGE_FILL[d.stage]}
-          className="h-2"
-          style={{
-            width: `${Math.max((d.count / max) * 100, 2)}%`,
-            backgroundColor: STAGE_FILL[d.stage],
-          }}
-        />
-      </div>
-      <span className="tabular w-10 shrink-0 text-right text-body-s text-text-primary">{d.count}</span>
-    </div>
-  )
+  // Timings only appear when at least one stage has one. An account with no
+  // status history reports 0 days for every stage, so the line rendered as
+  // five dashes -- height with no information in it, which is worse than the
+  // gap it was added to fill. One stage with a real number is enough to make
+  // the column meaningful, and the zeroes beside it then read as "not this
+  // one" rather than "not any of them".
+  const hasTimings = data.some((d) => d.avgDaysToStage > 0)
+  // The chain's own top stage is the denominator, not the global max. A funnel
+  // reads as "what fraction survived each step", and measuring against an exit
+  // count would make a heavily-rejected pipeline look like it converted well.
+  const top = Math.max(chain[0]?.count ?? 0, 1)
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3">{chain.map(bar)}</div>
+    // The panel fills the card, and it fills it by growing the BARS rather
+    // than by spreading the rows apart or centring the group in the leftover
+    // space. Both of those were tried and both left visible air. A bar's
+    // LENGTH is what encodes its count here, so its height is free: a taller
+    // bar says nothing different, which is exactly what makes it the right
+    // thing to stretch.
+    <div className="flex h-full flex-1 flex-col gap-4">
+      {/* An actual funnel, not a bar list: each stage is centred and its width
+          is its share of the first stage, so the taper IS the conversion. The
+          previous version was left-aligned tracks of equal length, which is a
+          bar chart wearing the word "funnel" -- you had to read the numbers to
+          see the shape the chart exists to show. */}
+      {/* Rows keep their pitch tight -- an earlier pass spread them with
+          justify-around, which put 60px between 28px bars and read as five
+          unrelated bars rather than one funnel. What absorbs the extra height
+          is each row growing, capped so a two-stage funnel does not draw two
+          slabs. */}
+      <div data-funnel-chain className="flex flex-1 flex-col items-center gap-2">
+        {chain.map((d) => {
+          const share = d.count / top
+          return (
+            <div key={d.stage} className="flex w-full flex-1 flex-col justify-center gap-0.5">
+              <div className="flex w-full items-center gap-3">
+              <span className="w-24 shrink-0 text-body-s text-text-secondary">
+                {LABELS[d.stage]}
+              </span>
+              <div
+                data-stage={d.stage}
+                className="flex h-full max-h-12 min-h-7 flex-1 items-center justify-center"
+              >
+                <div
+                  data-fill={STAGE_FILL[d.stage]}
+                  className="h-full rounded-sm transition-[width] duration-[--duration-base]"
+                  style={{
+                    // A floor so a zero stage is still a visible tick rather
+                    // than nothing -- "0 got here" is information.
+                    width: `${Math.max(share * 100, 1.5)}%`,
+                    backgroundColor: STAGE_FILL[d.stage],
+                  }}
+                />
+              </div>
+              <span className="tabular w-16 shrink-0 text-right text-body-s text-text-primary">
+                {d.count}
+                <span className="ml-1 text-text-muted">
+                  {Math.round(share * 100)}%
+                </span>
+              </span>
+              </div>
+              <StageTiming days={d.avgDaysToStage} show={hasTimings} />
+            </div>
+          )
+        })}
+      </div>
+
       {exits.length > 0 && (
-        <div data-funnel-exits className="flex flex-col gap-3 border-t border-border-subtle pt-3">
-          {exits.map(bar)}
+        <div
+          data-funnel-exits
+          className="flex flex-col gap-1 border-t border-border-subtle pt-3"
+        >
+          {exits.map((d) => (
+            <div key={d.stage} className="flex w-full flex-1 flex-col justify-center gap-0.5">
+              <div className="flex w-full items-center gap-3">
+              <span className="w-24 shrink-0 text-body-s text-text-secondary">
+                {LABELS[d.stage]}
+              </span>
+              <div
+                data-stage={d.stage}
+                data-exit="true"
+                className="flex h-5 flex-1 items-center"
+              >
+                <div
+                  data-fill={STAGE_FILL[d.stage]}
+                  className="h-5 rounded-sm"
+                  style={{
+                    width: `${Math.max((d.count / top) * 100, 1.5)}%`,
+                    backgroundColor: STAGE_FILL[d.stage],
+                  }}
+                />
+              </div>
+              <span className="tabular w-16 shrink-0 text-right text-body-s text-text-primary">
+                {d.count}
+              </span>
+              </div>
+              <StageTiming days={d.avgDaysToStage} show={hasTimings} />
+            </div>
+          ))}
         </div>
       )}
     </div>

@@ -139,6 +139,14 @@ export function WordResumeEditor({
     editorProps: {
       attributes: { class: 'focus:outline-none min-h-[10in] text-[15px] leading-7 text-zinc-900' },
     },
+    // Tiptap v3 renders eagerly by default, including on the server. This
+    // component is 'use client', but App Router still server-renders a
+    // client component for its initial HTML -- /cv is statically
+    // prerendered (confirmed in the build output), so `useEditor` really
+    // does run server-side. Without this, tiptap throws "SSR has been
+    // detected, please set `immediatelyRender` explicitly to `false`" and
+    // the whole route crashes with a client-side exception on load.
+    immediatelyRender: false,
   })
 
   useEffect(() => {
@@ -325,7 +333,7 @@ export function WordResumeEditor({
             href={backHref}
             className={buttonVariants({ variant: 'ghost', size: 's' })}
           >
-            Back
+            back
           </Link>
         }
       />
@@ -337,7 +345,7 @@ export function WordResumeEditor({
         <TemplatePresetSelector mode="word" onSelect={applyTemplate} />
         <Button variant="secondary" size="s" onClick={resetTemplate} disabled={!editor}>
           <RotateCcwIcon size={14} aria-hidden />
-          Reset
+          reset
         </Button>
         <Button
           variant="secondary"
@@ -358,7 +366,7 @@ export function WordResumeEditor({
           onClick={() => onDelete(draft.id)}
         >
           <TrashIcon size={14} aria-hidden />
-          Delete
+          delete
         </Button>
       </div>
 
@@ -371,13 +379,13 @@ export function WordResumeEditor({
               setTitle(e.target.value)
               markDirty()
             }}
-            placeholder="Untitled CV"
+            placeholder="untitled CV"
             className="mt-1"
           />
         </label>
         <p className="text-body-s text-text-muted md:text-right">
           {formatSaveTime(lastSavedAt)}
-          {isDirty ? <span className="ml-2 text-amber-600">Unsaved changes</span> : null}
+          {isDirty ? <span className="ml-2 text-amber-600">unsaved changes</span> : null}
         </p>
       </div>
 
@@ -387,21 +395,21 @@ export function WordResumeEditor({
           active={!!editor?.isActive('bold')}
           disabled={!editor}
         >
-          Bold
+          bold
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleItalic().run()}
           active={!!editor?.isActive('italic')}
           disabled={!editor}
         >
-          Italic
+          italic
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleBulletList().run()}
           active={!!editor?.isActive('bulletList')}
           disabled={!editor}
         >
-          Bullets
+          bullets
         </ToolbarButton>
         <ToolbarButton
           onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}

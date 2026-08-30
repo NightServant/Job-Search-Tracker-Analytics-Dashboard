@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ResumeDraft } from '@/services/resumeService'
 
 /**
@@ -179,6 +180,25 @@ describe('/cv?draft=<id> opens the right editor', () => {
     expect(createMutate).toHaveBeenCalledWith(expect.objectContaining({ mode: 'latex' }))
     expect(routerReplace).toHaveBeenCalledWith('/cv?draft=cv-new')
   })
+
+  it('offers the mode chooser as a dialog at ?draft=new, not a bare page', () => {
+    // Task 4 (M5.5): restored as a dialog. This route only ever reaches
+    // ?draft=new as a deep link now (the trigger itself moved onto
+    // DocumentsPage), so it still has to work landed on directly.
+    params('new')
+    resolved(null)
+    render(<Page />)
+    expect(screen.getByRole('dialog', { name: 'new CV' })).toBeTruthy()
+  })
+
+  it('sends ?draft=new back to Documents when the dialog is dismissed without a choice', async () => {
+    params('new')
+    resolved(null)
+    const user = userEvent.setup()
+    render(<Page />)
+    await user.keyboard('{Escape}')
+    expect(routerReplace).toHaveBeenCalledWith('/documents')
+  })
 })
 
 describe('the editor still saves', () => {
@@ -294,6 +314,32 @@ describe('the editor chrome carries no lucide glyphs', () => {
     resolved(wordDraft())
     render(<Page />)
     expect(screen.getByRole('link', { name: /back/i }).getAttribute('href')).toBe('/documents')
+  })
+})
+
+describe('deleting a CV from the editor', () => {
+  it('confirms before deleting, and does not delete on Cancel', async () => {
+    params('cv-1')
+    resolved(wordDraft())
+    const user = userEvent.setup()
+    render(<Page />)
+
+    await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
+    expect(screen.getByRole('alertdialog', { name: /delete this cv/i })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
+    expect(deleteMutate).not.toHaveBeenCalled()
+  })
+
+  it('deletes and returns to Documents once the confirm is accepted', async () => {
+    params('cv-1')
+    resolved(wordDraft())
+    const user = userEvent.setup()
+    render(<Page />)
+
+    await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
+    await user.click(screen.getByRole('button', { name: 'delete' }))
+    expect(deleteMutate).toHaveBeenCalledWith('cv-1')
+    expect(routerReplace).toHaveBeenCalledWith('/documents')
   })
 })
 

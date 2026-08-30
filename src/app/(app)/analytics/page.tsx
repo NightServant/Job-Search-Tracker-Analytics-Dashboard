@@ -4,10 +4,11 @@ import { useAuth } from '@/contexts/AuthContext'
 import {
   useTimeInStage,
   useConversionFunnel,
-  useSourceConversionTrends,
+  useStatusTransitions,
   useCohortAnalysis,
   useConversionMetrics,
 } from '@/hooks/useAnalytics'
+import { useJobs } from '@/hooks/useJobs'
 import { Analytics, type MetricState } from '@/components/analytics/Analytics'
 import { RouteLoading, RouteError } from '@/components/ui/route-states'
 
@@ -43,11 +44,16 @@ export default function Page() {
 
   const timeInStage = useTimeInStage(userId)
   const conversionFunnel = useConversionFunnel(userId)
-  const sourceConversionTrends = useSourceConversionTrends(userId)
+  const statusTransitions = useStatusTransitions(userId)
   const cohortAnalysis = useCohortAnalysis(userId)
   const conversionMetrics = useConversionMetrics(userId)
+  // Salary insights derives its distribution from the jobs themselves: no
+  // analyticsService method returns one, and the rows already carry
+  // salary_min/salary_max/salary_currency. Deliberately outside this route's
+  // loading/error gate -- one slow list must not blank five working panels.
+  const { data: jobs = [] } = useJobs()
 
-  const queries = [timeInStage, conversionFunnel, sourceConversionTrends, cohortAnalysis, conversionMetrics]
+  const queries = [timeInStage, conversionFunnel, statusTransitions, cohortAnalysis, conversionMetrics]
 
   if (queries.every((q) => q.isLoading)) {
     return <RouteLoading />
@@ -57,7 +63,7 @@ export default function Page() {
     const first = queries.find((q) => q.error)?.error
     return (
       <RouteError
-        title="Could not load your analytics."
+        title="could not load your analytics."
         message={first instanceof Error ? first.message : 'An error occurred while loading your analytics.'}
       />
     )
@@ -65,9 +71,10 @@ export default function Page() {
 
   return (
     <Analytics
+      jobs={jobs}
       timeInStage={toState(timeInStage)}
       conversionFunnel={toState(conversionFunnel)}
-      sourceConversionTrends={toState(sourceConversionTrends)}
+      statusTransitions={toState(statusTransitions)}
       cohortAnalysis={toState(cohortAnalysis)}
       conversionMetrics={toState(conversionMetrics)}
     />

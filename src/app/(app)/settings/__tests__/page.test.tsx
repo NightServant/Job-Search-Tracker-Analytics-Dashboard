@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 
 // This route reads through useAuth (email, signOut) and useUserPreferences,
 // and writes through useSetDefaultCurrency plus a direct RPC for account
@@ -36,6 +37,16 @@ afterEach(() => {
   showErrorMock.mockClear()
   showSuccessMock.mockClear()
 })
+
+// Task 4 (M5.5): DangerZone's window.confirm became a ConfirmDialog, so
+// triggering the delete now takes two clicks -- open the guard, then accept
+// it inside the alertdialog -- rather than one click plus a stubbed global.
+async function confirmDeleteAccount() {
+  const user = userEvent.setup()
+  await user.click(screen.getByRole('button', { name: /delete account/i }))
+  const dialog = screen.getByRole('alertdialog', { name: /delete your account/i })
+  await user.click(within(dialog).getByRole('button', { name: /delete account/i }))
+}
 
 function setup({
   email = 'gabe@example.com',
@@ -87,12 +98,10 @@ describe('Settings route wrapper', () => {
   it('calls the delete_own_account RPC and signs out once account deletion is confirmed', async () => {
     const { signOut } = setup()
     rpcMock.mockResolvedValue({ error: null })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: /delete account/i }))
+    await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('delete_own_account'))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
-    vi.mocked(window.confirm).mockRestore()
   })
 
   // CRITICAL from the review round: supabase.rpc() resolves { error } as a
@@ -115,16 +124,14 @@ describe('Settings route wrapper', () => {
         hint: null,
       },
     })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: /delete account/i }))
+    await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalled())
     expect(showErrorMock).toHaveBeenCalledWith(
       'Could not delete account',
       'The demo account cannot be deleted'
     )
     expect(signOut).not.toHaveBeenCalled()
-    vi.mocked(window.confirm).mockRestore()
   })
 
   it('surfaces a generic RPC failure\'s real message too', async () => {
@@ -132,12 +139,10 @@ describe('Settings route wrapper', () => {
     rpcMock.mockResolvedValue({
       error: { message: 'boom', code: 'XX000', details: null, hint: null },
     })
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: /delete account/i }))
+    await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalled())
     expect(showErrorMock).toHaveBeenCalledWith('Could not delete account', 'boom')
     expect(signOut).not.toHaveBeenCalled()
-    vi.mocked(window.confirm).mockRestore()
   })
 })

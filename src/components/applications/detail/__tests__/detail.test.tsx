@@ -187,8 +187,8 @@ describe('DetailPage', () => {
 
   it('renders Back and Edit as the header action, not the Top Bar', () => {
     render(<DetailPage job={JOB} />)
-    expect(screen.getByRole('link', { name: 'Back' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'Edit' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'back' })).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'edit' })).toBeTruthy()
   })
 
   it('renders every panel with sensible defaults when only job is given', () => {

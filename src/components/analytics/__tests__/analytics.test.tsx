@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import type { Job } from '@/types'
 import { Analytics, type MetricState } from '../Analytics'
 import { FunnelChart, normalizeFunnel, STAGE_FILL } from '../FunnelChart'
 import { TimeInStage } from '../TimeInStage'
-import { SourceTrends } from '../SourceTrends'
+import { SalaryInsights } from '../SalaryInsights'
 import { RangePicker } from '../RangePicker'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type {
   TimeInStageMetric,
   ConversionFunnelMetric,
-  SourceConversionTrend,
+  StatusTransition,
   CohortAnalysis,
   ConversionMetrics,
 } from '@/services/analyticsService'
@@ -31,7 +32,7 @@ afterEach(() => {
 // Recharts' ResponsiveContainer reads this to size its SVG and, at 0x0,
 // skips rendering its children entirely -- not a failure, just not
 // informative for a test. This gives it a plausible chart-sized box so the
-// panels that use it (TimeInStage, SourceTrends) actually draw something,
+// panels that use it (TimeInStage, the salary and cohort charts) actually draw something,
 // the same technique widely used to make Recharts testable under jsdom.
 Element.prototype.getBoundingClientRect = () => ({
   width: 600,
@@ -82,10 +83,11 @@ const PARTIAL_FUNNEL: ConversionFunnelMetric[] = [
   { stage: 'Offer', count: 2, percentage: 16.7, avgDaysToStage: 21, isExit: false },
 ]
 
-const TRENDS: SourceConversionTrend[] = [
-  { source: 'LinkedIn', month: '2026-06', applied: 4, interviewing: 2, offer: 1, rejected: 1, conversionRate: 25 },
-  { source: 'LinkedIn', month: '2026-07', applied: 3, interviewing: 1, offer: 0, rejected: 2, conversionRate: 0 },
-  { source: 'Referral', month: '2025-01', applied: 2, interviewing: 1, offer: 1, rejected: 0, conversionRate: 50 },
+const TRANSITIONS: StatusTransition[] = [
+  { from: 'wishlist', to: 'applied', count: 4 },
+  { from: 'applied', to: 'interviewing', count: 3 },
+  { from: 'interviewing', to: 'offer', count: 1 },
+  { from: 'applied', to: 'rejected', count: 2 },
 ]
 
 const COHORTS: CohortAnalysis[] = [
@@ -101,11 +103,26 @@ const METRICS: ConversionMetrics = {
   conversionBySource: { LinkedIn: 1, Referral: 1 },
 }
 
+/**
+ * Two priced jobs, so `fullProps` really is full: salary insights derives its
+ * own emptiness from `jobs` rather than a query, so omitting them hid the
+ * panel and every "all six panels" assertion was quietly about five.
+ *
+ * Cast, because Salary Insights reads four of `Job`'s ~30 columns and a
+ * literal carrying the other twenty-six would be noise around the three
+ * fields under test.
+ */
+const PRICED_JOBS = [
+  { id: 'j1', company: 'Acme', salary_min: 20_000, salary_max: 30_000, salary_currency: 'PHP' },
+  { id: 'j2', company: 'Globex', salary_min: 40_000, salary_max: 60_000, salary_currency: 'PHP' },
+] as unknown as Job[]
+
 function fullProps() {
   return {
+    jobs: PRICED_JOBS,
     timeInStage: ok(TIME_IN_STAGE),
     conversionFunnel: ok(FUNNEL),
-    sourceConversionTrends: ok(TRENDS),
+    statusTransitions: ok(TRANSITIONS),
     cohortAnalysis: ok(COHORTS),
     conversionMetrics: ok(METRICS),
   }
@@ -115,7 +132,7 @@ function emptyProps() {
   return {
     timeInStage: ok<TimeInStageMetric[]>([]),
     conversionFunnel: ok<ConversionFunnelMetric[]>([]),
-    sourceConversionTrends: ok<SourceConversionTrend[]>([]),
+    statusTransitions: ok<StatusTransition[]>([]),
     cohortAnalysis: ok<CohortAnalysis[]>([]),
     conversionMetrics: ok<ConversionMetrics>({
       totalJobs: 0,
@@ -137,20 +154,33 @@ describe('Analytics', () => {
     expect(container.querySelector('[data-top-bar] [data-range-picker]')).toBeNull()
   })
 
-  it('says there is nothing to chart rather than drawing an empty axis', () => {
-    // Four panels chart or table something with an axis/rows: time in
-    // stage, the funnel, source trends and cohorts. The overview KPI strip
-    // is exempt -- zeroes and dashes are not "an empty axis".
-    render(<Analytics {...emptyProps()} />)
-    expect(screen.getAllByText(/not enough data yet/i)).toHaveLength(4)
+  it('shows every panel with an explicit empty state rather than hiding it', () => {
+    // An earlier round hid a panel whose query returned nothing; Gabe
+    // reversed it after seeing the result. A panel that vanishes takes its
+    // heading with it, so the reader cannot tell an account with no
+    // interviews from a page that forgot to draw the panel.
+    const { container } = render(<Analytics {...emptyProps()} />)
+    expect(container.querySelectorAll('[data-analytics-panel]')).toHaveLength(6)
+    expect(screen.getByRole('heading', { name: 'pipeline flow' })).toBeTruthy()
+    expect(screen.getAllByText(/not enough data yet/i).length).toBeGreaterThan(0)
   })
 
   it('gives each panel its own loading state rather than gating the whole page on one', () => {
     const props = { ...fullProps(), cohortAnalysis: loading<CohortAnalysis[]>() }
     render(<Analytics {...props} />)
-    // The other four panels still rendered their real content.
-    expect(screen.getByRole('heading', { name: 'Time in stage' })).toBeTruthy()
-    expect(screen.getByText('LinkedIn')).toBeTruthy()
+    // The other four panels still rendered their real content -- the cohort
+    // panel is the only one showing a skeleton. Anchored on the cohort table
+    // being gone while a sibling panel's own rows are present, rather than on
+    // a heading, which renders in every state including loading.
+    const cohort = screen
+      .getByRole('heading', { name: 'cohort analysis' })
+      .closest('[data-analytics-panel]')!
+    expect(cohort.querySelector('table')).toBeNull()
+    expect(cohort.querySelector('[role="status"][aria-busy="true"]')).toBeTruthy()
+    const funnel = screen
+      .getByRole('heading', { name: 'conversion funnel' })
+      .closest('[data-analytics-panel]')!
+    expect(funnel.querySelectorAll('[data-stage]').length).toBeGreaterThan(0)
   })
 
   it('makes a failed panel read differently from an empty one', () => {
@@ -162,23 +192,60 @@ describe('Analytics', () => {
 
   it('states "All time" on panels the range picker cannot filter', () => {
     render(<Analytics {...fullProps()} />)
-    const funnelHeading = screen.getByRole('heading', { name: 'Conversion funnel' })
-    const funnelSection = funnelHeading.closest('section')!
-    expect(funnelSection.textContent).toMatch(/all time/i)
-    const stageHeading = screen.getByRole('heading', { name: 'Time in stage' })
-    expect(stageHeading.closest('section')!.textContent).toMatch(/all time/i)
+    // closest('[data-analytics-panel]'), not closest('section'): these panels
+    // are Cards now (M5.5 Item 7), and Card renders a div.
+    const funnelHeading = screen.getByRole('heading', { name: 'conversion funnel' })
+    expect(funnelHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
+    const stageHeading = screen.getByRole('heading', { name: 'time in stage' })
+    expect(stageHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
   })
 
-  it('narrows source trends and cohorts to the picked range, and leaves the other three panels unchanged', () => {
+  it('narrows cohorts to the picked range, and leaves the other panels unchanged', () => {
     render(<Analytics {...fullProps()} />)
-    // Default range is "All time", so everything is visible first.
-    expect(screen.getByText('Referral')).toBeTruthy()
+    // Cohort analysis is the one remaining panel the picker filters: source
+    // trends, which was the other, is gone. Its "top converting source"
+    // callout went with it, which is why this no longer needs getAllByText to
+    // step around the source name appearing in two places.
+    expect(screen.getByText('Feb 2025')).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Date range'), { target: { value: '3m' } })
-    // 2025-01's Referral row falls outside the last 3 months of "now"; the
+    // 2025-02's cohort falls outside the last 3 months of "now"; the
     // component's own default clock is real Date.now(), so this only pins
     // the row disappearing, not which exact months remain.
-    expect(screen.queryByText('Referral')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Conversion funnel' })).toBeTruthy()
+    expect(screen.queryByText('Feb 2025')).toBeNull()
+    expect(screen.getByRole('heading', { name: 'conversion funnel' })).toBeTruthy()
+  })
+
+  it('treats an all-zero series as empty rather than drawing a blank chart', () => {
+    // The empty check only tested for NO ROWS. An account with applications
+    // but no interviews has rows whose every value is zero, so the bars
+    // rendered at zero height and the panel looked broken rather than empty.
+    const zeroed = fullProps()
+    zeroed.timeInStage = {
+      data: [{ status: 'applied', avgDays: 0, medianDays: 0, minDays: 0, maxDays: 0, count: 0 }],
+      isLoading: false,
+      error: null,
+    }
+    render(<Analytics {...zeroed} />)
+    const panel = screen
+      .getByRole('heading', { name: 'time in stage' })
+      .closest('[data-analytics-panel]')!
+    expect(panel.textContent).toMatch(/not enough data yet/i)
+  })
+
+  it('keeps a still-loading or failed panel on the page instead of hiding it', () => {
+    // Blank means "the query came back with nothing". A panel that is still
+    // fetching has to hold its place or the page reflows as each query lands,
+    // and a failed read must say so -- dropping it would tell the reader they
+    // have no cohorts when the truth is that nobody knows.
+    const stillLoading = { ...fullProps(), cohortAnalysis: loading<CohortAnalysis[]>() }
+    const { unmount } = render(<Analytics {...stillLoading} />)
+    expect(screen.getByRole('heading', { name: 'cohort analysis' })).toBeTruthy()
+    unmount()
+
+    const errored = { ...fullProps(), cohortAnalysis: failed<CohortAnalysis[]>('cohort query timed out') }
+    render(<Analytics {...errored} />)
+    expect(screen.getByRole('heading', { name: 'cohort analysis' })).toBeTruthy()
+    expect(screen.getByText(/cohort query timed out/)).toBeTruthy()
   })
 
   it('colours the funnel with the status palette, in pipeline order', () => {
@@ -257,16 +324,113 @@ describe('Analytics', () => {
     // own responsive assertions -- jsdom never evaluates a media query, so
     // this checks the Tailwind classes that encode both widths are present,
     // not a rendered viewport.
-    const { container } = render(<Analytics {...fullProps()} />)
-    const grid = container.querySelector('[data-kpi-strip], .grid')!
+    render(<Analytics {...fullProps()} />)
+    // Scoped to the Overview panel: '.grid' alone now matches a Card's own
+    // header grid first, which is not the KPI strip.
+    const overview = screen
+      .getByRole('heading', { name: 'overview' })
+      .closest('[data-analytics-panel]')!
+    const grid = overview.querySelector('[data-overview-kpis]')!
     expect(grid.className).toContain('grid-cols-2')
     expect(grid.className).toContain('md:grid-cols-4')
   })
 
-  it('scrolls the cohort table inside its own container rather than the page body', () => {
+  it('wears the same accent band and banding as the applications table', () => {
+    // The app's two densest tables, on its two densest screens. Leaving one
+    // grey and accenting the other read as two unrelated decisions.
     const { container } = render(<Analytics {...fullProps()} />)
-    const heading = screen.getByRole('heading', { name: 'Cohort analysis' })
-    const table = heading.closest('section')!.querySelector('table')!
+    const head = container.querySelector(
+      '[data-panel-slot="cohort"] thead'
+    )!
+    expect(head.className).toMatch(/bg-accent-surface/)
+    expect(head.className).toMatch(/text-accent-on-surface/)
+    // accent-default is the TEXT weight -- accent-400 in dark -- and a
+    // full-width band of it is the over-bright header Gabe rejected.
+    expect(head.className).not.toMatch(/bg-accent-default/)
+  })
+
+  it('alternates the cohort rows so a seven-column row stays traceable across its width', () => {
+    render(<Analytics {...fullProps()} />)
+    const rows = [
+      ...screen
+        .getByRole('heading', { name: 'cohort analysis' })
+        .closest('[data-analytics-panel]')!
+        .querySelectorAll('tbody tr'),
+    ]
+    expect(rows.length).toBeGreaterThan(1)
+    // Striping is only striping if neighbours differ; asserting the class is
+    // present somewhere would pass on every row carrying it.
+    expect(rows[0].className).not.toMatch(/bg-accent-surface/)
+    expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
+    // The old neutral band is gone, same as the applications table.
+    expect(rows[1].className).not.toMatch(/bg-bg-surface/)
+  })
+
+  it('spans the KPI strip and the cohort table, and pairs the four charts', () => {
+    const { container } = render(<Analytics {...fullProps()} />)
+    const span = (key: string) =>
+      container.querySelector(`[data-panel-slot="${key}"]`)!.className.includes('lg:col-span-2')
+    expect(span('overview')).toBe(true)
+    expect(span('cohort')).toBe(true)
+    for (const key of ['funnel', 'pipeline', 'time-in-stage', 'salary']) {
+      expect(span(key)).toBe(false)
+    }
+  })
+
+  it('gives a chart the full width when it has no partner to pair with', () => {
+    // layOut walks the list in pairs, so an odd count leaves one chart alone.
+    // It fills its row rather than sitting beside a hole. Reachable through
+    // the public component by giving salary insights no priced jobs, which is
+    // the one panel whose presence is not query-driven.
+    const { container } = render(<Analytics {...fullProps()} jobs={[]} />)
+    expect(
+      container.querySelector('[data-panel-slot="salary"]')!.className
+    ).not.toContain('lg:col-span-2')
+    // It is still on the page, saying it is empty.
+    expect(screen.getByRole('heading', { name: 'salary insights' })).toBeTruthy()
+  })
+
+  it('stretches every card to its row and lets the body fill the difference', () => {
+    // Gabe asked for cards that match their neighbour's height AND carry no
+    // gap inside. Those pull against each other, so both halves are pinned:
+    // the card stretches, and the content claims the height rather than
+    // leaving it as air under one line of text.
+    const { container } = render(<Analytics {...fullProps()} />)
+    for (const slot of container.querySelectorAll('[data-panel-slot]')) {
+      expect(slot.querySelector('[data-analytics-panel]')!.className).toContain('h-full')
+    }
+    const content = container.querySelector(
+      '[data-panel-slot="funnel"] [data-slot="card-content"]'
+    )!
+    expect(content.className).toContain('flex-1')
+    // The funnel absorbs it by growing its bars: a bar's LENGTH encodes the
+    // count, so its height is free to stretch and says nothing different.
+    const stage = container.querySelector('[data-funnel-chain] [data-stage]')!
+    expect(stage.className).toContain('h-full')
+    expect(stage.className).toContain('max-h-12')
+  })
+
+  it('lets the two chart panels follow their row rather than setting its height', () => {
+    // Both charts are flex-1 so they grow into a card stretched to a taller
+    // neighbour, with a LOW floor so they never force the row taller than the
+    // neighbour needed. A 256px floor did exactly that -- measured at 1440px,
+    // dropping it to 192px took the funnel/pipeline row from 383px to 369px,
+    // which is the funnel's own natural height rather than the Sankey's floor.
+    const { container } = render(<Analytics {...fullProps()} />)
+    for (const key of ['pipeline', 'time-in-stage']) {
+      const box = container.querySelector(
+        `[data-panel-slot="${key}"] [data-slot="card-content"] [class*="min-h-"]`
+      )!
+      expect(box.className, key).toContain('flex-1')
+      expect(box.className, key).toContain('min-h-48')
+      expect(box.className, key).not.toContain('min-h-64')
+    }
+  })
+
+  it('scrolls the cohort table inside its own container rather than the page body', () => {
+    render(<Analytics {...fullProps()} />)
+    const heading = screen.getByRole('heading', { name: 'cohort analysis' })
+    const table = heading.closest('[data-analytics-panel]')!.querySelector('table')!
     expect(table.closest('.overflow-x-auto')).toBeTruthy()
   })
 })
@@ -309,35 +473,85 @@ describe('TimeInStage', () => {
   })
 })
 
-describe('SourceTrends', () => {
-  it('never bakes a resolved colour into a line stroke -- always the CSS token', () => {
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(true) // animation off so the line commits synchronously
-    const { container } = render(<SourceTrends data={TRENDS} />)
-    const strokes = [...container.querySelectorAll('.recharts-line-curve')].map((el) => el.getAttribute('stroke'))
-    expect(strokes.length).toBeGreaterThan(0)
-    for (const stroke of strokes) {
-      expect(stroke).toMatch(/^var\(--color-(accent-default|text-muted)\)$/)
-    }
+describe('FunnelChart timings', () => {
+  it('shows how long each stage took, which the chart used to discard', () => {
+    // getConversionFunnel has always returned avgDaysToStage and
+    // normalizeFunnel dropped it on the floor, so the panel could show a bar,
+    // a count and a percentage but could not answer "how long does this take".
+    render(<FunnelChart data={normalizeFunnel(FUNNEL)} />)
+    expect(screen.getByText('3d to reach')).toBeTruthy()
+    expect(screen.getByText('9d to reach')).toBeTruthy()
+    expect(screen.getByText('21d to reach')).toBeTruthy()
+    // The exits group carries it too -- how long people wait before a
+    // rejection is the most useful number on the panel.
+    expect(screen.getByText('11d to reach')).toBeTruthy()
   })
 
-  it('gates line animation on the reduced-motion preference', () => {
-    // Recharts' Line uses a different animation mechanism than Bar --
-    // the <path> is present on the very first synchronous render either
-    // way, but react-smooth's "draw the line in" effect starts it at
-    // stroke-dasharray="0px 0px" (invisible) when isAnimationActive is
-    // true, and omits the attribute entirely (the full stroke, immediately)
-    // when it's false. This fails if isAnimationActive is hardcoded either
-    // way regardless of reducedMotion.
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(false)
-    const animating = render(<SourceTrends data={TRENDS} />)
-    const animatingCurve = animating.container.querySelector('.recharts-line-curve')!
-    expect(animatingCurve.getAttribute('stroke-dasharray')).toBe('0px 0px')
-    animating.unmount()
+  it('writes a dash rather than "0d" where zero does not mean instant', () => {
+    // Two different zeroes: Wishlist is the starting stage, and a stage nobody
+    // has reached also reports 0. "0d to reach" would read as "this step is
+    // instant" for both, which is wrong for the second and meaningless for the
+    // first.
+    const unreached: ConversionFunnelMetric[] = [
+      { stage: 'Wishlist', count: 10, percentage: 100, avgDaysToStage: 0, isExit: false },
+      { stage: 'Applied', count: 10, percentage: 100, avgDaysToStage: 1, isExit: false },
+      { stage: 'Interviewing', count: 0, percentage: 0, avgDaysToStage: 0, isExit: false },
+    ]
+    render(<FunnelChart data={normalizeFunnel(unreached)} />)
+    expect(screen.queryByText(/0d to reach/)).toBeNull()
+    expect(screen.getAllByText('\u2014')).toHaveLength(2)
+    expect(screen.getByText('1d to reach')).toBeTruthy()
+  })
 
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(true)
-    const still = render(<SourceTrends data={TRENDS} />)
-    const stillCurve = still.container.querySelector('.recharts-line-curve')!
-    expect(stillCurve.getAttribute('stroke-dasharray')).toBeNull()
+  it('drops the timing line entirely when no stage has a timing', () => {
+    // An account with no status history reports 0 for every stage. Rendering
+    // the line anyway gave five dashes -- height with nothing in it, which is
+    // worse than the gap it was added to close.
+    const noHistory: ConversionFunnelMetric[] = [
+      { stage: 'Wishlist', count: 10, percentage: 100, avgDaysToStage: 0, isExit: false },
+      { stage: 'Applied', count: 10, percentage: 100, avgDaysToStage: 0, isExit: false },
+      { stage: 'Rejected', count: 1, percentage: 10, avgDaysToStage: 0, isExit: true },
+    ]
+    render(<FunnelChart data={normalizeFunnel(noHistory)} />)
+    expect(screen.queryByText('\u2014')).toBeNull()
+    // The bars themselves are untouched.
+    expect(screen.getByText('Wishlist')).toBeTruthy()
+  })
+
+  it('carries avgDaysToStage through normalizeFunnel', () => {
+    const result = normalizeFunnel(PARTIAL_FUNNEL)
+    expect(result.map((r) => r.avgDaysToStage)).toEqual([3, 9, 21])
+  })
+})
+
+describe('SalaryInsights scope', () => {
+  const priced = (rows: Array<[number, string]>) =>
+    rows.map(([amount, currency], i) => ({
+      id: `j${i}`,
+      company: `Co ${i}`,
+      salary_min: amount,
+      salary_max: amount,
+      salary_currency: currency,
+    })) as unknown as Job[]
+
+  it('says nothing about scope when every salary is in one currency', () => {
+    // The always-on line went at Gabe's request: "jobs with salary" already
+    // gives the included count, and every figure carries its own currency
+    // symbol, so the prose was restating what was above it.
+    render(<SalaryInsights jobs={priced([[20_000, 'PHP'], [30_000, 'PHP']])} />)
+    expect(screen.queryByText(/not shown/i)).toBeNull()
+  })
+
+  it('still discloses salaries it dropped for being in another currency', () => {
+    // The one case where silence misleads. Figures are never converted, so a
+    // mixed-currency account gets ONE currency charted and the rest dropped --
+    // without this the numbers look like the whole picture and are not.
+    render(
+      <SalaryInsights
+        jobs={priced([[20_000, 'PHP'], [30_000, 'PHP'], [5_000, 'USD']])}
+      />
+    )
+    expect(screen.getByText(/1 application in another currency not shown/i)).toBeTruthy()
   })
 })
 
@@ -345,7 +559,7 @@ describe('RangePicker', () => {
   it('offers the four windows the range maths supports, in that order', () => {
     render(<RangePicker value="all" onChange={() => {}} />)
     const options = screen.getAllByRole('option').map((o) => o.textContent)
-    expect(options).toEqual(['Last 3 months', 'Last 6 months', 'Last 12 months', 'All time'])
+    expect(options).toEqual(['Last 3 months', 'Last 6 months', 'Last 12 months', 'all time'])
   })
 })
 

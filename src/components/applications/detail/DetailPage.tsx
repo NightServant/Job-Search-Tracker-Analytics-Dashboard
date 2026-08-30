@@ -82,10 +82,10 @@ export function DetailPage({
         action={
           <div className="flex items-center gap-2">
             <Link href={backHref} className={buttonVariants({ variant: 'ghost', size: 's' })}>
-              Back
+              back
             </Link>
             <Link href={editHref} className={buttonVariants({ size: 's' })}>
-              Edit
+              edit
             </Link>
           </div>
         }

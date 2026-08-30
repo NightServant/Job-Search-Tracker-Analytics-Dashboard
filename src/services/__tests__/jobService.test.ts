@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import * as Sentry from '@sentry/react'
-import { jobService } from '../jobService'
 import { createMockSupabaseClient } from '../../test/mocks'
 
 vi.mock('@sentry/react')
@@ -22,7 +21,6 @@ describe('jobService', () => {
         }),
       } as any)
 
-      const formData = { company: 'Acme', role: 'Engineer' }
       const user = { id: 'user123' }
 
       // In real usage, jobService would call this with user context
@@ -58,7 +56,6 @@ describe('jobService', () => {
 
     it('logs errors with context to Sentry', () => {
       const error = new Error('Database connection failed')
-      const context = { operation: 'createJob', userId: 'user123' }
 
       Sentry.captureException(error, expect.any(Object))
       // In real usage, this would log with tags and extra data
@@ -119,7 +116,7 @@ describe('jobService', () => {
       Sentry.addBreadcrumb({
         category: 'job.delete',
         message: 'Job deleted',
-        level: 'warn',
+        level: 'warning',
         data: { jobId },
       })
 

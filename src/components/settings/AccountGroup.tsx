@@ -19,11 +19,11 @@ export interface AccountGroupProps {
 export function AccountGroup({ email = null, onSignOut, signingOut = false }: AccountGroupProps) {
   return (
     <div data-settings-group="account">
-      <PanelSection title="Account" titleSize="m">
+      <PanelSection title="account" titleSize="m">
         <div className="flex flex-col gap-4">
           <SettingsRow
-            label="Email"
-            description="The address you sign in with."
+            label="email"
+            description="the address you sign in with."
             wide
             control={
               <Input
@@ -36,8 +36,8 @@ export function AccountGroup({ email = null, onSignOut, signingOut = false }: Ac
             }
           />
           <SettingsRow
-            label="Sign out"
-            description="End your session on this device."
+            label="sign out"
+            description="end your session on this device."
             control={
               <Button variant="secondary" size="s" onClick={() => onSignOut?.()} disabled={signingOut}>
                 {signingOut ? 'Signing out' : 'Sign out'}

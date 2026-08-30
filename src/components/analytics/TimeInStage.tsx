@@ -33,7 +33,7 @@ export function TimeInStage({ data }: TimeInStageProps) {
   const reducedMotion = usePrefersReducedMotion()
 
   if (data.length === 0) {
-    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+    return <p className="text-body-s text-text-muted">not enough data yet.</p>
   }
 
   const chartData = STATUSES.filter((status) => data.some((d) => d.status === status)).map((status) => {
@@ -42,7 +42,12 @@ export function TimeInStage({ data }: TimeInStageProps) {
   })
 
   return (
-    <div className="h-64 w-full">
+    // flex-1 with a LOW floor, so the chart follows the card it is in rather
+    // than setting the card's height. A 256px floor meant this panel could
+    // force its row taller than its neighbour needed, which is the one way
+    // these charts stopped matching the cards beside them. 192px is still a
+    // legible plot; below that flex-1 has nothing left to give.
+    <div className="min-h-48 w-full flex-1">
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid vertical={false} stroke="var(--color-border-subtle)" />
@@ -63,9 +68,21 @@ export function TimeInStage({ data }: TimeInStageProps) {
               border: '1px solid var(--color-border-default)',
               borderRadius: 4,
             }}
-            formatter={(value: number) => [`${value} days`, 'Avg. time in stage']}
+            // recharts 3 types a Tooltip formatter's first argument as
+            // `ValueType | undefined`, so the `(value: number) =>` signature
+            // this had under recharts 2 no longer typechecks. The narrowing is
+            // done here rather than by widening the tuple's element types.
+            formatter={(value) => [`${Number(value)} days`, 'Avg. time in stage']}
           />
-          <Bar dataKey="avgDays" isAnimationActive={!reducedMotion} radius={[2, 2, 0, 0]}>
+          <Bar
+            dataKey="avgDays"
+            isAnimationActive={!reducedMotion}
+            radius={[2, 2, 0, 0]}
+            // Uncapped, recharts divides the full panel width by the number of
+            // stages, so an account with two stages draws two slabs half the
+            // panel wide. Same cap the salary histogram uses.
+            maxBarSize={72}
+          >
             {chartData.map((d) => (
               <Cell key={d.status} fill={d.fill} />
             ))}

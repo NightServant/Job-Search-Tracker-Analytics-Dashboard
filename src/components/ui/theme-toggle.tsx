@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { flushSync } from 'react-dom'
-import { motion } from 'framer-motion'
+import { motion } from 'motion/react'
 import { useTheme } from 'next-themes'
 import { cn } from '@/lib/utils'
 import { SunIcon, MoonIcon } from '@/components/icons'
@@ -17,7 +17,7 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
  * own sun/moon geometry as a `clipPath` with a fixed DOM id -- which collides
  * the moment two toggles render, and which the custom-icon constraint forbids
  * anyway. Swapping its icons for ours deletes the part being kept, so what
- * survives is the idea: crossfade plus counter-rotation, framer-motion driven.
+ * survives is the idea: crossfade plus counter-rotation, driven by motion (formerly framer-motion).
  *
  * Size is 32 on desktop chrome and 44 on mobile. That gap is deliberate -- a
  * finger needs the 44px target, a cursor does not, and matching them would make

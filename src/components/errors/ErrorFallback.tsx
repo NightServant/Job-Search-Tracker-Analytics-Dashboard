@@ -30,7 +30,7 @@ export default function ErrorFallback({ error, eventId, resetError }: FallbackPr
     <div className="min-h-screen bg-zinc-50 dark:bg-zinc-950 flex items-center justify-center p-6">
       <div className="card w-full max-w-lg p-6">
         <h1 className="text-xl font-semibold text-zinc-900 dark:text-white">
-          Something went wrong
+          something went wrong
         </h1>
         <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-300">
           {sentryEnabled
@@ -55,10 +55,10 @@ export default function ErrorFallback({ error, eventId, resetError }: FallbackPr
 
         <div className="mt-6 flex flex-col sm:flex-row gap-2">
           <button className="btn-primary" onClick={handleTryAgain}>
-            Try again
+            try again
           </button>
           <button className="btn-secondary" onClick={() => window.location.reload()}>
-            Reload
+            reload
           </button>
         </div>
       </div>

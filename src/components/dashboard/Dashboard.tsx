@@ -1,45 +1,196 @@
+'use client'
+
+import * as React from 'react'
+import Link from 'next/link'
 import { PageHeader } from '@/components/ui/page-header'
+import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { FollowUpNudge } from './FollowUpNudge'
 import { KpiStrip } from './KpiStrip'
-import { DashboardBlocks } from './DashboardBlocks'
+import { ApplicationsOverTime } from './ApplicationsOverTime'
+import { StatusDonut } from './StatusDonut'
+import { SourceMix } from './SourceMix'
+import { UpcomingEvents } from './UpcomingEvents'
+import { RecentApplicationsTable } from './RecentApplicationsTable'
 import { getStaleApplications } from '@/services/followUp'
+import { applicationsPerMonth, statusBreakdown, sourceBreakdown } from '@/lib/overviewSeries'
+import type { CalendarEvent } from '@/services/events'
 import type { Job } from '@/types'
 
 export interface DashboardProps {
   jobs: Job[]
+  events?: CalendarEvent[]
+  eventsLoading?: boolean
+  eventsError?: boolean
 }
 
 /** In-flight beyond two weeks with no sign of life is when chasing becomes reasonable. */
 const STALE_AFTER_DAYS = 14
 
+/** Figma 22:77 plots six buckets. */
+const TREND_MONTHS = 6
+
 /**
- * The dashboard's body, separated from `src/app/(app)/dashboard/page.tsx` so
- * it can be rendered and tested with plain props instead of through Next
- * routing. The route itself only fetches `jobs` and hands them here.
+ * The Overview's body, separated from `src/app/(app)/dashboard/page.tsx` so it
+ * can be rendered and tested with plain props instead of through Next routing.
  *
- * `last_touched_at` for staleness purposes is a job's `updated_at`, falling
- * back to `date_applied` then `created_at` for rows from before either column
- * was populated -- there is no separate activity-log query on this page, so
- * the freshest timestamp already on the row stands in for it.
+ * Rebuilt against Figma node 20:64 (M5.5 Item 5). What M5 shipped was six
+ * generic text blocks and no charts at all -- recharts has been a dependency
+ * this whole time and this screen never imported it.
+ *
+ * The header is the page title over a 2px rule with the date on the trailing
+ * edge, and the title is `overview` rather than `Dashboard`: the sidebar nav,
+ * the Figma page title and this heading all now agree, where before only the
+ * route path said dashboard and the heading copied it.
+ *
+ * The content panels are shadcn `Card`s, restyled to this system in Task 2 --
+ * no shadow, radius at the 4px cap, a hairline border rather than shadcn's
+ * ring. That is a deliberate departure from the frame, which separates these
+ * panels with rules rather than boxing them: Gabe asked for the card
+ * component on this screen specifically. The rule the frame does specify --
+ * the 2px one under the page title -- stays.
+ *
+ * Layout, top to bottom, matching the frame: header, rule, five-KPI strip with
+ * dividers, follow-up nudge, then a three-panel content grid at 460/300/280,
+ * then the recent-applications table. The one departure is the fourth panel,
+ * `by source` -- Gabe asked for a bar chart and the three Figma panels cover
+ * time, status and events, so source is the dimension none of them shows. It
+ * also preserves the data the retired `DashboardBlocks` surfaced as text.
+ *
+ * `events` arrives as a prop from the route, which reads `useEvents`. That
+ * hook already existed and `/calendar` already used it; the Overview never
+ * called it, which is why "upcoming events" printed a sentence derived from
+ * job statuses and had no empty state to show.
+ *
+ * `last_touched_at` for staleness is a job's `updated_at`, falling back to
+ * `date_applied` then `created_at` for rows from before either column was
+ * populated -- there is no activity-log query on this page, so the freshest
+ * timestamp already on the row stands in for it.
  */
-export function Dashboard({ jobs }: DashboardProps) {
-  const stale = getStaleApplications(
-    jobs.map((job) => ({
-      id: job.id,
-      company: job.company,
-      role: job.role,
-      status: job.status,
-      last_touched_at: job.updated_at || job.date_applied || job.created_at,
-    })),
-    STALE_AFTER_DAYS
+export function Dashboard({
+  jobs,
+  events = [],
+  eventsLoading = false,
+  eventsError = false,
+}: DashboardProps) {
+  const stale = React.useMemo(
+    () =>
+      getStaleApplications(
+        jobs.map((job) => ({
+          id: job.id,
+          company: job.company,
+          role: job.role,
+          status: job.status,
+          last_touched_at: job.updated_at || job.date_applied || job.created_at,
+        })),
+        STALE_AFTER_DAYS
+      ),
+    [jobs]
+  )
+
+  const trend = React.useMemo(() => applicationsPerMonth(jobs, TREND_MONTHS), [jobs])
+  const statuses = React.useMemo(() => statusBreakdown(jobs), [jobs])
+  const sources = React.useMemo(() => sourceBreakdown(jobs), [jobs])
+  const companyByJobId = React.useMemo(
+    () => Object.fromEntries(jobs.map((job) => [job.id, job.company])),
+    [jobs]
+  )
+
+  const today = React.useMemo(
+    () =>
+      new Date().toLocaleDateString(undefined, {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      }),
+    []
   )
 
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Dashboard" />
-      <FollowUpNudge stale={stale} />
+      <div>
+        {/* PageHeader rather than a hand-rolled h1: this screen having its own
+            was why its title was 28px while five other screens were 20px. */}
+        <PageHeader
+          title="overview"
+          action={<p className="tabular text-body-s text-text-muted">{today}</p>}
+        />
+        <hr data-header-rule className="mt-6 border-0 border-t-2 border-border-default" />
+      </div>
+
       <KpiStrip jobs={jobs} />
-      <DashboardBlocks jobs={jobs} />
+
+      <FollowUpNudge stale={stale} />
+
+      <div className="grid gap-8 lg:grid-cols-[460fr_300fr_280fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>applications over time</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col">
+            <ApplicationsOverTime data={trend} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>by status</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatusDonut data={statuses} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>upcoming events</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col">
+            <UpcomingEvents
+              events={events}
+              companyByJobId={companyByJobId}
+              loading={eventsLoading}
+              error={eventsError}
+            />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* `by source` shares this row rather than owning a full-width one of
+          its own. It is not in the Figma at all -- it is the bar chart Gabe
+          asked for -- and a lone full-bleed panel gave a handful of bars the
+          visual weight of the whole screen. The table is the frame's own
+          bottom block (26:76) and keeps the larger share. */}
+      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>recent applications</h2>
+            </CardTitle>
+            <CardAction>
+              <Link href="/applications" className="text-body-s text-accent-default hover:underline">
+                view all
+              </Link>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <RecentApplicationsTable jobs={jobs} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>by source</h2>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col">
+            <SourceMix data={sources} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

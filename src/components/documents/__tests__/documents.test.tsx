@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, within, cleanup, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ResumeSummary } from '@/services/resumeService'
 import { formatTouchedDate } from '@/services/date'
 import { DocumentRow } from '../DocumentRow'
@@ -49,6 +50,27 @@ function makeDoc(overrides: Partial<ResumeSummary> = {}): ResumeSummary {
 const DOC = makeDoc()
 
 describe('DocumentRow', () => {
+  it('puts the row controls inside the grid, not beside it', () => {
+    // Item 4: "version and delete button, does not align properly". The two
+    // controls used to hang outside the grid in a flex wrapper, so the grid's
+    // 1fr first column was measured from a width the stack had already taken
+    // -- by a different amount per row, which is why the four content columns
+    // landed at a different x on each one. As a real cell the grid measures
+    // them like everything else.
+    const { container } = render(
+      <DocumentRow doc={DOC} actions={<button type="button">versions</button>} />
+    )
+    const row = container.querySelector('[data-document-row]')!
+    const actions = row.querySelector('[data-row-actions]')!
+    expect(actions.parentElement).toBe(row)
+    expect(row.className).toContain('md:grid-cols-[1fr_7rem_6rem_6rem_auto]')
+  })
+
+  it('renders no actions cell when a caller passes none', () => {
+    const { container } = render(<DocumentRow doc={DOC} />)
+    expect(container.querySelector('[data-row-actions]')).toBeNull()
+  })
+
   it('lays out four columns on desktop and stacks on mobile', () => {
     // Desktop is Info, ATS Check, version, date across 1104px. At 335px the
     // marker, version and date drop onto their own line beneath the title.
@@ -137,7 +159,7 @@ describe('VersionHistory', () => {
   ]
 
   it('lists the saved versions of one CV', () => {
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={VERSIONS} />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={VERSIONS} />)
     expect(screen.getByText('v3')).toBeTruthy()
     expect(screen.getByText('v2')).toBeTruthy()
   })
@@ -146,27 +168,27 @@ describe('VersionHistory', () => {
     // This is the documents-list surface: it answers "what versions exist",
     // not "put one back". The editor's own history control owns restore, and
     // duplicating it here would mean two ways to overwrite a CV.
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={VERSIONS} />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={VERSIONS} />)
     expect(screen.queryByRole('button', { name: /restore/i })).toBeNull()
     expect(screen.getByRole('link', { name: /editor/i }).getAttribute('href')).toBe('/cv?draft=cv-1')
   })
 
   it('says the read failed rather than claiming there are no versions', () => {
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={[]} error />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={[]} error />)
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
     expect(screen.getByText(/could not load/i)).toBeTruthy()
   })
 
   it('says so plainly when a CV has never been snapshotted', () => {
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={[]} />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={[]} />)
     expect(screen.getByText(/no versions saved yet/i)).toBeTruthy()
   })
 
   it('shows a pending state rather than an empty one while the read is in flight', () => {
     const { container } = render(
-      <VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={[]} loading />
+      <VersionHistory editHref="/cv?draft=cv-1" versions={[]} loading />
     )
-    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    expect(container.querySelector('[data-versions-loading]')).toBeTruthy()
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
   })
 })
@@ -175,7 +197,7 @@ describe('DocumentsPage', () => {
   it('carries + new cv in the body header, matching Applications Add', () => {
     render(<DocumentsPage docs={[DOC]} />)
     const header = document.querySelector('[data-body-header]') as HTMLElement
-    expect(within(header).getByRole('link', { name: /new cv/i })).toBeTruthy()
+    expect(within(header).getByRole('button', { name: /new cv/i })).toBeTruthy()
   })
 
   it('offers exactly one way to start a CV, and it is the body header control', () => {
@@ -183,9 +205,31 @@ describe('DocumentsPage', () => {
     // chrome and identical on five of the seven app screens. This fails both
     // if the control leaves the header and if a second one appears elsewhere.
     const { container } = render(<DocumentsPage docs={[DOC]} />)
-    const create = [...container.querySelectorAll('a[href="/cv?draft=new"]')]
-    expect(create).toHaveLength(1)
-    expect(container.querySelector('[data-body-header]')!.contains(create[0])).toBe(true)
+    const header = container.querySelector('[data-body-header]')!
+    const triggers = within(header as HTMLElement).getAllByRole('button', { name: /new cv/i })
+    expect(triggers).toHaveLength(1)
+  })
+
+  it('opens the mode chooser as a dialog over the list, not a new page', async () => {
+    // Item 2's second half: M5 turned this into a full page at
+    // /cv?draft=new, reasoning a dialog would float over nothing. Gabe
+    // overruled that. Opening it here, without navigating away, is what
+    // makes the Documents list the thing the dialog actually sits over.
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={[DOC]} />)
+    await user.click(screen.getByRole('button', { name: /new cv/i }))
+    expect(screen.getByRole('dialog', { name: 'new CV' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /word editor/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /latex editor/i })).toBeTruthy()
+  })
+
+  it('reports the chosen mode to the caller, which owns the write and the navigation', async () => {
+    const onCreateDraft = vi.fn()
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={[DOC]} onCreateDraft={onCreateDraft} />)
+    await user.click(screen.getByRole('button', { name: /new cv/i }))
+    await user.click(screen.getByRole('button', { name: /latex editor/i }))
+    expect(onCreateDraft).toHaveBeenCalledWith('latex')
   })
 
   it('renders one row per CV', () => {
@@ -198,7 +242,7 @@ describe('DocumentsPage', () => {
   it('offers a way to start one rather than an empty page when there are no CVs', () => {
     render(<DocumentsPage docs={[]} />)
     expect(screen.getByText(/no cvs yet/i)).toBeTruthy()
-    expect(screen.getAllByRole('link', { name: /new cv/i }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('button', { name: /new cv/i }).length).toBeGreaterThan(0)
   })
 
   it('shows one CV version history at a time, beside the row it belongs to', () => {

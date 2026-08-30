@@ -28,13 +28,13 @@ export function LinkedCv({ links, error = false, className, ...props }: LinkedCv
   return (
     <PanelSection
       aria-label="Linked CV"
-      title="Linked CV"
+      title="linked CV"
       error={error ? 'Could not load the linked CV. Try refreshing the page.' : undefined}
       className={className}
       {...props}
     >
       {links.length === 0 ? (
-        <p className="text-body-s text-text-muted">No CV linked to this application yet.</p>
+        <p className="text-body-s text-text-muted">no CV linked to this application yet.</p>
       ) : (
         <ul className="flex flex-col">
           {links.map((link) => (

@@ -1,16 +1,23 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
 import { PageHeader } from '@/components/ui/page-header'
-import { buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
+import { AppDialog } from '@/components/ui/app-dialog'
 import { IconButton } from '@/components/ui/icon-button'
-import { ChevronDownIcon, PlusIcon, TrashIcon } from '@/components/icons'
+import { PlusIcon, TrashIcon } from '@/components/icons'
+import { ModeChooser } from '@/components/cv/ModeChooser'
+import { EmptyState } from '@/components/ui/empty-state'
 import { DocumentRow } from './DocumentRow'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
 import type { ResumeSummary } from '@/services/resumeService'
 
-/** Where `+ new cv` goes. `/cv` reads `draft=new` as "ask which editor, then create one". */
+/**
+ * `/cv?draft=new` still works as a deep link -- `src/app/(app)/cv/page.tsx`
+ * opens the same `ModeChooser` dialog directly when it lands there with
+ * nothing else to sit behind it. `+ new cv` itself no longer navigates: see
+ * the dialog below.
+ */
 export const NEW_CV_HREF = '/cv?draft=new'
 
 /**
@@ -39,6 +46,9 @@ export interface DocumentsPageProps {
   versions?: VersionEntry[]
   versionsLoading?: boolean
   versionsError?: boolean
+  /** Fires once a mode is chosen in the New CV dialog; the caller owns the write and the navigation. */
+  onCreateDraft?: (mode: 'word' | 'latex') => void
+  creatingDraft?: boolean
 }
 
 export function DocumentsPage({
@@ -49,74 +59,84 @@ export function DocumentsPage({
   versions = [],
   versionsLoading = false,
   versionsError = false,
+  onCreateDraft,
+  creatingDraft = false,
 }: DocumentsPageProps) {
+  const openDoc = docs.find((doc) => doc.id === openVersionsFor) ?? null
+  const [newCvOpen, setNewCvOpen] = React.useState(false)
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Documents"
+        title="documents"
         action={
-          <Link href={NEW_CV_HREF} className={buttonVariants({ size: 's' })}>
+          <Button size="s" onClick={() => setNewCvOpen(true)}>
             <PlusIcon size={16} aria-hidden />
-            New CV
-          </Link>
+            new CV
+          </Button>
         }
       />
 
       {docs.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 border-t border-border-subtle pt-6">
-          <p className="text-body-m text-text-primary">No CVs yet.</p>
-          <p className="text-body-s text-text-muted">
-            Write one in the document editor or in LaTeX, then pin it to the applications you send
-            it to.
-          </p>
-          <Link href={NEW_CV_HREF} className={buttonVariants({ variant: 'secondary', size: 's' })}>
-            New CV
-          </Link>
-        </div>
+        <EmptyState
+          icon="Documents"
+          action={
+            <Button variant="secondary" size="s" onClick={() => setNewCvOpen(true)}>
+              new CV
+            </Button>
+          }
+        >
+          no CVs yet. write one in the document editor or in LaTeX, then pin it to the applications
+          you send it to.
+        </EmptyState>
       ) : (
         <div>
-          {docs.map((doc) => {
-            const open = openVersionsFor === doc.id
-            return (
-              <div key={doc.id} className="border-b border-border-subtle">
-                <div className="flex items-stretch gap-2">
-                  <DocumentRow doc={doc} className="min-w-0 flex-1 border-b-0" />
-                  <div className="flex shrink-0 flex-col justify-center gap-1 py-2">
-                    <IconButton
-                      aria-expanded={open}
-                      onClick={() => onToggleVersions?.(doc)}
-                      className="w-auto shrink-0 grid-flow-col gap-1 px-2 text-label-caps uppercase"
-                    >
-                      Versions
-                      <ChevronDownIcon
-                        size={14}
-                        aria-hidden
-                        className={open ? 'rotate-180' : undefined}
-                      />
-                    </IconButton>
-                    <IconButton
-                      aria-label={`Delete ${doc.title}`}
-                      onClick={() => onDelete?.(doc)}
-                      className="shrink-0"
-                    >
-                      <TrashIcon size={16} aria-hidden />
-                    </IconButton>
-                  </div>
-                </div>
-                {open && (
-                  <VersionHistory
-                    title={doc.title}
-                    editHref={`/cv?draft=${doc.id}`}
-                    versions={versions}
-                    loading={versionsLoading}
-                    error={versionsError}
-                  />
-                )}
-              </div>
-            )
-          })}
+          {docs.map((doc) => (
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              actions={
+                <>
+                  <Button
+                    variant="secondary"
+                    size="s"
+                    onClick={() => onToggleVersions?.(doc)}
+                  >
+                    versions
+                  </Button>
+                  <IconButton
+                    aria-label={`Delete ${doc.title}`}
+                    onClick={() => onDelete?.(doc)}
+                  >
+                    <TrashIcon size={16} aria-hidden className="[&_svg]:size-4" />
+                  </IconButton>
+                </>
+              }
+            />
+          ))}
         </div>
       )}
+
+      <AppDialog
+        open={openDoc !== null}
+        onOpenChange={(next) => {
+          if (!next && openDoc) onToggleVersions?.(openDoc)
+        }}
+        title={openDoc ? `versions of ${openDoc.title}` : 'versions'}
+      >
+        {openDoc && (
+          <VersionHistory
+            editHref={`/cv?draft=${openDoc.id}`}
+            versions={versions}
+            loading={versionsLoading}
+            error={versionsError}
+          />
+        )}
+      </AppDialog>
+
+      <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="new CV">
+        <ModeChooser creating={creatingDraft} onChoose={(mode) => onCreateDraft?.(mode)} />
+      </AppDialog>
     </div>
   )
 }

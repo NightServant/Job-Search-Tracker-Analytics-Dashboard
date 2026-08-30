@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { BrandLockup } from '@/components/ui/brand-mark'
 import { SettingsIcon } from '@/components/icons'
 
 /**
@@ -18,7 +19,7 @@ export function TopBar({ settingsActive }: { settingsActive: boolean }) {
       data-top-bar
       className="flex h-16 items-center gap-2 border-b border-border-subtle bg-bg-canvas px-3 md:hidden"
     >
-      <span className="text-heading-m text-text-primary">Worktrack</span>
+      <BrandLockup />
       <div className="flex-1" />
       <ThemeToggle size={44} />
       <Link

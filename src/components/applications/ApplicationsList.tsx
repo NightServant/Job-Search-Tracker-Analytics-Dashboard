@@ -10,12 +10,18 @@ import { formatAppliedDate } from '@/services/date'
 import type { Job } from '@/types'
 
 /**
- * The mobile view of the same data the kanban shows on desktop.
+ * The flat, ungrouped list of applications -- now the only view of them.
  *
- * `md:hidden` is a hard rule rather than a preference: five columns across
- * 375px is 75px each, narrower than a card's own padding, so the kanban has no
- * legible small-screen form. The list is the design at that width, not a
- * degraded fallback.
+ * This used to carry a hard-coded `md:hidden`, because the kanban board was
+ * the desktop view and this was the small-screen substitute for it. The board
+ * is gone (M5.5 Item 3, 2026-08-29): grouping into five status columns *was*
+ * the sorting Gabe asked to remove, and the status tabs replace it. So this
+ * renders at every width, and the tabs choose which of its rows show.
+ *
+ * Nothing about the list was small-screen-specific, which is why it survived
+ * the board and the board did not survive it -- ungrouped rows scale from
+ * 375px to 1440px, whereas five columns across 375px is 75px each, narrower
+ * than a card's own padding.
  *
  * The row itself is M4's `ApplicationRow` and keeps owning the hairline that
  * separates it from its neighbour; the link and the two controls sit around it
@@ -50,7 +56,7 @@ export function ApplicationsList({
       id={id}
       role={role}
       aria-labelledby={ariaLabelledBy}
-      className={cn('md:hidden', className)}
+      className={cn(className)}
     >
       {jobs.length === 0 ? (
         <p className="py-8 text-body-s text-text-muted">{emptyMessage}</p>
@@ -87,7 +93,7 @@ export function ApplicationsList({
                     onClick={() => onEdit(job)}
                     className="shrink-0 text-label-caps uppercase"
                   >
-                    Edit
+                    edit
                   </IconButton>
                 )}
                 {onDelete && (

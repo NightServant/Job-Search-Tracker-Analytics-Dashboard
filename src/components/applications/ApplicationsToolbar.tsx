@@ -4,7 +4,7 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Spinner } from '@/components/ui/spinner'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { DownloadIcon, SearchIcon, UploadIcon } from '@/components/icons'
 
 /**
@@ -53,7 +53,7 @@ export function ApplicationsToolbar({
           id="applications-search"
           type="search"
           aria-label="Search applications"
-          placeholder="Search company or role"
+          placeholder="search company or role"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
@@ -80,12 +80,12 @@ export function ApplicationsToolbar({
           onClick={() => fileRef.current?.click()}
           disabled={importBusy}
         >
-          {importBusy ? <Spinner size={14} /> : <UploadIcon size={16} aria-hidden />}
+          {importBusy ? <CssSpinner size={14} /> : <UploadIcon size={16} aria-hidden />}
           Import CSV
         </Button>
         <Button variant="secondary" size="s" onClick={onExport} disabled={exportDisabled}>
           <DownloadIcon size={16} aria-hidden />
-          Export CSV
+          export CSV
         </Button>
       </div>
     </div>

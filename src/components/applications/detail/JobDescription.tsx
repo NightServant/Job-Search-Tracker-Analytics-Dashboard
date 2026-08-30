@@ -22,7 +22,7 @@ export function JobDescription({ description, url, className, ...props }: JobDes
   return (
     <PanelSection
       aria-label="Job description"
-      title="Job description"
+      title="job description"
       actions={
         url ? (
           <a
@@ -31,7 +31,7 @@ export function JobDescription({ description, url, className, ...props }: JobDes
             rel="noreferrer"
             className="flex items-center gap-1 text-body-s text-text-secondary hover:text-text-primary hover:underline"
           >
-            View posting
+            view posting
             <ExternalIcon size={14} />
           </a>
         ) : undefined

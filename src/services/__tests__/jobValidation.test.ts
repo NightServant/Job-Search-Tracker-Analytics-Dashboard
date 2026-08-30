@@ -438,7 +438,7 @@ describe('jobValidation', () => {
         role: 'Software Engineer',
         status: 'applied',
         salary_currency: 'XYZ',
-      } as JobFormData
+      } as unknown as JobFormData
 
       const errors = jobValidation.validateJobFormData(data)
       expect(errors.some((e) => e.field === 'salary_currency')).toBe(true)

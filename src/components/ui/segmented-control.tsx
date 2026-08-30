@@ -94,7 +94,21 @@ export function SegmentedControl<T extends string>({
       role="radiogroup"
       aria-disabled={disabled || undefined}
       onKeyDown={handleKeyDown}
-      className={cn('inline-flex rounded-md border border-border-default', className)}
+      // w-fit and overflow-hidden are both load-bearing.
+      //
+      // w-fit: `inline-flex` still stretches when its parent is a flex column
+      // with the default `align-items: stretch`, which is what Field is. The
+      // group then spanned the full 720px settings column while its six
+      // fixed-width buttons packed left -- the ~400px of bordered empty box
+      // after AUD that Gabe flagged. inline-flex sizing to content is only
+      // true when nothing stretches it.
+      //
+      // overflow-hidden: a selected end segment paints a square fill that
+      // otherwise bleeds past the group's own 4px corner radius.
+      className={cn(
+        'inline-flex w-fit overflow-hidden rounded-md border border-border-default',
+        className
+      )}
       {...props}
     >
       {options.map((option, index) => {

@@ -27,7 +27,7 @@ describe('buildDemoDataset', () => {
   it('never dates an application in the future', () => {
     const today = new Date().toISOString().slice(0, 10)
     const dated = data.jobs.filter((j) => j.date_applied)
-    expect(dated.every((j) => j.date_applied <= today)).toBe(true)
+    expect(dated.every((j) => (j.date_applied ?? '') <= today)).toBe(true)
   })
 
   it('leaves wishlist entries undated, because they were never sent', () => {
@@ -43,7 +43,9 @@ describe('buildDemoDataset', () => {
   })
 
   it('gives interviewing applications something on the calendar', () => {
-    const interviewing = data.jobs.filter((j) => j.status === 'interviewing').map((j) => j.ref)
+    const interviewing = data.jobs
+      .filter((j) => j.status === 'interviewing')
+      .map((j) => j.ref as string)
     const withEvents = new Set(data.events.map((e) => e.jobRef))
     expect(interviewing.every((ref) => withEvents.has(ref))).toBe(true)
   })

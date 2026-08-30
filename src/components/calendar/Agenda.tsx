@@ -36,10 +36,10 @@ function formatDayHeading(key: string): string {
  * the local-day-key pairing exists to keep out.
  *
  * Each row's rule is `border-border-strong`, the same neutral 2px vocabulary
- * `FollowUpNudge` and `KanbanColumn` already use -- never a status colour.
- * An event kind (interview, deadline, take-home...) is not an application
- * status, and the five status hues are reserved for that one meaning
- * everywhere else in the app.
+ * `FollowUpNudge` already uses -- never a status colour. An event kind
+ * (interview, deadline, take-home...) is not an application status, and the
+ * five status hues are reserved for that one meaning everywhere else in the
+ * app.
  *
  * `companyByJobId` is the client-side join fix round 1 added: roadmap 5.7
  * requires the mobile agenda carry "time, duration, title and company", but
@@ -66,7 +66,7 @@ export function Agenda({ events, companyByJobId = {}, className }: AgendaProps) 
   const days = [...grouped.keys()].sort()
 
   if (days.length === 0) {
-    return <p className={cn('text-body-s text-text-muted', className)}>Nothing scheduled.</p>
+    return <p className={cn('text-body-s text-text-muted', className)}>nothing scheduled.</p>
   }
 
   return (

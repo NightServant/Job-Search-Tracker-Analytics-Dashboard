@@ -6,7 +6,7 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { Spinner } from '@/components/ui/spinner'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { STATUSES } from '@/components/ui/status-marker'
 import { assertJobFormDataValid, jobValidation } from '@/services/jobValidation'
 import {
@@ -85,6 +85,15 @@ export interface ApplicationFormProps {
   onCancel?: () => void
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   autofilling?: boolean
+  /**
+   * Reports whether the typed payload has diverged from what the form
+   * mounted with, so the dialog around it (Task 4, M5.5) can gate the
+   * dismiss paths a modal adds -- Escape, an overlay click, the header close
+   * button -- that the old inline section never had. Compared against a
+   * snapshot taken once on mount, not against `touched`, so reverting a
+   * field back to its original value clears the flag again.
+   */
+  onDirtyChange?: (dirty: boolean) => void
 }
 
 export function ApplicationForm({
@@ -95,6 +104,7 @@ export function ApplicationForm({
   onCancel,
   onAutofill,
   autofilling = false,
+  onDirtyChange,
 }: ApplicationFormProps) {
   const [company, setCompany] = React.useState(job?.company ?? '')
   const [role, setRole] = React.useState(job?.role ?? '')
@@ -166,6 +176,18 @@ export function ApplicationForm({
 
   const blur = (field: string) => () => setTouched((prev) => ({ ...prev, [field]: true }))
 
+  const initialPayloadRef = React.useRef<JobFormData | null>(null)
+  if (initialPayloadRef.current === null) initialPayloadRef.current = payload
+  const isDirty = JSON.stringify(payload) !== JSON.stringify(initialPayloadRef.current)
+
+  React.useEffect(() => {
+    onDirtyChange?.(isDirty)
+    // Only isDirty needs to re-fire this -- onDirtyChange is a fresh closure
+    // on every parent render and including it would report on every keystroke
+    // regardless of whether dirtiness actually changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDirty])
+
   const handleAutofill = async () => {
     if (!onAutofill) return
     const normalized = normalizePostingUrl(url)
@@ -214,34 +236,30 @@ export function ApplicationForm({
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <h2 className="text-heading-m text-text-primary">
-        {job ? `Edit ${job.role} at ${job.company}` : 'New application'}
-      </h2>
-
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field id="company" label="Company" required>
+        <Field id="company" label="company" required>
           <Input
             id="company"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             onBlur={blur('company')}
             error={errorFor('company')}
-            placeholder="Acme"
+            placeholder="acme"
           />
         </Field>
 
-        <Field id="role" label="Role" required>
+        <Field id="role" label="role" required>
           <Input
             id="role"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             onBlur={blur('role')}
             error={errorFor('role')}
-            placeholder="Frontend Engineer"
+            placeholder="frontend engineer"
           />
         </Field>
 
-        <Field id="salary_min" label="Min salary">
+        <Field id="salary_min" label="min salary">
           <Input
             id="salary_min"
             type="number"
@@ -254,7 +272,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="salary_max" label="Max salary">
+        <Field id="salary_max" label="max salary">
           <Input
             id="salary_max"
             type="number"
@@ -269,8 +287,8 @@ export function ApplicationForm({
 
         <Field
           id="salary_currency"
-          label="Currency"
-          hint="Figures are stored in this currency and never converted."
+          label="currency"
+          hint="figures are stored in this currency and never converted."
         >
           <Select
             id="salary_currency"
@@ -286,7 +304,7 @@ export function ApplicationForm({
           </Select>
         </Field>
 
-        <Field id="status" label="Status">
+        <Field id="status" label="status">
           <Select
             id="status"
             value={status}
@@ -300,7 +318,7 @@ export function ApplicationForm({
           </Select>
         </Field>
 
-        <Field id="date_applied" label="Date applied">
+        <Field id="date_applied" label="date applied">
           <Input
             id="date_applied"
             type="date"
@@ -311,24 +329,24 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="location" label="Location">
+        <Field id="location" label="location">
           <Input
             id="location"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             onBlur={blur('location')}
             error={errorFor('location')}
-            placeholder="Manila / Remote"
+            placeholder="manila / remote"
           />
         </Field>
 
-        <Field id="work_mode" label="Work mode">
+        <Field id="work_mode" label="work mode">
           <Select
             id="work_mode"
             value={workMode}
             onChange={(e) => setWorkMode(e.target.value as WorkMode | '')}
           >
-            <option value="">Not set</option>
+            <option value="">not set</option>
             {WORK_MODES.map((mode) => (
               <option key={mode.value} value={mode.value}>
                 {mode.label}
@@ -337,7 +355,7 @@ export function ApplicationForm({
           </Select>
         </Field>
 
-        <Field id="source" label="Source">
+        <Field id="source" label="source">
           <Input
             id="source"
             value={source}
@@ -348,7 +366,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="url" label="Posting URL" span>
+        <Field id="url" label="posting URL" span>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
             <Input
               id="url"
@@ -365,7 +383,7 @@ export function ApplicationForm({
                 disabled={autofilling}
                 className="shrink-0"
               >
-                {autofilling && <Spinner size={14} />}
+                {autofilling && <CssSpinner size={14} />}
                 {autofilling ? 'Reading' : 'Auto-fill'}
               </Button>
             )}
@@ -373,7 +391,7 @@ export function ApplicationForm({
           {autofillNote && <p className="text-body-s text-text-muted">{autofillNote}</p>}
         </Field>
 
-        <Field id="tags" label="Tags">
+        <Field id="tags" label="tags">
           <Input
             id="tags"
             value={tagsInput}
@@ -384,7 +402,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="tech_stack" label="Tech stack">
+        <Field id="tech_stack" label="tech stack">
           <Input
             id="tech_stack"
             value={techInput}
@@ -404,15 +422,15 @@ export function ApplicationForm({
             className="h-4 w-4 rounded-none border-border-default accent-accent-default"
           />
           <label htmlFor="is_referral" className="text-body-m text-text-primary">
-            Came through a referral
+            came through a referral
           </label>
         </div>
 
         <Field
           id="description"
-          label="Job description"
+          label="job description"
           span
-          hint="Pasted in full, this is what the ATS keyword match reads."
+          hint="pasted in full, this is what the ATS keyword match reads."
         >
           <Textarea
             id="description"
@@ -424,7 +442,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="notes" label="Notes" span>
+        <Field id="notes" label="notes" span>
           <Textarea
             id="notes"
             value={notes}
@@ -436,20 +454,20 @@ export function ApplicationForm({
       </div>
 
       <div className="flex flex-col gap-5 border-t border-border-subtle pt-6">
-        <h3 className="text-label-caps uppercase text-text-secondary">Contact</h3>
+        <h3 className="text-label-caps uppercase text-text-secondary">contact</h3>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="contact_name" label="Name">
+          <Field id="contact_name" label="name">
             <Input
               id="contact_name"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
               onBlur={blur('contact_name')}
               error={errorFor('contact_name')}
-              placeholder="Recruiter or hiring manager"
+              placeholder="recruiter or hiring manager"
             />
           </Field>
 
-          <Field id="contact_email" label="Email">
+          <Field id="contact_email" label="email">
             <Input
               id="contact_email"
               type="email"
@@ -468,11 +486,11 @@ export function ApplicationForm({
               onChange={(e) => setContactLinkedin(e.target.value)}
               onBlur={blur('contact_linkedin')}
               error={errorFor('contact_linkedin')}
-              placeholder="https://www.linkedin.com/in/..."
+              placeholder="https://www.LinkedIn.com/in/..."
             />
           </Field>
 
-          <Field id="contact_notes" label="Contact notes" span>
+          <Field id="contact_notes" label="contact notes" span>
             <Textarea
               id="contact_notes"
               value={contactNotes}
@@ -492,12 +510,12 @@ export function ApplicationForm({
 
       <div className="flex items-center gap-3 border-t border-border-subtle pt-6">
         <Button type="submit" disabled={saving}>
-          {saving && <Spinner size={14} />}
+          {saving && <CssSpinner size={14} />}
           {saving ? 'Saving' : submitLabel}
         </Button>
         {onCancel && (
           <Button variant="ghost" onClick={onCancel} disabled={saving}>
-            Cancel
+            cancel
           </Button>
         )}
       </div>

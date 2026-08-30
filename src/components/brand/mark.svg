@@ -1,0 +1,19 @@
+<svg width="23" height="23" viewBox="0 0 23 23" fill="none" xmlns="http://www.w3.org/2000/svg">
+<rect width="23" height="23" fill="#F5F5F5"/>
+<g id="Components &#194;&#183; Navigation">
+<rect width="1200" height="1150" transform="translate(-48 -295)" fill="white"/>
+<g id="Logo">
+<g id="Mark" clip-path="url(#clip0_13_4)">
+<rect id="Cell 1" width="10" height="10" rx="1" fill="#18181B"/>
+<rect id="Cell 2" x="13" width="10" height="10" rx="1" fill="#18181B"/>
+<rect id="Cell / Active" y="13" width="10" height="10" rx="1" fill="#C2410C"/>
+<rect id="Cell 4" x="13" y="13" width="10" height="10" rx="1" fill="#18181B"/>
+</g>
+</g>
+</g>
+<defs>
+<clipPath id="clip0_13_4">
+<rect width="23" height="23" fill="white"/>
+</clipPath>
+</defs>
+</svg>

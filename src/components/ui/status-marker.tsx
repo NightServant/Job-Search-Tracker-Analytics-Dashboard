@@ -28,7 +28,12 @@ const LABELS: Record<Status, string> = {
 // Written out rather than interpolated. `bg-status-${status}-mark` produces no
 // CSS at all -- Tailwind scans source text, so a class it never literally sees
 // is a class it never emits. This cost the token gallery its status swatches.
-const RULES: Record<Status, string> = {
+//
+// Exported: this is the one place the five `bg-status-*-mark` classes are
+// spelled out, so every consumer that needs a status colour as a solid
+// swatch -- the rule here, the kanban column's legend dot, the status tab's
+// legend dot -- shares one map instead of re-deriving it.
+export const STATUS_MARK_CLASSES: Record<Status, string> = {
   wishlist: 'bg-status-wishlist-mark',
   applied: 'bg-status-applied-mark',
   interviewing: 'bg-status-interviewing-mark',
@@ -51,7 +56,7 @@ export function StatusMarker({ status, className, ...props }: StatusMarkerProps)
       <span
         data-status-rule
         aria-hidden
-        className={cn('h-[2px] w-full rounded-none', RULES[status])}
+        className={cn('h-[2px] w-full rounded-none', STATUS_MARK_CLASSES[status])}
       />
     </span>
   )

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { ResumeSummary } from '@/services/resumeService'
 
 /**
@@ -11,11 +12,18 @@ import type { ResumeSummary } from '@/services/resumeService'
 const useResumesMock = vi.hoisted(() => vi.fn())
 const useResumeVersionsMock = vi.hoisted(() => vi.fn())
 const deleteMutate = vi.hoisted(() => vi.fn())
+const createMutate = vi.hoisted(() => vi.fn())
+const routerPush = vi.hoisted(() => vi.fn())
 
 vi.mock('@/hooks/useResumes', () => ({
   useResumes: useResumesMock,
   useResumeVersions: useResumeVersionsMock,
   useDeleteResume: () => ({ mutateAsync: deleteMutate, isPending: false }),
+  useCreateResume: () => ({ mutateAsync: createMutate, isPending: false }),
+}))
+
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: routerPush, replace: vi.fn() }),
 }))
 
 vi.mock('@/contexts/ToastContext', () => ({
@@ -41,7 +49,7 @@ beforeEach(() => {
   vi.clearAllMocks()
   useResumeVersionsMock.mockReturnValue({ data: [], isLoading: false, error: null })
   deleteMutate.mockResolvedValue(undefined)
-  window.confirm = vi.fn(() => true)
+  createMutate.mockResolvedValue({ id: 'cv-new' })
 })
 
 afterEach(() => cleanup())
@@ -66,20 +74,25 @@ describe('Documents route wrapper', () => {
     expect(screen.getByRole('link', { name: 'Backend CV' })).toBeTruthy()
   })
 
-  it('confirms before deleting, and does not delete when the confirm is declined', () => {
-    window.confirm = vi.fn(() => false)
+  // Item 2's second half, and the same defect class as window.confirm
+  // everywhere else: a native confirm is unstyled, unthemeable and
+  // untestable without stubbing a global.
+  it('confirms before deleting, and does not delete when Cancel is chosen', async () => {
     useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
+    const user = userEvent.setup()
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: /delete backend cv/i }))
+    await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
+    expect(screen.getByRole('alertdialog', { name: /delete backend cv/i })).toBeTruthy()
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(deleteMutate).not.toHaveBeenCalled()
   })
 
   it('deletes the CV the row names once the confirm is accepted', async () => {
     useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
+    const user = userEvent.setup()
     render(<Page />)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /delete backend cv/i }))
-    })
+    await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
+    await user.click(screen.getByRole('button', { name: 'delete' }))
     expect(deleteMutate).toHaveBeenCalledWith('cv-1')
   })
 
@@ -94,11 +107,21 @@ describe('Documents route wrapper', () => {
     expect(useResumeVersionsMock).toHaveBeenLastCalledWith('cv-1')
   })
 
-  it('collapses the version history when the same row is toggled again', () => {
+  it('stops asking for versions once the dialog is dismissed', async () => {
+    // Was "collapses when the same row is toggled again", back when the
+    // history was an inline disclosure you clicked twice. It is a dialog now
+    // (M5.5 Item 4), so the trigger is behind an overlay while it is open and
+    // Escape is the real dismissal path. What matters either way is that
+    // closing releases the query, rather than leaving it subscribed to a row
+    // nobody is looking at.
+    const user = userEvent.setup()
     useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
+
+    await user.click(screen.getByRole('button', { name: /^versions$/i }))
+    expect(useResumeVersionsMock).toHaveBeenLastCalledWith('cv-1')
+
+    await user.keyboard('{Escape}')
     expect(useResumeVersionsMock).toHaveBeenLastCalledWith(null)
   })
 
@@ -109,5 +132,23 @@ describe('Documents route wrapper', () => {
     fireEvent.click(screen.getByRole('button', { name: /versions/i }))
     expect(screen.getByText(/could not load the saved versions/i)).toBeTruthy()
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
+  })
+
+  // Task 4 (M5.5): New CV moved from a Link to /cv?draft=new into a dialog
+  // opened right here, so choosing a mode has to create the draft and land
+  // on its editor exactly as the old full-page ModeChooser did.
+  it('creates a CV in the chosen mode from the dialog and opens its editor', async () => {
+    useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
+    const user = userEvent.setup()
+    render(<Page />)
+
+    await user.click(screen.getByRole('button', { name: /new cv/i }))
+    await user.click(screen.getByRole('button', { name: /latex editor/i }))
+
+    expect(createMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'latex', title: 'Untitled LaTeX CV' })
+    )
+    await act(async () => {})
+    expect(routerPush).toHaveBeenCalledWith('/cv?draft=cv-new')
   })
 })

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 // The route wrapper must read the same react-query cache every other screen
@@ -10,14 +10,24 @@ import { render, screen } from '@testing-library/react'
 const useJobsMock = vi.hoisted(() => vi.fn())
 vi.mock('@/hooks/useJobs', () => ({ useJobs: useJobsMock }))
 
+// The Overview reads the calendar as of M5.5 Item 5. Mocked for the same
+// reason useJobs is -- and additionally because useEvents pulls in the real
+// supabase client at module load, which throws on an unset URL.
+const useEventsMock = vi.hoisted(() => vi.fn())
+vi.mock('@/hooks/useEvents', () => ({ useEvents: useEventsMock }))
+
 import Page from '../page'
 
 describe('Dashboard route wrapper', () => {
+  beforeEach(() => {
+    useEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+  })
+
   it('shows a spinner while jobs are loading, not an empty dashboard', () => {
     useJobsMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
     const { container } = render(<Page />)
     expect(container.querySelector('[role="status"]')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Dashboard' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'overview' })).toBeNull()
   })
 
   it('surfaces a fetch error instead of rendering a zeroed-out KPI strip', () => {
@@ -31,14 +41,16 @@ describe('Dashboard route wrapper', () => {
     })
     render(<Page />)
     expect(screen.getByText(/network down/)).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Dashboard' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'overview' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'retry' })).toBeTruthy()
   })
 
   it('renders the dashboard body from the shared jobs cache once loaded', () => {
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'Dashboard' })).toBeTruthy()
+    // 'overview', not 'Dashboard': the sidebar nav, the Figma page title and
+    // this heading now agree. Only the route path says dashboard.
+    expect(screen.getByRole('heading', { name: 'overview' })).toBeTruthy()
     expect(useJobsMock).toHaveBeenCalled()
   })
 })

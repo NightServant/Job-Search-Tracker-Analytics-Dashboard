@@ -80,7 +80,7 @@ function contentEquals(a: unknown, b: unknown): boolean {
 }
 
 /** The minimal surface `maybeCreateSnapshot` needs from a Supabase client. */
-type SnapshotReaderClient = Pick<typeof supabase, 'from'>
+export type SnapshotReaderClient = Pick<typeof supabase, 'from'>
 
 async function latestSnapshot(
   client: SnapshotReaderClient,
