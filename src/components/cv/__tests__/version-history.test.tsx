@@ -90,7 +90,10 @@ describe('deleting a snapshot', () => {
     open()
     await waitFor(() => expect(screen.getByText(/v2/)).toBeTruthy())
 
-    await user.click(screen.getAllByRole('button', { name: /remove this version/i })[0])
+    // Named per version, not "remove this version" on every row: with ten
+    // snapshots in the list, one repeated label gives a screen reader ten
+    // identical buttons and no way to tell which deletes what.
+    await user.click(screen.getByRole('button', { name: 'Remove v2' }))
     expect(screen.getByRole('alertdialog', { name: /delete this version/i })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(deleteSnapshotMock).not.toHaveBeenCalled()
@@ -105,8 +108,27 @@ describe('deleting a snapshot', () => {
     open()
     await waitFor(() => expect(screen.getByText(/v1/)).toBeTruthy())
 
-    await user.click(screen.getAllByRole('button', { name: /remove this version/i })[1])
+    await user.click(screen.getByRole('button', { name: 'Remove v1' }))
     await user.click(screen.getByRole('button', { name: 'delete' }))
     await waitFor(() => expect(deleteSnapshotMock).toHaveBeenCalledWith('s-1', 'user-1'))
+  })
+})
+
+describe('version history panel placement', () => {
+  it('anchors to the trigger and portals out, rather than hanging off its right edge', async () => {
+    getSnapshotsMock.mockResolvedValue([
+      { id: 's-1', resume_id: 'cv-1', version: 1, created_at: '2026-08-19T10:00:00.000Z' },
+    ])
+    open()
+    await waitFor(() => expect(screen.getByText(/v1/)).toBeTruthy())
+
+    const panel = document.querySelector('[data-slot="popover-content"]')!
+    // The old panel was `absolute right-0 top-full`, which pins a 384px panel's
+    // RIGHT edge to the trigger's -- so it hung 384px LEFT, off the viewport
+    // and across the sidebar. align="start" runs it rightwards instead.
+    expect(panel.className).not.toMatch(/\bright-0\b/)
+    expect(panel.closest('[data-slot="popover-positioner"], .isolate')).toBeTruthy()
+    // Portalled, so no ancestor's overflow or stacking context can clip it.
+    expect(panel.closest('[data-cv-toolbar]')).toBeNull()
   })
 })
