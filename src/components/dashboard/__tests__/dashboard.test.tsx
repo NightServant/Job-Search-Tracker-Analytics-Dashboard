@@ -23,13 +23,48 @@ const FRESH_FIXTURE: Job[] = [
 ]
 
 describe('Dashboard', () => {
-  it('puts the follow-up nudge above the KPI strip', () => {
-    // The nudge is the only thing on this page that asks for an action today.
-    // Below the fold it is a notification nobody reads.
+  it('puts the KPI strip above the follow-up nudge, as the frame draws it', () => {
+    // REVERSED in M5.5 Item 5, deliberately. This asserted the opposite,
+    // from roadmap 5.3's prose ("KPI strip, follow-up nudge first"). Figma
+    // 20:64 puts the KPI Strip at y=129 and the Follow-up Nudge at y=287, so
+    // the frame and the prose disagree -- and the roadmap names the Figma
+    // file as the source of truth for design. Both are above the fold at
+    // 1024px, so the nudge is not buried either way.
     const { container } = render(<Dashboard jobs={STALE_FIXTURE} />)
     const nudge = container.querySelector('[data-follow-up]')!
     const kpis = container.querySelector('[data-kpi-strip]')!
-    expect(nudge.compareDocumentPosition(kpis) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(kpis.compareDocumentPosition(nudge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('reads the calendar rather than inventing an events sentence', () => {
+    // The old block printed the literal string "N interviews in progress",
+    // derived from job statuses -- so it had no empty state and could never
+    // show a real event. Item 5's first complaint.
+    render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
+    expect(screen.queryByText(/interviews in progress/i)).toBeNull()
+    expect(screen.getByText(/nothing scheduled yet/i)).toBeTruthy()
+  })
+
+  it('distinguishes a failing calendar read from an empty calendar', () => {
+    render(<Dashboard jobs={FRESH_FIXTURE} events={[]} eventsError />)
+    expect(screen.getByText(/could not load your calendar/i)).toBeTruthy()
+    expect(screen.queryByText(/nothing scheduled yet/i)).toBeNull()
+  })
+
+  it('renders the three charts Gabe asked for', () => {
+    // line/area over time, the status doughnut, and bars by source. recharts
+    // has been a dependency since M5 and this screen imported none of it.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    expect(container.querySelector('[data-chart-over-time]')).toBeTruthy()
+    expect(container.querySelector('[data-chart-donut]')).toBeTruthy()
+    expect(container.querySelector('[data-chart-sources]')).toBeTruthy()
+  })
+
+  it('keeps all five statuses in the donut legend, including the zeros', () => {
+    // A legend that drops empty statuses changes length as data changes, and
+    // the colour under a given segment starts meaning something else.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    expect(container.querySelectorAll('[data-donut-legend] li')).toHaveLength(5)
   })
 
   it('hides the nudge entirely when nothing is stale', () => {
@@ -38,11 +73,16 @@ describe('Dashboard', () => {
     expect(container.querySelector('[data-follow-up]')).toBeNull()
   })
 
-  it('renders six blocks, each linking out to its own route', () => {
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
-    const blocks = container.querySelectorAll('[data-dashboard-block]')
-    expect(blocks).toHaveLength(6)
-    for (const b of blocks) expect(b.querySelector('a[href]')).toBeTruthy()
+  it('renders the recent-applications table with real column labels', () => {
+    // Replaces "renders six blocks": the six generic text blocks are gone.
+    // The old Recent applications block was loose text with no column labels,
+    // so nothing lined up between rows and a screen reader got no row/column
+    // relationship at all.
+    render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const table = screen.getByRole('table')
+    for (const label of ['company', 'position', 'status', 'applied on']) {
+      expect(within(table).getByRole('columnheader', { name: label })).toBeTruthy()
+    }
   })
 
   it('shows KPI values with tabular figures', () => {
@@ -52,18 +92,14 @@ describe('Dashboard', () => {
     }
   })
 
-  it('separates the six blocks with a hairline rule, not a border box', () => {
-    // Only job-card.tsx earns a full border in this system, and its own doc
-    // comment says why: it moves. A static dashboard grouping doesn't, so it
-    // gets a rule instead -- same vocabulary as application-row's border-b.
+  it('draws the header rule the frame specifies and no card borders', () => {
+    // Figma 20:68 is a 2px full-width rule under the page title. Separation in
+    // this system is hairline rules, never boxed cards -- the six bordered
+    // blocks this replaced were themselves a fix round in M5.
     const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
-    const blocks = container.querySelectorAll('[data-dashboard-block]')
-    expect(blocks).toHaveLength(6)
-    for (const b of blocks) {
-      const el = b as HTMLElement
-      expect(el.className).toContain('border-t')
-      expect(el.className).not.toMatch(/(^|\s)border(\s|$)/)
-    }
+    const rule = container.querySelector('[data-header-rule]') as HTMLElement
+    expect(rule).toBeTruthy()
+    expect(rule.className).toContain('border-t-2')
   })
 
   it('links each row in Recent applications to that job\'s own detail route', () => {
@@ -86,7 +122,7 @@ describe('Dashboard', () => {
       created_at: '2026-08-20T14:23:01.123456+00:00',
     })
     render(<Dashboard jobs={[wishlist]} />)
-    expect(screen.getByText('Not applied')).toBeTruthy()
+    expect(screen.getByText('not applied')).toBeTruthy()
     expect(screen.queryByText(/2026-08-20T/)).toBeNull()
   })
 
