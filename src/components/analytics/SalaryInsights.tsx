@@ -132,14 +132,26 @@ export function SalaryInsights({ jobs }: SalaryInsightsProps) {
         </div>
       )}
 
-      <p data-salary-scope className="text-body-s text-text-muted">
-        {dist.currency} only, {dist.included}{' '}
-        {dist.included === 1 ? 'application' : 'applications'}.
-        {dist.excludedOtherCurrency > 0
-          ? ` ${dist.excludedOtherCurrency} in another currency not shown \u2014 figures are never converted.`
-          : ''}
-        {dist.missing > 0 ? ` ${dist.missing} with no salary recorded.` : ''}
-      </p>
+      {/*
+        The always-on scope line is gone at Gabe's request. Most of what it
+        said was already on the panel: "jobs with salary" is the included
+        count, and every figure is formatted with its own currency symbol, so
+        naming the currency again in prose was restating the ₱ signs above it.
+
+        What survives is the one case where silence actually misleads. Salaries
+        are stored per row and NEVER converted (Global Constraint), so when an
+        account holds salaries in more than one currency this panel charts one
+        of them and drops the rest. Without a line saying so, the numbers look
+        like the whole picture and are not. This renders only in that case, and
+        never for an account with a single currency.
+      */}
+      {dist.excludedOtherCurrency > 0 && (
+        <p data-salary-scope className="text-body-s text-text-muted">
+          {dist.excludedOtherCurrency}{' '}
+          {dist.excludedOtherCurrency === 1 ? 'application' : 'applications'} in another currency
+          not shown &mdash; figures are never converted.
+        </p>
+      )}
     </div>
   )
 }

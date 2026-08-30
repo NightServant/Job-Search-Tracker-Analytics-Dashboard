@@ -4,6 +4,7 @@ import type { Job } from '@/types'
 import { Analytics, type MetricState } from '../Analytics'
 import { FunnelChart, normalizeFunnel, STAGE_FILL } from '../FunnelChart'
 import { TimeInStage } from '../TimeInStage'
+import { SalaryInsights } from '../SalaryInsights'
 import { RangePicker } from '../RangePicker'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type {
@@ -502,6 +503,37 @@ describe('FunnelChart timings', () => {
   it('carries avgDaysToStage through normalizeFunnel', () => {
     const result = normalizeFunnel(PARTIAL_FUNNEL)
     expect(result.map((r) => r.avgDaysToStage)).toEqual([3, 9, 21])
+  })
+})
+
+describe('SalaryInsights scope', () => {
+  const priced = (rows: Array<[number, string]>) =>
+    rows.map(([amount, currency], i) => ({
+      id: `j${i}`,
+      company: `Co ${i}`,
+      salary_min: amount,
+      salary_max: amount,
+      salary_currency: currency,
+    })) as unknown as Job[]
+
+  it('says nothing about scope when every salary is in one currency', () => {
+    // The always-on line went at Gabe's request: "jobs with salary" already
+    // gives the included count, and every figure carries its own currency
+    // symbol, so the prose was restating what was above it.
+    render(<SalaryInsights jobs={priced([[20_000, 'PHP'], [30_000, 'PHP']])} />)
+    expect(screen.queryByText(/not shown/i)).toBeNull()
+  })
+
+  it('still discloses salaries it dropped for being in another currency', () => {
+    // The one case where silence misleads. Figures are never converted, so a
+    // mixed-currency account gets ONE currency charted and the rest dropped --
+    // without this the numbers look like the whole picture and are not.
+    render(
+      <SalaryInsights
+        jobs={priced([[20_000, 'PHP'], [30_000, 'PHP'], [5_000, 'USD']])}
+      />
+    )
+    expect(screen.getByText(/1 application in another currency not shown/i)).toBeTruthy()
   })
 })
 

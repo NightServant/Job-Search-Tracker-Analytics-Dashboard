@@ -19,6 +19,13 @@ export interface EmptyStateProps extends React.HTMLAttributes<HTMLDivElement> {
  * and a loading panel and a failed panel all looked like the same nothing, and
  * the eye had no anchor to land on.
  *
+ * The glyph is 72px and the copy is body-m in `text-secondary`, not body-s in
+ * `text-muted`. The first pass was 40px over body-s, which is caption scale:
+ * on Documents, where the empty state is the entire screen, it read as a
+ * stray note in the middle of a blank page. Muted copy is right for a note
+ * beside real content and wrong for copy that IS the content — nothing else
+ * on the screen outranks it, so nothing needs it de-emphasised.
+ *
  * Two things this deliberately is not:
  *
  * It is not an error state. A failed read gets `AlertCircleIcon` in
@@ -40,17 +47,20 @@ export function EmptyState({ icon, children, action, className, ...props }: Empt
     <div
       data-empty-state
       className={cn(
-        'flex flex-col items-center gap-3 px-4 py-10 text-center',
+        // Scaled up: at 40px over body-s this read as a caption dropped into
+        // the middle of a 900px blank page rather than as the page's content.
+        // An empty state IS the screen when it shows, so it is sized like one.
+        'flex flex-col items-center gap-5 px-4 py-20 text-center',
         className
       )}
       {...props}
     >
       <Icon
-        size={40}
+        size={72}
         aria-hidden
-        className="text-text-muted opacity-60 [&_svg]:size-10"
+        className="text-text-muted opacity-50 [&_svg]:size-18"
       />
-      <p className="max-w-prose text-body-s text-text-muted">{children}</p>
+      <p className="max-w-prose text-body-m text-text-secondary">{children}</p>
       {action}
     </div>
   )
