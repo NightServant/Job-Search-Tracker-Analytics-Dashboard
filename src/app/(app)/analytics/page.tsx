@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import {
   useTimeInStage,
   useConversionFunnel,
-  useSourceConversionTrends,
+  useStatusTransitions,
   useCohortAnalysis,
   useConversionMetrics,
 } from '@/hooks/useAnalytics'
@@ -44,7 +44,7 @@ export default function Page() {
 
   const timeInStage = useTimeInStage(userId)
   const conversionFunnel = useConversionFunnel(userId)
-  const sourceConversionTrends = useSourceConversionTrends(userId)
+  const statusTransitions = useStatusTransitions(userId)
   const cohortAnalysis = useCohortAnalysis(userId)
   const conversionMetrics = useConversionMetrics(userId)
   // Salary insights derives its distribution from the jobs themselves: no
@@ -53,7 +53,7 @@ export default function Page() {
   // loading/error gate -- one slow list must not blank five working panels.
   const { data: jobs = [] } = useJobs()
 
-  const queries = [timeInStage, conversionFunnel, sourceConversionTrends, cohortAnalysis, conversionMetrics]
+  const queries = [timeInStage, conversionFunnel, statusTransitions, cohortAnalysis, conversionMetrics]
 
   if (queries.every((q) => q.isLoading)) {
     return <RouteLoading />
@@ -74,7 +74,7 @@ export default function Page() {
       jobs={jobs}
       timeInStage={toState(timeInStage)}
       conversionFunnel={toState(conversionFunnel)}
-      sourceConversionTrends={toState(sourceConversionTrends)}
+      statusTransitions={toState(statusTransitions)}
       cohortAnalysis={toState(cohortAnalysis)}
       conversionMetrics={toState(conversionMetrics)}
     />

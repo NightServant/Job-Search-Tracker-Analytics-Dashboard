@@ -7,19 +7,19 @@ import { AlertCircleIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Callout } from './Callout'
 import { SalaryInsights } from './SalaryInsights'
+import { PipelineFlow } from './PipelineFlow'
 import type { Job } from '@/types'
 import { KpiStat } from '@/components/ui/kpi-stat'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RangePicker } from './RangePicker'
 import { FunnelChart, normalizeFunnel } from './FunnelChart'
 import { TimeInStage } from './TimeInStage'
-import { SourceTrends } from './SourceTrends'
 import { CohortTable } from './CohortTable'
 import { filterByMonth, rangeLabel, type RangeOption } from '@/lib/analyticsRange'
 import type {
+  StatusTransition,
   TimeInStageMetric,
   ConversionFunnelMetric,
-  SourceConversionTrend,
   CohortAnalysis,
   ConversionMetrics,
 } from '@/services/analyticsService'
@@ -39,7 +39,7 @@ export interface MetricState<T> {
 export interface AnalyticsProps {
   timeInStage: MetricState<TimeInStageMetric[]>
   conversionFunnel: MetricState<ConversionFunnelMetric[]>
-  sourceConversionTrends: MetricState<SourceConversionTrend[]>
+  statusTransitions: MetricState<StatusTransition[]>
   cohortAnalysis: MetricState<CohortAnalysis[]>
   conversionMetrics: MetricState<ConversionMetrics>
   /**
@@ -193,20 +193,13 @@ function Overview({ data }: { data: ConversionMetrics | null }) {
 export function Analytics({
   timeInStage,
   conversionFunnel,
-  sourceConversionTrends,
+  statusTransitions,
   cohortAnalysis,
   conversionMetrics,
   jobs = [],
 }: AnalyticsProps) {
   const [range, setRange] = React.useState<RangeOption>('all')
 
-  const filteredTrends = React.useMemo(
-    () =>
-      sourceConversionTrends.data
-        ? filterByMonth(sourceConversionTrends.data, (t) => t.month, range)
-        : [],
-    [sourceConversionTrends.data, range]
-  )
   const filteredCohorts = React.useMemo(
     () => (cohortAnalysis.data ? filterByMonth(cohortAnalysis.data, (c) => c.cohort, range) : []),
     [cohortAnalysis.data, range]
@@ -229,31 +222,27 @@ export function Analytics({
     [filteredCohorts]
   )
 
-  const topSource = React.useMemo(() => {
-    if (filteredTrends.length === 0) return null
-    const totals = new Map<string, { applied: number; offer: number }>()
-    for (const row of filteredTrends) {
-      const acc = totals.get(row.source) ?? { applied: 0, offer: 0 }
-      acc.applied += row.applied
-      acc.offer += row.offer
-      totals.set(row.source, acc)
-    }
-    return [...totals.entries()]
-      .map(([source, t]) => ({
-        source,
-        applied: t.applied,
-        offer: t.offer,
-        rate: t.applied > 0 ? Math.round((t.offer / t.applied) * 100) : 0,
-      }))
-      .sort((a, b) => b.rate - a.rate || b.applied - a.applied)[0]
-  }, [filteredTrends])
 
   return (
     // Two columns from lg. A 2560px single column meant a lot of scrolling
     // past half-empty panels; paired, each panel gets a width that suits it and
-    // the page halves in height. The footer spans both (lg:col-span-2) because
-    // it is the end of the page, not a panel.
-    <div className="grid gap-8 lg:grid-cols-2">
+    // the page halves in height. Full-width panels span both (lg:col-span-2).
+    //
+    // Order is the question each panel answers, not the order they were
+    // built: how am I doing (overview), how far do applications get (funnel),
+    // where do they actually go (pipeline flow), how long do they sit (time in
+    // stage), what are they worth (salary), then the full month-by-month
+    // breakdown last, because a seven-column table is reference material
+    // rather than a headline. Only the KPI strip and that table span both
+    // columns; every chart stays half-width, which is what stopped them
+    // reading as too wide.
+    //
+    // items-start, because grid's default `stretch` sizes both cards in a row
+    // to the taller one. A panel showing an empty state beside a full salary
+    // breakdown then grew to that height and left a column of dead space under
+    // its own text -- the gap Gabe reported under pipeline flow. Each card now
+    // takes its content's height, and a short panel simply looks short.
+    <div className="grid items-start gap-8 lg:grid-cols-2">
       <PageHeader className="lg:col-span-2" title="analytics" action={<RangePicker value={range} onChange={setRange} />} />
 
       <AnalyticsPanel
@@ -278,6 +267,18 @@ export function Analytics({
       </AnalyticsPanel>
 
       <AnalyticsPanel
+        title="pipeline flow"
+        action={<Span>all time</Span>}
+        error={statusTransitions.error ? errorMessage(statusTransitions.error) : undefined}
+      >
+        <PanelBody
+          state={statusTransitions}
+          empty={(statusTransitions.data ?? []).length === 0}
+          render={() => <PipelineFlow transitions={statusTransitions.data ?? []} />}
+        />
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
         title="time in stage"
         action={<Span>all time</Span>}
         error={timeInStage.error ? errorMessage(timeInStage.error) : undefined}
@@ -290,6 +291,13 @@ export function Analytics({
           }
           render={() => <TimeInStage data={timeInStage.data ?? []} />}
         />
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        title="salary insights"
+        action={<Span>all time</Span>}
+      >
+        <SalaryInsights jobs={jobs} />
       </AnalyticsPanel>
 
       <AnalyticsPanel
@@ -320,39 +328,6 @@ export function Analytics({
             </div>
           )}
         />
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        title="source trends"
-        action={<Span>{rangeLabel(range)}</Span>}
-        error={sourceConversionTrends.error ? errorMessage(sourceConversionTrends.error) : undefined}
-      >
-        <PanelBody
-          state={sourceConversionTrends}
-          empty={
-            filteredTrends.length === 0 ||
-            filteredTrends.every((t) => t.applied === 0 && t.offer === 0)
-          }
-          render={() => (
-            <div className="flex flex-col gap-6">
-              <SourceTrends data={filteredTrends} />
-              {topSource && (
-                <Callout
-                  label="top converting source"
-                  metrics={[
-                    { label: 'source', value: topSource.source },
-                    { label: 'applications', value: String(topSource.applied) },
-                    { label: 'offer rate', value: `${topSource.rate}%` },
-                  ]}
-                />
-              )}
-            </div>
-          )}
-        />
-      </AnalyticsPanel>
-
-      <AnalyticsPanel title="salary insights" action={<Span>all time</Span>}>
-        <SalaryInsights jobs={jobs} />
       </AnalyticsPanel>
 
     </div>

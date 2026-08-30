@@ -9,7 +9,7 @@ import { render, screen, cleanup } from '@testing-library/react'
 const useAuthMock = vi.hoisted(() => vi.fn())
 const useTimeInStageMock = vi.hoisted(() => vi.fn())
 const useConversionFunnelMock = vi.hoisted(() => vi.fn())
-const useSourceConversionTrendsMock = vi.hoisted(() => vi.fn())
+const useStatusTransitionsMock = vi.hoisted(() => vi.fn())
 const useCohortAnalysisMock = vi.hoisted(() => vi.fn())
 const useConversionMetricsMock = vi.hoisted(() => vi.fn())
 // Salary insights derives its distribution from the jobs list (M5.5 Item 7).
@@ -23,7 +23,7 @@ vi.mock('@/contexts/AuthContext', () => ({ useAuth: useAuthMock }))
 vi.mock('@/hooks/useAnalytics', () => ({
   useTimeInStage: useTimeInStageMock,
   useConversionFunnel: useConversionFunnelMock,
-  useSourceConversionTrends: useSourceConversionTrendsMock,
+  useStatusTransitions: useStatusTransitionsMock,
   useCohortAnalysis: useCohortAnalysisMock,
   useConversionMetrics: useConversionMetricsMock,
 }))
@@ -44,7 +44,7 @@ const FAILED = { data: undefined, isLoading: false, error: new Error('network do
 function mockAll(state: typeof LOADING | typeof EMPTY_OK | typeof FAILED) {
   useTimeInStageMock.mockReturnValue(state)
   useConversionFunnelMock.mockReturnValue(state)
-  useSourceConversionTrendsMock.mockReturnValue(state)
+  useStatusTransitionsMock.mockReturnValue(state)
   useCohortAnalysisMock.mockReturnValue(state)
   useConversionMetricsMock.mockReturnValue(state === EMPTY_OK ? METRICS_OK : state)
 }
@@ -72,7 +72,7 @@ describe('Analytics route wrapper', () => {
   it('does not blank the page when only one of five metrics is still loading', () => {
     useTimeInStageMock.mockReturnValue(LOADING)
     useConversionFunnelMock.mockReturnValue(EMPTY_OK)
-    useSourceConversionTrendsMock.mockReturnValue(EMPTY_OK)
+    useStatusTransitionsMock.mockReturnValue(EMPTY_OK)
     useCohortAnalysisMock.mockReturnValue(EMPTY_OK)
     useConversionMetricsMock.mockReturnValue(METRICS_OK)
     render(<Page />)
@@ -85,7 +85,7 @@ describe('Analytics route wrapper', () => {
     // would have turned this into the same RouteError as a total failure.
     useTimeInStageMock.mockReturnValue(EMPTY_OK)
     useConversionFunnelMock.mockReturnValue(EMPTY_OK)
-    useSourceConversionTrendsMock.mockReturnValue(EMPTY_OK)
+    useStatusTransitionsMock.mockReturnValue(EMPTY_OK)
     useCohortAnalysisMock.mockReturnValue(FAILED)
     useConversionMetricsMock.mockReturnValue(METRICS_OK)
     render(<Page />)

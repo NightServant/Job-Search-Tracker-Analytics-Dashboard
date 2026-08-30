@@ -3,13 +3,12 @@ import { render, screen, fireEvent, cleanup } from '@testing-library/react'
 import { Analytics, type MetricState } from '../Analytics'
 import { FunnelChart, normalizeFunnel, STAGE_FILL } from '../FunnelChart'
 import { TimeInStage } from '../TimeInStage'
-import { SourceTrends } from '../SourceTrends'
 import { RangePicker } from '../RangePicker'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type {
   TimeInStageMetric,
   ConversionFunnelMetric,
-  SourceConversionTrend,
+  StatusTransition,
   CohortAnalysis,
   ConversionMetrics,
 } from '@/services/analyticsService'
@@ -31,7 +30,7 @@ afterEach(() => {
 // Recharts' ResponsiveContainer reads this to size its SVG and, at 0x0,
 // skips rendering its children entirely -- not a failure, just not
 // informative for a test. This gives it a plausible chart-sized box so the
-// panels that use it (TimeInStage, SourceTrends) actually draw something,
+// panels that use it (TimeInStage, the salary and cohort charts) actually draw something,
 // the same technique widely used to make Recharts testable under jsdom.
 Element.prototype.getBoundingClientRect = () => ({
   width: 600,
@@ -82,10 +81,11 @@ const PARTIAL_FUNNEL: ConversionFunnelMetric[] = [
   { stage: 'Offer', count: 2, percentage: 16.7, avgDaysToStage: 21, isExit: false },
 ]
 
-const TRENDS: SourceConversionTrend[] = [
-  { source: 'LinkedIn', month: '2026-06', applied: 4, interviewing: 2, offer: 1, rejected: 1, conversionRate: 25 },
-  { source: 'LinkedIn', month: '2026-07', applied: 3, interviewing: 1, offer: 0, rejected: 2, conversionRate: 0 },
-  { source: 'Referral', month: '2025-01', applied: 2, interviewing: 1, offer: 1, rejected: 0, conversionRate: 50 },
+const TRANSITIONS: StatusTransition[] = [
+  { from: 'wishlist', to: 'applied', count: 4 },
+  { from: 'applied', to: 'interviewing', count: 3 },
+  { from: 'interviewing', to: 'offer', count: 1 },
+  { from: 'applied', to: 'rejected', count: 2 },
 ]
 
 const COHORTS: CohortAnalysis[] = [
@@ -105,7 +105,7 @@ function fullProps() {
   return {
     timeInStage: ok(TIME_IN_STAGE),
     conversionFunnel: ok(FUNNEL),
-    sourceConversionTrends: ok(TRENDS),
+    statusTransitions: ok(TRANSITIONS),
     cohortAnalysis: ok(COHORTS),
     conversionMetrics: ok(METRICS),
   }
@@ -115,7 +115,7 @@ function emptyProps() {
   return {
     timeInStage: ok<TimeInStageMetric[]>([]),
     conversionFunnel: ok<ConversionFunnelMetric[]>([]),
-    sourceConversionTrends: ok<SourceConversionTrend[]>([]),
+    statusTransitions: ok<StatusTransition[]>([]),
     cohortAnalysis: ok<CohortAnalysis[]>([]),
     conversionMetrics: ok<ConversionMetrics>({
       totalJobs: 0,
@@ -139,7 +139,7 @@ describe('Analytics', () => {
 
   it('says there is nothing to chart rather than drawing an empty axis', () => {
     // Four panels chart or table something with an axis/rows: time in
-    // stage, the funnel, source trends and cohorts. The overview KPI strip
+    // stage, the funnel, pipeline flow and cohorts. The overview KPI strip
     // is exempt -- zeroes and dashes are not "an empty axis".
     render(<Analytics {...emptyProps()} />)
     expect(screen.getAllByText(/not enough data yet/i)).toHaveLength(4)
@@ -148,9 +148,19 @@ describe('Analytics', () => {
   it('gives each panel its own loading state rather than gating the whole page on one', () => {
     const props = { ...fullProps(), cohortAnalysis: loading<CohortAnalysis[]>() }
     render(<Analytics {...props} />)
-    // The other four panels still rendered their real content.
-    expect(screen.getByRole('heading', { name: 'time in stage' })).toBeTruthy()
-    expect(screen.getByText('LinkedIn')).toBeTruthy()
+    // The other four panels still rendered their real content -- the cohort
+    // panel is the only one showing a skeleton. Anchored on the cohort table
+    // being gone while a sibling panel's own rows are present, rather than on
+    // a heading, which renders in every state including loading.
+    const cohort = screen
+      .getByRole('heading', { name: 'cohort analysis' })
+      .closest('[data-analytics-panel]')!
+    expect(cohort.querySelector('table')).toBeNull()
+    expect(cohort.querySelector('[role="status"][aria-busy="true"]')).toBeTruthy()
+    const funnel = screen
+      .getByRole('heading', { name: 'conversion funnel' })
+      .closest('[data-analytics-panel]')!
+    expect(funnel.querySelectorAll('[data-stage]').length).toBeGreaterThan(0)
   })
 
   it('makes a failed panel read differently from an empty one', () => {
@@ -170,17 +180,18 @@ describe('Analytics', () => {
     expect(stageHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
   })
 
-  it('narrows source trends and cohorts to the picked range, and leaves the other three panels unchanged', () => {
+  it('narrows cohorts to the picked range, and leaves the other panels unchanged', () => {
     render(<Analytics {...fullProps()} />)
-    // getAllByText: the source name now appears twice at "All time" -- once in
-    // the trends data and once in the "top converting source" callout, which
-    // is selected from those same rows.
-    expect(screen.getAllByText('Referral').length).toBeGreaterThan(0)
+    // Cohort analysis is the one remaining panel the picker filters: source
+    // trends, which was the other, is gone. Its "top converting source"
+    // callout went with it, which is why this no longer needs getAllByText to
+    // step around the source name appearing in two places.
+    expect(screen.getByText('Feb 2025')).toBeTruthy()
     fireEvent.change(screen.getByLabelText('Date range'), { target: { value: '3m' } })
-    // 2025-01's Referral row falls outside the last 3 months of "now"; the
+    // 2025-02's cohort falls outside the last 3 months of "now"; the
     // component's own default clock is real Date.now(), so this only pins
     // the row disappearing, not which exact months remain.
-    expect(screen.queryByText('Referral')).toBeNull()
+    expect(screen.queryByText('Feb 2025')).toBeNull()
     expect(screen.getByRole('heading', { name: 'conversion funnel' })).toBeTruthy()
   })
 
@@ -288,6 +299,21 @@ describe('Analytics', () => {
     expect(grid.className).toContain('md:grid-cols-4')
   })
 
+  it('alternates the cohort rows so a seven-column row stays traceable across its width', () => {
+    render(<Analytics {...fullProps()} />)
+    const rows = [
+      ...screen
+        .getByRole('heading', { name: 'cohort analysis' })
+        .closest('[data-analytics-panel]')!
+        .querySelectorAll('tbody tr'),
+    ]
+    expect(rows.length).toBeGreaterThan(1)
+    // Striping is only striping if neighbours differ; asserting the class is
+    // present somewhere would pass on every row carrying it.
+    expect(rows[0].className).not.toContain('bg-bg-surface')
+    expect(rows[1].className).toContain('bg-bg-surface')
+  })
+
   it('scrolls the cohort table inside its own container rather than the page body', () => {
     render(<Analytics {...fullProps()} />)
     const heading = screen.getByRole('heading', { name: 'cohort analysis' })
@@ -331,38 +357,6 @@ describe('TimeInStage', () => {
     vi.mocked(usePrefersReducedMotion).mockReturnValue(true)
     const still = render(<TimeInStage data={TIME_IN_STAGE} />)
     expect(still.container.querySelectorAll('.recharts-bar-rectangle path').length).toBeGreaterThan(0)
-  })
-})
-
-describe('SourceTrends', () => {
-  it('never bakes a resolved colour into a line stroke -- always the CSS token', () => {
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(true) // animation off so the line commits synchronously
-    const { container } = render(<SourceTrends data={TRENDS} />)
-    const strokes = [...container.querySelectorAll('.recharts-line-curve')].map((el) => el.getAttribute('stroke'))
-    expect(strokes.length).toBeGreaterThan(0)
-    for (const stroke of strokes) {
-      expect(stroke).toMatch(/^var\(--color-(accent-default|text-muted)\)$/)
-    }
-  })
-
-  it('gates line animation on the reduced-motion preference', () => {
-    // Recharts' Line uses a different animation mechanism than Bar --
-    // the <path> is present on the very first synchronous render either
-    // way, but react-smooth's "draw the line in" effect starts it at
-    // stroke-dasharray="0px 0px" (invisible) when isAnimationActive is
-    // true, and omits the attribute entirely (the full stroke, immediately)
-    // when it's false. This fails if isAnimationActive is hardcoded either
-    // way regardless of reducedMotion.
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(false)
-    const animating = render(<SourceTrends data={TRENDS} />)
-    const animatingCurve = animating.container.querySelector('.recharts-line-curve')!
-    expect(animatingCurve.getAttribute('stroke-dasharray')).toBe('0px 0px')
-    animating.unmount()
-
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(true)
-    const still = render(<SourceTrends data={TRENDS} />)
-    const stillCurve = still.container.querySelector('.recharts-line-curve')!
-    expect(stillCurve.getAttribute('stroke-dasharray')).toBeNull()
   })
 })
 

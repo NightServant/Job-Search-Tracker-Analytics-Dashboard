@@ -62,11 +62,69 @@ export interface CohortAnalysis {
   avgTimeToOffer: number | null
 }
 
+
+export interface StatusTransition {
+  from: JobStatus
+  to: JobStatus
+  count: number
+}
+
 export const analyticsService = {
   /**
    * Compute time-in-stage metrics for a user's job applications
    * Shows how long jobs spend in each status stage
    */
+
+  /**
+   * Forward status transitions, for the pipeline-flow Sankey.
+   *
+   * Reads `job_status_history` rather than deriving anything from current
+   * status. A flow built from end states would be a fabrication: it can say
+   * how many jobs ARE at "offer" but not how any of them got there, and a
+   * Sankey's whole claim is the path.
+   *
+   * BACKWARD TRANSITIONS ARE DROPPED, deliberately, and the panel says so.
+   * Statuses here are user-set with no enforced state machine, so
+   * interviewing -> applied happens (a correction, a re-application). A Sankey
+   * is a directed acyclic diagram; feeding it a cycle either throws or renders
+   * a loop nobody can read. Dropping them makes the chart show the forward
+   * journey, which is the question being asked, and the footnote keeps that
+   * honest rather than silent.
+   */
+  async getStatusTransitions(userId: string): Promise<StatusTransition[]> {
+    const ORDER: JobStatus[] = ['wishlist', 'applied', 'interviewing', 'offer', 'rejected']
+    const rank = (s: string) => ORDER.indexOf(s as JobStatus)
+
+    const { data, error } = await supabase
+      .from('job_status_history')
+      .select('from_status, to_status')
+      .eq('user_id', userId)
+
+    if (error) throw error
+    if (!data) return []
+
+    const counts = new Map<string, number>()
+    for (const row of data) {
+      const from = row.from_status as JobStatus
+      const to = row.to_status as JobStatus
+      if (from === to) continue
+      const a = rank(from)
+      const b = rank(to)
+      if (a === -1 || b === -1) continue
+      // 'rejected' is an exit reachable from any stage, so it is forward from
+      // anywhere; everything else must move down the pipeline.
+      const forward = to === 'rejected' ? true : b > a
+      if (!forward) continue
+      const key = `${from}>${to}`
+      counts.set(key, (counts.get(key) ?? 0) + 1)
+    }
+
+    return [...counts.entries()].map(([key, count]) => {
+      const [from, to] = key.split('>') as [JobStatus, JobStatus]
+      return { from, to, count }
+    })
+  },
+
   async getTimeInStageMetrics(userId: string): Promise<TimeInStageMetric[]> {
     try {
       Sentry.addBreadcrumb({

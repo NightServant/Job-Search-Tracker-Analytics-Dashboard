@@ -140,3 +140,106 @@ export function salaryDistribution(jobs: Job[], bucketCount?: number): SalaryDis
     max,
   }
 }
+
+/** Fixed classification bands, in the panel's own currency. */
+export interface SalaryBand {
+  label: string
+  from: number
+  /** Inclusive upper bound; `null` on the open-ended top band. */
+  to: number | null
+  count: number
+}
+
+export interface CompanySalary {
+  company: string
+  /** Mean of the midpoints of that company's priced applications. */
+  average: number
+  jobs: number
+}
+
+const BAND_STEP = 25_000
+const BAND_COUNT = 4
+
+/**
+ * Salary classification -- fixed bands rather than buckets derived from the
+ * data's own min and max.
+ *
+ * The earlier version divided [min, max] into N equal buckets, so the axis
+ * labels moved every time a job was added and two accounts could never be
+ * compared. Bands are absolute: 0-25k is 0-25k whatever anyone has recorded.
+ * That is what makes "most of my applications are entry band" a statement
+ * about the market rather than about this row set.
+ *
+ * The top band is open-ended, so a salary above the last edge is classified
+ * rather than dropped -- the failure mode of a fixed scheme is silently
+ * discarding the outliers it cannot place.
+ *
+ * Bands are in the distribution's own currency and are NOT converted, the same
+ * rule the rest of this module follows.
+ */
+export function salaryBands(dist: SalaryDistribution, jobs: Job[]): SalaryBand[] {
+  const bands: SalaryBand[] = []
+  for (let i = 0; i < BAND_COUNT; i += 1) {
+    const from = i * BAND_STEP
+    const last = i === BAND_COUNT - 1
+    bands.push({
+      from,
+      to: last ? null : from + BAND_STEP,
+      label: last ? `${fmtK(from)}+` : `${fmtK(from)}-${fmtK(from + BAND_STEP)}`,
+      count: 0,
+    })
+  }
+  if (dist.currency === null) return bands
+
+  for (const job of jobs) {
+    if ((job.salary_currency || 'PHP') !== dist.currency) continue
+    const value = midpoint(job)
+    if (value === null || value <= 0) continue
+    const index = Math.min(BAND_COUNT - 1, Math.floor(value / BAND_STEP))
+    bands[index].count += 1
+  }
+  return bands
+}
+
+function fmtK(value: number): string {
+  return value === 0 ? '0' : `${Math.round(value / 1000)}k`
+}
+
+/**
+ * Average salary per company, richest first.
+ *
+ * Averages the midpoints of that company's priced applications, and only
+ * within the distribution's currency -- averaging PHP with USD would produce a
+ * number that is not money in any currency.
+ */
+export function salaryByCompany(dist: SalaryDistribution, jobs: Job[], limit = 8): CompanySalary[] {
+  if (dist.currency === null) return []
+  const totals = new Map<string, { sum: number; n: number }>()
+  for (const job of jobs) {
+    if ((job.salary_currency || 'PHP') !== dist.currency) continue
+    const value = midpoint(job)
+    if (value === null || value <= 0) continue
+    const key = job.company?.trim() || 'unknown'
+    const acc = totals.get(key) ?? { sum: 0, n: 0 }
+    acc.sum += value
+    acc.n += 1
+    totals.set(key, acc)
+  }
+  return [...totals.entries()]
+    .map(([company, t]) => ({ company, average: t.sum / t.n, jobs: t.n }))
+    .sort((a, b) => b.average - a.average || a.company.localeCompare(b.company))
+    .slice(0, limit)
+}
+
+/** Mean of every counted midpoint -- the panel's "avg midpoint" stat. */
+export function averageMidpoint(dist: SalaryDistribution, jobs: Job[]): number | null {
+  if (dist.currency === null) return null
+  const values: number[] = []
+  for (const job of jobs) {
+    if ((job.salary_currency || 'PHP') !== dist.currency) continue
+    const v = midpoint(job)
+    if (v !== null && v > 0) values.push(v)
+  }
+  if (values.length === 0) return null
+  return values.reduce((a, b) => a + b, 0) / values.length
+}

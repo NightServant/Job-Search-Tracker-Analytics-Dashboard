@@ -114,6 +114,18 @@ export function useConversionMetrics(userId?: string) {
   })
 }
 
+export function useStatusTransitions(userId?: string) {
+  return useQuery({
+    queryKey: ['analytics', 'statusTransitions', userId],
+    queryFn: () => analyticsService.getStatusTransitions(userId!),
+    enabled: !!userId,
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  })
+}
+
 export function useAnalytics() {
   const { session } = useAuth()
   const userId = session?.user?.id

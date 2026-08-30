@@ -310,6 +310,65 @@ describe('analyticsService', () => {
     })
   })
 
+  describe('getStatusTransitions', () => {
+    // Driven through the fake, not asserted against an inline literal -- the
+    // defect class documented at the top of this file.
+
+    it('counts each distinct edge and drops backward moves', async () => {
+      clientRef.current = fakeSupabase({
+        job_status_history: [
+          { user_id: 'user-1', from_status: 'wishlist', to_status: 'applied' },
+          { user_id: 'user-1', from_status: 'wishlist', to_status: 'applied' },
+          { user_id: 'user-1', from_status: 'applied', to_status: 'interviewing' },
+          // Backward: a Sankey is acyclic, and applied -> interviewing above
+          // plus this would draw a loop. Dropped, and the panel says so.
+          { user_id: 'user-1', from_status: 'interviewing', to_status: 'applied' },
+          // A no-op write is not a transition.
+          { user_id: 'user-1', from_status: 'applied', to_status: 'applied' },
+        ],
+      })
+
+      const result = await analyticsService.getStatusTransitions('user-1')
+
+      expect(result).toContainEqual({ from: 'wishlist', to: 'applied', count: 2 })
+      expect(result).toContainEqual({ from: 'applied', to: 'interviewing', count: 1 })
+      expect(result.find((t) => t.from === 'interviewing' && t.to === 'applied')).toBeUndefined()
+      expect(result).toHaveLength(2)
+    })
+
+    it('keeps a rejection from any stage, which rank order alone would discard', async () => {
+      // rejected sits last in ORDER, so interviewing -> rejected passes a
+      // rank check by accident -- but offer -> rejected would too, and a
+      // rejection is an exit from wherever it happened. The special case is
+      // load-bearing: without it, nothing after rejected could ever be an
+      // edge. Pinning it means a refactor to pure rank comparison fails here.
+      clientRef.current = fakeSupabase({
+        job_status_history: [
+          { user_id: 'user-1', from_status: 'offer', to_status: 'rejected' },
+          { user_id: 'user-1', from_status: 'wishlist', to_status: 'rejected' },
+        ],
+      })
+
+      const result = await analyticsService.getStatusTransitions('user-1')
+
+      expect(result).toContainEqual({ from: 'offer', to: 'rejected', count: 1 })
+      expect(result).toContainEqual({ from: 'wishlist', to: 'rejected', count: 1 })
+    })
+
+    it('ignores a status this app does not know rather than indexing it at -1', async () => {
+      clientRef.current = fakeSupabase({
+        job_status_history: [
+          { user_id: 'user-1', from_status: 'applied', to_status: 'ghosted' },
+          { user_id: 'user-1', from_status: 'applied', to_status: 'interviewing' },
+        ],
+      })
+
+      const result = await analyticsService.getStatusTransitions('user-1')
+
+      expect(result).toEqual([{ from: 'applied', to: 'interviewing', count: 1 }])
+    })
+  })
+
   describe('getSourceConversionTrends', () => {
     it('groups applications by source and month', () => {
       const trends: SourceConversionTrend[] = [

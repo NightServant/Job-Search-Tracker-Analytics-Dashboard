@@ -69,7 +69,15 @@ export function TimeInStage({ data }: TimeInStageProps) {
             // done here rather than by widening the tuple's element types.
             formatter={(value) => [`${Number(value)} days`, 'Avg. time in stage']}
           />
-          <Bar dataKey="avgDays" isAnimationActive={!reducedMotion} radius={[2, 2, 0, 0]}>
+          <Bar
+            dataKey="avgDays"
+            isAnimationActive={!reducedMotion}
+            radius={[2, 2, 0, 0]}
+            // Uncapped, recharts divides the full panel width by the number of
+            // stages, so an account with two stages draws two slabs half the
+            // panel wide. Same cap the salary histogram uses.
+            maxBarSize={72}
+          >
             {chartData.map((d) => (
               <Cell key={d.status} fill={d.fill} />
             ))}
