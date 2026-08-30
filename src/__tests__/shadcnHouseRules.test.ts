@@ -107,8 +107,23 @@ describe('the installed component set', () => {
     }
   })
 
+  it('caps the radius scale rounded-lg and friends derive from', () => {
+    // The utilities above are only safe because these are overridden. Tailwind
+    // v4 reads rounded-lg from --radius-lg, not from --radius, and its default
+    // is 0.5rem. Losing these silently doubles the radius on 26 components.
+    const css = readFileSync('src/index.css', 'utf8')
+    for (const token of ['--radius-lg', '--radius-xl', '--radius-2xl']) {
+      expect(css, `${token} must be capped at 4px`).toContain(`${token}: 4px;`)
+    }
+  })
+
   it('respects the 4px radius cap', () => {
-    // --radius: 4px makes rounded-lg 4px, but xl/2xl/3xl/full exceed the cap
+    // Tailwind v4 derives rounded-lg/xl/2xl from --radius-lg/-xl/-2xl, NOT
+    // from --radius. Those were never overridden, so rounded-lg resolved to
+    // its 0.5rem default -- 8px -- in all 26 vendored components while this
+    // test excused it. They are capped at 4px in index.css now, which is what
+    // the companion assertion below verifies; without that check this one
+    // would go back to permitting an 8px radius the moment the cap is lost.
     // regardless of the variable.
     for (const file of uiFiles()) {
       // Matches the directional and numbered forms too. The plan's original

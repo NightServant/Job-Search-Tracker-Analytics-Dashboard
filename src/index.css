@@ -142,6 +142,16 @@
   --radius-none: 0px;
   --radius-sm: 2px;
   --radius-md: 4px;
+  /* Tailwind v4 derives rounded-lg/xl/2xl from these, NOT from --radius. They
+     were never overridden, so --radius-lg sat at its 0.5rem default and every
+     `rounded-lg` in the 26 vendored components rendered at 8px -- double the
+     cap -- while the house-rules test excused rounded-lg on the stated
+     assumption that "--radius: 4px makes rounded-lg 4px". It does not.
+     Capping them here fixes all 26 at once instead of editing each file, and
+     keeps the cap true for anything installed from the registry later. */
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+  --radius-2xl: 4px;
 
   --spacing-rule: 2px;
   --spacing-hairline: 1px;

@@ -40,14 +40,55 @@ describe('ApplicationsPage', () => {
     expect(screen.getAllByTestId('application-row')).toHaveLength(JOBS.length)
   })
 
-  it('shows "Not applied" on the row for a job with no applied date, never a raw fallback string', () => {
+  it('shows "not applied" on the row for a job with no applied date, never a raw fallback string', () => {
     // Regression for the list disagreeing with the dashboard about what an
     // unset date_applied renders as -- both now go through the same
     // formatAppliedDate rather than each inventing its own literal.
-    const notYetApplied = makeJob({ id: '7', status: 'wishlist', date_applied: null })
+    // The second assertion used to forbid the lowercase literal, back when the
+    // friendly label was title-case. Chrome is lowercase now (Item 10), so
+    // that pair contradicted itself -- the label IS "not applied". Restored to
+    // the original intent: show the label, never leak a raw timestamp or a
+    // stringified null from created_at.
+    const notYetApplied = makeJob({
+      id: '7',
+      status: 'wishlist',
+      date_applied: null,
+      created_at: '2026-08-20T14:23:01.123456+00:00',
+    })
     render(<ApplicationsPage jobs={[notYetApplied]} />)
-    expect(screen.getByText('Not applied')).toBeTruthy()
-    expect(screen.queryByText(/^not applied$/)).toBeNull()
+    expect(screen.getByText('not applied')).toBeTruthy()
+    expect(screen.queryByText(/2026-08-20T/)).toBeNull()
+    expect(screen.queryByText(/^null$/i)).toBeNull()
+  })
+
+  it('splits the rows across pages and moves between them', () => {
+    // M5 Task 4 removed the original 20-per-page pagination along with the
+    // advanced filters; Gabe asked for it back.
+    const many = Array.from({ length: 45 }, (_, i) =>
+      makeJob({ id: `p${i}`, status: 'applied', company: `Co ${i}` })
+    )
+    render(<ApplicationsPage jobs={many} />)
+    expect(screen.getAllByTestId('application-row')).toHaveLength(10)
+    expect(screen.getByText(/1.*10 of 45/)).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: '5' }))
+    // 45 rows over 10 a page leaves 5 on the last one -- a slice that returned
+    // a full page here would mean the offset maths is wrong.
+    expect(screen.getAllByTestId('application-row')).toHaveLength(5)
+  })
+
+  it('returns to the first page when a search changes the result set', () => {
+    // Otherwise narrowing the list while on page 3 leaves the user staring at
+    // an empty page with no indication why.
+    const many = Array.from({ length: 45 }, (_, i) =>
+      makeJob({ id: `p${i}`, status: 'applied', company: `Co ${i}` })
+    )
+    render(<ApplicationsPage jobs={many} />)
+    fireEvent.click(screen.getByRole('button', { name: '5' }))
+    expect(screen.getAllByTestId('application-row')).toHaveLength(5)
+
+    fireEvent.change(screen.getByPlaceholderText(/search/i), { target: { value: 'Co 1' } })
+    expect(screen.getAllByTestId('application-row').length).toBeGreaterThan(5)
   })
 
   it('marks the selected tab for a screen reader, not just visually', () => {

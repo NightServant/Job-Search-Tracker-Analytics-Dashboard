@@ -7,7 +7,16 @@ import { AppDialog } from '@/components/ui/app-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PlusIcon } from '@/components/icons'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
-import { ApplicationsList } from './ApplicationsList'
+import { ApplicationsTable } from './ApplicationsTable'
+import { Card, CardContent } from '@/components/ui/card'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from './StatusTabs'
 import { ApplicationForm } from './ApplicationForm'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
@@ -23,6 +32,13 @@ interface CsvImport {
 }
 
 type FormState = { job: Job | null } | null
+
+/**
+ * M5 Task 4's removed pagination was 20 a page. Ten instead: at twenty, an
+ * account with a dozen applications never sees pagination at all and cannot
+ * tell whether it exists -- which is exactly how it read on review.
+ */
+const PAGE_SIZE = 10
 
 function downloadCsv(fileName: string, text: string) {
   const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' })
@@ -98,6 +114,7 @@ export function ApplicationsPage({
 }: ApplicationsPageProps) {
   const [search, setSearch] = React.useState('')
   const [tab, setTab] = React.useState<StatusTabValue>('all')
+  const [page, setPage] = React.useState(1)
   const [form, setForm] = React.useState<FormState>(null)
   const [formDirty, setFormDirty] = React.useState(false)
   const [discardOpen, setDiscardOpen] = React.useState(false)
@@ -155,6 +172,21 @@ export function ApplicationsPage({
   }, [searched])
 
   const listed = tab === 'all' ? searched : searched.filter((job) => job.status === tab)
+
+  // Pagination. M5 Task 4 removed the original 20-per-page pagination along
+  // with the advanced filters; Gabe asked for it back.
+  const pageCount = Math.max(1, Math.ceil(listed.length / PAGE_SIZE))
+  // Clamp rather than store a page that no longer exists: deleting the last
+  // row of page 3, or narrowing the search, would otherwise leave the user on
+  // an empty page with no way back except paging.
+  const current = Math.min(page, pageCount)
+  const paged = listed.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+
+  // Search and tab both change the result set, so the page index they were
+  // valid for is meaningless afterwards.
+  React.useEffect(() => {
+    setPage(1)
+  }, [search, tab])
 
   // A status tab at zero is a real, expected state (nobody has an offer on
   // day one), not a search yielding nothing -- so it gets its own sentence
@@ -348,15 +380,72 @@ export function ApplicationsPage({
             panelId="applications-list"
             className="border-b border-border-subtle"
           />
-          <ApplicationsList
-            id="applications-list"
-            role="tabpanel"
-            aria-labelledby={`status-tab-${tab}`}
-            jobs={listed}
-            emptyMessage={emptyListMessage}
-            onEdit={(job) => setForm({ job })}
-            onDelete={onDelete}
-          />
+          <Card>
+            <CardContent>
+              <ApplicationsTable
+                id="applications-list"
+                role="tabpanel"
+                aria-labelledby={`status-tab-${tab}`}
+                jobs={paged}
+                emptyMessage={emptyListMessage}
+                onEdit={(job) => setForm({ job })}
+                onDelete={onDelete}
+              />
+            </CardContent>
+          </Card>
+
+          {listed.length > 0 && (
+            <div className="flex items-center justify-between gap-4">
+              <p className="text-body-s text-text-muted">
+                {(current - 1) * PAGE_SIZE + 1}&ndash;
+                {Math.min(current * PAGE_SIZE, listed.length)} of {listed.length}
+              </p>
+              {pageCount > 1 && (
+              <Pagination className="mx-0 w-auto justify-end">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      aria-disabled={current === 1}
+                      className={current === 1 ? 'pointer-events-none opacity-50' : undefined}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.max(1, p - 1))
+                      }}
+                    />
+                  </PaginationItem>
+                  {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+                    <PaginationItem key={n}>
+                      <PaginationLink
+                        href="#"
+                        isActive={n === current}
+                        onClick={(e) => {
+                          e.preventDefault()
+                          setPage(n)
+                        }}
+                      >
+                        {n}
+                      </PaginationLink>
+                    </PaginationItem>
+                  ))}
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      aria-disabled={current === pageCount}
+                      className={
+                        current === pageCount ? 'pointer-events-none opacity-50' : undefined
+                      }
+                      onClick={(e) => {
+                        e.preventDefault()
+                        setPage((p) => Math.min(pageCount, p + 1))
+                      }}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
