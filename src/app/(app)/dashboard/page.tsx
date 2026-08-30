@@ -38,7 +38,7 @@ export default function Page() {
   if (error) {
     return (
       <RouteError
-        title="Could not load your dashboard."
+        title="could not load your dashboard."
         message={error instanceof Error ? error.message : 'An error occurred while loading your applications.'}
       />
     )

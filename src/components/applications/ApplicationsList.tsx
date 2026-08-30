@@ -93,7 +93,7 @@ export function ApplicationsList({
                     onClick={() => onEdit(job)}
                     className="shrink-0 text-label-caps uppercase"
                   >
-                    Edit
+                    edit
                   </IconButton>
                 )}
                 {onDelete && (

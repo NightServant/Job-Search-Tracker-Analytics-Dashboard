@@ -83,7 +83,7 @@ describe('Documents route wrapper', () => {
     render(<Page />)
     await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
     expect(screen.getByRole('alertdialog', { name: /delete backend cv/i })).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(deleteMutate).not.toHaveBeenCalled()
   })
 
@@ -92,7 +92,7 @@ describe('Documents route wrapper', () => {
     const user = userEvent.setup()
     render(<Page />)
     await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'delete' }))
     expect(deleteMutate).toHaveBeenCalledWith('cv-1')
   })
 

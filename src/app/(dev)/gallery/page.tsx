@@ -18,9 +18,9 @@ export default function GalleryPage() {
   return (
     <main className="min-h-screen bg-background text-foreground p-8 space-y-16">
       <header className="space-y-1">
-        <h1 className="text-2xl font-bold">Design system</h1>
+        <h1 className="text-2xl font-bold">design system</h1>
         <p className="text-sm text-muted-foreground">
-          Every component, both themes. Toggle the theme to review dark.
+          every component, both themes. toggle the theme to review dark.
         </p>
       </header>
       <Tokens />

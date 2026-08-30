@@ -44,7 +44,7 @@ export default function Page() {
   if (error) {
     return (
       <RouteError
-        title="Could not load your calendar."
+        title="could not load your calendar."
         message={error instanceof Error ? error.message : 'An error occurred while loading your events.'}
       />
     )

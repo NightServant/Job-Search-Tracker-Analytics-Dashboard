@@ -49,13 +49,13 @@ export function ActivityTimeline({
   return (
     <PanelSection
       aria-label="Activity"
-      title="Activity"
+      title="activity"
       error={error ? 'Could not load activity. Try refreshing the page.' : undefined}
       className={className}
       {...props}
     >
       {sorted.length === 0 ? (
-        <p className="text-body-s text-text-muted">No activity logged for this application yet.</p>
+        <p className="text-body-s text-text-muted">no activity logged for this application yet.</p>
       ) : (
         <ul className="flex flex-col">
           {sorted.map((entry) => (

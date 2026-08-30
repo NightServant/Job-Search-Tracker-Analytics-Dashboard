@@ -149,7 +149,7 @@ describe('Analytics', () => {
     const props = { ...fullProps(), cohortAnalysis: loading<CohortAnalysis[]>() }
     render(<Analytics {...props} />)
     // The other four panels still rendered their real content.
-    expect(screen.getByRole('heading', { name: 'Time in stage' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'time in stage' })).toBeTruthy()
     expect(screen.getByText('LinkedIn')).toBeTruthy()
   })
 
@@ -164,9 +164,9 @@ describe('Analytics', () => {
     render(<Analytics {...fullProps()} />)
     // closest('[data-analytics-panel]'), not closest('section'): these panels
     // are Cards now (M5.5 Item 7), and Card renders a div.
-    const funnelHeading = screen.getByRole('heading', { name: 'Conversion funnel' })
+    const funnelHeading = screen.getByRole('heading', { name: 'conversion funnel' })
     expect(funnelHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
-    const stageHeading = screen.getByRole('heading', { name: 'Time in stage' })
+    const stageHeading = screen.getByRole('heading', { name: 'time in stage' })
     expect(stageHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
   })
 
@@ -181,7 +181,7 @@ describe('Analytics', () => {
     // component's own default clock is real Date.now(), so this only pins
     // the row disappearing, not which exact months remain.
     expect(screen.queryByText('Referral')).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Conversion funnel' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'conversion funnel' })).toBeTruthy()
   })
 
   it('colours the funnel with the status palette, in pipeline order', () => {
@@ -264,7 +264,7 @@ describe('Analytics', () => {
     // Scoped to the Overview panel: '.grid' alone now matches a Card's own
     // header grid first, which is not the KPI strip.
     const overview = screen
-      .getByRole('heading', { name: 'Overview' })
+      .getByRole('heading', { name: 'overview' })
       .closest('[data-analytics-panel]')!
     const grid = overview.querySelector('[data-overview-kpis]')!
     expect(grid.className).toContain('grid-cols-2')
@@ -273,7 +273,7 @@ describe('Analytics', () => {
 
   it('scrolls the cohort table inside its own container rather than the page body', () => {
     render(<Analytics {...fullProps()} />)
-    const heading = screen.getByRole('heading', { name: 'Cohort analysis' })
+    const heading = screen.getByRole('heading', { name: 'cohort analysis' })
     const table = heading.closest('[data-analytics-panel]')!.querySelector('table')!
     expect(table.closest('.overflow-x-auto')).toBeTruthy()
   })

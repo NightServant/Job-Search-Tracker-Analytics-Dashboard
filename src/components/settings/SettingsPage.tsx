@@ -50,7 +50,7 @@ export function SettingsPage({
 }: SettingsPageProps) {
   return (
     <div className="flex flex-col gap-8">
-      <PageHeader title="Settings" />
+      <PageHeader title="settings" />
       <AccountGroup email={email} onSignOut={onSignOut} signingOut={signingOut} />
       <PreferencesGroup
         defaultCurrency={resolveDefaultCurrency(prefs)}

@@ -53,7 +53,7 @@ export function ApplicationsToolbar({
           id="applications-search"
           type="search"
           aria-label="Search applications"
-          placeholder="Search company or role"
+          placeholder="search company or role"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           className="pl-9"
@@ -85,7 +85,7 @@ export function ApplicationsToolbar({
         </Button>
         <Button variant="secondary" size="s" onClick={onExport} disabled={exportDisabled}>
           <DownloadIcon size={16} aria-hidden />
-          Export CSV
+          export CSV
         </Button>
       </div>
     </div>

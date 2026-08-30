@@ -27,10 +27,10 @@ export function DangerZone({ onDeleteAccount, deleting = false }: DangerZoneProp
 
   return (
     <div data-settings-group="danger">
-      <PanelSection title="Danger zone" titleSize="m">
+      <PanelSection title="danger zone" titleSize="m">
         <SettingsRow
-          label="Delete account"
-          description="Permanently remove your account and everything tied to it. This cannot be undone."
+          label="delete account"
+          description="permanently remove your account and everything tied to it. this cannot be undone."
           control={
             <Button
               variant="secondary"
@@ -47,9 +47,9 @@ export function DangerZone({ onDeleteAccount, deleting = false }: DangerZoneProp
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
-        title="Delete your account?"
+        title="delete your account?"
         body="This permanently removes every application, document and event tied to it. This cannot be undone."
-        confirmLabel="Delete account"
+        confirmLabel="delete account"
         destructive
         onConfirm={() => {
           setConfirmOpen(false)

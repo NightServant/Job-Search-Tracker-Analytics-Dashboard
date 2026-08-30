@@ -19,7 +19,7 @@ const SIZES = [18, 20, 44] as const
 export function Icons() {
   return (
     <section className="space-y-4">
-      <h2 className="text-heading-l">Icons</h2>
+      <h2 className="text-heading-l">icons</h2>
       <p className="text-body-s text-text-muted">
         {Object.keys(icons).length} icons from AnimateIcons (MIT), vendored via the shadcn CLI. They
         inherit colour from the text around them.
@@ -40,7 +40,7 @@ export function Icons() {
       </div>
 
       <div className="rounded-md border border-border-subtle p-4 space-y-2">
-        <p className="text-label-caps uppercase text-text-muted">Colour follows the text</p>
+        <p className="text-label-caps uppercase text-text-muted">colour follows the text</p>
         <div className="flex items-center gap-6">
           <span className="text-accent-default flex items-center gap-2 text-body-m">
             {(() => { const I = icons.Check; return <I size={18} /> })()} accent

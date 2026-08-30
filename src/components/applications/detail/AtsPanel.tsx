@@ -57,10 +57,10 @@ export function AtsPanel({ match, error = false, className, ...props }: AtsPanel
         <div className="flex flex-col gap-4">
           <AtsCheck result={verdictFor(match.score)} label={`${match.score}%`} />
           <div className="flex flex-col gap-1">
-            <p className="text-label-caps uppercase text-text-secondary">Missing keywords</p>
+            <p className="text-label-caps uppercase text-text-secondary">missing keywords</p>
             {match.missing.length === 0 ? (
               <p className="text-body-s text-text-muted">
-                None -- every term in the posting shows up in the CV.
+                none -- every term in the posting shows up in the CV.
               </p>
             ) : (
               <p className="text-body-s text-text-primary">{match.missing.join(', ')}</p>
@@ -68,7 +68,7 @@ export function AtsPanel({ match, error = false, className, ...props }: AtsPanel
           </div>
           {match.matched.length > 0 && (
             <div className="flex flex-col gap-1">
-              <p className="text-label-caps uppercase text-text-secondary">Matched</p>
+              <p className="text-label-caps uppercase text-text-secondary">matched</p>
               <p className="text-body-s text-text-muted">{match.matched.join(', ')}</p>
             </div>
           )}

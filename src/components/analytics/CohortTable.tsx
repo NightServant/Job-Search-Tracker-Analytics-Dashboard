@@ -20,7 +20,7 @@ function monthLabel(cohort: string): string {
  */
 export function CohortTable({ data }: CohortTableProps) {
   if (data.length === 0) {
-    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+    return <p className="text-body-s text-text-muted">not enough data yet.</p>
   }
 
   return (
@@ -28,13 +28,13 @@ export function CohortTable({ data }: CohortTableProps) {
       <table className="w-full min-w-[560px] border-collapse text-body-s">
         <thead>
           <tr className="border-b border-border-subtle text-left text-text-muted">
-            <th className="py-2 pr-4 font-medium">Cohort</th>
-            <th className="py-2 pr-4 text-right font-medium">Applied</th>
-            <th className="py-2 pr-4 text-right font-medium">Interviewing</th>
-            <th className="py-2 pr-4 text-right font-medium">Offered</th>
-            <th className="py-2 pr-4 text-right font-medium">Rejected</th>
-            <th className="py-2 pr-4 text-right font-medium">Conversion</th>
-            <th className="py-2 text-right font-medium">Avg. time to offer</th>
+            <th className="py-2 pr-4 font-medium">cohort</th>
+            <th className="py-2 pr-4 text-right font-medium">applied</th>
+            <th className="py-2 pr-4 text-right font-medium">interviewing</th>
+            <th className="py-2 pr-4 text-right font-medium">offered</th>
+            <th className="py-2 pr-4 text-right font-medium">rejected</th>
+            <th className="py-2 pr-4 text-right font-medium">conversion</th>
+            <th className="py-2 text-right font-medium">avg. time to offer</th>
           </tr>
         </thead>
         <tbody>

@@ -28,22 +28,22 @@ const ROWS = [
 export function Composites() {
   return (
     <section className="space-y-4">
-      <h2 className="text-heading-l">Composites</h2>
+      <h2 className="text-heading-l">composites</h2>
       <p className="text-body-s text-text-muted">
         Assembled from the primitives above. These add no styling of their own -- M5 builds screens
         from these and writes no new component CSS.
       </p>
 
-      <Row title="KPI Stat" note="Tabular figures, so the strip does not reflow as numbers change.">
+      <Row title="kpi stat" note="Tabular figures, so the strip does not reflow as numbers change.">
         <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-          <KpiStat label="Applied" value={128} delta={{ value: '+12 this week', direction: 'up' }} />
-          <KpiStat label="Interviewing" value={9} delta={{ value: '+2', direction: 'up' }} />
-          <KpiStat label="Offers" value={2} delta={{ value: 'no change', direction: 'flat' }} />
-          <KpiStat label="Response rate" value="18%" delta={{ value: '-3 pts', direction: 'down' }} />
+          <KpiStat label="applied" value={128} delta={{ value: '+12 this week', direction: 'up' }} />
+          <KpiStat label="interviewing" value={9} delta={{ value: '+2', direction: 'up' }} />
+          <KpiStat label="offers" value={2} delta={{ value: 'no change', direction: 'flat' }} />
+          <KpiStat label="response rate" value="18%" delta={{ value: '-3 pts', direction: 'down' }} />
         </div>
       </Row>
 
-      <Row title="Application Row" note="Hairline rules between rows. Salary renders in the job own currency.">
+      <Row title="application row" note="Hairline rules between rows. Salary renders in the job own currency.">
         <div>
           {ROWS.map((r) => (
             <ApplicationRow key={r.company} {...r} />
@@ -60,7 +60,7 @@ export function Composites() {
         list, filtered by the status tabs, at every width. `JobCard` survives
         on its own merits -- it is still used standalone elsewhere.
       */}
-      <Row title="Job Card" note="A card only because it moves. No shadow, 4px radius.">
+      <Row title="job card" note="A card only because it moves. No shadow, 4px radius.">
         <div className="flex flex-wrap gap-4">
           <JobCard company="Vercel" role="DX Engineer" status="wishlist" salaryMin={140000} salaryMax={175000} currency="USD" className="w-56" />
           <JobCard company="Grab" role="Product Engineer" status="applied" salaryMin={1800000} salaryMax={2400000} currency="PHP" className="w-56" />
@@ -68,24 +68,24 @@ export function Composites() {
         </div>
       </Row>
 
-      <Row title="Nav Item" note="Sidebar carries the number; the mobile bottom bar drops it for room.">
+      <Row title="nav item" note="Sidebar carries the number; the mobile bottom bar drops it for room.">
         <div className="flex flex-col gap-6 md:flex-row">
           <div className="w-56 space-y-1">
-            <NavItem href="#" label="Overview" icon="Overview" index={1} />
-            <NavItem href="#" label="Applications" icon="Applications" index={2} active />
-            <NavItem href="#" label="Calendar" icon="Calendar" index={3} />
+            <NavItem href="#" label="overview" icon="Overview" index={1} />
+            <NavItem href="#" label="applications" icon="Applications" index={2} active />
+            <NavItem href="#" label="calendar" icon="Calendar" index={3} />
           </div>
           <div className="flex w-[375px] max-w-full items-stretch gap-1 border-t border-border-subtle pt-1">
-            <NavItem href="#" label="Overview" icon="Overview" variant="bottom" />
-            <NavItem href="#" label="Apps" icon="Applications" variant="bottom" active />
-            <NavItem href="#" label="Calendar" icon="Calendar" variant="bottom" />
-            <NavItem href="#" label="Docs" icon="Documents" variant="bottom" />
-            <NavItem href="#" label="Stats" icon="Analytics" variant="bottom" />
+            <NavItem href="#" label="overview" icon="Overview" variant="bottom" />
+            <NavItem href="#" label="apps" icon="Applications" variant="bottom" active />
+            <NavItem href="#" label="calendar" icon="Calendar" variant="bottom" />
+            <NavItem href="#" label="docs" icon="Documents" variant="bottom" />
+            <NavItem href="#" label="stats" icon="Analytics" variant="bottom" />
           </div>
         </div>
       </Row>
 
-      <Row title="Sidebar" note="Logo, nav, divider, settings, spacer, toggle, footer -- that order is from Figma.">
+      <Row title="sidebar" note="Logo, nav, divider, settings, spacer, toggle, footer -- that order is from Figma.">
         <div className="flex h-[520px] w-60 overflow-hidden rounded-md border border-border-subtle">
           <Sidebar pathname="/applications" className="border-r-0" />
         </div>

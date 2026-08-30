@@ -122,7 +122,7 @@ export function ApplicationsTable({
                         onClick={() => onEdit(job)}
                         className="text-label-caps uppercase"
                       >
-                        Edit
+                        edit
                       </IconButton>
                     )}
                     {onDelete && (

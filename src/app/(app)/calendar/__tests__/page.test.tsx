@@ -61,7 +61,7 @@ describe('Calendar route wrapper', () => {
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     const { container } = render(<Page />)
     expect(container.querySelector('[role="status"]')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Calendar' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'calendar' })).toBeNull()
   })
 
   it('surfaces a failed events fetch rather than rendering an empty calendar', () => {
@@ -73,8 +73,8 @@ describe('Calendar route wrapper', () => {
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     render(<Page />)
     expect(screen.getByText(/network down/)).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Calendar' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'calendar' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'retry' })).toBeTruthy()
   })
 
   it('does not block on the supplementary jobs read -- a loading or failed jobs fetch still renders events', () => {
@@ -85,14 +85,14 @@ describe('Calendar route wrapper', () => {
       error: null,
     })
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'Calendar' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'calendar' })).toBeTruthy()
   })
 
   it('joins event.job_id against the jobs cache and carries the company into the agenda', () => {
     useEventsMock.mockReturnValue({ data: [EVENT], isLoading: false, error: null })
     useJobsMock.mockReturnValue({ data: [JOB], isLoading: false, error: null })
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'Calendar' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'calendar' })).toBeTruthy()
     expect(screen.getByText('Acme Corp')).toBeTruthy()
   })
 })

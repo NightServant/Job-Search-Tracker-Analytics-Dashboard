@@ -24,7 +24,7 @@ import { AlertCircleIcon } from '@/components/icons'
  *
  * The one place they diverged was the action under the message. Dashboard
  * and Applications both retry with `<Button variant="secondary" size="s"
- * onClick={() => window.location.reload()}>Retry</Button>` -- their error is
+ * onClick={() => window.location.reload()}>retry</Button>` -- their error is
  * a fetch that might just succeed the second time. The detail route used a
  * `Link` back to `/applications` instead, because its error is a job that
  * does not exist (RLS makes a bad id and someone else's job indistinguishable
@@ -81,7 +81,7 @@ export function RouteError({ title, message, action }: RouteErrorProps) {
       <p className="text-body-s text-text-muted">{message}</p>
       {action ?? (
         <Button variant="secondary" size="s" onClick={() => window.location.reload()}>
-          Retry
+          retry
         </Button>
       )}
     </div>

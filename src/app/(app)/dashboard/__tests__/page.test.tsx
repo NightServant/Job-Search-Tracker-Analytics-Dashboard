@@ -42,7 +42,7 @@ describe('Dashboard route wrapper', () => {
     render(<Page />)
     expect(screen.getByText(/network down/)).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'overview' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'retry' })).toBeTruthy()
   })
 
   it('renders the dashboard body from the shared jobs cache once loaded', () => {

@@ -103,7 +103,7 @@ describe('ApplicationsPage', () => {
     // against Documents' "+ new cv". The body header is where it gets fixed.
     const { container } = render(<ApplicationsPage jobs={JOBS} />)
     const header = container.querySelector('[data-body-header]')!
-    expect(header.querySelector('button')!.textContent).toContain('Add')
+    expect(header.querySelector('button')!.textContent).toContain('add')
   })
 
   it('narrows the list by the search box', () => {
@@ -148,21 +148,21 @@ describe('ApplicationsPage', () => {
     // stay open with the field intact instead of discarding it.
     const onCreate = vi.fn().mockResolvedValue(false)
     render(<ApplicationsPage jobs={JOBS} onCreate={onCreate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    fireEvent.change(screen.getByLabelText(/^Company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
+    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
     fireEvent.click(screen.getByRole('button', { name: /add application/i }))
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     expect(screen.getByRole('heading', { name: /new application/i })).toBeTruthy()
-    expect(screen.getByLabelText(/^Company/)).toHaveValue('Acme')
+    expect(screen.getByLabelText(/^company/)).toHaveValue('Acme')
   })
 
   it('closes the form only once the save resolves successfully', async () => {
     const onCreate = vi.fn().mockResolvedValue(true)
     render(<ApplicationsPage jobs={JOBS} onCreate={onCreate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    fireEvent.change(screen.getByLabelText(/^Company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
+    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
     fireEvent.click(screen.getByRole('button', { name: /add application/i }))
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: /new application/i })).toBeNull()
@@ -210,7 +210,7 @@ describe('ApplicationsPage', () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
     await user.click(screen.getAllByRole('button', { name: /^edit/i })[0])
-    expect(screen.getByLabelText(/^Company/)).toHaveFocus()
+    expect(screen.getByLabelText(/^company/)).toHaveFocus()
   })
 
   it('returns focus to the Edit trigger that opened the dialog once it closes', async () => {
@@ -218,7 +218,7 @@ describe('ApplicationsPage', () => {
     render(<ApplicationsPage jobs={JOBS} />)
     const trigger = screen.getAllByRole('button', { name: /^edit/i })[0]
     await user.click(trigger)
-    expect(screen.getByLabelText(/^Company/)).toHaveFocus()
+    expect(screen.getByLabelText(/^company/)).toHaveFocus()
     await user.keyboard('{Escape}')
     expect(trigger).toHaveFocus()
   })
@@ -226,31 +226,31 @@ describe('ApplicationsPage', () => {
   it('asks before discarding a dirty form on Escape, an overlay click or the header close button', async () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-    await user.type(screen.getByLabelText(/^Company/), 'Acme')
+    await user.click(screen.getByRole('button', { name: 'add' }))
+    await user.type(screen.getByLabelText(/^company/), 'Acme')
 
     await user.keyboard('{Escape}')
     expect(screen.getByRole('alertdialog', { name: /discard/i })).toBeTruthy()
     // The form dialog is still open and the typed field is still intact --
     // Escape did not drop it, it only raised the question.
-    expect(screen.getByLabelText(/^Company/)).toHaveValue('Acme')
+    expect(screen.getByLabelText(/^company/)).toHaveValue('Acme')
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(screen.getByLabelText(/^Company/)).toHaveValue('Acme')
+    expect(screen.getByLabelText(/^company/)).toHaveValue('Acme')
 
     await user.keyboard('{Escape}')
     await user.click(screen.getByRole('button', { name: 'Discard' }))
-    expect(screen.queryByLabelText(/^Company/)).toBeNull()
+    expect(screen.queryByLabelText(/^company/)).toBeNull()
   })
 
   it('closes an untouched form immediately on Escape, with no discard prompt', async () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    await user.click(screen.getByRole('button', { name: 'Add' }))
+    await user.click(screen.getByRole('button', { name: 'add' }))
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(screen.queryByLabelText(/^Company/)).toBeNull()
+    expect(screen.queryByLabelText(/^company/)).toBeNull()
   })
 
   it('still lets Cancel close a dirty form immediately, the same as it always has', async () => {
@@ -259,11 +259,11 @@ describe('ApplicationsPage', () => {
     // get the discard prompt.
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    await user.click(screen.getByRole('button', { name: 'Add' }))
-    await user.type(screen.getByLabelText(/^Company/), 'Acme')
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'add' }))
+    await user.type(screen.getByLabelText(/^company/), 'Acme')
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(screen.queryByLabelText(/^Company/)).toBeNull()
+    expect(screen.queryByLabelText(/^company/)).toBeNull()
   })
 
   it('wires the list as a labelled tabpanel for the selected status tab', () => {
@@ -394,7 +394,7 @@ describe('ApplicationForm', () => {
     // A PHP user typing a peso figure into a form defaulted to USD produces a
     // number that is wrong by a factor of 55 and looks plausible.
     render(<ApplicationForm defaultCurrency="PHP" />)
-    expect((screen.getByLabelText('Currency') as HTMLSelectElement).value).toBe('PHP')
+    expect((screen.getByLabelText('currency') as HTMLSelectElement).value).toBe('PHP')
   })
 
   it('disables submit and shows a spinner while saving', () => {
@@ -409,13 +409,13 @@ describe('ApplicationForm', () => {
     // a stored figure without changing it.
     const job = makeJob({ id: '9', status: 'applied', salary_currency: 'USD' })
     render(<ApplicationForm defaultCurrency="PHP" job={job} />)
-    expect((screen.getByLabelText('Currency') as HTMLSelectElement).value).toBe('USD')
+    expect((screen.getByLabelText('currency') as HTMLSelectElement).value).toBe('USD')
   })
 
   it('refuses to submit a job with no company and says why', () => {
     const onSubmit = vi.fn()
     render(<ApplicationForm defaultCurrency="PHP" onSubmit={onSubmit} />)
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'Engineer' } })
+    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
     fireEvent.click(screen.getByRole('button', { name: /add application/i }))
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByText(/company is required/i)).toBeTruthy()
@@ -424,9 +424,9 @@ describe('ApplicationForm', () => {
   it('submits the typed currency alongside the figures', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined)
     render(<ApplicationForm defaultCurrency="PHP" onSubmit={onSubmit} />)
-    fireEvent.change(screen.getByLabelText(/^Company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'Engineer' } })
-    fireEvent.change(screen.getByLabelText('Currency'), { target: { value: 'USD' } })
+    fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
+    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
+    fireEvent.change(screen.getByLabelText('currency'), { target: { value: 'USD' } })
     fireEvent.click(screen.getByRole('button', { name: /add application/i }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
     expect(onSubmit.mock.calls[0][0]).toMatchObject({

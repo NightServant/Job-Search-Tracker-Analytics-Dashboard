@@ -9,7 +9,7 @@ describe('SettingsPage', () => {
   it('has exactly three groups, in order: account, preferences, danger zone', () => {
     render(<SettingsPage prefs={null} />)
     const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['Account', 'Preferences', 'Danger zone'])
+    expect(headings).toEqual(['account', 'preferences', 'danger zone'])
   })
 
   it('keeps the danger zone last among the data-settings-group containers', () => {
@@ -26,13 +26,13 @@ describe('SettingsPage', () => {
     render(<SettingsPage prefs={null} />)
     expect(screen.queryByText(/appearance/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /theme/i })).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Account' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'account' })).toBeTruthy()
   })
 
   it('has no export control -- /applications owns CSV', () => {
     render(<SettingsPage prefs={null} />)
     expect(screen.queryByRole('button', { name: /export/i })).toBeNull()
-    expect(screen.getByRole('heading', { name: 'Preferences' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'preferences' })).toBeTruthy()
   })
 
   it('offers the six currencies from the CHECK constraint, PHP selected when there is no stored preference', () => {
@@ -87,7 +87,7 @@ describe('SettingsPage', () => {
     render(<SettingsPage prefs={null} onDeleteAccount={onDeleteAccount} />)
     await user.click(screen.getByRole('button', { name: /delete account/i }))
     expect(screen.getByRole('alertdialog', { name: /delete your account/i })).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(onDeleteAccount).not.toHaveBeenCalled()
   })
 
@@ -96,7 +96,7 @@ describe('SettingsPage', () => {
     const user = userEvent.setup()
     render(<SettingsPage prefs={null} onDeleteAccount={onDeleteAccount} />)
     await user.click(screen.getByRole('button', { name: /delete account/i }))
-    await user.click(screen.getByRole('button', { name: 'Delete account' }))
+    await user.click(screen.getByRole('button', { name: 'delete account' }))
     expect(onDeleteAccount).toHaveBeenCalledTimes(1)
   })
 

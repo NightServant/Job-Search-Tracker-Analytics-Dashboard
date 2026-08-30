@@ -292,7 +292,7 @@ export function LatexResumeEditor({
         title="LaTeX CV"
         action={
           <Link href={backHref} className={buttonVariants({ variant: 'ghost', size: 's' })}>
-            Back
+            back
           </Link>
         }
       />
@@ -304,13 +304,13 @@ export function LatexResumeEditor({
         <TemplatePresetSelector mode="latex" onSelect={applyTemplate} />
         <Button variant="secondary" size="s" onClick={resetTemplate}>
           <RotateCcwIcon size={14} aria-hidden />
-          Reset
+          reset
         </Button>
         <Button variant="secondary" size="s" onClick={() => void handleSave()} disabled={isSaving}>
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
         <Button variant="secondary" size="s" onClick={copyLatex}>
-          Copy LaTeX
+          copy LaTeX
         </Button>
         <Button
           variant="ghost"
@@ -319,7 +319,7 @@ export function LatexResumeEditor({
           onClick={() => onDelete(draft.id)}
         >
           <TrashIcon size={14} aria-hidden />
-          Delete
+          delete
         </Button>
       </div>
 
@@ -332,13 +332,13 @@ export function LatexResumeEditor({
               setTitle(e.target.value)
               markDirty()
             }}
-            placeholder="Untitled CV"
+            placeholder="untitled CV"
             className="mt-1"
           />
         </label>
         <p className="text-body-s text-text-muted md:text-right">
           {formatSaveTime(lastSavedAt)}
-          {isDirty ? <span className="ml-2 text-amber-600">Unsaved changes</span> : null}
+          {isDirty ? <span className="ml-2 text-amber-600">unsaved changes</span> : null}
         </p>
       </div>
 
@@ -360,7 +360,7 @@ export function LatexResumeEditor({
         </div>
         <div className="flex flex-col gap-2 border-t border-border-subtle pt-4">
           <div className="flex items-center justify-between">
-            <p className="text-heading-s text-text-primary">Preview</p>
+            <p className="text-heading-s text-text-primary">preview</p>
             <span className="text-body-s text-text-muted">
               {cdnAvailable ? 'Live rendering' : 'Readable preview'}
             </span>

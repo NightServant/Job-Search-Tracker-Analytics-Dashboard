@@ -67,24 +67,24 @@ export function DocumentsPage({
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Documents"
+        title="documents"
         action={
           <Button size="s" onClick={() => setNewCvOpen(true)}>
             <PlusIcon size={16} aria-hidden />
-            New CV
+            new CV
           </Button>
         }
       />
 
       {docs.length === 0 ? (
         <div className="flex flex-col items-start gap-3 border-t border-border-subtle pt-6">
-          <p className="text-body-m text-text-primary">No CVs yet.</p>
+          <p className="text-body-m text-text-primary">no CVs yet.</p>
           <p className="text-body-s text-text-muted">
             Write one in the document editor or in LaTeX, then pin it to the applications you send
             it to.
           </p>
           <Button variant="secondary" size="s" onClick={() => setNewCvOpen(true)}>
-            New CV
+            new CV
           </Button>
         </div>
       ) : (
@@ -132,7 +132,7 @@ export function DocumentsPage({
         )}
       </AppDialog>
 
-      <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="New CV">
+      <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="new CV">
         <ModeChooser creating={creatingDraft} onChoose={(mode) => onCreateDraft?.(mode)} />
       </AppDialog>
     </div>

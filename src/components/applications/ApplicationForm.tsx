@@ -237,29 +237,29 @@ export function ApplicationForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field id="company" label="Company" required>
+        <Field id="company" label="company" required>
           <Input
             id="company"
             value={company}
             onChange={(e) => setCompany(e.target.value)}
             onBlur={blur('company')}
             error={errorFor('company')}
-            placeholder="Acme"
+            placeholder="acme"
           />
         </Field>
 
-        <Field id="role" label="Role" required>
+        <Field id="role" label="role" required>
           <Input
             id="role"
             value={role}
             onChange={(e) => setRole(e.target.value)}
             onBlur={blur('role')}
             error={errorFor('role')}
-            placeholder="Frontend Engineer"
+            placeholder="frontend engineer"
           />
         </Field>
 
-        <Field id="salary_min" label="Min salary">
+        <Field id="salary_min" label="min salary">
           <Input
             id="salary_min"
             type="number"
@@ -272,7 +272,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="salary_max" label="Max salary">
+        <Field id="salary_max" label="max salary">
           <Input
             id="salary_max"
             type="number"
@@ -287,8 +287,8 @@ export function ApplicationForm({
 
         <Field
           id="salary_currency"
-          label="Currency"
-          hint="Figures are stored in this currency and never converted."
+          label="currency"
+          hint="figures are stored in this currency and never converted."
         >
           <Select
             id="salary_currency"
@@ -304,7 +304,7 @@ export function ApplicationForm({
           </Select>
         </Field>
 
-        <Field id="status" label="Status">
+        <Field id="status" label="status">
           <Select
             id="status"
             value={status}
@@ -318,7 +318,7 @@ export function ApplicationForm({
           </Select>
         </Field>
 
-        <Field id="date_applied" label="Date applied">
+        <Field id="date_applied" label="date applied">
           <Input
             id="date_applied"
             type="date"
@@ -329,24 +329,24 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="location" label="Location">
+        <Field id="location" label="location">
           <Input
             id="location"
             value={location}
             onChange={(e) => setLocation(e.target.value)}
             onBlur={blur('location')}
             error={errorFor('location')}
-            placeholder="Manila / Remote"
+            placeholder="manila / remote"
           />
         </Field>
 
-        <Field id="work_mode" label="Work mode">
+        <Field id="work_mode" label="work mode">
           <Select
             id="work_mode"
             value={workMode}
             onChange={(e) => setWorkMode(e.target.value as WorkMode | '')}
           >
-            <option value="">Not set</option>
+            <option value="">not set</option>
             {WORK_MODES.map((mode) => (
               <option key={mode.value} value={mode.value}>
                 {mode.label}
@@ -355,7 +355,7 @@ export function ApplicationForm({
           </Select>
         </Field>
 
-        <Field id="source" label="Source">
+        <Field id="source" label="source">
           <Input
             id="source"
             value={source}
@@ -366,7 +366,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="url" label="Posting URL" span>
+        <Field id="url" label="posting URL" span>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
             <Input
               id="url"
@@ -391,7 +391,7 @@ export function ApplicationForm({
           {autofillNote && <p className="text-body-s text-text-muted">{autofillNote}</p>}
         </Field>
 
-        <Field id="tags" label="Tags">
+        <Field id="tags" label="tags">
           <Input
             id="tags"
             value={tagsInput}
@@ -402,7 +402,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="tech_stack" label="Tech stack">
+        <Field id="tech_stack" label="tech stack">
           <Input
             id="tech_stack"
             value={techInput}
@@ -422,15 +422,15 @@ export function ApplicationForm({
             className="h-4 w-4 rounded-none border-border-default accent-accent-default"
           />
           <label htmlFor="is_referral" className="text-body-m text-text-primary">
-            Came through a referral
+            came through a referral
           </label>
         </div>
 
         <Field
           id="description"
-          label="Job description"
+          label="job description"
           span
-          hint="Pasted in full, this is what the ATS keyword match reads."
+          hint="pasted in full, this is what the ATS keyword match reads."
         >
           <Textarea
             id="description"
@@ -442,7 +442,7 @@ export function ApplicationForm({
           />
         </Field>
 
-        <Field id="notes" label="Notes" span>
+        <Field id="notes" label="notes" span>
           <Textarea
             id="notes"
             value={notes}
@@ -454,20 +454,20 @@ export function ApplicationForm({
       </div>
 
       <div className="flex flex-col gap-5 border-t border-border-subtle pt-6">
-        <h3 className="text-label-caps uppercase text-text-secondary">Contact</h3>
+        <h3 className="text-label-caps uppercase text-text-secondary">contact</h3>
         <div className="grid gap-5 sm:grid-cols-2">
-          <Field id="contact_name" label="Name">
+          <Field id="contact_name" label="name">
             <Input
               id="contact_name"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
               onBlur={blur('contact_name')}
               error={errorFor('contact_name')}
-              placeholder="Recruiter or hiring manager"
+              placeholder="recruiter or hiring manager"
             />
           </Field>
 
-          <Field id="contact_email" label="Email">
+          <Field id="contact_email" label="email">
             <Input
               id="contact_email"
               type="email"
@@ -486,11 +486,11 @@ export function ApplicationForm({
               onChange={(e) => setContactLinkedin(e.target.value)}
               onBlur={blur('contact_linkedin')}
               error={errorFor('contact_linkedin')}
-              placeholder="https://www.linkedin.com/in/..."
+              placeholder="https://www.LinkedIn.com/in/..."
             />
           </Field>
 
-          <Field id="contact_notes" label="Contact notes" span>
+          <Field id="contact_notes" label="contact notes" span>
             <Textarea
               id="contact_notes"
               value={contactNotes}
@@ -515,7 +515,7 @@ export function ApplicationForm({
         </Button>
         {onCancel && (
           <Button variant="ghost" onClick={onCancel} disabled={saving}>
-            Cancel
+            cancel
           </Button>
         )}
       </div>

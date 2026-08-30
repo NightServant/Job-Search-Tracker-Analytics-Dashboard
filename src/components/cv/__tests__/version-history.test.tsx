@@ -92,7 +92,7 @@ describe('deleting a snapshot', () => {
 
     await user.click(screen.getAllByRole('button', { name: /remove this version/i })[0])
     expect(screen.getByRole('alertdialog', { name: /delete this version/i })).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(deleteSnapshotMock).not.toHaveBeenCalled()
   })
 
@@ -106,7 +106,7 @@ describe('deleting a snapshot', () => {
     await waitFor(() => expect(screen.getByText(/v1/)).toBeTruthy())
 
     await user.click(screen.getAllByRole('button', { name: /remove this version/i })[1])
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'delete' }))
     await waitFor(() => expect(deleteSnapshotMock).toHaveBeenCalledWith('s-1', 'user-1'))
   })
 })

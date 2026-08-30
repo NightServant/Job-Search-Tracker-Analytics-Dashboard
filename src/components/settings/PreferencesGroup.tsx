@@ -43,14 +43,14 @@ export function PreferencesGroup({
 }: PreferencesGroupProps) {
   return (
     <div data-settings-group="preferences">
-      <PanelSection title="Preferences" titleSize="m">
+      <PanelSection title="preferences" titleSize="m">
         {/* SettingsRow, not Field: this was the only settings group not using
             it, which is why it sat differently from account and danger zone.
             `wide` is the roadmap's 5.7 mobile rule -- the currency selector is
             genuinely wide, so it stacks below its label at 375px. */}
         <SettingsRow
-          label="Default currency"
-          description="Seeds the currency for every new application. Existing applications keep the currency they were saved in."
+          label="default currency"
+          description="seeds the currency for every new application. existing applications keep the currency they were saved in."
           wide
           control={
             <SegmentedControl

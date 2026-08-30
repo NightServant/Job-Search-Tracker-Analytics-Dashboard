@@ -16,14 +16,14 @@ export function Motion() {
 
   return (
     <section className="space-y-4">
-      <h2 className="text-heading-l">Motion</h2>
+      <h2 className="text-heading-l">motion</h2>
 
       <div
         className="rounded-md border border-border-subtle p-4"
         data-motion-state={reduced ? 'reduced' : 'full'}
       >
         <p className="text-body-m text-text-primary">
-          Reduced motion is <strong>{reduced ? 'ON' : 'OFF'}</strong>.
+          reduced motion is <strong>{reduced ? 'ON' : 'OFF'}</strong>.
         </p>
         <p className="text-body-s text-text-muted">
           Change it in your OS settings with this page open. Everything below reacts live -- no
@@ -33,7 +33,7 @@ export function Motion() {
       </div>
 
       <div className="rounded-md border border-border-subtle p-4">
-        <h3 className="text-heading-s text-text-primary">Theme wipe</h3>
+        <h3 className="text-heading-s text-text-primary">theme wipe</h3>
         <p className="mb-3 text-body-s text-text-muted">
           A circle grows from the button. Where View Transitions are unsupported the theme flips
           instantly -- the animation is decoration, the state change is the feature.
@@ -42,7 +42,7 @@ export function Motion() {
       </div>
 
       <div className="rounded-md border border-border-subtle p-4">
-        <h3 className="text-heading-s text-text-primary">Reveal</h3>
+        <h3 className="text-heading-s text-text-primary">reveal</h3>
         <p className="mb-3 text-body-s text-text-muted">
           Fades in on first intersection, once. Scroll it out and back -- it does not replay.
         </p>

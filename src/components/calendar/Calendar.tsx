@@ -70,19 +70,19 @@ export function Calendar({ events, companyByJobId = {} }: CalendarProps) {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Calendar"
+        title="calendar"
         action={
           <div className="hidden items-center gap-3 md:flex">
             <p className="tabular text-body-m text-text-secondary">{monthLabel}</p>
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="s" onClick={goToPreviousMonth}>
-                Previous
+                previous
               </Button>
               <Button variant="ghost" size="s" onClick={goToToday}>
-                Today
+                today
               </Button>
               <Button variant="ghost" size="s" onClick={goToNextMonth}>
-                Next
+                next
               </Button>
             </div>
           </div>

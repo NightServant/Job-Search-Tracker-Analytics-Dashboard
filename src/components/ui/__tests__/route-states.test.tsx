@@ -48,7 +48,7 @@ describe('RouteError', () => {
     })
 
     render(<RouteError title="Could not load your applications." message="network down" />)
-    fireEvent.click(screen.getByRole('button', { name: 'Retry' }))
+    fireEvent.click(screen.getByRole('button', { name: 'retry' }))
     expect(reload).toHaveBeenCalledTimes(1)
 
     Object.defineProperty(window, 'location', { configurable: true, value: originalLocation })
@@ -62,7 +62,7 @@ describe('RouteError', () => {
         action={<a href="/applications">Back to applications</a>}
       />
     )
-    expect(screen.queryByRole('button', { name: 'Retry' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'retry' })).toBeNull()
     expect(screen.getByRole('link', { name: 'Back to applications' })).toBeTruthy()
   })
 })

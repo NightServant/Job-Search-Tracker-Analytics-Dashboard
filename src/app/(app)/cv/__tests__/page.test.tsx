@@ -188,7 +188,7 @@ describe('/cv?draft=<id> opens the right editor', () => {
     params('new')
     resolved(null)
     render(<Page />)
-    expect(screen.getByRole('dialog', { name: 'New CV' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'new CV' })).toBeTruthy()
   })
 
   it('sends ?draft=new back to Documents when the dialog is dismissed without a choice', async () => {
@@ -326,7 +326,7 @@ describe('deleting a CV from the editor', () => {
 
     await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
     expect(screen.getByRole('alertdialog', { name: /delete this cv/i })).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(deleteMutate).not.toHaveBeenCalled()
   })
 
@@ -337,7 +337,7 @@ describe('deleting a CV from the editor', () => {
     render(<Page />)
 
     await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'delete' }))
     expect(deleteMutate).toHaveBeenCalledWith('cv-1')
     expect(routerReplace).toHaveBeenCalledWith('/documents')
   })

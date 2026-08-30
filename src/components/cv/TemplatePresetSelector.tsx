@@ -30,7 +30,7 @@ export function TemplatePresetSelector({ mode, onSelect }: TemplatePresetSelecto
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
       >
-        Templates
+        templates
         <ChevronDownIcon size={14} aria-hidden className={isOpen ? 'rotate-180' : undefined} />
       </Button>
 

@@ -58,7 +58,7 @@ export function ConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="-mx-0 -mb-0 border-t-0 bg-transparent p-0">
-          <AlertDialogCancel variant="secondary">Cancel</AlertDialogCancel>
+          <AlertDialogCancel variant="secondary">cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={() => void onConfirm()}
             className={cn(

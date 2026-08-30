@@ -41,7 +41,7 @@ export function ModeChooser({ creating = false, onChoose }: ModeChooserProps) {
       <button type="button" disabled={creating} onClick={() => onChoose('latex')} className={CHOICE}>
         <span className="text-body-m text-text-primary">LaTeX editor</span>
         <span className="text-body-s text-text-muted">
-          Source-code editing with a live preview, for LaTeX users.
+          source-code editing with a live preview, for LaTeX users.
         </span>
       </button>
     </div>

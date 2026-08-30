@@ -95,7 +95,7 @@ export interface FunnelChartProps {
  */
 export function FunnelChart({ data }: FunnelChartProps) {
   if (data.length === 0) {
-    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+    return <p className="text-body-s text-text-muted">not enough data yet.</p>
   }
 
   const max = Math.max(...data.map((d) => d.count), 1)

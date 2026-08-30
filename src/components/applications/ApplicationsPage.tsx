@@ -269,11 +269,11 @@ export function ApplicationsPage({
   return (
     <div className="flex flex-col gap-8">
       <PageHeader
-        title="Applications"
+        title="applications"
         action={
           <Button size="s" onClick={() => setForm({ job: null })}>
             <PlusIcon size={16} aria-hidden />
-            Add
+            add
           </Button>
         }
       />
@@ -308,7 +308,7 @@ export function ApplicationsPage({
       <ConfirmDialog
         open={discardOpen}
         onOpenChange={setDiscardOpen}
-        title="Discard unsaved changes?"
+        title="discard unsaved changes?"
         body="This application has edits that have not been saved. Closing now discards them."
         confirmLabel="Discard"
         destructive
@@ -346,14 +346,14 @@ export function ApplicationsPage({
               onChange={(e) => setSkipDuplicates(e.target.checked)}
               className="h-4 w-4 rounded-none border-border-default accent-accent-default"
             />
-            Skip rows already tracked
+            skip rows already tracked
           </label>
           <div className="flex items-center gap-2">
             <Button size="s" onClick={runImport} disabled={importing}>
               Import {skipDuplicates ? csv.importable.length : csv.rows.length}
             </Button>
             <Button variant="ghost" size="s" onClick={() => setCsv(null)} disabled={importing}>
-              Cancel
+              cancel
             </Button>
           </div>
         </section>
@@ -361,14 +361,14 @@ export function ApplicationsPage({
 
       {jobs.length === 0 ? (
         <div className="flex flex-col items-start gap-3 border-t border-border-subtle py-12">
-          <h2 className="text-heading-m text-text-primary">No applications yet</h2>
+          <h2 className="text-heading-m text-text-primary">no applications yet</h2>
           <p className="max-w-prose text-body-m text-text-muted">
             Add the first one by hand, or import the spreadsheet you have been keeping
             instead. Company and role are the only columns an import needs.
           </p>
           <Button onClick={() => setForm({ job: null })}>
             <PlusIcon size={16} aria-hidden />
-            Add your first application
+            add your first application
           </Button>
         </div>
       ) : (

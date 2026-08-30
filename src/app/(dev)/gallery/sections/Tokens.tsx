@@ -46,7 +46,7 @@ export function Tokens() {
   return (
     <section className="space-y-10">
       <div className="space-y-4">
-        <h2 className="text-heading-l">Semantic colour</h2>
+        <h2 className="text-heading-l">semantic colour</h2>
         <p className="text-body-s text-text-muted">
           The only colour names components may use. Primitives are referenced by these and nowhere else.
         </p>
@@ -56,7 +56,7 @@ export function Tokens() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-heading-l">Status</h2>
+        <h2 className="text-heading-l">status</h2>
         <p className="text-body-s text-text-muted">
           Marks are identical in both themes — the hue carries the meaning. Orange is never a status.
         </p>
@@ -72,17 +72,17 @@ export function Tokens() {
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-heading-l">Type scale</h2>
+        <h2 className="text-heading-l">type scale</h2>
         {TYPE.map(([label, cls]) => (
           <div key={label} className="flex items-baseline gap-6 border-b border-border-subtle pb-2">
             <span className="w-28 shrink-0 text-body-s text-text-muted font-mono">{label}</span>
-            <span className={cls}>Every application, every version of your CV</span>
+            <span className={cls}>every application, every version of your CV</span>
           </div>
         ))}
       </div>
 
       <div className="space-y-4">
-        <h2 className="text-heading-l">Data</h2>
+        <h2 className="text-heading-l">data</h2>
         <p className="text-body-s text-text-muted">
           Tabular figures. Helvetica has proportional digits, so without this the columns drift.
         </p>

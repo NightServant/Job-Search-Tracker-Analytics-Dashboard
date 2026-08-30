@@ -162,7 +162,7 @@ function PanelBody({
     )
   }
   if (empty) {
-    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+    return <p className="text-body-s text-text-muted">not enough data yet.</p>
   }
   return <>{render()}</>
 }
@@ -177,13 +177,13 @@ function Overview({ data }: { data: ConversionMetrics | null }) {
   }
   return (
     <div data-overview-kpis className="grid grid-cols-2 gap-6 md:grid-cols-4">
-      <KpiStat label="Total applications" value={metrics.totalJobs} />
+      <KpiStat label="total applications" value={metrics.totalJobs} />
       <KpiStat
-        label="Time to first interview"
+        label="time to first interview"
         value={metrics.timeToFirstInterview === null ? '—' : `${metrics.timeToFirstInterview}d`}
       />
-      <KpiStat label="Time to offer" value={metrics.timeToOffer === null ? '—' : `${metrics.timeToOffer}d`} />
-      <KpiStat label="Conversion rate" value={`${Math.round(metrics.conversionRate)}%`} />
+      <KpiStat label="time to offer" value={metrics.timeToOffer === null ? '—' : `${metrics.timeToOffer}d`} />
+      <KpiStat label="conversion rate" value={`${Math.round(metrics.conversionRate)}%`} />
     </div>
   )
 }
@@ -282,19 +282,19 @@ export function Analytics({
     // the page halves in height. The footer spans both (lg:col-span-2) because
     // it is the end of the page, not a panel.
     <div className="grid gap-8 lg:grid-cols-2">
-      <PageHeader className="lg:col-span-2" title="Analytics" action={<RangePicker value={range} onChange={setRange} />} />
+      <PageHeader className="lg:col-span-2" title="analytics" action={<RangePicker value={range} onChange={setRange} />} />
 
       <AnalyticsPanel
-        title="Overview"
-        action={<Span>All time</Span>}
+        title="overview"
+        action={<Span>all time</Span>}
         error={conversionMetrics.error ? errorMessage(conversionMetrics.error) : undefined}
       >
         <PanelBody state={conversionMetrics} empty={false} render={() => <Overview data={conversionMetrics.data} />} />
       </AnalyticsPanel>
 
       <AnalyticsPanel
-        title="Conversion funnel"
-        action={<Span>All time</Span>}
+        title="conversion funnel"
+        action={<Span>all time</Span>}
         error={conversionFunnel.error ? errorMessage(conversionFunnel.error) : undefined}
       >
         <PanelBody
@@ -305,8 +305,8 @@ export function Analytics({
       </AnalyticsPanel>
 
       <AnalyticsPanel
-        title="Time in stage"
-        action={<Span>All time</Span>}
+        title="time in stage"
+        action={<Span>all time</Span>}
         error={timeInStage.error ? errorMessage(timeInStage.error) : undefined}
       >
         <PanelBody
@@ -317,7 +317,7 @@ export function Analytics({
       </AnalyticsPanel>
 
       <AnalyticsPanel
-        title="Source trends"
+        title="source trends"
         action={<Span>{rangeLabel(range)}</Span>}
         error={sourceConversionTrends.error ? errorMessage(sourceConversionTrends.error) : undefined}
       >
@@ -343,7 +343,7 @@ export function Analytics({
       </AnalyticsPanel>
 
       <AnalyticsPanel
-        title="Cohort analysis"
+        title="cohort analysis"
         action={<Span>{rangeLabel(range)}</Span>}
         error={cohortAnalysis.error ? errorMessage(cohortAnalysis.error) : undefined}
       >
@@ -368,7 +368,7 @@ export function Analytics({
         />
       </AnalyticsPanel>
 
-      <AnalyticsPanel title="Salary insights" action={<Span>All time</Span>}>
+      <AnalyticsPanel title="salary insights" action={<Span>all time</Span>}>
         <SalaryInsights jobs={jobs} />
       </AnalyticsPanel>
 

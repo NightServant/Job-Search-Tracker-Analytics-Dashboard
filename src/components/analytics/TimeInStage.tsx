@@ -33,7 +33,7 @@ export function TimeInStage({ data }: TimeInStageProps) {
   const reducedMotion = usePrefersReducedMotion()
 
   if (data.length === 0) {
-    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+    return <p className="text-body-s text-text-muted">not enough data yet.</p>
   }
 
   const chartData = STATUSES.filter((status) => data.some((d) => d.status === status)).map((status) => {

@@ -66,7 +66,7 @@ export function Agenda({ events, companyByJobId = {}, className }: AgendaProps) 
   const days = [...grouped.keys()].sort()
 
   if (days.length === 0) {
-    return <p className={cn('text-body-s text-text-muted', className)}>Nothing scheduled.</p>
+    return <p className={cn('text-body-s text-text-muted', className)}>nothing scheduled.</p>
   }
 
   return (

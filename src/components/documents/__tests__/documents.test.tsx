@@ -218,7 +218,7 @@ describe('DocumentsPage', () => {
     const user = userEvent.setup()
     render(<DocumentsPage docs={[DOC]} />)
     await user.click(screen.getByRole('button', { name: /new cv/i }))
-    expect(screen.getByRole('dialog', { name: 'New CV' })).toBeTruthy()
+    expect(screen.getByRole('dialog', { name: 'new CV' })).toBeTruthy()
     expect(screen.getByRole('button', { name: /word editor/i })).toBeTruthy()
     expect(screen.getByRole('button', { name: /latex editor/i })).toBeTruthy()
   })

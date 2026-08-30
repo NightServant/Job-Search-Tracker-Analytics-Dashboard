@@ -115,7 +115,7 @@ function CvRoute() {
         onOpenChange={(open) => {
           if (!open) router.replace(DOCUMENTS)
         }}
-        title="New CV"
+        title="new CV"
       >
         <ModeChooser creating={createResume.isPending} onChoose={(mode) => void createDraft(mode)} />
       </AppDialog>
@@ -131,7 +131,7 @@ function CvRoute() {
   if (draftQuery.error) {
     return (
       <RouteError
-        title="Could not open that CV."
+        title="could not open that CV."
         message={
           draftQuery.error instanceof Error
             ? draftQuery.error.message
@@ -145,11 +145,11 @@ function CvRoute() {
   if (!draft) {
     return (
       <RouteError
-        title="Could not find that CV."
+        title="could not find that CV."
         message="It may have been deleted, or the link may be wrong."
         action={
           <Link href={DOCUMENTS} className={buttonVariants({ variant: 'secondary', size: 's' })}>
-            Back to documents
+            back to documents
           </Link>
         }
       />
@@ -171,9 +171,9 @@ function CvRoute() {
         onOpenChange={(open) => {
           if (!open) setPendingDeleteId(null)
         }}
-        title="Delete this CV?"
+        title="delete this CV?"
         body="This cannot be undone."
-        confirmLabel="Delete"
+        confirmLabel="delete"
         destructive
         onConfirm={confirmDeleteDraft}
       />

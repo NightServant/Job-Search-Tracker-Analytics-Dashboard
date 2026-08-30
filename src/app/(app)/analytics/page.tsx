@@ -63,7 +63,7 @@ export default function Page() {
     const first = queries.find((q) => q.error)?.error
     return (
       <RouteError
-        title="Could not load your analytics."
+        title="could not load your analytics."
         message={first instanceof Error ? first.message : 'An error occurred while loading your analytics.'}
       />
     )

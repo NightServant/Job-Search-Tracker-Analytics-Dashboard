@@ -84,7 +84,7 @@ export default function Page() {
   if (error) {
     return (
       <RouteError
-        title="Could not load your CVs."
+        title="could not load your CVs."
         message={error instanceof Error ? error.message : 'An error occurred while loading them.'}
       />
     )
@@ -116,7 +116,7 @@ export default function Page() {
         }}
         title={pendingDelete ? `Delete ${pendingDelete.title}?` : ''}
         body="This cannot be undone."
-        confirmLabel="Delete"
+        confirmLabel="delete"
         destructive
         onConfirm={confirmDelete}
       />

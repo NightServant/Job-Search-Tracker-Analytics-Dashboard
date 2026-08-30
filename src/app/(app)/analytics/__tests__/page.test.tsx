@@ -58,15 +58,15 @@ describe('Analytics route wrapper', () => {
     mockAll(LOADING)
     const { container } = render(<Page />)
     expect(container.querySelector('[role="status"]')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Analytics' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'analytics' })).toBeNull()
   })
 
   it('surfaces a total failure rather than rendering five empty panels', () => {
     mockAll(FAILED)
     render(<Page />)
     expect(screen.getByText(/network down/)).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Analytics' })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'analytics' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'retry' })).toBeTruthy()
   })
 
   it('does not blank the page when only one of five metrics is still loading', () => {
@@ -76,7 +76,7 @@ describe('Analytics route wrapper', () => {
     useCohortAnalysisMock.mockReturnValue(EMPTY_OK)
     useConversionMetricsMock.mockReturnValue(METRICS_OK)
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'Analytics' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'analytics' })).toBeTruthy()
   })
 
   it('does not blank the page when only one of five metrics has failed', () => {
@@ -89,7 +89,7 @@ describe('Analytics route wrapper', () => {
     useCohortAnalysisMock.mockReturnValue(FAILED)
     useConversionMetricsMock.mockReturnValue(METRICS_OK)
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'Analytics' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'analytics' })).toBeTruthy()
     expect(screen.getByText(/network down/)).toBeTruthy()
   })
 })

@@ -29,9 +29,9 @@ function Row({ title, note, children }: { title: string; note?: string; children
 export function Primitives() {
   return (
     <section className="space-y-4">
-      <h2 className="text-heading-l">Primitives</h2>
+      <h2 className="text-heading-l">primitives</h2>
 
-      <Row title="Button" note="Three intents, two sizes. Radius never exceeds 4px.">
+      <Row title="button" note="Three intents, two sizes. Radius never exceeds 4px.">
         <div className="flex flex-wrap items-center gap-3">
           {(['primary', 'secondary', 'ghost'] as const).map((v) =>
             (['m', 's'] as const).map((s) => (
@@ -44,7 +44,7 @@ export function Primitives() {
         </div>
       </Row>
 
-      <Row title="Status Marker" note="A 2px rule and a label. No fill, no dot, no radius.">
+      <Row title="status marker" note="A 2px rule and a label. No fill, no dot, no radius.">
         <div className="flex flex-wrap gap-8">
           {STATUSES.map((s) => (
             <StatusMarker key={s} status={s} className="w-28" />
@@ -52,7 +52,7 @@ export function Primitives() {
         </div>
       </Row>
 
-      <Row title="ATS Check" note="The same vocabulary, three outcomes. Review is amber, not the accent.">
+      <Row title="ATS check" note="The same vocabulary, three outcomes. Review is amber, not the accent.">
         <div className="flex flex-wrap gap-8">
           {ATS_RESULTS.map((r) => (
             <AtsCheck key={r} result={r} className="w-28" />
@@ -60,22 +60,22 @@ export function Primitives() {
         </div>
       </Row>
 
-      <Row title="Input" note="Default, Error and Disabled. Tab into the first field to review Focus.">
+      <Row title="input" note="Default, Error and Disabled. Tab into the first field to review Focus.">
         <div className="grid max-w-sm gap-4">
-          <Input id="g-default" placeholder="Default" />
+          <Input id="g-default" placeholder="default" />
           <Input id="g-error" defaultValue="not-an-email" error="Enter a valid email" />
-          <Input id="g-disabled" placeholder="Disabled" disabled />
-          <PasswordInput id="g-password" placeholder="Password" />
+          <Input id="g-disabled" placeholder="disabled" disabled />
+          <PasswordInput id="g-password" placeholder="password" />
         </div>
       </Row>
 
-      <Row title="Breadcrumb" note="The last crumb is the current page, so it is text rather than a link.">
+      <Row title="breadcrumb" note="The last crumb is the current page, so it is text rather than a link.">
         <Breadcrumb
           items={[{ label: 'Dashboard', href: '/dashboard' }, { label: 'Applications', href: '/applications' }, { label: 'Senior Engineer' }]}
         />
       </Row>
 
-      <Row title="Theme Toggle" note="32px for a cursor, 44px for a finger. Both drive next-themes.">
+      <Row title="theme toggle" note="32px for a cursor, 44px for a finger. Both drive next-themes.">
         <div className="flex items-center gap-4">
           <ThemeToggle />
           <ThemeToggle size={44} />

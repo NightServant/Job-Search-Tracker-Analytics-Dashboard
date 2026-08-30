@@ -41,13 +41,13 @@ export function NextEvent({ event, error = false, className, ...props }: NextEve
   return (
     <PanelSection
       aria-label="Next event"
-      title="Next event"
+      title="next event"
       error={error ? 'Could not load the next event. Try refreshing the page.' : undefined}
       className={className}
       {...props}
     >
       {event === null ? (
-        <p className="text-body-s text-text-muted">Nothing scheduled for this application yet.</p>
+        <p className="text-body-s text-text-muted">nothing scheduled for this application yet.</p>
       ) : (
         <div className="flex items-start gap-3">
           <CalendarIcon size={16} className="mt-0.5 shrink-0 text-text-muted" />

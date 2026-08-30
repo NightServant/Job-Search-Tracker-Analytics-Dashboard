@@ -113,7 +113,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
         aria-expanded={isOpen}
         onClick={() => setIsOpen(!isOpen)}
       >
-        Versions
+        versions
         <ChevronDownIcon size={14} aria-hidden className={isOpen ? 'rotate-180' : undefined} />
       </Button>
 
@@ -122,7 +122,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
           <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 top-full z-50 mt-2 w-96 rounded-md border border-border-default bg-bg-canvas">
             <div className="border-b border-border-subtle p-4">
-              <h3 className="text-heading-s text-text-primary">Version history</h3>
+              <h3 className="text-heading-s text-text-primary">version history</h3>
               <p className="mt-1 text-body-s text-text-muted">
                 Restore a previous version of this CV. Autosaves are kept for reference.
               </p>
@@ -134,7 +134,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
               </div>
             ) : snapshots.length === 0 ? (
               <p className="p-4 text-body-s text-text-muted">
-                No versions yet. Editing this CV snapshots it automatically.
+                no versions yet. editing this CV snapshots it automatically.
               </p>
             ) : (
               <div className="max-h-96 overflow-y-auto">
@@ -165,7 +165,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
                         onClick={() => handleDelete(snapshot.id)}
                       >
                         <TrashIcon size={14} aria-hidden />
-                        Remove
+                        remove
                       </Button>
                     </div>
                   </div>
@@ -181,9 +181,9 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
         onOpenChange={(open) => {
           if (!open) setPendingDeleteId(null)
         }}
-        title="Delete this version?"
+        title="delete this version?"
         body="This cannot be undone."
-        confirmLabel="Delete"
+        confirmLabel="delete"
         destructive
         onConfirm={confirmDelete}
       />

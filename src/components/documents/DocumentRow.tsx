@@ -99,14 +99,14 @@ export function DocumentRow({ doc, actions, className, ...props }: DocumentRowPr
         {ats ? (
           <AtsCheck result={ats} className="w-16 shrink-0" />
         ) : (
-          <span className="text-body-s text-text-muted">Not checked</span>
+          <span className="text-body-s text-text-muted">not checked</span>
         )}
         {doc.version !== null ? (
           <span className="tabular text-body-s text-text-secondary">v{doc.version}</span>
         ) : doc.hasVersions ? (
-          <span className="text-body-s text-text-muted">Unnumbered</span>
+          <span className="text-body-s text-text-muted">unnumbered</span>
         ) : (
-          <span className="text-body-s text-text-muted">No versions</span>
+          <span className="text-body-s text-text-muted">no versions</span>
         )}
         <time dateTime={doc.updated_at} className="tabular text-body-s text-text-muted">
           {formatTouchedDate(doc.updated_at)}

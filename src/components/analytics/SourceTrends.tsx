@@ -54,7 +54,7 @@ export function SourceTrends({ data }: SourceTrendsProps) {
   }, [data])
 
   if (data.length === 0) {
-    return <p className="text-body-s text-text-muted">Not enough data yet.</p>
+    return <p className="text-body-s text-text-muted">not enough data yet.</p>
   }
 
   return (

@@ -36,7 +36,7 @@ describe('ConfirmDialog', () => {
         onConfirm={onConfirm}
       />
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
+    await userEvent.click(screen.getByRole('button', { name: 'cancel' }))
     expect(onConfirm).not.toHaveBeenCalled()
     // Positive companion in the same test:
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }))

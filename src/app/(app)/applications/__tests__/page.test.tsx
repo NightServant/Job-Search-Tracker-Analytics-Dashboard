@@ -54,7 +54,7 @@ describe('Applications route wrapper', () => {
     useJobsMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
     const { container } = render(<Page />)
     expect(container.querySelector('[role="status"]')).toBeTruthy()
-    expect(screen.queryByRole('heading', { name: 'Applications' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'applications' })).toBeNull()
   })
 
   it('surfaces a fetch error instead of the empty-account copy', () => {
@@ -68,13 +68,13 @@ describe('Applications route wrapper', () => {
     render(<Page />)
     expect(screen.getByText(/network down/)).toBeTruthy()
     expect(screen.queryByText(/no applications yet/i)).toBeNull()
-    expect(screen.getByRole('button', { name: 'Retry' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'retry' })).toBeTruthy()
   })
 
   it('renders the screen from the shared jobs cache once loaded', () => {
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'Applications' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'applications' })).toBeTruthy()
     expect(useJobsMock).toHaveBeenCalled()
   })
 
@@ -92,14 +92,14 @@ describe('Applications route wrapper', () => {
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     render(<Page />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    fireEvent.change(screen.getByLabelText(/^Company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^Role/), { target: { value: 'Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
+    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
     fireEvent.click(screen.getByRole('button', { name: /add application/i }))
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
     expect(screen.getByRole('heading', { name: /new application/i })).toBeTruthy()
-    expect(screen.getByLabelText(/^Company/)).toHaveValue('Acme')
+    expect(screen.getByLabelText(/^company/)).toHaveValue('Acme')
   })
 
   it('resolves handleUpdate to false and keeps the edit form open when the mutation rejects', async () => {
@@ -146,8 +146,8 @@ describe('Applications route wrapper', () => {
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     render(<Page />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    expect(screen.getByLabelText(/^Currency/)).toHaveValue('PHP')
+    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    expect(screen.getByLabelText(/^currency/)).toHaveValue('PHP')
   })
 
   it('defaults a new application to the stored preference instead of PHP', () => {
@@ -159,8 +159,8 @@ describe('Applications route wrapper', () => {
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
     render(<Page />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'Add' }))
-    expect(screen.getByLabelText(/^Currency/)).toHaveValue('USD')
+    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    expect(screen.getByLabelText(/^currency/)).toHaveValue('USD')
   })
 
   // Item 2's second half: window.confirm is the same defect class as the
@@ -177,7 +177,7 @@ describe('Applications route wrapper', () => {
       screen.getByRole('alertdialog', { name: 'Delete Engineer at Initech?' })
     ).toBeTruthy()
 
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
+    await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(deleteJobMutate).not.toHaveBeenCalled()
     expect(screen.queryByRole('alertdialog')).toBeNull()
   })
@@ -189,7 +189,7 @@ describe('Applications route wrapper', () => {
     render(<Page />)
 
     await user.click(screen.getAllByRole('button', { name: /^delete/i })[0])
-    await user.click(screen.getByRole('button', { name: 'Delete' }))
+    await user.click(screen.getByRole('button', { name: 'delete' }))
     await waitFor(() => expect(deleteJobMutate).toHaveBeenCalledWith('1'))
   })
 })

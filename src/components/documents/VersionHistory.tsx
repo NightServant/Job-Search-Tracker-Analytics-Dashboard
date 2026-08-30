@@ -55,7 +55,7 @@ export function VersionHistory({
       {error ? (
         <p className="flex items-center gap-2 text-body-s text-status-rejected-mark">
           <AlertCircleIcon size={16} aria-hidden className="[&_svg]:size-4" />
-          Could not load the saved versions of this CV.
+          could not load the saved versions of this CV.
         </p>
       ) : loading ? (
         <Skeleton className="h-24 w-full" data-versions-loading />
@@ -84,7 +84,7 @@ export function VersionHistory({
         href={editHref}
         className={buttonVariants({ variant: 'secondary', size: 's', className: 'self-start' })}
       >
-        Open the editor to restore a version
+        open the editor to restore a version
       </Link>
     </div>
   )

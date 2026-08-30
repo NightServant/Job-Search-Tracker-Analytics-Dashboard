@@ -48,7 +48,7 @@ describe('Calendar', () => {
 
   it('renders a page header titled Calendar', () => {
     render(<Calendar events={EVENTS} />)
-    expect(screen.getByRole('heading', { name: 'Calendar' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'calendar' })).toBeTruthy()
   })
 
   it('threads a companyByJobId prop through into the agenda, unmodified', () => {
