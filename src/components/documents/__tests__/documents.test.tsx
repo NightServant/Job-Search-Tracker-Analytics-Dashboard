@@ -50,6 +50,27 @@ function makeDoc(overrides: Partial<ResumeSummary> = {}): ResumeSummary {
 const DOC = makeDoc()
 
 describe('DocumentRow', () => {
+  it('puts the row controls inside the grid, not beside it', () => {
+    // Item 4: "version and delete button, does not align properly". The two
+    // controls used to hang outside the grid in a flex wrapper, so the grid's
+    // 1fr first column was measured from a width the stack had already taken
+    // -- by a different amount per row, which is why the four content columns
+    // landed at a different x on each one. As a real cell the grid measures
+    // them like everything else.
+    const { container } = render(
+      <DocumentRow doc={DOC} actions={<button type="button">versions</button>} />
+    )
+    const row = container.querySelector('[data-document-row]')!
+    const actions = row.querySelector('[data-row-actions]')!
+    expect(actions.parentElement).toBe(row)
+    expect(row.className).toContain('md:grid-cols-[1fr_7rem_6rem_6rem_auto]')
+  })
+
+  it('renders no actions cell when a caller passes none', () => {
+    const { container } = render(<DocumentRow doc={DOC} />)
+    expect(container.querySelector('[data-row-actions]')).toBeNull()
+  })
+
   it('lays out four columns on desktop and stacks on mobile', () => {
     // Desktop is Info, ATS Check, version, date across 1104px. At 335px the
     // marker, version and date drop onto their own line beneath the title.
@@ -138,7 +159,7 @@ describe('VersionHistory', () => {
   ]
 
   it('lists the saved versions of one CV', () => {
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={VERSIONS} />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={VERSIONS} />)
     expect(screen.getByText('v3')).toBeTruthy()
     expect(screen.getByText('v2')).toBeTruthy()
   })
@@ -147,27 +168,27 @@ describe('VersionHistory', () => {
     // This is the documents-list surface: it answers "what versions exist",
     // not "put one back". The editor's own history control owns restore, and
     // duplicating it here would mean two ways to overwrite a CV.
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={VERSIONS} />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={VERSIONS} />)
     expect(screen.queryByRole('button', { name: /restore/i })).toBeNull()
     expect(screen.getByRole('link', { name: /editor/i }).getAttribute('href')).toBe('/cv?draft=cv-1')
   })
 
   it('says the read failed rather than claiming there are no versions', () => {
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={[]} error />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={[]} error />)
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
     expect(screen.getByText(/could not load/i)).toBeTruthy()
   })
 
   it('says so plainly when a CV has never been snapshotted', () => {
-    render(<VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={[]} />)
+    render(<VersionHistory editHref="/cv?draft=cv-1" versions={[]} />)
     expect(screen.getByText(/no versions saved yet/i)).toBeTruthy()
   })
 
   it('shows a pending state rather than an empty one while the read is in flight', () => {
     const { container } = render(
-      <VersionHistory title="Backend CV" editHref="/cv?draft=cv-1" versions={[]} loading />
+      <VersionHistory editHref="/cv?draft=cv-1" versions={[]} loading />
     )
-    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    expect(container.querySelector('[data-versions-loading]')).toBeTruthy()
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
   })
 })

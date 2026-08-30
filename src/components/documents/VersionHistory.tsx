@@ -1,7 +1,7 @@
 import * as React from 'react'
 import Link from 'next/link'
-import { PanelSection } from '@/components/ui/panel-section'
-import { CssSpinner } from '@/components/ui/css-spinner'
+import { Skeleton } from '@/components/ui/skeleton'
+import { AlertCircleIcon } from '@/components/icons'
 import { buttonVariants } from '@/components/ui/button'
 import { formatSnapshotTime } from '@/services/date'
 
@@ -23,14 +23,21 @@ export interface VersionEntry {
  * because that is the only surface that can show you what you are about to
  * replace, so the link out is the whole action here.
  *
- * `PanelSection` supplies the heading, the hairline and the failed-read
- * treatment, so a version list that fails reads as the same kind of fact as
- * any other panel that fails. Empty and failed are separate states: "no
- * versions saved yet" is a true statement about a new CV and a false one about
- * a network error.
+ * Renders inside a dialog (M5.5 Item 4), which supplies the heading -- so
+ * this no longer wraps itself in `PanelSection`. It used to be an inline
+ * disclosure opened by a square icon button deformed to hold text and a
+ * chevron, which is what Gabe called "a weird dropdown": it was not a dropdown
+ * at all, and it set `aria-expanded` with no `aria-controls`, telling a screen
+ * reader that something expanded without saying what.
+ *
+ * Empty and failed stay separate states: "no versions saved yet" is a true
+ * statement about a new CV and a false one about a network error.
  */
 export interface VersionHistoryProps {
-  title: string
+  /**
+   * No `title` -- the dialog that hosts this owns the heading now. Passing one
+   * here as well is how two surfaces end up disagreeing about the same CV.
+   */
   editHref: string
   versions: VersionEntry[]
   loading?: boolean
@@ -38,20 +45,20 @@ export interface VersionHistoryProps {
 }
 
 export function VersionHistory({
-  title,
   editHref,
   versions,
   loading = false,
   error = false,
 }: VersionHistoryProps) {
   return (
-    <PanelSection
-      title={`Versions of ${title}`}
-      className="border-t-0 pb-6 pt-3"
-      error={error ? 'Could not load the saved versions of this CV.' : undefined}
-    >
-      {loading ? (
-        <CssSpinner size={20} className="text-text-muted" />
+    <div className="flex flex-col gap-4">
+      {error ? (
+        <p className="flex items-center gap-2 text-body-s text-status-rejected-mark">
+          <AlertCircleIcon size={16} aria-hidden className="[&_svg]:size-4" />
+          Could not load the saved versions of this CV.
+        </p>
+      ) : loading ? (
+        <Skeleton className="h-24 w-full" data-versions-loading />
       ) : versions.length === 0 ? (
         <p className="text-body-s text-text-muted">
           No versions saved yet. Editing this CV snapshots it automatically.
@@ -79,6 +86,6 @@ export function VersionHistory({
       >
         Open the editor to restore a version
       </Link>
-    </PanelSection>
+    </div>
   )
 }

@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { IconButton } from '@/components/ui/icon-button'
-import { ChevronDownIcon, PlusIcon, TrashIcon } from '@/components/icons'
+import { PlusIcon, TrashIcon } from '@/components/icons'
 import { ModeChooser } from '@/components/cv/ModeChooser'
 import { DocumentRow } from './DocumentRow'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
@@ -61,6 +61,7 @@ export function DocumentsPage({
   onCreateDraft,
   creatingDraft = false,
 }: DocumentsPageProps) {
+  const openDoc = docs.find((doc) => doc.id === openVersionsFor) ?? null
   const [newCvOpen, setNewCvOpen] = React.useState(false)
 
   return (
@@ -88,48 +89,48 @@ export function DocumentsPage({
         </div>
       ) : (
         <div>
-          {docs.map((doc) => {
-            const open = openVersionsFor === doc.id
-            return (
-              <div key={doc.id} className="border-b border-border-subtle">
-                <div className="flex items-stretch gap-2">
-                  <DocumentRow doc={doc} className="min-w-0 flex-1 border-b-0" />
-                  <div className="flex shrink-0 flex-col justify-center gap-1 py-2">
-                    <IconButton
-                      aria-expanded={open}
-                      onClick={() => onToggleVersions?.(doc)}
-                      className="w-auto shrink-0 grid-flow-col gap-1 px-2 text-label-caps uppercase"
-                    >
-                      Versions
-                      <ChevronDownIcon
-                        size={14}
-                        aria-hidden
-                        className={open ? 'rotate-180' : undefined}
-                      />
-                    </IconButton>
-                    <IconButton
-                      aria-label={`Delete ${doc.title}`}
-                      onClick={() => onDelete?.(doc)}
-                      className="shrink-0"
-                    >
-                      <TrashIcon size={16} aria-hidden />
-                    </IconButton>
-                  </div>
-                </div>
-                {open && (
-                  <VersionHistory
-                    title={doc.title}
-                    editHref={`/cv?draft=${doc.id}`}
-                    versions={versions}
-                    loading={versionsLoading}
-                    error={versionsError}
-                  />
-                )}
-              </div>
-            )
-          })}
+          {docs.map((doc) => (
+            <DocumentRow
+              key={doc.id}
+              doc={doc}
+              actions={
+                <>
+                  <Button
+                    variant="secondary"
+                    size="s"
+                    onClick={() => onToggleVersions?.(doc)}
+                  >
+                    versions
+                  </Button>
+                  <IconButton
+                    aria-label={`Delete ${doc.title}`}
+                    onClick={() => onDelete?.(doc)}
+                  >
+                    <TrashIcon size={16} aria-hidden className="[&_svg]:size-4" />
+                  </IconButton>
+                </>
+              }
+            />
+          ))}
         </div>
       )}
+
+      <AppDialog
+        open={openDoc !== null}
+        onOpenChange={(next) => {
+          if (!next && openDoc) onToggleVersions?.(openDoc)
+        }}
+        title={openDoc ? `versions of ${openDoc.title}` : 'versions'}
+      >
+        {openDoc && (
+          <VersionHistory
+            editHref={`/cv?draft=${openDoc.id}`}
+            versions={versions}
+            loading={versionsLoading}
+            error={versionsError}
+          />
+        )}
+      </AppDialog>
 
       <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="New CV">
         <ModeChooser creating={creatingDraft} onChoose={(mode) => onCreateDraft?.(mode)} />

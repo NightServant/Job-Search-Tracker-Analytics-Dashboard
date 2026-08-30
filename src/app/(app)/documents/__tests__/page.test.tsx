@@ -107,11 +107,21 @@ describe('Documents route wrapper', () => {
     expect(useResumeVersionsMock).toHaveBeenLastCalledWith('cv-1')
   })
 
-  it('collapses the version history when the same row is toggled again', () => {
+  it('stops asking for versions once the dialog is dismissed', async () => {
+    // Was "collapses when the same row is toggled again", back when the
+    // history was an inline disclosure you clicked twice. It is a dialog now
+    // (M5.5 Item 4), so the trigger is behind an overlay while it is open and
+    // Escape is the real dismissal path. What matters either way is that
+    // closing releases the query, rather than leaving it subscribed to a row
+    // nobody is looking at.
+    const user = userEvent.setup()
     useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
+
+    await user.click(screen.getByRole('button', { name: /^versions$/i }))
+    expect(useResumeVersionsMock).toHaveBeenLastCalledWith('cv-1')
+
+    await user.keyboard('{Escape}')
     expect(useResumeVersionsMock).toHaveBeenLastCalledWith(null)
   })
 
