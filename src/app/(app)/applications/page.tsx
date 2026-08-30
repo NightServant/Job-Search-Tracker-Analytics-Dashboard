@@ -7,7 +7,6 @@ import {
   useCreateJobsBulk,
   useUpdateJob,
   useDeleteJob,
-  useUpdateJobStatus,
   useAutofillJobFromUrl,
 } from '@/hooks/useJobs'
 import { useToast } from '@/contexts/ToastContext'
@@ -16,7 +15,7 @@ import { RouteLoading, RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
-import type { Job, JobFormData, JobStatus } from '@/types'
+import type { Job, JobFormData } from '@/types'
 
 function message(err: unknown, fallback: string): string {
   const raw = err instanceof Error ? err.message : String(err)
@@ -50,7 +49,6 @@ export default function Page() {
   const createJobsBulk = useCreateJobsBulk()
   const updateJob = useUpdateJob()
   const deleteJob = useDeleteJob()
-  const updateStatus = useUpdateJobStatus()
   const autofill = useAutofillJobFromUrl()
   const { success, error: showError } = useToast()
   const [pendingDelete, setPendingDelete] = React.useState<Job | null>(null)
@@ -107,14 +105,6 @@ export default function Page() {
     }
   }
 
-  const handleStatusChange = async (job: Job, status: JobStatus) => {
-    try {
-      await updateStatus.mutateAsync({ id: job.id, status })
-    } catch (err) {
-      showError('Could not move the application', message(err, 'Unknown error'))
-    }
-  }
-
   const handleImport = async (rows: JobFormData[]) => {
     try {
       await createJobsBulk.mutateAsync(rows)
@@ -134,7 +124,6 @@ export default function Page() {
         onCreate={handleCreate}
         onUpdate={handleUpdate}
         onDelete={handleDelete}
-        onStatusChange={handleStatusChange}
         onImport={handleImport}
         onAutofill={(url) => autofill.mutateAsync(url)}
         onCsvError={(msg) => showError('CSV import failed', msg)}

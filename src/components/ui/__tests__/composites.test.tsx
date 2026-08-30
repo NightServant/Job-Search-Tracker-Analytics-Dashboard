@@ -3,7 +3,6 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { KpiStat } from '../kpi-stat'
 import { ApplicationRow } from '../application-row'
 import { JobCard } from '../job-card'
-import { KanbanColumn } from '../kanban-column'
 import { NavItem } from '../nav-item'
 import { Sidebar, NAV } from '../sidebar'
 
@@ -62,13 +61,6 @@ describe('JobCard', () => {
     expect(card.className).toContain('border-border-subtle')
     expect(card.className).not.toMatch(/shadow-/)
     expect(card.className).toContain('rounded-md')
-  })
-})
-
-describe('KanbanColumn', () => {
-  it('renders its count with tabular figures', () => {
-    const { container } = render(<KanbanColumn title="Applied" count={12} />)
-    expect(container.querySelector('[data-column-count]')!.className).toContain('tabular')
   })
 })
 

@@ -3,7 +3,6 @@
 import { KpiStat } from '@/components/ui/kpi-stat'
 import { ApplicationRow } from '@/components/ui/application-row'
 import { JobCard } from '@/components/ui/job-card'
-import { KanbanColumn } from '@/components/ui/kanban-column'
 import { NavItem } from '@/components/ui/nav-item'
 import { Sidebar } from '@/components/ui/sidebar'
 
@@ -52,18 +51,20 @@ export function Composites() {
         </div>
       </Row>
 
-      <Row title="Job Card and Kanban Column" note="A card only because it moves. No shadow, 4px radius.">
-        <div className="flex gap-6 overflow-x-auto pb-2">
-          <KanbanColumn title="Wishlist" count={2}>
-            <JobCard company="Vercel" role="DX Engineer" status="wishlist" salaryMin={140000} salaryMax={175000} currency="USD" />
-            <JobCard company="Linear" role="Frontend Engineer" status="wishlist" currency="USD" />
-          </KanbanColumn>
-          <KanbanColumn title="Applied" count={1}>
-            <JobCard company="Grab" role="Product Engineer" status="applied" salaryMin={1800000} salaryMax={2400000} currency="PHP" />
-          </KanbanColumn>
-          <KanbanColumn title="Interviewing" count={1}>
-            <JobCard company="Canonical" role="Senior Frontend Engineer" status="interviewing" salaryMin={95000} salaryMax={130000} currency="USD" />
-          </KanbanColumn>
+      {/*
+        The kanban board and its `KanbanColumn` wrapper were removed
+        2026-08-29 (Item 3, second pass) at Gabe's explicit instruction --
+        verbatim, "I said remove the sorting itself, not redesign it": the
+        five status columns were themselves the "sorting" he wanted gone, not
+        a styling detail to fix in place. `/applications` is a single flat
+        list, filtered by the status tabs, at every width. `JobCard` survives
+        on its own merits -- it is still used standalone elsewhere.
+      */}
+      <Row title="Job Card" note="A card only because it moves. No shadow, 4px radius.">
+        <div className="flex flex-wrap gap-4">
+          <JobCard company="Vercel" role="DX Engineer" status="wishlist" salaryMin={140000} salaryMax={175000} currency="USD" className="w-56" />
+          <JobCard company="Grab" role="Product Engineer" status="applied" salaryMin={1800000} salaryMax={2400000} currency="PHP" className="w-56" />
+          <JobCard company="Canonical" role="Senior Frontend Engineer" status="interviewing" salaryMin={95000} salaryMax={130000} currency="USD" className="w-56" />
         </div>
       </Row>
 

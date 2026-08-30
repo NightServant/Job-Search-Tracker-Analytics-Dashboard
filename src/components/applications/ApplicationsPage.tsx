@@ -8,12 +8,11 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PlusIcon } from '@/components/icons'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
 import { ApplicationsList } from './ApplicationsList'
-import { KanbanView } from './KanbanView'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from './StatusTabs'
 import { ApplicationForm } from './ApplicationForm'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
-import type { Job, JobAutofillResult, JobFormData, JobStatus } from '@/types'
+import type { Job, JobAutofillResult, JobFormData } from '@/types'
 
 interface CsvImport {
   fileName: string
@@ -41,15 +40,34 @@ function downloadCsv(fileName: string, text: string) {
  * of through Next routing and react-query. Every mutation arrives as a
  * callback; the route owns the hooks.
  *
- * Two views over one list, chosen by width rather than by a toggle. The old
- * screen had a list/kanban switch, and keeping it would have meant a control
- * that does nothing on mobile (where kanban is forbidden) and duplicates the
- * board on desktop. 5.4 states the rule directly: kanban desktop, list plus
- * status tabs on mobile.
+ * One list, narrowed by the status tabs. There is no board.
  *
- * Search narrows both views; the status tabs narrow only the list, because the
- * board already separates by status and a tab that hides four of five columns
- * is a filter arguing with a layout.
+ * The kanban was removed on Gabe's instruction (M5.5 Item 3, 2026-08-29).
+ * His original complaint was that it "would not be able to display all
+ * applications properly based on sorting", and after two narrower readings
+ * from me he was explicit: *"I said remove the sorting itself, not redesign
+ * it!"* The board's grouping into five status columns IS that sorting, so
+ * the whole board goes rather than its styling. The tabs are its
+ * replacement, not an addition beside it.
+ *
+ * - `all` -> every application, ungrouped.
+ * - any single status -> the same list, filtered to that status.
+ *
+ * No columns at any width, which retires the old "no kanban below 768px"
+ * constraint as moot: desktop and mobile are now the same surface, and the
+ * only thing that changes with width is how much of a row fits. Search
+ * narrows the list at every width, same as before.
+ *
+ * The status tabs themselves are also a deliberate departure from the design
+ * rather than a restoration of it -- desktop Figma frame `31:174` has no
+ * tabs at all. Gabe asked for them explicitly.
+ *
+ * WHAT THIS COST, recorded rather than discovered later: dragging a card
+ * between columns was the only way to change a status without opening the
+ * edit dialog, and it died with the board. Status is still fully editable
+ * through the dialog, so this is a lost convenience, not a lost capability
+ * -- but if a per-row status control is wanted back, that is a new task with
+ * a frame behind it, not something to reintroduce as a side effect.
  */
 export interface ApplicationsPageProps {
   jobs: Job[]
@@ -57,7 +75,6 @@ export interface ApplicationsPageProps {
   onCreate?: (data: JobFormData) => Promise<boolean>
   onUpdate?: (id: string, data: JobFormData) => Promise<boolean>
   onDelete?: (job: Job) => void
-  onStatusChange?: (job: Job, status: JobStatus) => void
   onImport?: (rows: JobFormData[]) => Promise<boolean>
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   onCsvError?: (message: string) => void
@@ -72,7 +89,6 @@ export function ApplicationsPage({
   onCreate,
   onUpdate,
   onDelete,
-  onStatusChange,
   onImport,
   onAutofill,
   onCsvError,
@@ -107,6 +123,14 @@ export function ApplicationsPage({
     setForm(null)
   }
 
+  // Sorted most-recently-created first. This predates Task 5 and Task 5 does
+  // not change it, but it is worth naming now that a single status renders as
+  // a flat list where order is the only structure left: `created_at` is when
+  // the row was added to Worktrack, which is not the same field as
+  // `date_applied` (when the application itself went out) -- "most recently
+  // applied first" is what a user reading this list would expect, and this
+  // is "most recently added" instead. A date-sort toggle was dropped in M5
+  // and Gabe still wants it back; that is its own task, not folded in here.
   const searched = React.useMemo(() => {
     const needle = search.trim().toLowerCase()
     const matched = needle
@@ -131,6 +155,13 @@ export function ApplicationsPage({
   }, [searched])
 
   const listed = tab === 'all' ? searched : searched.filter((job) => job.status === tab)
+
+  // A status tab at zero is a real, expected state (nobody has an offer on
+  // day one), not a search yielding nothing -- so it gets its own sentence
+  // rather than the generic "nothing matches these filters" the search box
+  // produces, which would misname the cause.
+  const emptyListMessage =
+    tab === 'all' ? undefined : `no ${tab} applications${search.trim() ? ' match this search' : ' yet'}.`
 
   const handleCsvFile = async (file: File) => {
     setParsingCsv(true)
@@ -315,19 +346,14 @@ export function ApplicationsPage({
             onChange={setTab}
             counts={counts}
             panelId="applications-list"
-            className="md:hidden border-b border-border-subtle"
+            className="border-b border-border-subtle"
           />
           <ApplicationsList
             id="applications-list"
             role="tabpanel"
             aria-labelledby={`status-tab-${tab}`}
             jobs={listed}
-            onEdit={(job) => setForm({ job })}
-            onDelete={onDelete}
-          />
-          <KanbanView
-            jobs={searched}
-            onStatusChange={onStatusChange}
+            emptyMessage={emptyListMessage}
             onEdit={(job) => setForm({ job })}
             onDelete={onDelete}
           />
