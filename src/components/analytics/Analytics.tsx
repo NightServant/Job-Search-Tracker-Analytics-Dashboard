@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/componen
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { AlertCircleIcon } from '@/components/icons'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Callout } from './Callout'
 import { SalaryInsights } from './SalaryInsights'
 import type { Job } from '@/types'
@@ -162,7 +163,11 @@ function PanelBody({
     )
   }
   if (empty) {
-    return <p className="text-body-s text-text-muted">not enough data yet.</p>
+    return (
+      <EmptyState icon="Analytics">
+        not enough data yet. this fills in as applications move through the pipeline.
+      </EmptyState>
+    )
   }
   return <>{render()}</>
 }
@@ -299,7 +304,7 @@ export function Analytics({
       >
         <PanelBody
           state={conversionFunnel}
-          empty={funnelData.length === 0}
+          empty={funnelData.length === 0 || funnelData.every((d) => d.count === 0)}
           render={() => <FunnelChart data={funnelData} />}
         />
       </AnalyticsPanel>
@@ -311,34 +316,11 @@ export function Analytics({
       >
         <PanelBody
           state={timeInStage}
-          empty={(timeInStage.data ?? []).length === 0}
+          empty={
+            (timeInStage.data ?? []).length === 0 ||
+            (timeInStage.data ?? []).every((d) => d.count === 0)
+          }
           render={() => <TimeInStage data={timeInStage.data ?? []} />}
-        />
-      </AnalyticsPanel>
-
-      <AnalyticsPanel
-        title="source trends"
-        action={<Span>{rangeLabel(range)}</Span>}
-        error={sourceConversionTrends.error ? errorMessage(sourceConversionTrends.error) : undefined}
-      >
-        <PanelBody
-          state={sourceConversionTrends}
-          empty={filteredTrends.length === 0}
-          render={() => (
-            <div className="flex flex-col gap-6">
-              <SourceTrends data={filteredTrends} />
-              {topSource && (
-                <Callout
-                  label="top converting source"
-                  metrics={[
-                    { label: 'source', value: topSource.source },
-                    { label: 'applications', value: String(topSource.applied) },
-                    { label: 'offer rate', value: `${topSource.rate}%` },
-                  ]}
-                />
-              )}
-            </div>
-          )}
         />
       </AnalyticsPanel>
 
@@ -349,7 +331,10 @@ export function Analytics({
       >
         <PanelBody
           state={cohortAnalysis}
-          empty={filteredCohorts.length === 0}
+          empty={
+            filteredCohorts.length === 0 ||
+            filteredCohorts.every((c) => c.jobsApplied === 0)
+          }
           render={() => (
             <div className="flex flex-col gap-6">
               {bestCohort && (
@@ -363,6 +348,35 @@ export function Analytics({
                 />
               )}
               <CohortTable data={filteredCohorts} />
+            </div>
+          )}
+        />
+      </AnalyticsPanel>
+
+      <AnalyticsPanel
+        title="source trends"
+        action={<Span>{rangeLabel(range)}</Span>}
+        error={sourceConversionTrends.error ? errorMessage(sourceConversionTrends.error) : undefined}
+      >
+        <PanelBody
+          state={sourceConversionTrends}
+          empty={
+            filteredTrends.length === 0 ||
+            filteredTrends.every((t) => t.applied === 0 && t.offer === 0)
+          }
+          render={() => (
+            <div className="flex flex-col gap-6">
+              <SourceTrends data={filteredTrends} />
+              {topSource && (
+                <Callout
+                  label="top converting source"
+                  metrics={[
+                    { label: 'source', value: topSource.source },
+                    { label: 'applications', value: String(topSource.applied) },
+                    { label: 'offer rate', value: `${topSource.rate}%` },
+                  ]}
+                />
+              )}
             </div>
           )}
         />

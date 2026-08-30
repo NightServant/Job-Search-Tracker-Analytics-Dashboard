@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { FollowUpNudge } from './FollowUpNudge'
 import { KpiStrip } from './KpiStrip'
@@ -107,10 +108,12 @@ export function Dashboard({
   return (
     <div className="flex flex-col gap-8">
       <div>
-        <div data-body-header className="flex items-baseline justify-between gap-4">
-          <h1 className="text-display-m text-text-primary">overview</h1>
-          <p className="tabular text-body-s text-text-muted">{today}</p>
-        </div>
+        {/* PageHeader rather than a hand-rolled h1: this screen having its own
+            was why its title was 28px while five other screens were 20px. */}
+        <PageHeader
+          title="overview"
+          action={<p className="tabular text-body-s text-text-muted">{today}</p>}
+        />
         <hr data-header-rule className="mt-6 border-0 border-t-2 border-border-default" />
       </div>
 

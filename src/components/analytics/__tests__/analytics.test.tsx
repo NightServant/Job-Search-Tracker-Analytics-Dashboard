@@ -184,6 +184,23 @@ describe('Analytics', () => {
     expect(screen.getByRole('heading', { name: 'conversion funnel' })).toBeTruthy()
   })
 
+  it('treats an all-zero series as empty rather than drawing a blank chart', () => {
+    // The empty check only tested for NO ROWS. An account with applications
+    // but no interviews has rows whose every value is zero, so the bars
+    // rendered at zero height and the panel looked broken rather than empty.
+    const zeroed = fullProps()
+    zeroed.timeInStage = {
+      data: [{ status: 'applied', avgDays: 0, medianDays: 0, minDays: 0, maxDays: 0, count: 0 }],
+      isLoading: false,
+      error: null,
+    }
+    render(<Analytics {...zeroed} />)
+    const panel = screen
+      .getByRole('heading', { name: 'time in stage' })
+      .closest('[data-analytics-panel]')!
+    expect(panel.textContent).toMatch(/not enough data yet/i)
+  })
+
   it('colours the funnel with the status palette, in pipeline order', () => {
     const { container } = render(<FunnelChart data={normalizeFunnel(PARTIAL_FUNNEL)} />)
     const stages = [...container.querySelectorAll('[data-stage]')].map((s) => s.getAttribute('data-stage'))

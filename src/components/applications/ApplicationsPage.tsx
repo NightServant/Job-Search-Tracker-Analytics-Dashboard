@@ -400,7 +400,6 @@ export function ApplicationsPage({
                 {(current - 1) * PAGE_SIZE + 1}&ndash;
                 {Math.min(current * PAGE_SIZE, listed.length)} of {listed.length}
               </p>
-              {pageCount > 1 && (
               <Pagination className="mx-0 w-auto justify-end">
                 <PaginationContent>
                   <PaginationItem>
@@ -414,9 +413,10 @@ export function ApplicationsPage({
                       }}
                     />
                   </PaginationItem>
-                  {Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
-                    <PaginationItem key={n}>
-                      <PaginationLink
+                  {pageCount > 1 &&
+                    Array.from({ length: pageCount }, (_, i) => i + 1).map((n) => (
+                      <PaginationItem key={n}>
+                        <PaginationLink
                         href="#"
                         isActive={n === current}
                         onClick={(e) => {
@@ -426,8 +426,8 @@ export function ApplicationsPage({
                       >
                         {n}
                       </PaginationLink>
-                    </PaginationItem>
-                  ))}
+                      </PaginationItem>
+                    ))}
                   <PaginationItem>
                     <PaginationNext
                       href="#"
@@ -443,7 +443,6 @@ export function ApplicationsPage({
                   </PaginationItem>
                 </PaginationContent>
               </Pagination>
-              )}
             </div>
           )}
         </>

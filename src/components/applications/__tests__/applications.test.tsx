@@ -61,6 +61,18 @@ describe('ApplicationsPage', () => {
     expect(screen.queryByText(/^null$/i)).toBeNull()
   })
 
+  it('shows previous and next even when everything fits on one page', () => {
+    // They were gated on pageCount > 1, so an account under one page saw no
+    // pagination at all and could not tell the feature existed -- which is
+    // exactly how it read on review.
+    render(<ApplicationsPage jobs={JOBS} />)
+    expect(screen.getByRole('button', { name: /previous/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /next/i })).toBeTruthy()
+    // Both disabled, because there is nowhere to go.
+    expect(screen.getByRole('button', { name: /previous/i }).getAttribute('aria-disabled')).toBe('true')
+    expect(screen.getByRole('button', { name: /next/i }).getAttribute('aria-disabled')).toBe('true')
+  })
+
   it('splits the rows across pages and moves between them', () => {
     // M5 Task 4 removed the original 20-per-page pagination along with the
     // advanced filters; Gabe asked for it back.

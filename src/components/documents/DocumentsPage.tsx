@@ -7,6 +7,7 @@ import { AppDialog } from '@/components/ui/app-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { PlusIcon, TrashIcon } from '@/components/icons'
 import { ModeChooser } from '@/components/cv/ModeChooser'
+import { EmptyState } from '@/components/ui/empty-state'
 import { DocumentRow } from './DocumentRow'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
 import type { ResumeSummary } from '@/services/resumeService'
@@ -77,16 +78,17 @@ export function DocumentsPage({
       />
 
       {docs.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 border-t border-border-subtle pt-6">
-          <p className="text-body-m text-text-primary">no CVs yet.</p>
-          <p className="text-body-s text-text-muted">
-            Write one in the document editor or in LaTeX, then pin it to the applications you send
-            it to.
-          </p>
-          <Button variant="secondary" size="s" onClick={() => setNewCvOpen(true)}>
-            new CV
-          </Button>
-        </div>
+        <EmptyState
+          icon="Documents"
+          action={
+            <Button variant="secondary" size="s" onClick={() => setNewCvOpen(true)}>
+              new CV
+            </Button>
+          }
+        >
+          no CVs yet. write one in the document editor or in LaTeX, then pin it to the applications
+          you send it to.
+        </EmptyState>
       ) : (
         <div>
           {docs.map((doc) => (
