@@ -632,11 +632,23 @@ body,
    NO INVERT in dark mode, unlike the greyscale version. Inverting a colour
    image maps every hue to its complement -- warm becomes cold, and the tint
    stops matching the accent. Dark instead carries slightly more opacity,
-   because the same wash reads fainter against a near-black canvas. */
+   because the same wash reads fainter against a near-black canvas.
+
+   LIGHT IS HEAVILY DESATURATED, AND NOT FOR A LUMINANCE REASON. The image's
+   mean colour is rgb(222,125,48) -- orange. Measured against the real tokens,
+   contrast was never in danger: even at 14% the page sits at 15.4:1 against
+   text-primary, where AA body text needs 4.5. What the orange cast actually
+   cost was the ACCENT. #c2410c is the one colour this system reserves for
+   meaning -- active nav, primary action, focus -- and laying a warm orange
+   wash under it leaves the accent competing with its own background. So light
+   drops saturation to 0.3, which pulls the wash to a warm grey and hands the
+   chroma back to the accent. Dark keeps more saturation because a warm tint
+   on near-black reads as depth rather than as a competing hue, and Gabe
+   confirmed dark already reads correctly. */
 :root {
   --app-backdrop-image: url('/backdrop.jpg');
-  --app-backdrop-opacity: 0.10;
-  --app-backdrop-filter: saturate(0.9);
+  --app-backdrop-opacity: 0.09;
+  --app-backdrop-filter: saturate(0.3);
 }
 :root:not([data-theme='light']) {
   @media (prefers-color-scheme: dark) {
