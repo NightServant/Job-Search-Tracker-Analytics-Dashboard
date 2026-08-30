@@ -4,6 +4,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircleIcon } from '@/components/icons'
+import { EmptyState } from '@/components/ui/empty-state'
 import type { CalendarEvent } from '@/services/events'
 
 const KIND_LABELS: Record<CalendarEvent['kind'], string> = {
@@ -74,9 +75,9 @@ export function UpcomingEvents({
   return (
     <div className="flex flex-col gap-3">
       {shown.length === 0 ? (
-        <p data-events-empty className="py-4 text-body-s text-text-muted">
+        <EmptyState data-events-empty icon="Calendar">
           nothing scheduled yet. interviews and deadlines you add show up here.
-        </p>
+        </EmptyState>
       ) : (
         <ul className="flex flex-col">
           {shown.map((event) => {

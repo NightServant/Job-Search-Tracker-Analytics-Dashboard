@@ -611,3 +611,45 @@ body,
     --toast-exit-duration: 1ms;
   }
 }
+
+/* --- App backdrop (M5.5) --------------------------------------------------
+   A real photograph: Unsplash photo-1759640415499 by Liana S
+   (@cherstve_pechivo), an abstract blurred black-and-white texture, under the
+   Unsplash Licence. Credited in the README alongside the other third-party
+   assets, per the roadmap's standing rule -- the licence does not require
+   attribution, the repo's own convention does.
+
+   A blurred greyscale texture was chosen deliberately over anything
+   representational. This sits behind dense text, tabular figures and 2px
+   status rules; a photo with subjects, edges or local colour fights all
+   three, and no opacity value rescues it. Greyscale also means one asset
+   serves both themes honestly.
+
+   Theme-aware means two treatments, not one image dimmed twice. Light leaves
+   it as-is, so the dark regions settle the white canvas slightly. Dark
+   INVERTS it, so those same regions lift a near-black canvas instead of
+   punching holes in it -- an uninverted photo over dark reads as smudges. */
+:root {
+  --app-backdrop-image: url('/backdrop.jpg');
+  --app-backdrop-opacity: 0.05;
+  --app-backdrop-filter: none;
+}
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --app-backdrop-opacity: 0.08;
+    --app-backdrop-filter: invert(1);
+  }
+}
+:root[data-theme='dark'] {
+  --app-backdrop-opacity: 0.08;
+  --app-backdrop-filter: invert(1);
+}
+[data-app-backdrop] {
+  background-image: var(--app-backdrop-image);
+  background-repeat: no-repeat;
+  background-size: cover;
+  background-position: center;
+  opacity: var(--app-backdrop-opacity);
+  filter: var(--app-backdrop-filter);
+}
+

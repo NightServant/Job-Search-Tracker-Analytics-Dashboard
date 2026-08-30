@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { PanelSection } from '@/components/ui/panel-section'
+import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import { FollowUpNudge } from './FollowUpNudge'
 import { KpiStrip } from './KpiStrip'
 import { ApplicationsOverTime } from './ApplicationsOverTime'
@@ -40,6 +40,13 @@ const TREND_MONTHS = 6
  * edge, and the title is `overview` rather than `Dashboard`: the sidebar nav,
  * the Figma page title and this heading all now agree, where before only the
  * route path said dashboard and the heading copied it.
+ *
+ * The content panels are shadcn `Card`s, restyled to this system in Task 2 --
+ * no shadow, radius at the 4px cap, a hairline border rather than shadcn's
+ * ring. That is a deliberate departure from the frame, which separates these
+ * panels with rules rather than boxing them: Gabe asked for the card
+ * component on this screen specifically. The rule the frame does specify --
+ * the 2px one under the page title -- stays.
  *
  * Layout, top to bottom, matching the frame: header, rule, five-KPI strip with
  * dividers, follow-up nudge, then a three-panel content grid at 460/300/280,
@@ -112,20 +119,35 @@ export function Dashboard({
       <FollowUpNudge stale={stale} />
 
       <div className="grid gap-8 lg:grid-cols-[460fr_300fr_280fr]">
-        <PanelSection title="applications over time" titleSize="m">
-          <ApplicationsOverTime data={trend} />
-        </PanelSection>
-        <PanelSection title="by status" titleSize="m">
-          <StatusDonut data={statuses} />
-        </PanelSection>
-        <PanelSection title="upcoming events" titleSize="m">
-          <UpcomingEvents
-            events={events}
-            companyByJobId={companyByJobId}
-            loading={eventsLoading}
-            error={eventsError}
-          />
-        </PanelSection>
+        <Card>
+          <CardHeader>
+            <CardTitle>applications over time</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ApplicationsOverTime data={trend} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>by status</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <StatusDonut data={statuses} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>upcoming events</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <UpcomingEvents
+              events={events}
+              companyByJobId={companyByJobId}
+              loading={eventsLoading}
+              error={eventsError}
+            />
+          </CardContent>
+        </Card>
       </div>
 
       {/* `by source` shares this row rather than owning a full-width one of
@@ -134,20 +156,27 @@ export function Dashboard({
           visual weight of the whole screen. The table is the frame's own
           bottom block (26:76) and keeps the larger share. */}
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
-        <PanelSection
-          title="recent applications"
-          titleSize="m"
-          actions={
-            <Link href="/applications" className="text-body-s text-accent-default hover:underline">
-              view all
-            </Link>
-          }
-        >
-          <RecentApplicationsTable jobs={jobs} />
-        </PanelSection>
-        <PanelSection title="by source" titleSize="m">
-          <SourceBars data={sources} />
-        </PanelSection>
+        <Card>
+          <CardHeader>
+            <CardTitle>recent applications</CardTitle>
+            <CardAction>
+              <Link href="/applications" className="text-body-s text-accent-default hover:underline">
+                view all
+              </Link>
+            </CardAction>
+          </CardHeader>
+          <CardContent>
+            <RecentApplicationsTable jobs={jobs} />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>by source</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <SourceBars data={sources} />
+          </CardContent>
+        </Card>
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import * as React from 'react'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { EmptyState } from '@/components/ui/empty-state'
 import type { SourceCount } from '@/lib/overviewSeries'
 
 const CONFIG = {
@@ -43,9 +44,9 @@ export function SourceBars({ data }: SourceBarsProps) {
 
   if (data.length === 0) {
     return (
-      <p className="py-8 text-body-s text-text-muted">
+      <EmptyState icon="Analytics">
         no sources recorded yet. add one to an application and it shows up here.
-      </p>
+      </EmptyState>
     )
   }
 

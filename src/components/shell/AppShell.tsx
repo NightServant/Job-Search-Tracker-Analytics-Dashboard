@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { Sidebar, NAV } from '@/components/ui/sidebar'
+import { AppBackground } from './AppBackground'
 import { activeNavHref, isUnder } from '@/lib/activeNav'
 import { TopBar } from './TopBar'
 import { BottomNav } from './BottomNav'
@@ -21,6 +22,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-bg-canvas">
+      <AppBackground />
       <Sidebar pathname={pathname} activeHref={active} className="hidden md:flex" />
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar settingsActive={settingsActive} />

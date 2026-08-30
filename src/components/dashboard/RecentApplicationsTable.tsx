@@ -11,6 +11,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
+import { EmptyState } from '@/components/ui/empty-state'
 import { formatAppliedDate } from '@/services/date'
 import type { Job } from '@/types'
 
@@ -42,9 +43,9 @@ export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsT
 
   if (rows.length === 0) {
     return (
-      <p className="py-4 text-body-s text-text-muted">
+      <EmptyState icon="Applications">
         no applications yet. add one and it shows up here.
-      </p>
+      </EmptyState>
     )
   }
 
