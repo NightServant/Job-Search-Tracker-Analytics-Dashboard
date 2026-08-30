@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { CssSpinner } from '@/components/ui/css-spinner'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { AlertCircleIcon } from '@/components/icons'
 
@@ -33,10 +33,31 @@ import { AlertCircleIcon } from '@/components/icons'
  * `action` overrides it for the one site that cannot use a retry rather than
  * forcing that site into one that would not work.
  */
+/**
+ * A skeleton of the page's own shape, not a centred spinner (M5.5 Item 11).
+ *
+ * A spinner says "something is happening somewhere". A skeleton says "a
+ * heading, then a row of figures, then content, are arriving here" -- so the
+ * layout does not jump when the data lands, and the wait reads as this page
+ * loading rather than as the app hanging.
+ *
+ * `role="status"` with a visually-hidden label, so a screen reader is told the
+ * page is loading rather than encountering a pile of unlabelled boxes.
+ */
 export function RouteLoading() {
   return (
-    <div className="flex justify-center py-24">
-      <CssSpinner size={24} />
+    <div role="status" aria-busy="true" className="flex flex-col gap-8 py-2">
+      <span className="sr-only">loading</span>
+      <div className="flex flex-col gap-3">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-px w-full" />
+      </div>
+      <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-14 w-full" />
+        ))}
+      </div>
+      <Skeleton className="h-64 w-full" />
     </div>
   )
 }

@@ -250,6 +250,15 @@
   animation: pulse var(--duration-skeleton) var(--ease-standard) infinite;
 }
 
+/* Six unused utilities removed in M5.5 Item 11 (.animate-fade-in,
+   .animate-slide-down, .animate-slide-up, .btn-danger, .btn-ghost,
+   .card-hover). What still holds the rest of this block alive, precisely:
+   .btn-primary/.btn-secondary/.card/.input/.label are used by
+   screens/LoginPage.tsx -- live, and deleted by M6 Task 4 -- and by
+   components/errors/ErrorFallback.tsx, which is dead code: its only importer
+   AppErrorBoundary is itself imported by nothing, and there is no
+   app/error.tsx. So this block dies with M6, not before. */
+
 /* --- Legacy v3 tokens -------------------------------------------------------
    The screens still in the tree were built against these and are rewritten in
    M5. Kept so M4 does not have to redesign screens it is not responsible for;
@@ -475,15 +484,7 @@ body,
          focus:ring-ring dark:bg-zinc-800 dark:text-zinc-50 dark:hover:bg-zinc-700;
   }
 
-  .btn-danger {
-    @apply btn bg-red-600 text-white hover:bg-red-700
-           focus:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600;
-  }
 
-  .btn-ghost {
-    @apply btn bg-transparent text-zinc-600 hover:bg-zinc-100
-        dark:text-zinc-300 dark:hover:bg-zinc-800;
-  }
 
   .input {
       @apply w-full px-3 py-2 rounded-lg border border-input 
@@ -496,25 +497,12 @@ body,
       @apply block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1;
   }
 
-  .card-hover {
-    @apply card hover:shadow-md hover:border-zinc-300 
-           dark:hover:border-zinc-700 transition-all duration-200;
-  }
 }
 
 /* Animation utilities */
 @layer utilities {
-  .animate-fade-in {
-    animation: fadeIn 0.2s ease-out;
-  }
 
-  .animate-slide-up {
-    animation: slideUp 0.2s ease-out;
-  }
 
-  .animate-slide-down {
-    animation: slideDown 0.2s ease-out;
-  }
 }
 
 @keyframes fadeIn {

@@ -10,7 +10,7 @@ import { Callout } from './Callout'
 import { SalaryInsights } from './SalaryInsights'
 import type { Job } from '@/types'
 import { KpiStat } from '@/components/ui/kpi-stat'
-import { CssSpinner } from '@/components/ui/css-spinner'
+import { Skeleton } from '@/components/ui/skeleton'
 import { RangePicker } from './RangePicker'
 import { FunnelChart, normalizeFunnel } from './FunnelChart'
 import { TimeInStage } from './TimeInStage'
@@ -155,8 +155,9 @@ function PanelBody({
 }) {
   if (state.isLoading) {
     return (
-      <div className="flex justify-center py-8">
-        <CssSpinner size={20} />
+      <div role="status" aria-busy="true">
+        <span className="sr-only">loading</span>
+        <Skeleton className="h-40 w-full" />
       </div>
     )
   }

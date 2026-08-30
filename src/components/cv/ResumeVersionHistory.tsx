@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
-import { CssSpinner } from '@/components/ui/css-spinner'
+import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ChevronDownIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { useToast } from '@/contexts/ToastContext'
@@ -130,7 +130,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
 
             {isLoading ? (
               <div className="flex justify-center p-4">
-                <CssSpinner size={20} className="text-text-muted" />
+                <Skeleton className="h-20 w-full" />
               </div>
             ) : snapshots.length === 0 ? (
               <p className="p-4 text-body-s text-text-muted">

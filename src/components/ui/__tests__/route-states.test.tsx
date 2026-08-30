@@ -5,13 +5,21 @@ import { RouteLoading, RouteError } from '../route-states'
 afterEach(() => cleanup())
 
 describe('RouteLoading', () => {
-  it('centers a size-24 spinner the same way all three routes used to', () => {
+  it('sketches the page shape rather than centring a spinner', () => {
+    // Replaces "centers a size-24 spinner". A spinner says something is
+    // happening somewhere; a skeleton says a heading, a row of figures and
+    // content are arriving HERE, so the layout does not jump when data lands.
     const { container } = render(<RouteLoading />)
-    const wrapper = container.firstElementChild as HTMLElement
-    expect(wrapper.className).toContain('flex')
-    expect(wrapper.className).toContain('justify-center')
-    expect(wrapper.className).toContain('py-24')
-    expect(wrapper.querySelector('[role="status"]')).toBeTruthy()
+    const region = container.firstElementChild as HTMLElement
+    expect(region.getAttribute('role')).toBe('status')
+    expect(region.getAttribute('aria-busy')).toBe('true')
+    // More than one block, or it is a spinner wearing a rectangle.
+    expect(container.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(1)
+  })
+
+  it('names the wait for a screen reader rather than leaving unlabelled boxes', () => {
+    render(<RouteLoading />)
+    expect(screen.getByText('loading')).toBeTruthy()
   })
 })
 
