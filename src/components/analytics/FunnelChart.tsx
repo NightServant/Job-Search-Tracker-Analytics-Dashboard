@@ -46,6 +46,17 @@ export interface FunnelStageDatum {
   percentage: number
   /** See `ConversionFunnelMetric.isExit`. `true` only for 'rejected'. */
   isExit: boolean
+  /**
+   * Mean days taken to reach this stage. The service has always returned it
+   * and this chart used to discard it, which is why the panel had a bar, a
+   * count and a percentage and still could not answer "how long does this
+   * take" -- the one question a funnel is usually read for.
+   *
+   * `0` on the starting stage, where "time to reach" is meaningless, and `0`
+   * on any stage nobody has reached. Both render as a dash rather than "0d",
+   * which would claim the step is instant.
+   */
+  avgDaysToStage: number
 }
 
 /**
@@ -73,7 +84,13 @@ export function normalizeFunnel(metrics: ConversionFunnelMetric[]): FunnelStageD
   }
   return STATUSES.filter((stage) => byStage.has(stage)).map((stage) => {
     const metric = byStage.get(stage)!
-    return { stage, count: metric.count, percentage: metric.percentage, isExit: metric.isExit }
+    return {
+      stage,
+      count: metric.count,
+      percentage: metric.percentage,
+      isExit: metric.isExit,
+      avgDaysToStage: metric.avgDaysToStage,
+    }
   })
 }
 
@@ -94,6 +111,22 @@ export interface FunnelChartProps {
  * not the fifth rung of a chain that is supposed to read top-to-bottom as
  * monotonically non-increasing.
  */
+/**
+ * The timing line under a stage's bar.
+ *
+ * A dash, not "0d". Zero means either the starting stage (nothing precedes it)
+ * or a stage nobody has reached yet -- printing "0d to reach" for either would
+ * read as "this step takes no time", which is the opposite of the truth in the
+ * second case.
+ */
+function StageTiming({ days }: { days: number }) {
+  return (
+    <p className="pl-27 text-body-s text-text-muted">
+      {days > 0 ? `${Math.round(days)}d to reach` : '\u2014'}
+    </p>
+  )
+}
+
 export function FunnelChart({ data }: FunnelChartProps) {
   if (data.length === 0) {
     return (
@@ -130,7 +163,8 @@ export function FunnelChart({ data }: FunnelChartProps) {
         {chain.map((d) => {
           const share = d.count / top
           return (
-            <div key={d.stage} className="flex w-full items-center gap-3">
+            <div key={d.stage} className="flex w-full flex-col gap-0.5">
+              <div className="flex w-full items-center gap-3">
               <span className="w-24 shrink-0 text-body-s text-text-secondary">
                 {LABELS[d.stage]}
               </span>
@@ -155,6 +189,8 @@ export function FunnelChart({ data }: FunnelChartProps) {
                   {Math.round(share * 100)}%
                 </span>
               </span>
+              </div>
+              <StageTiming days={d.avgDaysToStage} />
             </div>
           )
         })}
@@ -166,7 +202,8 @@ export function FunnelChart({ data }: FunnelChartProps) {
           className="flex flex-col gap-1 border-t border-border-subtle pt-3"
         >
           {exits.map((d) => (
-            <div key={d.stage} className="flex w-full items-center gap-3">
+            <div key={d.stage} className="flex w-full flex-col gap-0.5">
+              <div className="flex w-full items-center gap-3">
               <span className="w-24 shrink-0 text-body-s text-text-secondary">
                 {LABELS[d.stage]}
               </span>
@@ -187,6 +224,8 @@ export function FunnelChart({ data }: FunnelChartProps) {
               <span className="tabular w-16 shrink-0 text-right text-body-s text-text-primary">
                 {d.count}
               </span>
+              </div>
+              <StageTiming days={d.avgDaysToStage} />
             </div>
           ))}
         </div>

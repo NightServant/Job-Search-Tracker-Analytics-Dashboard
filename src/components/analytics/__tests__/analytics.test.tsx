@@ -463,6 +463,42 @@ describe('TimeInStage', () => {
   })
 })
 
+describe('FunnelChart timings', () => {
+  it('shows how long each stage took, which the chart used to discard', () => {
+    // getConversionFunnel has always returned avgDaysToStage and
+    // normalizeFunnel dropped it on the floor, so the panel could show a bar,
+    // a count and a percentage but could not answer "how long does this take".
+    render(<FunnelChart data={normalizeFunnel(FUNNEL)} />)
+    expect(screen.getByText('3d to reach')).toBeTruthy()
+    expect(screen.getByText('9d to reach')).toBeTruthy()
+    expect(screen.getByText('21d to reach')).toBeTruthy()
+    // The exits group carries it too -- how long people wait before a
+    // rejection is the most useful number on the panel.
+    expect(screen.getByText('11d to reach')).toBeTruthy()
+  })
+
+  it('writes a dash rather than "0d" where zero does not mean instant', () => {
+    // Two different zeroes: Wishlist is the starting stage, and a stage nobody
+    // has reached also reports 0. "0d to reach" would read as "this step is
+    // instant" for both, which is wrong for the second and meaningless for the
+    // first.
+    const unreached: ConversionFunnelMetric[] = [
+      { stage: 'Wishlist', count: 10, percentage: 100, avgDaysToStage: 0, isExit: false },
+      { stage: 'Applied', count: 10, percentage: 100, avgDaysToStage: 1, isExit: false },
+      { stage: 'Interviewing', count: 0, percentage: 0, avgDaysToStage: 0, isExit: false },
+    ]
+    render(<FunnelChart data={normalizeFunnel(unreached)} />)
+    expect(screen.queryByText(/0d to reach/)).toBeNull()
+    expect(screen.getAllByText('\u2014')).toHaveLength(2)
+    expect(screen.getByText('1d to reach')).toBeTruthy()
+  })
+
+  it('carries avgDaysToStage through normalizeFunnel', () => {
+    const result = normalizeFunnel(PARTIAL_FUNNEL)
+    expect(result.map((r) => r.avgDaysToStage)).toEqual([3, 9, 21])
+  })
+})
+
 describe('RangePicker', () => {
   it('offers the four windows the range maths supports, in that order', () => {
     render(<RangePicker value="all" onChange={() => {}} />)
