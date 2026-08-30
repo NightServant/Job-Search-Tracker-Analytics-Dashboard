@@ -3,8 +3,6 @@
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
-import Link from 'next/link'
-import { cn } from '@/lib/utils'
 import { AlertCircleIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Callout } from './Callout'
@@ -64,11 +62,13 @@ function AnalyticsPanel({
   title,
   action,
   error,
+  className,
   children,
 }: {
   title: string
   action?: React.ReactNode
   error?: string
+  className?: string
   children: React.ReactNode
 }) {
   return (
@@ -77,7 +77,7 @@ function AnalyticsPanel({
     // in the accessibility tree is lost -- but the panel boundary still has to
     // be addressable, by tests and by anything that needs to scope a query to
     // one panel.
-    <Card data-analytics-panel>
+    <Card data-analytics-panel className={className}>
       <CardHeader>
         {/* An <h2> inside CardTitle, not instead of it: CardTitle renders a
             div, so converting these panels to Cards silently removed every
@@ -103,39 +103,6 @@ function AnalyticsPanel({
   )
 }
 
-/**
- * Figma `App Footer` (80:1052) -- six link items with `·` separators. Absent
- * from the code until now. Plain links, not nav: this is the end of a 2560px
- * page, and the sidebar is the navigation.
- */
-function AppFooter({ className }: { className?: string }) {
-  const links = [
-    { href: '/dashboard', label: 'overview' },
-    { href: '/applications', label: 'applications' },
-    { href: '/calendar', label: 'calendar' },
-    { href: '/documents', label: 'documents' },
-    { href: '/analytics', label: 'analytics' },
-    { href: '/settings', label: 'settings' },
-  ]
-  return (
-    <footer
-      data-app-footer
-      className={cn(
-        'flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border-subtle pt-6 text-body-s text-text-muted',
-        className
-      )}
-    >
-      {links.map((link, i) => (
-        <React.Fragment key={link.href}>
-          {i > 0 && <span aria-hidden>·</span>}
-          <Link href={link.href} className="hover:text-accent-default">
-            {link.label}
-          </Link>
-        </React.Fragment>
-      ))}
-    </footer>
-  )
-}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Could not load this metric.'
@@ -290,6 +257,7 @@ export function Analytics({
       <PageHeader className="lg:col-span-2" title="analytics" action={<RangePicker value={range} onChange={setRange} />} />
 
       <AnalyticsPanel
+        className="lg:col-span-2"
         title="overview"
         action={<Span>all time</Span>}
         error={conversionMetrics.error ? errorMessage(conversionMetrics.error) : undefined}
@@ -325,6 +293,7 @@ export function Analytics({
       </AnalyticsPanel>
 
       <AnalyticsPanel
+        className="lg:col-span-2"
         title="cohort analysis"
         action={<Span>{rangeLabel(range)}</Span>}
         error={cohortAnalysis.error ? errorMessage(cohortAnalysis.error) : undefined}
@@ -386,7 +355,6 @@ export function Analytics({
         <SalaryInsights jobs={jobs} />
       </AnalyticsPanel>
 
-      <AppFooter className="lg:col-span-2" />
     </div>
   )
 }

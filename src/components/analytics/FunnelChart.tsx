@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { STATUSES, type Status } from '@/components/ui/status-marker'
+import { EmptyState } from '@/components/ui/empty-state'
 import type { ConversionFunnelMetric } from '@/services/analyticsService'
 
 const LABELS: Record<Status, string> = {
@@ -95,36 +96,90 @@ export interface FunnelChartProps {
  */
 export function FunnelChart({ data }: FunnelChartProps) {
   if (data.length === 0) {
-    return <p className="text-body-s text-text-muted">not enough data yet.</p>
+    return (
+      <EmptyState icon="Analytics">
+        not enough data yet. this fills in as applications move through the pipeline.
+      </EmptyState>
+    )
   }
 
-  const max = Math.max(...data.map((d) => d.count), 1)
   const chain = data.filter((d) => !d.isExit)
   const exits = data.filter((d) => d.isExit)
-
-  const bar = (d: FunnelStageDatum) => (
-    <div key={d.stage} data-stage={d.stage} data-exit={d.isExit ? 'true' : undefined} className="flex items-center gap-3">
-      <span className="w-28 shrink-0 text-body-s text-text-secondary">{LABELS[d.stage]}</span>
-      <div className="h-2 flex-1 bg-bg-inset">
-        <div
-          data-fill={STAGE_FILL[d.stage]}
-          className="h-2"
-          style={{
-            width: `${Math.max((d.count / max) * 100, 2)}%`,
-            backgroundColor: STAGE_FILL[d.stage],
-          }}
-        />
-      </div>
-      <span className="tabular w-10 shrink-0 text-right text-body-s text-text-primary">{d.count}</span>
-    </div>
-  )
+  // The chain's own top stage is the denominator, not the global max. A funnel
+  // reads as "what fraction survived each step", and measuring against an exit
+  // count would make a heavily-rejected pipeline look like it converted well.
+  const top = Math.max(chain[0]?.count ?? 0, 1)
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-col gap-3">{chain.map(bar)}</div>
+    <div className="flex flex-col gap-4">
+      {/* An actual funnel, not a bar list: each stage is centred and its width
+          is its share of the first stage, so the taper IS the conversion. The
+          previous version was left-aligned tracks of equal length, which is a
+          bar chart wearing the word "funnel" -- you had to read the numbers to
+          see the shape the chart exists to show. */}
+      <div data-funnel-chain className="flex flex-col items-center gap-1">
+        {chain.map((d) => {
+          const share = d.count / top
+          return (
+            <div key={d.stage} className="flex w-full items-center gap-3">
+              <span className="w-24 shrink-0 text-body-s text-text-secondary">
+                {LABELS[d.stage]}
+              </span>
+              <div
+                data-stage={d.stage}
+                className="flex h-7 flex-1 items-center justify-center"
+              >
+                <div
+                  data-fill={STAGE_FILL[d.stage]}
+                  className="h-7 rounded-sm transition-[width] duration-[--duration-base]"
+                  style={{
+                    // A floor so a zero stage is still a visible tick rather
+                    // than nothing -- "0 got here" is information.
+                    width: `${Math.max(share * 100, 1.5)}%`,
+                    backgroundColor: STAGE_FILL[d.stage],
+                  }}
+                />
+              </div>
+              <span className="tabular w-16 shrink-0 text-right text-body-s text-text-primary">
+                {d.count}
+                <span className="ml-1 text-text-muted">
+                  {Math.round(share * 100)}%
+                </span>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
       {exits.length > 0 && (
-        <div data-funnel-exits className="flex flex-col gap-3 border-t border-border-subtle pt-3">
-          {exits.map(bar)}
+        <div
+          data-funnel-exits
+          className="flex flex-col gap-1 border-t border-border-subtle pt-3"
+        >
+          {exits.map((d) => (
+            <div key={d.stage} className="flex w-full items-center gap-3">
+              <span className="w-24 shrink-0 text-body-s text-text-secondary">
+                {LABELS[d.stage]}
+              </span>
+              <div
+                data-stage={d.stage}
+                data-exit="true"
+                className="flex h-5 flex-1 items-center"
+              >
+                <div
+                  data-fill={STAGE_FILL[d.stage]}
+                  className="h-5 rounded-sm"
+                  style={{
+                    width: `${Math.max((d.count / top) * 100, 1.5)}%`,
+                    backgroundColor: STAGE_FILL[d.stage],
+                  }}
+                />
+              </div>
+              <span className="tabular w-16 shrink-0 text-right text-body-s text-text-primary">
+                {d.count}
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>

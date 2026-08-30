@@ -54,9 +54,21 @@ function midpoint(job: Job): number | null {
   return null
 }
 
-const BUCKET_COUNT = 12
+/**
+ * Figma draws twelve bars, but twelve is a ceiling rather than a constant.
+ * Four salaries spread over twelve buckets is eight empty columns and three
+ * lonely bars -- the chart reserves space for data that does not exist and
+ * reads as broken rather than as sparse. Square-root choice is the standard
+ * rule for this and degrades sensibly: 4 salaries -> 2 buckets, 25 -> 5,
+ * 144+ -> the full twelve.
+ */
+const MAX_BUCKETS = 12
 
-export function salaryDistribution(jobs: Job[], bucketCount = BUCKET_COUNT): SalaryDistribution {
+function bucketsFor(count: number): number {
+  return Math.max(1, Math.min(MAX_BUCKETS, Math.ceil(Math.sqrt(count))))
+}
+
+export function salaryDistribution(jobs: Job[], bucketCount?: number): SalaryDistribution {
   const priced = jobs
     .map((job) => ({ job, value: midpoint(job) }))
     .filter((row): row is { job: Job; value: number } => row.value !== null && row.value > 0)
@@ -98,20 +110,21 @@ export function salaryDistribution(jobs: Job[], bucketCount = BUCKET_COUNT): Sal
 
   // A single distinct value has no range to divide, so one bucket holds it
   // rather than producing twelve empty ones around a zero-width span.
+  const buckets_ = bucketCount ?? bucketsFor(values.length)
   const span = max - min
-  const width = span > 0 ? span / bucketCount : 0
+  const width = span > 0 ? span / buckets_ : 0
   const buckets: SalaryBucket[] = []
 
   if (width === 0) {
     buckets.push({ from: min, to: max, count: values.length })
   } else {
-    for (let i = 0; i < bucketCount; i += 1) {
+    for (let i = 0; i < buckets_; i += 1) {
       buckets.push({ from: min + i * width, to: min + (i + 1) * width, count: 0 })
     }
     for (const value of values) {
       // The top value would land at index bucketCount; clamp it into the last
       // bucket, whose upper bound is inclusive.
-      const index = Math.min(bucketCount - 1, Math.floor((value - min) / width))
+      const index = Math.min(buckets_ - 1, Math.floor((value - min) / width))
       buckets[index].count += 1
     }
   }

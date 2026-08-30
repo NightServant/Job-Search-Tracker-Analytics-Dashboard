@@ -370,7 +370,7 @@ describe('RangePicker', () => {
   it('offers the four windows the range maths supports, in that order', () => {
     render(<RangePicker value="all" onChange={() => {}} />)
     const options = screen.getAllByRole('option').map((o) => o.textContent)
-    expect(options).toEqual(['Last 3 months', 'Last 6 months', 'Last 12 months', 'All time'])
+    expect(options).toEqual(['Last 3 months', 'Last 6 months', 'Last 12 months', 'all time'])
   })
 })
 

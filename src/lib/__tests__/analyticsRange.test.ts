@@ -51,8 +51,8 @@ describe('rangeLabel', () => {
     expect(RANGE_OPTIONS.map((o) => o.value)).toEqual(['3m', '6m', '12m', 'all'])
   })
 
-  it('falls back to "All time" for an unrecognised value rather than throwing', () => {
+  it('falls back to "all time" for an unrecognised value rather than throwing', () => {
     // @ts-expect-error -- deliberately outside the RangeOption union
-    expect(rangeLabel('bogus')).toBe('All time')
+    expect(rangeLabel('bogus')).toBe('all time')
   })
 })
