@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import type { Job } from '@/types'
 import { Analytics, type MetricState } from '../Analytics'
 import { FunnelChart, normalizeFunnel, STAGE_FILL } from '../FunnelChart'
 import { TimeInStage } from '../TimeInStage'
@@ -101,8 +102,23 @@ const METRICS: ConversionMetrics = {
   conversionBySource: { LinkedIn: 1, Referral: 1 },
 }
 
+/**
+ * Two priced jobs, so `fullProps` really is full: salary insights derives its
+ * own emptiness from `jobs` rather than a query, so omitting them hid the
+ * panel and every "all six panels" assertion was quietly about five.
+ *
+ * Cast, because Salary Insights reads four of `Job`'s ~30 columns and a
+ * literal carrying the other twenty-six would be noise around the three
+ * fields under test.
+ */
+const PRICED_JOBS = [
+  { id: 'j1', company: 'Acme', salary_min: 20_000, salary_max: 30_000, salary_currency: 'PHP' },
+  { id: 'j2', company: 'Globex', salary_min: 40_000, salary_max: 60_000, salary_currency: 'PHP' },
+] as unknown as Job[]
+
 function fullProps() {
   return {
+    jobs: PRICED_JOBS,
     timeInStage: ok(TIME_IN_STAGE),
     conversionFunnel: ok(FUNNEL),
     statusTransitions: ok(TRANSITIONS),
@@ -137,12 +153,22 @@ describe('Analytics', () => {
     expect(container.querySelector('[data-top-bar] [data-range-picker]')).toBeNull()
   })
 
-  it('says there is nothing to chart rather than drawing an empty axis', () => {
-    // Four panels chart or table something with an axis/rows: time in
-    // stage, the funnel, pipeline flow and cohorts. The overview KPI strip
-    // is exempt -- zeroes and dashes are not "an empty axis".
+  it('leaves a panel off the page entirely rather than showing it empty', () => {
+    const { container } = render(<Analytics {...emptyProps()} />)
+    // Every query succeeded and returned nothing, so no panel renders at all
+    // -- not six cards each repeating the same "not enough data yet".
+    expect(container.querySelectorAll('[data-analytics-panel]')).toHaveLength(0)
+    // ...but the page is not left as a bare title.
+    expect(screen.getByText(/nothing to chart yet/i)).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'analytics' })).toBeTruthy()
+  })
+
+  it('keeps the range picker reachable on the nothing-to-chart page', () => {
+    // The all-blank branch is a separate return, so it is the one place the
+    // picker could silently go missing -- and a narrowed range is exactly how
+    // a reader lands on an empty page with data still sitting outside it.
     render(<Analytics {...emptyProps()} />)
-    expect(screen.getAllByText(/not enough data yet/i)).toHaveLength(4)
+    expect(screen.getByLabelText('Date range')).toBeTruthy()
   })
 
   it('gives each panel its own loading state rather than gating the whole page on one', () => {
@@ -206,10 +232,25 @@ describe('Analytics', () => {
       error: null,
     }
     render(<Analytics {...zeroed} />)
-    const panel = screen
-      .getByRole('heading', { name: 'time in stage' })
-      .closest('[data-analytics-panel]')!
-    expect(panel.textContent).toMatch(/not enough data yet/i)
+    expect(screen.queryByRole('heading', { name: 'time in stage' })).toBeNull()
+    // Its neighbours are untouched -- one blank panel is not a blank page.
+    expect(screen.getByRole('heading', { name: 'conversion funnel' })).toBeTruthy()
+  })
+
+  it('keeps a still-loading or failed panel on the page instead of hiding it', () => {
+    // Blank means "the query came back with nothing". A panel that is still
+    // fetching has to hold its place or the page reflows as each query lands,
+    // and a failed read must say so -- dropping it would tell the reader they
+    // have no cohorts when the truth is that nobody knows.
+    const stillLoading = { ...fullProps(), cohortAnalysis: loading<CohortAnalysis[]>() }
+    const { unmount } = render(<Analytics {...stillLoading} />)
+    expect(screen.getByRole('heading', { name: 'cohort analysis' })).toBeTruthy()
+    unmount()
+
+    const errored = { ...fullProps(), cohortAnalysis: failed<CohortAnalysis[]>('cohort query timed out') }
+    render(<Analytics {...errored} />)
+    expect(screen.getByRole('heading', { name: 'cohort analysis' })).toBeTruthy()
+    expect(screen.getByText(/cohort query timed out/)).toBeTruthy()
   })
 
   it('colours the funnel with the status palette, in pipeline order', () => {
@@ -312,6 +353,44 @@ describe('Analytics', () => {
     // present somewhere would pass on every row carrying it.
     expect(rows[0].className).not.toContain('bg-bg-surface')
     expect(rows[1].className).toContain('bg-bg-surface')
+  })
+
+  it('promotes a half-width panel to full width when hiding leaves it without a partner', () => {
+    // The point of computing spans instead of hardcoding them. With all four
+    // charts present they pair off two to a row; hide one and the odd chart
+    // out fills its row rather than sitting beside a hole.
+    const paired = render(<Analytics {...fullProps()} />)
+    const span = (key: string) =>
+      paired.container.querySelector(`[data-panel-slot="${key}"]`)!.className
+    expect(span('funnel')).not.toContain('lg:col-span-2')
+    expect(span('pipeline')).not.toContain('lg:col-span-2')
+    expect(span('time-in-stage')).not.toContain('lg:col-span-2')
+    expect(span('salary')).not.toContain('lg:col-span-2')
+    paired.unmount()
+
+    // Drop pipeline flow: funnel now pairs with time in stage, which leaves
+    // salary alone at the end of the run.
+    const odd = render(
+      <Analytics {...fullProps()} statusTransitions={ok<StatusTransition[]>([])} />
+    )
+    const oddSpan = (key: string) =>
+      odd.container.querySelector(`[data-panel-slot="${key}"]`)!.className
+    expect(odd.container.querySelector('[data-panel-slot="pipeline"]')).toBeNull()
+    expect(oddSpan('funnel')).not.toContain('lg:col-span-2')
+    expect(oddSpan('time-in-stage')).not.toContain('lg:col-span-2')
+    expect(oddSpan('salary')).toContain('lg:col-span-2')
+  })
+
+  it('keeps the two full-width panels full width whatever else is showing', () => {
+    const { container } = render(
+      <Analytics {...fullProps()} statusTransitions={ok<StatusTransition[]>([])} />
+    )
+    expect(container.querySelector('[data-panel-slot="overview"]')!.className).toContain(
+      'lg:col-span-2'
+    )
+    expect(container.querySelector('[data-panel-slot="cohort"]')!.className).toContain(
+      'lg:col-span-2'
+    )
   })
 
   it('scrolls the cohort table inside its own container rather than the page body', () => {
