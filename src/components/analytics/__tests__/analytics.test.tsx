@@ -335,6 +335,20 @@ describe('Analytics', () => {
     expect(grid.className).toContain('md:grid-cols-4')
   })
 
+  it('wears the same accent band and banding as the applications table', () => {
+    // The app's two densest tables, on its two densest screens. Leaving one
+    // grey and accenting the other read as two unrelated decisions.
+    const { container } = render(<Analytics {...fullProps()} />)
+    const head = container.querySelector(
+      '[data-panel-slot="cohort"] thead'
+    )!
+    expect(head.className).toMatch(/bg-accent-surface/)
+    expect(head.className).toMatch(/text-accent-on-surface/)
+    // accent-default is the TEXT weight -- accent-400 in dark -- and a
+    // full-width band of it is the over-bright header Gabe rejected.
+    expect(head.className).not.toMatch(/bg-accent-default/)
+  })
+
   it('alternates the cohort rows so a seven-column row stays traceable across its width', () => {
     render(<Analytics {...fullProps()} />)
     const rows = [
@@ -346,8 +360,10 @@ describe('Analytics', () => {
     expect(rows.length).toBeGreaterThan(1)
     // Striping is only striping if neighbours differ; asserting the class is
     // present somewhere would pass on every row carrying it.
-    expect(rows[0].className).not.toContain('bg-bg-surface')
-    expect(rows[1].className).toContain('bg-bg-surface')
+    expect(rows[0].className).not.toMatch(/bg-accent-surface/)
+    expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
+    // The old neutral band is gone, same as the applications table.
+    expect(rows[1].className).not.toMatch(/bg-bg-surface/)
   })
 
   it('spans the KPI strip and the cohort table, and pairs the four charts', () => {
