@@ -35,7 +35,7 @@ export function ApplicationsOverTime({ data }: ApplicationsOverTimeProps) {
   const reducedMotion = usePrefersReducedMotion()
 
   return (
-    <ChartContainer config={CONFIG} className="aspect-auto h-56 w-full" data-chart-over-time>
+    <ChartContainer config={CONFIG} className="aspect-auto h-full min-h-56 w-full flex-1" data-chart-over-time>
       <AreaChart data={data} margin={{ left: 4, right: 8, top: 8, bottom: 0 }}>
         <defs>
           <linearGradient id="overTimeFill" x1="0" y1="0" x2="0" y2="1">

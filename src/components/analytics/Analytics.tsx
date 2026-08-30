@@ -2,7 +2,12 @@
 
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
-import { PanelSection } from '@/components/ui/panel-section'
+import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
+import Link from 'next/link'
+import { AlertCircleIcon } from '@/components/icons'
+import { Callout } from './Callout'
+import { SalaryInsights } from './SalaryInsights'
+import type { Job } from '@/types'
 import { KpiStat } from '@/components/ui/kpi-stat'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { RangePicker } from './RangePicker'
@@ -37,6 +42,94 @@ export interface AnalyticsProps {
   sourceConversionTrends: MetricState<SourceConversionTrend[]>
   cohortAnalysis: MetricState<CohortAnalysis[]>
   conversionMetrics: MetricState<ConversionMetrics>
+  /**
+   * For the salary panel only. Derived from rows the app already has rather
+   * than a new analyticsService query -- see `lib/salaryHistogram`.
+   */
+  jobs?: Job[]
+}
+
+/**
+ * A Card wearing PanelSection's error treatment.
+ *
+ * Gabe asked for the card component on this screen. `PanelSection` supplied
+ * the heading, the hairline and -- the part that matters -- a failed-read
+ * state distinct from an empty one, which M5's Task 5 needed a fix round to
+ * get right. Swapping to a bare Card would have quietly dropped that, so the
+ * error branch moves here instead of disappearing.
+ */
+function AnalyticsPanel({
+  title,
+  action,
+  error,
+  children,
+}: {
+  title: string
+  action?: React.ReactNode
+  error?: string
+  children: React.ReactNode
+}) {
+  return (
+    // data-analytics-panel because Card renders a div where PanelSection
+    // rendered a <section>. An unnamed <section> is not a landmark, so nothing
+    // in the accessibility tree is lost -- but the panel boundary still has to
+    // be addressable, by tests and by anything that needs to scope a query to
+    // one panel.
+    <Card data-analytics-panel>
+      <CardHeader>
+        {/* An <h2> inside CardTitle, not instead of it: CardTitle renders a
+            div, so converting these panels to Cards silently removed every
+            panel heading from the accessibility tree and from the document
+            outline. Tailwind's preflight resets heading size and weight to
+            inherit, so this is semantics at zero visual cost. */}
+        <CardTitle>
+          <h2>{title}</h2>
+        </CardTitle>
+        {action ? <CardAction>{action}</CardAction> : null}
+      </CardHeader>
+      <CardContent>
+        {error ? (
+          <p className="flex items-center gap-2 text-body-s text-status-rejected-mark">
+            <AlertCircleIcon size={16} aria-hidden className="[&_svg]:size-4" />
+            {error}
+          </p>
+        ) : (
+          children
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+/**
+ * Figma `App Footer` (80:1052) -- six link items with `·` separators. Absent
+ * from the code until now. Plain links, not nav: this is the end of a 2560px
+ * page, and the sidebar is the navigation.
+ */
+function AppFooter() {
+  const links = [
+    { href: '/dashboard', label: 'overview' },
+    { href: '/applications', label: 'applications' },
+    { href: '/calendar', label: 'calendar' },
+    { href: '/documents', label: 'documents' },
+    { href: '/analytics', label: 'analytics' },
+    { href: '/settings', label: 'settings' },
+  ]
+  return (
+    <footer
+      data-app-footer
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border-subtle pt-6 text-body-s text-text-muted"
+    >
+      {links.map((link, i) => (
+        <React.Fragment key={link.href}>
+          {i > 0 && <span aria-hidden>·</span>}
+          <Link href={link.href} className="hover:text-accent-default">
+            {link.label}
+          </Link>
+        </React.Fragment>
+      ))}
+    </footer>
+  )
 }
 
 function errorMessage(error: unknown): string {
@@ -78,7 +171,7 @@ function Overview({ data }: { data: ConversionMetrics | null }) {
     conversionBySource: {},
   }
   return (
-    <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+    <div data-overview-kpis className="grid grid-cols-2 gap-6 md:grid-cols-4">
       <KpiStat label="Total applications" value={metrics.totalJobs} />
       <KpiStat
         label="Time to first interview"
@@ -126,6 +219,7 @@ export function Analytics({
   sourceConversionTrends,
   cohortAnalysis,
   conversionMetrics,
+  jobs = [],
 }: AnalyticsProps) {
   const [range, setRange] = React.useState<RangeOption>('all')
 
@@ -146,22 +240,52 @@ export function Analytics({
     [conversionFunnel.data]
   )
 
+  // Both callouts are SELECTED from the rows their own table already shows --
+  // one sort, no query. No analyticsService method returns a "best" anything,
+  // and inventing one for a superlative already in memory is how M5's Task 8
+  // ended up with a range picker over services that take no range.
+  const bestCohort = React.useMemo(
+    () =>
+      filteredCohorts.length === 0
+        ? null
+        : [...filteredCohorts].sort((a, b) => b.conversionRate - a.conversionRate)[0],
+    [filteredCohorts]
+  )
+
+  const topSource = React.useMemo(() => {
+    if (filteredTrends.length === 0) return null
+    const totals = new Map<string, { applied: number; offer: number }>()
+    for (const row of filteredTrends) {
+      const acc = totals.get(row.source) ?? { applied: 0, offer: 0 }
+      acc.applied += row.applied
+      acc.offer += row.offer
+      totals.set(row.source, acc)
+    }
+    return [...totals.entries()]
+      .map(([source, t]) => ({
+        source,
+        applied: t.applied,
+        offer: t.offer,
+        rate: t.applied > 0 ? Math.round((t.offer / t.applied) * 100) : 0,
+      }))
+      .sort((a, b) => b.rate - a.rate || b.applied - a.applied)[0]
+  }, [filteredTrends])
+
   return (
     <div className="flex flex-col gap-8">
       <PageHeader title="Analytics" action={<RangePicker value={range} onChange={setRange} />} />
 
-      <PanelSection
+      <AnalyticsPanel
         title="Overview"
-        titleSize="m"
-        actions={<Span>All time</Span>}
+        action={<Span>All time</Span>}
         error={conversionMetrics.error ? errorMessage(conversionMetrics.error) : undefined}
       >
         <PanelBody state={conversionMetrics} empty={false} render={() => <Overview data={conversionMetrics.data} />} />
-      </PanelSection>
+      </AnalyticsPanel>
 
-      <PanelSection
+      <AnalyticsPanel
         title="Conversion funnel"
-        actions={<Span>All time</Span>}
+        action={<Span>All time</Span>}
         error={conversionFunnel.error ? errorMessage(conversionFunnel.error) : undefined}
       >
         <PanelBody
@@ -169,11 +293,11 @@ export function Analytics({
           empty={funnelData.length === 0}
           render={() => <FunnelChart data={funnelData} />}
         />
-      </PanelSection>
+      </AnalyticsPanel>
 
-      <PanelSection
+      <AnalyticsPanel
         title="Time in stage"
-        actions={<Span>All time</Span>}
+        action={<Span>All time</Span>}
         error={timeInStage.error ? errorMessage(timeInStage.error) : undefined}
       >
         <PanelBody
@@ -181,31 +305,65 @@ export function Analytics({
           empty={(timeInStage.data ?? []).length === 0}
           render={() => <TimeInStage data={timeInStage.data ?? []} />}
         />
-      </PanelSection>
+      </AnalyticsPanel>
 
-      <PanelSection
+      <AnalyticsPanel
         title="Source trends"
-        actions={<Span>{rangeLabel(range)}</Span>}
+        action={<Span>{rangeLabel(range)}</Span>}
         error={sourceConversionTrends.error ? errorMessage(sourceConversionTrends.error) : undefined}
       >
         <PanelBody
           state={sourceConversionTrends}
           empty={filteredTrends.length === 0}
-          render={() => <SourceTrends data={filteredTrends} />}
+          render={() => (
+            <div className="flex flex-col gap-6">
+              <SourceTrends data={filteredTrends} />
+              {topSource && (
+                <Callout
+                  label="top converting source"
+                  metrics={[
+                    { label: 'source', value: topSource.source },
+                    { label: 'applications', value: String(topSource.applied) },
+                    { label: 'offer rate', value: `${topSource.rate}%` },
+                  ]}
+                />
+              )}
+            </div>
+          )}
         />
-      </PanelSection>
+      </AnalyticsPanel>
 
-      <PanelSection
+      <AnalyticsPanel
         title="Cohort analysis"
-        actions={<Span>{rangeLabel(range)}</Span>}
+        action={<Span>{rangeLabel(range)}</Span>}
         error={cohortAnalysis.error ? errorMessage(cohortAnalysis.error) : undefined}
       >
         <PanelBody
           state={cohortAnalysis}
           empty={filteredCohorts.length === 0}
-          render={() => <CohortTable data={filteredCohorts} />}
+          render={() => (
+            <div className="flex flex-col gap-6">
+              {bestCohort && (
+                <Callout
+                  label="best performing cohort"
+                  metrics={[
+                    { label: 'cohort', value: bestCohort.cohort },
+                    { label: 'applied', value: String(bestCohort.jobsApplied) },
+                    { label: 'conversion', value: `${Math.round(bestCohort.conversionRate)}%` },
+                  ]}
+                />
+              )}
+              <CohortTable data={filteredCohorts} />
+            </div>
+          )}
         />
-      </PanelSection>
+      </AnalyticsPanel>
+
+      <AnalyticsPanel title="Salary insights" action={<Span>All time</Span>}>
+        <SalaryInsights jobs={jobs} />
+      </AnalyticsPanel>
+
+      <AppFooter />
     </div>
   )
 }

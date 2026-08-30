@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
+import { Bar, BarChart, LabelList, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -29,6 +29,13 @@ export interface SourceBarsProps {
  * ("Jobstreet", "referral from a friend"): as vertical x-axis ticks they
  * truncate or rotate, and neither reads.
  *
+ * No x axis and no gridlines. The first cut drew a 0-12 scale with vertical
+ * rules behind two bars, which spent most of the panel measuring a number the
+ * reader can get exactly from a label at the end of the bar. At this size the
+ * comparison between bars is the whole message and the axis is furniture --
+ * so the value goes on the bar and the scale goes away. A wider analytics
+ * chart with many categories would want the axis back; this one does not.
+ *
  * The accent carries the bars. A source is not a status, so the five status
  * hues would be borrowing a vocabulary that means something else.
  */
@@ -40,7 +47,7 @@ export function SourceBars({ data }: SourceBarsProps) {
   // space rather than the space fitting the bars. 28px a row plus axis
   // padding, and maxBarSize caps the thickness independently, so one source
   // and six both read as the same chart.
-  const height = Math.max(96, data.length * 28 + 32)
+  const height = Math.max(88, data.length * 30 + 16)
 
   if (data.length === 0) {
     return (
@@ -52,13 +59,13 @@ export function SourceBars({ data }: SourceBarsProps) {
 
   return (
     <ChartContainer config={CONFIG} className="aspect-auto w-full" style={{ height }} data-chart-sources>
-      <BarChart data={data} layout="vertical" margin={{ left: 4, right: 12, top: 4, bottom: 0 }}>
-        <CartesianGrid horizontal={false} strokeDasharray="0" />
-        <XAxis type="number" tickLine={false} axisLine={false} allowDecimals={false} className="tabular" />
+      <BarChart data={data} layout="vertical" margin={{ left: 0, right: 28, top: 0, bottom: 0 }}>
+        {/* hide: the scale still drives bar widths, it just isn't drawn. */}
+        <XAxis type="number" hide />
         <YAxis
           type="category"
           dataKey="source"
-          width={96}
+          width={92}
           tickLine={false}
           axisLine={false}
           tickMargin={8}
@@ -68,9 +75,17 @@ export function SourceBars({ data }: SourceBarsProps) {
           dataKey="count"
           fill="var(--color-accent-default)"
           radius={[0, 2, 2, 0]}
-          maxBarSize={20}
+          maxBarSize={14}
           isAnimationActive={!reducedMotion}
-        />
+        >
+          <LabelList
+            dataKey="count"
+            position="right"
+            offset={8}
+            className="tabular fill-text-secondary"
+            fontSize={12}
+          />
+        </Bar>
       </BarChart>
     </ChartContainer>
   )

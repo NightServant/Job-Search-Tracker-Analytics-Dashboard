@@ -8,6 +8,7 @@ import {
   useCohortAnalysis,
   useConversionMetrics,
 } from '@/hooks/useAnalytics'
+import { useJobs } from '@/hooks/useJobs'
 import { Analytics, type MetricState } from '@/components/analytics/Analytics'
 import { RouteLoading, RouteError } from '@/components/ui/route-states'
 
@@ -46,6 +47,11 @@ export default function Page() {
   const sourceConversionTrends = useSourceConversionTrends(userId)
   const cohortAnalysis = useCohortAnalysis(userId)
   const conversionMetrics = useConversionMetrics(userId)
+  // Salary insights derives its distribution from the jobs themselves: no
+  // analyticsService method returns one, and the rows already carry
+  // salary_min/salary_max/salary_currency. Deliberately outside this route's
+  // loading/error gate -- one slow list must not blank five working panels.
+  const { data: jobs = [] } = useJobs()
 
   const queries = [timeInStage, conversionFunnel, sourceConversionTrends, cohortAnalysis, conversionMetrics]
 
@@ -65,6 +71,7 @@ export default function Page() {
 
   return (
     <Analytics
+      jobs={jobs}
       timeInStage={toState(timeInStage)}
       conversionFunnel={toState(conversionFunnel)}
       sourceConversionTrends={toState(sourceConversionTrends)}

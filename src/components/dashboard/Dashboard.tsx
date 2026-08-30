@@ -121,15 +121,19 @@ export function Dashboard({
       <div className="grid gap-8 lg:grid-cols-[460fr_300fr_280fr]">
         <Card>
           <CardHeader>
-            <CardTitle>applications over time</CardTitle>
+            <CardTitle>
+              <h2>applications over time</h2>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col">
             <ApplicationsOverTime data={trend} />
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>by status</CardTitle>
+            <CardTitle>
+              <h2>by status</h2>
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <StatusDonut data={statuses} />
@@ -137,9 +141,11 @@ export function Dashboard({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>upcoming events</CardTitle>
+            <CardTitle>
+              <h2>upcoming events</h2>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col">
             <UpcomingEvents
               events={events}
               companyByJobId={companyByJobId}
@@ -158,7 +164,9 @@ export function Dashboard({
       <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
         <Card>
           <CardHeader>
-            <CardTitle>recent applications</CardTitle>
+            <CardTitle>
+              <h2>recent applications</h2>
+            </CardTitle>
             <CardAction>
               <Link href="/applications" className="text-body-s text-accent-default hover:underline">
                 view all
@@ -171,9 +179,11 @@ export function Dashboard({
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>by source</CardTitle>
+            <CardTitle>
+              <h2>by source</h2>
+            </CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col">
             <SourceBars data={sources} />
           </CardContent>
         </Card>

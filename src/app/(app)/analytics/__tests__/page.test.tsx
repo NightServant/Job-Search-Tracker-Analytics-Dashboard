@@ -12,6 +12,12 @@ const useConversionFunnelMock = vi.hoisted(() => vi.fn())
 const useSourceConversionTrendsMock = vi.hoisted(() => vi.fn())
 const useCohortAnalysisMock = vi.hoisted(() => vi.fn())
 const useConversionMetricsMock = vi.hoisted(() => vi.fn())
+// Salary insights derives its distribution from the jobs list (M5.5 Item 7).
+// Mocked for the same reason the metric hooks are -- and additionally because
+// useJobs pulls in the real supabase client at module load, which throws on an
+// unset URL.
+const useJobsMock = vi.hoisted(() => vi.fn(() => ({ data: [], isLoading: false, error: null })))
+vi.mock('@/hooks/useJobs', () => ({ useJobs: useJobsMock }))
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: useAuthMock }))
 vi.mock('@/hooks/useAnalytics', () => ({

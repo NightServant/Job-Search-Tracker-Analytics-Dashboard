@@ -162,17 +162,20 @@ describe('Analytics', () => {
 
   it('states "All time" on panels the range picker cannot filter', () => {
     render(<Analytics {...fullProps()} />)
+    // closest('[data-analytics-panel]'), not closest('section'): these panels
+    // are Cards now (M5.5 Item 7), and Card renders a div.
     const funnelHeading = screen.getByRole('heading', { name: 'Conversion funnel' })
-    const funnelSection = funnelHeading.closest('section')!
-    expect(funnelSection.textContent).toMatch(/all time/i)
+    expect(funnelHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
     const stageHeading = screen.getByRole('heading', { name: 'Time in stage' })
-    expect(stageHeading.closest('section')!.textContent).toMatch(/all time/i)
+    expect(stageHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
   })
 
   it('narrows source trends and cohorts to the picked range, and leaves the other three panels unchanged', () => {
     render(<Analytics {...fullProps()} />)
-    // Default range is "All time", so everything is visible first.
-    expect(screen.getByText('Referral')).toBeTruthy()
+    // getAllByText: the source name now appears twice at "All time" -- once in
+    // the trends data and once in the "top converting source" callout, which
+    // is selected from those same rows.
+    expect(screen.getAllByText('Referral').length).toBeGreaterThan(0)
     fireEvent.change(screen.getByLabelText('Date range'), { target: { value: '3m' } })
     // 2025-01's Referral row falls outside the last 3 months of "now"; the
     // component's own default clock is real Date.now(), so this only pins
@@ -257,8 +260,13 @@ describe('Analytics', () => {
     // own responsive assertions -- jsdom never evaluates a media query, so
     // this checks the Tailwind classes that encode both widths are present,
     // not a rendered viewport.
-    const { container } = render(<Analytics {...fullProps()} />)
-    const grid = container.querySelector('[data-kpi-strip], .grid')!
+    render(<Analytics {...fullProps()} />)
+    // Scoped to the Overview panel: '.grid' alone now matches a Card's own
+    // header grid first, which is not the KPI strip.
+    const overview = screen
+      .getByRole('heading', { name: 'Overview' })
+      .closest('[data-analytics-panel]')!
+    const grid = overview.querySelector('[data-overview-kpis]')!
     expect(grid.className).toContain('grid-cols-2')
     expect(grid.className).toContain('md:grid-cols-4')
   })
@@ -266,7 +274,7 @@ describe('Analytics', () => {
   it('scrolls the cohort table inside its own container rather than the page body', () => {
     render(<Analytics {...fullProps()} />)
     const heading = screen.getByRole('heading', { name: 'Cohort analysis' })
-    const table = heading.closest('section')!.querySelector('table')!
+    const table = heading.closest('[data-analytics-panel]')!.querySelector('table')!
     expect(table.closest('.overflow-x-auto')).toBeTruthy()
   })
 })

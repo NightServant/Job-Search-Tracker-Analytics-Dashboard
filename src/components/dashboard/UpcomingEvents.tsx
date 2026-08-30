@@ -73,9 +73,9 @@ export function UpcomingEvents({
   const shown = events.slice(0, limit)
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-1 flex-col gap-3">
       {shown.length === 0 ? (
-        <EmptyState data-events-empty icon="Calendar">
+        <EmptyState data-events-empty icon="Calendar" className="flex-1 justify-center">
           nothing scheduled yet. interviews and deadlines you add show up here.
         </EmptyState>
       ) : (
