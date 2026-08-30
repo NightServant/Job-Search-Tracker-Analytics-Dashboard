@@ -405,11 +405,16 @@ describe('Analytics', () => {
       '[data-panel-slot="funnel"] [data-slot="card-content"]'
     )!
     expect(content.className).toContain('flex-1')
+    // The panel root claims the height and centres its whole contents. The
+    // chain must NOT claim it itself: that centred the stages in the spare
+    // room and stranded the exits row at the bottom of the card.
+    const root = container.querySelector('[data-funnel-chain]')!.parentElement!
+    expect(root.className).toContain('flex-1')
+    expect(root.className).toContain('justify-center')
     const chain = container.querySelector('[data-funnel-chain]')!
-    expect(chain.className).toContain('flex-1')
-    // Rows spread over the height they were given rather than stacking at the
-    // top of it.
-    expect(chain.className).toContain('justify-around')
+    expect(chain.className).not.toContain('flex-1')
+    // ...and rows keep their own pitch rather than being spread apart.
+    expect(chain.className).not.toContain('justify-around')
   })
 
   it('scrolls the cohort table inside its own container rather than the page body', () => {

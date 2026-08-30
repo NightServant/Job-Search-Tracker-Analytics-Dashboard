@@ -111,20 +111,22 @@ export function FunnelChart({ data }: FunnelChartProps) {
   const top = Math.max(chain[0]?.count ?? 0, 1)
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    // justify-center on the WHOLE panel, and nothing inside claims the spare
+    // height. Letting the chain take it centred four rows in a 434px region
+    // and stranded the exits row at the far bottom of the card, which read as
+    // two unrelated charts. Now the chain, its divider and the exits stay one
+    // compact group and the leftover height splits above and below it.
+    <div className="flex flex-1 flex-col justify-center gap-4">
       {/* An actual funnel, not a bar list: each stage is centred and its width
           is its share of the first stage, so the taper IS the conversion. The
           previous version was left-aligned tracks of equal length, which is a
           bar chart wearing the word "funnel" -- you had to read the numbers to
           see the shape the chart exists to show. */}
-      {/* justify-around, and flex-1 so the chain claims the card's spare
-          height: the stages then spread down the panel instead of clumping in
-          its top third. Bar thickness stays fixed -- it is a stage marker, not
-          a second quantity -- so what grows is the air between rows. */}
-      <div
-        data-funnel-chain
-        className="flex flex-1 flex-col items-center justify-around gap-1"
-      >
+      {/* Rows keep their own compact pitch. An earlier pass spread them with
+          justify-around to fill the card, which put 60px between 28px bars and
+          read as five unrelated bars rather than one funnel. Bar thickness is
+          fixed too -- a bar is a stage marker, not a second quantity. */}
+      <div data-funnel-chain className="flex flex-col items-center gap-2">
         {chain.map((d) => {
           const share = d.count / top
           return (
