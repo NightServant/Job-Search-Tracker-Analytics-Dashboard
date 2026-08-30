@@ -393,6 +393,25 @@ describe('Analytics', () => {
     )
   })
 
+  it('hands a stretched card\'s spare height down to the panel instead of leaving it at the bottom', () => {
+    // jsdom has no layout, so this pins the chain of classes that carries the
+    // height rather than a measured pixel gap -- every link has to be present
+    // for the real page to work, and dropping any one of them reintroduces the
+    // dead space under the funnel. Measured in the browser at 1440px: funnel
+    // card 559px against salary's 559px, with 17px of card padding below the
+    // last row instead of ~230px of empty card.
+    const { container } = render(<Analytics {...fullProps()} />)
+    const content = container.querySelector(
+      '[data-panel-slot="funnel"] [data-slot="card-content"]'
+    )!
+    expect(content.className).toContain('flex-1')
+    const chain = container.querySelector('[data-funnel-chain]')!
+    expect(chain.className).toContain('flex-1')
+    // Rows spread over the height they were given rather than stacking at the
+    // top of it.
+    expect(chain.className).toContain('justify-around')
+  })
+
   it('scrolls the cohort table inside its own container rather than the page body', () => {
     render(<Analytics {...fullProps()} />)
     const heading = screen.getByRole('heading', { name: 'cohort analysis' })

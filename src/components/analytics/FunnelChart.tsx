@@ -111,13 +111,20 @@ export function FunnelChart({ data }: FunnelChartProps) {
   const top = Math.max(chain[0]?.count ?? 0, 1)
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-1 flex-col gap-4">
       {/* An actual funnel, not a bar list: each stage is centred and its width
           is its share of the first stage, so the taper IS the conversion. The
           previous version was left-aligned tracks of equal length, which is a
           bar chart wearing the word "funnel" -- you had to read the numbers to
           see the shape the chart exists to show. */}
-      <div data-funnel-chain className="flex flex-col items-center gap-1">
+      {/* justify-around, and flex-1 so the chain claims the card's spare
+          height: the stages then spread down the panel instead of clumping in
+          its top third. Bar thickness stays fixed -- it is a stage marker, not
+          a second quantity -- so what grows is the air between rows. */}
+      <div
+        data-funnel-chain
+        className="flex flex-1 flex-col items-center justify-around gap-1"
+      >
         {chain.map((d) => {
           const share = d.count / top
           return (

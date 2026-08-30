@@ -88,7 +88,16 @@ function AnalyticsPanel({
         </CardTitle>
         {action ? <CardAction>{action}</CardAction> : null}
       </CardHeader>
-      <CardContent>
+      {/*
+        flex-1, so a card stretched to match a taller neighbour hands the extra
+        height down to the panel rather than leaving it as dead space at the
+        bottom -- the gap Gabe pointed at inside the conversion funnel. The
+        components that can use height (the funnel's rows, the charts) claim it
+        with flex-1 of their own; the ones that do not are unaffected, since a
+        flex child without flex-1 still sizes to its content -- and on a card
+        that was never stretched there is no spare height to hand down anyway.
+      */}
+      <CardContent className="flex flex-1 flex-col">
         {error ? (
           <p className="flex items-center gap-2 text-body-s text-status-rejected-mark">
             <AlertCircleIcon size={16} aria-hidden className="[&_svg]:size-4" />

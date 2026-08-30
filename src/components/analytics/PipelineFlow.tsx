@@ -69,8 +69,8 @@ export function PipelineFlow({ transitions }: PipelineFlowProps) {
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      <div className="h-64 w-full">
+    <div className="flex flex-1 flex-col gap-3">
+      <div className="min-h-64 w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <Sankey
             data={graph}
