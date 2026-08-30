@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { ApplicationsPage } from '../ApplicationsPage'
 import { ApplicationForm } from '../ApplicationForm'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from '../StatusTabs'
+import { ApplicationsTable } from '../ApplicationsTable'
 import { makeJob } from '@/test/fixtures'
 import type { Job } from '@/types'
 
@@ -454,5 +455,33 @@ describe('ApplicationForm', () => {
     const submit = container.querySelector('button[type="submit"]')!
     expect(submit.textContent!.trim().length).toBeGreaterThan(0)
     expect(submit.querySelector('svg')).toBeNull()
+  })
+})
+
+describe('ApplicationsTable accent header', () => {
+  it('wears the accent band on its header, from the surface token not the text one', () => {
+    const { container } = render(<ApplicationsTable jobs={[makeJob({ id: 'a', status: 'applied' })]} />)
+    const header = container.querySelector('thead')!
+    expect(header.className).toMatch(/bg-accent-surface/)
+    // accent-default is chosen for text contrast -- accent-400 in dark -- so a
+    // full-width band of it is the over-bright header Gabe rejected on the
+    // calendar. Same rule, same token, both surfaces.
+    expect(header.className).not.toMatch(/bg-accent-default/)
+    // TableHead sets its own muted foreground, which wins over inheritance.
+    expect(header.className).toMatch(/text-accent-on-surface/)
+  })
+
+  it('bands its rows from the same accent family, not a neutral grey', () => {
+    const { container } = render(
+      <ApplicationsTable jobs={[makeJob({ id: 'a', status: 'applied' }), makeJob({ id: 'b', status: 'applied' }), makeJob({ id: 'c', status: 'applied' })]} />
+    )
+    const rows = [...container.querySelectorAll('tbody tr')]
+    // Striping is only striping if neighbours differ.
+    expect(rows[0].className).not.toMatch(/bg-accent-surface/)
+    expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
+    expect(rows[2].className).not.toMatch(/bg-accent-surface/)
+    // The old neutral band is gone -- a grey table with an orange header was
+    // the thing that read as two unrelated decisions.
+    expect(rows[1].className).not.toMatch(/bg-bg-surface/)
   })
 })

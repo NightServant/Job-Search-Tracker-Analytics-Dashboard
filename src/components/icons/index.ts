@@ -43,6 +43,8 @@ import { CalendarIcon as CalendarIconBase } from './calendar'
 import { ChartLineIcon } from './chart-line'
 import { CheckIcon as CheckIconBase } from './check'
 import { ChevronDownIcon as ChevronDownIconBase } from './chevron-down'
+import { ChevronLeftIcon as ChevronLeftIconBase } from './chevron-left'
+import { ChevronRightIcon as ChevronRightIconBase } from './chevron-right'
 import { ClockIcon as ClockIconBase } from './clock'
 import { DownloadIcon as DownloadIconBase } from './download'
 import { EllipsisVerticalIcon } from './ellipsis-vertical'
@@ -98,6 +100,8 @@ export const SunIcon = withDefaultSize(SunIconBase)
 export const MoonIcon = withDefaultSize(MoonIconBase)
 export const AlertCircleIcon = withDefaultSize(TriangleAlertIcon)
 export const ChevronDownIcon = withDefaultSize(ChevronDownIconBase)
+export const ChevronLeftIcon = withDefaultSize(ChevronLeftIconBase)
+export const ChevronRightIcon = withDefaultSize(ChevronRightIconBase)
 export const TrashIcon = withDefaultSize(TrashIconBase)
 export const CheckIcon = withDefaultSize(CheckIconBase)
 export const GripVerticalIcon = withDefaultSize(EllipsisVerticalIcon)
@@ -149,6 +153,8 @@ export const icons = {
   Moon: asIconComponent(MoonIcon),
   AlertCircle: asIconComponent(AlertCircleIcon),
   ChevronDown: asIconComponent(ChevronDownIcon),
+  ChevronLeft: asIconComponent(ChevronLeftIcon),
+  ChevronRight: asIconComponent(ChevronRightIcon),
   Trash: asIconComponent(TrashIcon),
   GripVertical: asIconComponent(GripVerticalIcon),
   RotateCcw: asIconComponent(RotateCcwIcon),

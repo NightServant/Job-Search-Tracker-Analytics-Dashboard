@@ -4,6 +4,8 @@ import type { CalendarEvent } from '@/services/events'
 
 import { Calendar } from '../Calendar'
 import { Agenda } from '../Agenda'
+import { MonthGrid } from '../MonthGrid'
+import { buildMonthGrid } from '@/lib/calendar'
 
 afterEach(() => cleanup())
 
@@ -19,6 +21,53 @@ const ev = (id: string, starts_at: string, job_id: string | null = 'job-1'): Cal
 })
 
 const EVENTS: CalendarEvent[] = [ev('a', new Date().toISOString())]
+
+describe('MonthGrid accent theming', () => {
+  const grid = buildMonthGrid(2026, 7)
+
+  it('carries the accent across the whole grid, not just today', () => {
+    // Gabe asked for an orange calendar and said explicitly that he did not
+    // mean highlighting today -- that already existed. The frame, the rules
+    // between cells and the weekday header all have to carry it.
+    const { container } = render(<MonthGrid grid={grid} month={7} events={[]} />)
+    const root = container.querySelector('[data-month-grid]')!
+    expect(root.className).toMatch(/border-accent-surface/)
+    // gap-px over a tinted background is what draws the rules between cells.
+    expect(root.className).toMatch(/bg-accent-default\/25/)
+    expect(root.className).toMatch(/gap-px/)
+
+    const heading = screen.getByText('Sun')
+    // accent-surface, never accent-default: the latter is picked for text
+    // contrast (accent-400 in dark) and a full-width band of it is the
+    // over-bright header Gabe rejected.
+    expect(heading.className).toMatch(/bg-accent-surface/)
+    expect(heading.className).toMatch(/text-accent-on-surface/)
+    expect(heading.className).not.toMatch(/bg-accent-default/)
+  })
+
+  it('tints today\u2019s own cell rather than decorating its number alone', () => {
+    const today = new Date(2026, 7, 12)
+    const { container } = render(
+      <MonthGrid grid={grid} month={7} events={[]} today={today} />
+    )
+    const cell = container.querySelector('[data-today-cell]')!
+    expect(cell.className).toMatch(/bg-accent-default/)
+    // The 2px rule survives: it is the system's "this one" mark and the tint
+    // is additional, not a replacement.
+    expect(cell.querySelector('[data-today]')).toBeTruthy()
+    expect(container.querySelectorAll('[data-today-cell]')).toHaveLength(1)
+  })
+
+  it('sets neighbouring months back so the current month is the subject', () => {
+    const { container } = render(<MonthGrid grid={grid} month={7} events={[]} />)
+    const cells = [...container.querySelectorAll('[data-month-grid] > div')].slice(7)
+    const outside = cells.filter((c) => c.className.includes('bg-bg-inset'))
+    // August 2026 starts on a Saturday and the six-week grid runs to 5 Sept,
+    // so there are genuinely padded days on both ends.
+    expect(outside.length).toBeGreaterThan(0)
+    expect(outside.length).toBeLessThan(cells.length)
+  })
+})
 
 describe('Calendar', () => {
   // Fix round 2: Calendar no longer calls useJobs() itself (ruling R3 --

@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from '@/components/icons'
 import { buildMonthGrid, weekOf } from '@/lib/calendar'
 import { MonthGrid } from './MonthGrid'
 import { WeekStrip } from './WeekStrip'
@@ -74,15 +75,21 @@ export function Calendar({ events, companyByJobId = {} }: CalendarProps) {
         action={
           <div className="hidden items-center gap-3 md:flex">
             <p className="tabular text-body-m text-text-secondary">{monthLabel}</p>
+            {/* Icons sit on the side the control moves you toward, so the
+                pair reads as one axis; `today` takes the calendar glyph
+                because it is a jump to a date rather than a step along one. */}
             <div className="flex items-center gap-1">
               <Button variant="ghost" size="s" onClick={goToPreviousMonth}>
+                <ChevronLeftIcon size={16} aria-hidden className="[&_svg]:size-4" />
                 previous
               </Button>
               <Button variant="ghost" size="s" onClick={goToToday}>
+                <CalendarIcon size={16} aria-hidden className="[&_svg]:size-4" />
                 today
               </Button>
               <Button variant="ghost" size="s" onClick={goToNextMonth}>
                 next
+                <ChevronRightIcon size={16} aria-hidden className="[&_svg]:size-4" />
               </Button>
             </div>
           </div>

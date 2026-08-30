@@ -75,8 +75,18 @@ export function ApplicationsTable({
   return (
     <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy} className="overflow-x-auto">
       <Table data-applications-table>
-        <TableHeader>
-          <TableRow>
+        {/*
+          The same accent band the calendar's weekday row wears, from the same
+          `accent-surface` pair. accent-surface is the token for a FIELD of
+          accent; `accent-default` is picked for text contrast (accent-400 in
+          dark) and a full-width bar of it is the over-bright header Gabe
+          rejected on the calendar.
+
+          `[&_th]:text-accent-on-surface` because TableHead sets its own muted
+          foreground, which would otherwise win over anything inherited.
+        */}
+        <TableHeader className="bg-accent-surface [&_th]:text-accent-on-surface">
+          <TableRow className="hover:bg-transparent">
             <TableHead>company</TableHead>
             <TableHead>position</TableHead>
             <TableHead>status</TableHead>
@@ -92,7 +102,13 @@ export function ApplicationsTable({
               data-testid="application-row"
               // Zebra on the odd rows only, so the first row sits on the
               // canvas and the banding reads as an aid rather than as a fill.
-              className={cn(i % 2 === 1 && 'bg-bg-surface')}
+              //
+              // Tinted from accent-surface rather than the neutral bg-surface,
+              // so the banding belongs to the same warm family as the header
+              // band above it instead of reading as a grey table wearing an
+              // orange hat. At 30% it stays a guide for the eye across a row
+              // and never competes with the StatusMarker in the row itself.
+              className={cn(i % 2 === 1 && 'bg-accent-surface/30')}
             >
               <TableCell className="max-w-0 truncate text-text-primary">
                 <Link

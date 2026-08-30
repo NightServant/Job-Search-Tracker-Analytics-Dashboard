@@ -76,6 +76,15 @@
   --color-accent-hover: var(--color-accent-800);
   --color-accent-subtle: var(--color-accent-50);
   --color-accent-on-accent: var(--color-base-white);
+  /* An accent SURFACE -- a band or panel large enough that the colour is a
+     field rather than a mark. `accent-default` cannot do this job: it is
+     picked for text contrast (accent-700 here, accent-400 in dark), and
+     accent-400 across a whole header bar is the "too bright" Gabe rejected.
+     `accent-subtle` cannot either -- it goes neutral in dark, so the band
+     would simply stop being orange. This pair stays orange in both themes and
+     stays quiet in both. */
+  --color-accent-surface: var(--color-accent-100);
+  --color-accent-on-surface: var(--color-accent-800);
 
   /* --- shadcn semantic aliases ----------------------------------------------
      shadcn components are copied into this tree and reference `bg-primary`,
@@ -239,6 +248,10 @@
   --color-accent-hover: var(--color-accent-300);
   --color-accent-subtle: var(--color-neutral-900);
   --color-accent-on-accent: var(--color-neutral-950);
+  /* Deep, not bright: accent-900 is the darkest step, so a full-width band
+     reads as a tinted surface rather than a slab of signal colour. */
+  --color-accent-surface: var(--color-accent-900);
+  --color-accent-on-surface: var(--color-accent-200);
 
   --color-status-wishlist-fill: var(--color-neutral-800);
   --color-status-applied-fill: var(--color-neutral-800);

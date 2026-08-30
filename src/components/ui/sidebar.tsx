@@ -111,8 +111,14 @@ function ThemeSection({ collapsed }: { collapsed: boolean }) {
   }
 
   return (
-    <div className="flex h-8 items-center gap-3">
-      <ThemeToggle />
+    // Mirrors NavItem's expanded row exactly -- a 2px lead-in the width of the
+    // active rule, then gap-3, then the icon -- so the sun/moon lands on the
+    // same x as every nav icon. The toggle's own hit target is 32px against a
+    // 20px icon column, so `-mx-1.5` lets the button overflow its slot: the
+    // icon centres on the column while the target and its hover fill stay 32.
+    <div className="flex h-9 items-center gap-3">
+      <span aria-hidden className="h-full w-[2px] shrink-0" />
+      <ThemeToggle className="-mx-1.5" />
       <span data-theme-label className="text-body-m text-text-secondary">
         {label}
       </span>
@@ -185,11 +191,10 @@ function SidebarNav({ pathname = '/dashboard', activeHref, className, ...props }
       </div>
 
       <div className={cn('flex flex-col gap-1', collapsed && 'items-center')}>
-        {NAV.map((item, i) => (
+        {NAV.map((item) => (
           <NavItem
             key={item.href}
             {...item}
-            index={i + 1}
             active={active === item.href}
             collapsed={collapsed}
           />
@@ -202,7 +207,6 @@ function SidebarNav({ pathname = '/dashboard', activeHref, className, ...props }
         href="/settings"
         label="settings"
         icon="Settings"
-        index={6}
         active={settingsActive}
         collapsed={collapsed}
       />

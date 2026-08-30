@@ -8,22 +8,23 @@ import { icons } from '@/components/icons'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 /**
- * A numbered navigation entry.
+ * A navigation entry.
  *
  * Active state is a 2px rule, the same vocabulary as the Status Marker -- not a
  * filled pill and not a tinted background. One way of saying "this one",
  * everywhere.
  *
- * The number is dropped on the mobile bottom bar. Five entries across 375px
- * leaves roughly 75px each, which fits an icon and a label or an icon and a
- * number, but not all three without the label truncating -- and the label is
- * the part that carries meaning.
+ * The Figma frame numbers each entry 01..06 and the first implementation did
+ * too. Gabe had them removed: they index a list nobody refers to by number,
+ * and they pushed the icons a full index-width off the column the theme
+ * control's icon sits on, so the sidebar had two icon axes instead of one.
+ * The row is now rule, icon, label -- and `ThemeSection` mirrors that lead-in
+ * exactly, which is what puts every icon in the sidebar on one axis.
  *
  * Sidebar metrics read from Figma node 19:20/19:41 (M5.5 Task 3): 36px tall,
- * a 20px icon, the index in Data/S (12px, not the 11px uppercase Label/Caps
- * M5 used), accent text AND accent index when active, text/secondary (not
- * text/muted) otherwise -- and no background fill in any state; the Figma
- * Nav Item description says so outright.
+ * a 20px icon, accent text when active, text/secondary (not text/muted)
+ * otherwise -- and no background fill in any state; the Figma Nav Item
+ * description says so outright.
  *
  * The rule (Active Bar, node I19:20;18:18) is a REAL flex child in Figma --
  * `w-[2px] h-full`, transparent when inactive, painted when active -- not an
@@ -48,13 +49,12 @@ export interface NavItemProps {
   href: string
   label: string
   icon: IconName
-  index?: number
   active?: boolean
   variant?: 'sidebar' | 'bottom'
   /**
    * Icon-rail mode: the sidebar collapsed via SidebarTrigger. Sidebar
-   * variant only -- the mobile bottom bar never collapses. Hides the index
-   * and (visually) the label; the label stays in the DOM as `sr-only` so the
+   * variant only -- the mobile bottom bar never collapses. Hides (visually)
+   * the label; the label stays in the DOM as `sr-only` so the
    * link keeps a real accessible name rather than depending solely on the
    * tooltip, which is the visual affordance for a sighted, collapsed rail.
    */
@@ -66,7 +66,6 @@ export function NavItem({
   href,
   label,
   icon,
-  index,
   active = false,
   variant = 'sidebar',
   collapsed = false,
@@ -95,7 +94,7 @@ export function NavItem({
         className
       )}
     >
-      {/* Sidebar (expanded): a real flex child ahead of the index, reserving
+      {/* Sidebar (expanded): a real flex child ahead of the icon, reserving
           its own width so the row never reflows when it becomes active.
           Sidebar (rail): pinned absolute at the item's own left edge per the
           collapsed-rail spec -- there is no index to protect from reflow, so
@@ -129,15 +128,6 @@ export function NavItem({
             !active && 'group-focus-visible:bg-accent-default'
           )}
         />
-      )}
-
-      {!bottom && !rail && index !== undefined && (
-        <span
-          data-nav-index
-          className={cn('tabular text-data-s', active ? 'text-accent-default' : 'text-text-muted')}
-        >
-          {String(index).padStart(2, '0')}
-        </span>
       )}
 
       {rail ? (

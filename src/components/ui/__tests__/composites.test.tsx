@@ -67,22 +67,26 @@ describe('JobCard', () => {
 describe('NavItem', () => {
   it('marks the active entry with a rule and aria-current', () => {
     const { container } = render(
-      <NavItem href="/jobs" label="Applications" icon="Applications" index={2} active />
+      <NavItem href="/jobs" label="Applications" icon="Applications" active />
     )
     expect(container.querySelector('[data-nav-rule]')!.className).toContain('rounded-none')
     expect(screen.getByRole('link').getAttribute('aria-current')).toBe('page')
   })
 
-  it('zero-pads the sidebar number', () => {
-    const { container } = render(<NavItem href="/jobs" label="Jobs" icon="Applications" index={2} />)
-    expect(container.querySelector('[data-nav-index]')!.textContent).toBe('02')
+  it('carries no number at all', () => {
+    // Gabe had the 01..06 indices removed: they numbered a list nobody refers
+    // to by number, and they pushed every icon an index-width off the column
+    // the theme control sits on.
+    const { container } = render(<NavItem href="/jobs" label="Jobs" icon="Applications" />)
+    expect(container.querySelector('[data-nav-index]')).toBeNull()
+    expect(container.textContent).not.toMatch(/\d/)
   })
 
   it('drops the number on the mobile bottom bar', () => {
     // Five entries at 375px cannot fit icon, number and label without the
     // label truncating, and the label is the part that carries meaning.
     const { container } = render(
-      <NavItem href="/jobs" label="Jobs" icon="Applications" index={2} variant="bottom" />
+      <NavItem href="/jobs" label="Jobs" icon="Applications" variant="bottom" />
     )
     expect(container.querySelector('[data-nav-index]')).toBeNull()
   })
@@ -198,20 +202,29 @@ describe('Sidebar', () => {
     }
   })
 
-  it('offsets the index from the accent bar by the bar width plus one gap, not flush against it', () => {
-    // Figma 19:20: Active Bar (w-2) then gap-[12px] then the "01" text -- 14px
-    // total from the item's left edge to where the index starts.
+  it('puts every sidebar icon on one axis, nav rows and the theme control alike', () => {
+    // jsdom has no layout, so this pins the structure that produces the
+    // alignment: both rows lead with the same 2px element and the same gap-3
+    // before their icon. Gabe's ask was that the nav icons line up with the
+    // theme icon; they did not, because the nav rows carried an index between
+    // the rule and the icon and the theme row carried nothing at all.
     const { container } = render(<Sidebar pathname="/applications" />)
     const item = container.querySelector('[data-nav-item][data-active]')!
     const rule = item.querySelector('[data-nav-rule]')!
-    const index = item.querySelector('[data-nav-index]')!
-    // The rule must be a normal flow sibling ahead of the index (not an
-    // absolutely-positioned overlay sitting under it at the same x=0).
+    // In flow ahead of the icon, not an overlay pinned under it at x=0.
     expect(rule.className).not.toMatch(/\babsolute\b/)
-    expect(rule.compareDocumentPosition(index) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(rule.className).toMatch(/w-\[2px\]/)
+    expect(item.className).toMatch(/gap-3/)
+
+    const themeRow = container.querySelector('[data-theme-label]')!.parentElement!
+    expect(themeRow.className).toMatch(/gap-3/)
+    expect(themeRow.firstElementChild!.className).toMatch(/w-\[2px\]/)
+    // The 32px hit target overflows the 20px icon column so the glyph centres
+    // on it; without this the theme icon sits 6px right of every nav icon.
+    expect(themeRow.querySelector('[data-theme-toggle]')!.className).toMatch(/-mx-1\.5/)
   })
 
-  it('collapses to an icon rail: icons stay, indices and visible labels go, and nothing loses its accessible name', () => {
+  it('collapses to an icon rail: icons stay, visible labels go, and nothing loses its accessible name', () => {
     // Gabe: "collapsing currently hides the whole nav and leaves an empty
     // column." Collapsed must keep every destination reachable, not blank
     // the sidebar out.
@@ -220,7 +233,7 @@ describe('Sidebar', () => {
 
     const links = screen.getAllByRole('link')
     const overview = links.find((l) => l.getAttribute('href') === '/dashboard')!
-    expect(overview.querySelector('[data-nav-index]'), 'index should be hidden in the rail').toBeNull()
+    expect(overview.querySelector('[data-nav-index]'), 'no index anywhere any more').toBeNull()
     expect(overview.querySelector('svg'), 'icon should still render').toBeTruthy()
     // The label is visually hidden (sr-only) but still in the DOM, so the
     // link keeps a real accessible name instead of depending on the tooltip.

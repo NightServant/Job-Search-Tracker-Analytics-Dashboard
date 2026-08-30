@@ -71,9 +71,9 @@ export function Composites() {
       <Row title="nav item" note="Sidebar carries the number; the mobile bottom bar drops it for room.">
         <div className="flex flex-col gap-6 md:flex-row">
           <div className="w-56 space-y-1">
-            <NavItem href="#" label="overview" icon="Overview" index={1} />
-            <NavItem href="#" label="applications" icon="Applications" index={2} active />
-            <NavItem href="#" label="calendar" icon="Calendar" index={3} />
+            <NavItem href="#" label="overview" icon="Overview" />
+            <NavItem href="#" label="applications" icon="Applications" active />
+            <NavItem href="#" label="calendar" icon="Calendar" />
           </div>
           <div className="flex w-[375px] max-w-full items-stretch gap-1 border-t border-border-subtle pt-1">
             <NavItem href="#" label="overview" icon="Overview" variant="bottom" />
