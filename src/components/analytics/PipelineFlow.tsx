@@ -70,7 +70,12 @@ export function PipelineFlow({ transitions }: PipelineFlowProps) {
 
   return (
     <div className="flex flex-1 flex-col gap-3">
-      <div className="min-h-64 w-full flex-1">
+      {/* flex-1 with a LOW floor, so the diagram follows the card it is in
+          rather than setting the card's height. A 256px floor meant this panel
+          could force its row taller than its neighbour needed, which is the one
+          way these charts stopped matching the cards beside them. 192px is
+          still a legible plot; below that flex-1 has nothing left to give. */}
+      <div className="min-h-48 w-full flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <Sankey
             data={graph}

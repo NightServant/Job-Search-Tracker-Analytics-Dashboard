@@ -394,6 +394,23 @@ describe('Analytics', () => {
     expect(stage.className).toContain('max-h-12')
   })
 
+  it('lets the two chart panels follow their row rather than setting its height', () => {
+    // Both charts are flex-1 so they grow into a card stretched to a taller
+    // neighbour, with a LOW floor so they never force the row taller than the
+    // neighbour needed. A 256px floor did exactly that -- measured at 1440px,
+    // dropping it to 192px took the funnel/pipeline row from 383px to 369px,
+    // which is the funnel's own natural height rather than the Sankey's floor.
+    const { container } = render(<Analytics {...fullProps()} />)
+    for (const key of ['pipeline', 'time-in-stage']) {
+      const box = container.querySelector(
+        `[data-panel-slot="${key}"] [data-slot="card-content"] [class*="min-h-"]`
+      )!
+      expect(box.className, key).toContain('flex-1')
+      expect(box.className, key).toContain('min-h-48')
+      expect(box.className, key).not.toContain('min-h-64')
+    }
+  })
+
   it('scrolls the cohort table inside its own container rather than the page body', () => {
     render(<Analytics {...fullProps()} />)
     const heading = screen.getByRole('heading', { name: 'cohort analysis' })
