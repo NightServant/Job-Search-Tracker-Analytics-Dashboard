@@ -355,66 +355,57 @@ describe('Analytics', () => {
     expect(rows[1].className).toContain('bg-bg-surface')
   })
 
-  it('promotes a half-width panel to full width when hiding leaves it without a partner', () => {
-    // The point of computing spans instead of hardcoding them. With all four
-    // charts present they pair off two to a row; hide one and the odd chart
-    // out fills its row rather than sitting beside a hole.
-    const paired = render(<Analytics {...fullProps()} />)
-    const span = (key: string) =>
-      paired.container.querySelector(`[data-panel-slot="${key}"]`)!.className
-    expect(span('funnel')).not.toContain('lg:col-span-2')
-    expect(span('pipeline')).not.toContain('lg:col-span-2')
-    expect(span('time-in-stage')).not.toContain('lg:col-span-2')
-    expect(span('salary')).not.toContain('lg:col-span-2')
-    paired.unmount()
-
-    // Drop pipeline flow: funnel now pairs with time in stage, which leaves
-    // salary alone at the end of the run.
-    const odd = render(
-      <Analytics {...fullProps()} statusTransitions={ok<StatusTransition[]>([])} />
-    )
-    const oddSpan = (key: string) =>
-      odd.container.querySelector(`[data-panel-slot="${key}"]`)!.className
-    expect(odd.container.querySelector('[data-panel-slot="pipeline"]')).toBeNull()
-    expect(oddSpan('funnel')).not.toContain('lg:col-span-2')
-    expect(oddSpan('time-in-stage')).not.toContain('lg:col-span-2')
-    expect(oddSpan('salary')).toContain('lg:col-span-2')
-  })
-
-  it('keeps the two full-width panels full width whatever else is showing', () => {
-    const { container } = render(
-      <Analytics {...fullProps()} statusTransitions={ok<StatusTransition[]>([])} />
-    )
-    expect(container.querySelector('[data-panel-slot="overview"]')!.className).toContain(
-      'lg:col-span-2'
-    )
-    expect(container.querySelector('[data-panel-slot="cohort"]')!.className).toContain(
-      'lg:col-span-2'
-    )
-  })
-
-  it('hands a stretched card\'s spare height down to the panel instead of leaving it at the bottom', () => {
-    // jsdom has no layout, so this pins the chain of classes that carries the
-    // height rather than a measured pixel gap -- every link has to be present
-    // for the real page to work, and dropping any one of them reintroduces the
-    // dead space under the funnel. Measured in the browser at 1440px: funnel
-    // card 559px against salary's 559px, with 17px of card padding below the
-    // last row instead of ~230px of empty card.
+  it('balances the two columns instead of pairing panels into shared rows', () => {
+    // Greedy packing on the declared weights. With all five column panels
+    // present the two columns should come out within one panel of each other
+    // -- that balance is what removes the dead space, since a card is only
+    // ever as tall as its content once nothing shares a row height.
     const { container } = render(<Analytics {...fullProps()} />)
-    const content = container.querySelector(
-      '[data-panel-slot="funnel"] [data-slot="card-content"]'
-    )!
-    expect(content.className).toContain('flex-1')
-    // The panel root claims the height and centres its whole contents. The
-    // chain must NOT claim it itself: that centred the stages in the spare
-    // room and stranded the exits row at the bottom of the card.
-    const root = container.querySelector('[data-funnel-chain]')!.parentElement!
-    expect(root.className).toContain('flex-1')
-    expect(root.className).toContain('justify-center')
-    const chain = container.querySelector('[data-funnel-chain]')!
-    expect(chain.className).not.toContain('flex-1')
-    // ...and rows keep their own pitch rather than being spread apart.
-    expect(chain.className).not.toContain('justify-around')
+    const column = (i: number) =>
+      [...container.querySelectorAll(`[data-panel-column="${i}"]`)].map(
+        (s) => (s as HTMLElement).dataset.panelSlot
+      )
+    // salary is the heavy one (weight 8), so it must not share a column with
+    // the next-heaviest pair -- that was exactly the multicol failure.
+    expect(column(0)).toEqual(['funnel', 'time-in-stage', 'cohort'])
+    expect(column(1)).toEqual(['pipeline', 'salary'])
+    // The KPI strip is the only panel outside the columns.
+    expect(
+      [...container.querySelectorAll('[data-panel-column="full"]')].map(
+        (s) => (s as HTMLElement).dataset.panelSlot
+      )
+    ).toEqual(['overview'])
+  })
+
+  it('gives the last remaining panel the full width rather than leaving a column empty', () => {
+    const { container } = render(
+      <Analytics
+        {...fullProps()}
+        jobs={[]}
+        statusTransitions={ok<StatusTransition[]>([])}
+        timeInStage={ok<TimeInStageMetric[]>([])}
+        cohortAnalysis={ok<CohortAnalysis[]>([])}
+      />
+    )
+    expect(
+      [...container.querySelectorAll('[data-panel-column="full"]')].map(
+        (s) => (s as HTMLElement).dataset.panelSlot
+      )
+    ).toEqual(['overview', 'funnel'])
+    expect(container.querySelectorAll('[data-panel-column="0"]')).toHaveLength(0)
+  })
+
+  it('never stretches a card past its own content', () => {
+    // The dead space Gabe reported four times came from shared row heights.
+    // Each column is its own flex stack now, and items-start keeps the two
+    // stacks from stretching to match each other.
+    const { container } = render(<Analytics {...fullProps()} />)
+    const row = container.querySelector('[data-panel-column="0"]')!.parentElement!.parentElement!
+    expect(row.className).toContain('lg:items-start')
+    expect(row.className).not.toContain('grid')
+    for (const slot of container.querySelectorAll('[data-panel-slot]')) {
+      expect(slot.querySelector('[data-analytics-panel]')!.className).not.toContain('h-full')
+    }
   })
 
   it('scrolls the cohort table inside its own container rather than the page body', () => {
@@ -491,6 +482,21 @@ describe('FunnelChart timings', () => {
     expect(screen.queryByText(/0d to reach/)).toBeNull()
     expect(screen.getAllByText('\u2014')).toHaveLength(2)
     expect(screen.getByText('1d to reach')).toBeTruthy()
+  })
+
+  it('drops the timing line entirely when no stage has a timing', () => {
+    // An account with no status history reports 0 for every stage. Rendering
+    // the line anyway gave five dashes -- height with nothing in it, which is
+    // worse than the gap it was added to close.
+    const noHistory: ConversionFunnelMetric[] = [
+      { stage: 'Wishlist', count: 10, percentage: 100, avgDaysToStage: 0, isExit: false },
+      { stage: 'Applied', count: 10, percentage: 100, avgDaysToStage: 0, isExit: false },
+      { stage: 'Rejected', count: 1, percentage: 10, avgDaysToStage: 0, isExit: true },
+    ]
+    render(<FunnelChart data={normalizeFunnel(noHistory)} />)
+    expect(screen.queryByText('\u2014')).toBeNull()
+    // The bars themselves are untouched.
+    expect(screen.getByText('Wishlist')).toBeTruthy()
   })
 
   it('carries avgDaysToStage through normalizeFunnel', () => {

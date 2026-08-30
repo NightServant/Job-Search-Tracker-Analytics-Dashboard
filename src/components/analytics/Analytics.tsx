@@ -76,7 +76,7 @@ function AnalyticsPanel({
     // in the accessibility tree is lost -- but the panel boundary still has to
     // be addressable, by tests and by anything that needs to scope a query to
     // one panel.
-    <Card data-analytics-panel className="h-full">
+    <Card data-analytics-panel>
       <CardHeader>
         {/* An <h2> inside CardTitle, not instead of it: CardTitle renders a
             div, so converting these panels to Cards silently removed every
@@ -88,15 +88,6 @@ function AnalyticsPanel({
         </CardTitle>
         {action ? <CardAction>{action}</CardAction> : null}
       </CardHeader>
-      {/*
-        flex-1, so a card stretched to match a taller neighbour hands the extra
-        height down to the panel rather than leaving it as dead space at the
-        bottom -- the gap Gabe pointed at inside the conversion funnel. The
-        components that can use height (the funnel's rows, the charts) claim it
-        with flex-1 of their own; the ones that do not are unaffected, since a
-        flex child without flex-1 still sizes to its content -- and on a card
-        that was never stretched there is no spare height to hand down anyway.
-      */}
       <CardContent className="flex flex-1 flex-col">
         {error ? (
           <p className="flex items-center gap-2 text-body-s text-status-rejected-mark">
@@ -157,55 +148,65 @@ function blank(state: MetricState<unknown>, empty: boolean): boolean {
 }
 
 /**
- * One panel's place in the grid. `span` is what the panel WANTS; `layOut`
- * decides what it gets.
+ * One panel awaiting placement.
+ *
+ * `weight` is a rough estimate of the panel's height in arbitrary units, used
+ * to balance the two columns. It does not need to be accurate -- only to rank
+ * a tall panel above a short one, which is knowable from what the panel
+ * contains (a stats row plus a chart plus a table is taller than five bars)
+ * and does not need measuring.
  */
 interface PanelSpec {
   key: string
-  span: 'full' | 'half'
+  span: 'full' | 'column'
+  weight: number
   node: React.ReactNode
 }
 
 /**
- * Assigns column spans against the panels that actually rendered.
+ * Packs the column panels into two balanced columns.
  *
- * Panels are hidden when their query returns nothing, so the set on the page
- * changes as an account fills up -- which means a hardcoded arrangement is
- * wrong the moment one panel drops out of it. Two half-width panels declared
- * side by side become one half-width panel and a hole when the second is
- * hidden, and every panel after it shifts to the wrong column.
+ * Three layouts were tried before this one and all three failed the same way.
+ * A grid lays out in ROWS, so two cards in a row share a height: the shorter
+ * one either stretches and carries the difference as empty card, or does not
+ * and carries it as a hole beside it. Redistributing that space -- centring
+ * it, spreading the rows into it, adding content to fill it -- only moves it.
+ * CSS multi-column has no rows and looked like the answer, but `break-inside:
+ * avoid` (without which a card splits in half across the column boundary)
+ * defeats the browser's balancer: it put a 261px panel alone in one column
+ * and stacked 822px in the other.
  *
- * So the spans are computed from the visible list, not written into it. Walk
- * it in order tracking which column is next: a full-width panel takes the row
- * and resets to column one; a half-width panel pairs with the next one if
- * there is a half-width panel to pair with, and is promoted to full width if
- * there is not. A lone chart then fills its row instead of sitting beside a
- * gap, and the arrangement re-forms itself for whatever subset is present.
+ * So the packing is explicit. Greedy: walk the panels in the author's order
+ * and put each one in whichever column is currently shorter. Each column is
+ * its own flex stack, so a card is exactly as tall as its content and the
+ * next card starts right below it. No card is ever stretched, and there is no
+ * shared row height to leave a gap.
  *
- * Order is still the author's -- this only decides widths.
+ * `weight` only has to RANK panels, not measure them -- greedy packing on
+ * approximate weights lands within one panel of optimal, and being one panel
+ * off means a slightly longer column, not a hole in the middle of one.
+ *
+ * A single column panel spans the full width instead, since one card in
+ * column one leaves column two visibly empty.
  */
-function layOut(specs: PanelSpec[]): Array<PanelSpec & { full: boolean }> {
-  const out: Array<PanelSpec & { full: boolean }> = []
-  let atRowStart = true
-  for (let i = 0; i < specs.length; i += 1) {
-    const spec = specs[i]
-    if (spec.span === 'full') {
-      out.push({ ...spec, full: true })
-      atRowStart = true
-      continue
-    }
-    if (!atRowStart) {
-      // Second half of a row already opened by the previous panel.
-      out.push({ ...spec, full: false })
-      atRowStart = true
-      continue
-    }
-    const partner = specs[i + 1]
-    const paired = partner !== undefined && partner.span === 'half'
-    out.push({ ...spec, full: !paired })
-    atRowStart = !paired
+function packColumns(specs: PanelSpec[]): {
+  full: PanelSpec[]
+  columns: [PanelSpec[], PanelSpec[]]
+} {
+  const full = specs.filter((spec) => spec.span === 'full')
+  const flowing = specs.filter((spec) => spec.span === 'column')
+
+  // One panel cannot fill two columns, so it takes the width instead.
+  if (flowing.length === 1) return { full: [...full, ...flowing], columns: [[], []] }
+
+  const columns: [PanelSpec[], PanelSpec[]] = [[], []]
+  const heights = [0, 0]
+  for (const spec of flowing) {
+    const target = heights[0] <= heights[1] ? 0 : 1
+    columns[target].push(spec)
+    heights[target] += spec.weight
   }
-  return out
+  return { full, columns }
 }
 
 function Overview({ data }: { data: ConversionMetrics | null }) {
@@ -339,6 +340,7 @@ export function Analytics({
     specs.push({
       key: 'overview',
       span: 'full',
+      weight: 0,
       node: (
         <AnalyticsPanel
           title="overview"
@@ -354,7 +356,8 @@ export function Analytics({
   if (!hide.funnel) {
     specs.push({
       key: 'funnel',
-      span: 'half',
+      span: 'column',
+      weight: 3, // five bars and a divider
       node: (
         <AnalyticsPanel
           title="conversion funnel"
@@ -370,7 +373,8 @@ export function Analytics({
   if (!hide.pipeline) {
     specs.push({
       key: 'pipeline',
-      span: 'half',
+      span: 'column',
+      weight: 4, // a fixed-height diagram plus a footnote
       node: (
         <AnalyticsPanel
           title="pipeline flow"
@@ -389,7 +393,8 @@ export function Analytics({
   if (!hide.timeInStage) {
     specs.push({
       key: 'time-in-stage',
-      span: 'half',
+      span: 'column',
+      weight: 4, // a fixed-height chart
       node: (
         <AnalyticsPanel
           title="time in stage"
@@ -405,7 +410,8 @@ export function Analytics({
   if (!hide.salary) {
     specs.push({
       key: 'salary',
-      span: 'half',
+      span: 'column',
+      weight: 8, // a stats row, a chart AND a company table -- the tall one
       node: (
         <AnalyticsPanel title="salary insights" action={<Span>all time</Span>}>
           <SalaryInsights jobs={jobs} />
@@ -417,7 +423,13 @@ export function Analytics({
   if (!hide.cohort) {
     specs.push({
       key: 'cohort',
-      span: 'full',
+      // Packed like the rest rather than spanning both columns. Spanning
+      // forces a break across the full width, which stranded empty space
+      // beside the shorter column. Its seven columns still fit -- the table
+      // carries its own min-width and overflow-x-auto, per the global
+      // constraint that a wide table scrolls inside its own container.
+      span: 'column',
+      weight: 4, // a callout plus a handful of rows
       node: (
         <AnalyticsPanel
           title="cohort analysis"
@@ -447,36 +459,45 @@ export function Analytics({
     })
   }
 
+  // Order above is the question each panel answers: how am I doing
+  // (overview), how far do applications get (funnel), where do they actually
+  // go (pipeline flow), how long do they sit (time in stage), what are they
+  // worth (salary), then the month-by-month breakdown, which is reference
+  // material rather than a headline. `packColumns` preserves that order
+  // within each column; what it decides is which column.
+  const packed = packColumns(specs)
+
   return (
     // Two columns from lg. A 2560px single column meant a lot of scrolling
     // past half-empty panels; paired, each panel gets a width that suits it
     // and the page halves in height.
-    //
-    // Order is the question each panel answers: how am I doing (overview),
-    // how far do applications get (funnel), where do they actually go
-    // (pipeline flow), how long do they sit (time in stage), what are they
-    // worth (salary), then the full month-by-month breakdown last, because a
-    // seven-column table is reference material rather than a headline. The
-    // two full-width panels sit at the ends, so the four charts in the middle
-    // pair off cleanly however many of them are present.
-    //
-    // Cards in a row stretch to the taller one (grid's default, plus h-full on
-    // the Card so it fills the slot it was given). That was briefly turned off
-    // -- a panel showing "not enough data yet" grew to its neighbour's height
-    // and left a column of dead space under one line of text, the gap Gabe
-    // reported under pipeline flow. Hiding empty panels outright removed that
-    // case: nothing that stretches is empty any more. So stretch is back on,
-    // because the alternative left the SHORTER card floating with the row's
-    // dead space beside it instead of inside it, which looks like a hole
-    // rather than a card.
-    <div className="grid gap-8 lg:grid-cols-2">
-      <PageHeader className="lg:col-span-2" title="analytics" action={<RangePicker value={range} onChange={setRange} />} />
+    <div className="flex flex-col gap-8">
+      <PageHeader title="analytics" action={<RangePicker value={range} onChange={setRange} />} />
 
-      {layOut(specs).map(({ key, node, full }) => (
-        <div key={key} data-panel-slot={key} className={full ? 'lg:col-span-2' : undefined}>
+      {packed.full.map(({ key, node }) => (
+        <div key={key} data-panel-slot={key} data-panel-column="full">
           {node}
         </div>
       ))}
+
+      {/* Two independent stacks, not a grid: a grid would give paired cards a
+          shared row height, which is the whole source of the dead space. Each
+          column is its own flex column, so every card is exactly as tall as
+          its content. items-start keeps the two stacks from stretching to
+          match each other's total height. */}
+      {packed.columns.some((column) => column.length > 0) && (
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-start">
+          {packed.columns.map((column, index) => (
+            <div key={index} className="flex flex-1 flex-col gap-8">
+              {column.map(({ key, node }) => (
+                <div key={key} data-panel-slot={key} data-panel-column={index}>
+                  {node}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

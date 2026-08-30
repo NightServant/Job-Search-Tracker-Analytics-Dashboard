@@ -119,7 +119,8 @@ export interface FunnelChartProps {
  * read as "this step takes no time", which is the opposite of the truth in the
  * second case.
  */
-function StageTiming({ days }: { days: number }) {
+function StageTiming({ days, show }: { days: number; show: boolean }) {
+  if (!show) return null
   return (
     <p className="pl-27 text-body-s text-text-muted">
       {days > 0 ? `${Math.round(days)}d to reach` : '\u2014'}
@@ -138,6 +139,13 @@ export function FunnelChart({ data }: FunnelChartProps) {
 
   const chain = data.filter((d) => !d.isExit)
   const exits = data.filter((d) => d.isExit)
+  // Timings only appear when at least one stage has one. An account with no
+  // status history reports 0 days for every stage, so the line rendered as
+  // five dashes -- height with no information in it, which is worse than the
+  // gap it was added to fill. One stage with a real number is enough to make
+  // the column meaningful, and the zeroes beside it then read as "not this
+  // one" rather than "not any of them".
+  const hasTimings = data.some((d) => d.avgDaysToStage > 0)
   // The chain's own top stage is the denominator, not the global max. A funnel
   // reads as "what fraction survived each step", and measuring against an exit
   // count would make a heavily-rejected pipeline look like it converted well.
@@ -190,7 +198,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
                 </span>
               </span>
               </div>
-              <StageTiming days={d.avgDaysToStage} />
+              <StageTiming days={d.avgDaysToStage} show={hasTimings} />
             </div>
           )
         })}
@@ -225,7 +233,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
                 {d.count}
               </span>
               </div>
-              <StageTiming days={d.avgDaysToStage} />
+              <StageTiming days={d.avgDaysToStage} show={hasTimings} />
             </div>
           ))}
         </div>
