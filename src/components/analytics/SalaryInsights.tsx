@@ -1,51 +1,50 @@
 'use client'
 
 import * as React from 'react'
-import { Bar, BarChart, XAxis } from 'recharts'
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { EmptyState } from '@/components/ui/empty-state'
-import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
-import {
-  salaryDistribution,
-  salaryBands,
-  salaryByCompany,
-  averageMidpoint,
-} from '@/lib/salaryHistogram'
+import { salaryDistribution, salaryRanges, averageMidpoint } from '@/lib/salaryHistogram'
+import type { CompanyRange } from '@/lib/salaryHistogram'
 import type { Job } from '@/types'
 
-const CONFIG = {
-  count: { label: 'applications', color: 'var(--color-accent-default)' },
-} satisfies ChartConfig
+/** Axis ticks in thousands -- full peso figures collide across eight rows. */
+function compact(value: number): string {
+  return value >= 1000 ? `${Math.round(value / 1000)}k` : String(Math.round(value))
+}
 
 export interface SalaryInsightsProps {
   jobs: Job[]
 }
 
 /**
- * Figma `Panel / Salary Insights` (80:1003) — a stats row over a twelve-bar
- * histogram. Absent from the code entirely until now.
+ * Figma `Panel / Salary Insights` (80:1003) — a stats row over a chart.
  *
  * The distribution comes from `lib/salaryHistogram`, derived from the jobs the
  * route already holds. No analyticsService method returns one, and the rows
  * carry `salary_min`/`salary_max`/`salary_currency` already.
  *
- * THE CURRENCY LINE IS NOT A FOOTNOTE. Salaries are stored per row and never
- * converted, so this charts one currency and says which. Jobs priced in
- * another currency, and jobs with no salary at all, are counted and disclosed
- * separately — they are two different reasons a job is not in the chart, and a
- * panel that silently under-reports is worse than one that explains itself.
+ * ONE CURRENCY, NEVER CONVERTED. Salaries are stored per row and figures are
+ * never converted, so this charts a single currency. When an account holds
+ * more than one, the rest are dropped and the panel says so beneath itself --
+ * silently under-reporting is worse than explaining.
  *
- * The distribution is FIXED CLASSIFICATION BANDS, not buckets derived from the
- * data's own min and max. Derived buckets moved their axis labels every time a
- * job was added and made two accounts incomparable; 0-25k is 0-25k for
- * everyone. The top band is open-ended so an outlier is classified rather than
- * silently dropped.
+ * The chart is a RANGE PLOT, not a histogram. Two earlier versions bucketed
+ * midpoints -- first into buckets derived from the data's own min and max
+ * (whose axis labels moved every time a job was added, making two accounts
+ * incomparable), then into fixed 25k bands. Both collapsed each job to a
+ * single number, which threw away the half of the data that a job posting
+ * actually is: ₱20-60k and ₱39-41k share a midpoint and are not the same
+ * offer. And on a small account the whole chart collapsed into one or two
+ * bars. The plot now draws each company's posted band with its average marked
+ * inside it, which is the comparison the panel exists to support.
+ *
+ * The per-company average TABLE that used to sit below is gone with it: the
+ * plot marks each average on its own row, so the table was the same numbers a
+ * second time -- the duplication Gabe had removed from `cohort analysis` for
+ * exactly this reason.
  */
 export function SalaryInsights({ jobs }: SalaryInsightsProps) {
-  const reducedMotion = usePrefersReducedMotion()
   const dist = React.useMemo(() => salaryDistribution(jobs), [jobs])
-  const bands = React.useMemo(() => salaryBands(dist, jobs), [dist, jobs])
-  const byCompany = React.useMemo(() => salaryByCompany(dist, jobs), [dist, jobs])
+  const ranges = React.useMemo(() => salaryRanges(dist, jobs), [dist, jobs])
   const avg = React.useMemo(() => averageMidpoint(dist, jobs), [dist, jobs])
 
   const money = React.useMemo(
@@ -67,7 +66,10 @@ export function SalaryInsights({ jobs }: SalaryInsightsProps) {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    // h-full/flex-1 so the panel fills a card stretched to its neighbour's
+    // height. The range plot below is the part that grows into it -- the
+    // stats row and the legend are fixed-height by nature.
+    <div className="flex h-full flex-1 flex-col gap-6">
       <dl className="flex flex-wrap gap-x-10 gap-y-3">
         <div>
           <dt className="text-body-s text-text-muted">jobs with salary</dt>
@@ -87,49 +89,8 @@ export function SalaryInsights({ jobs }: SalaryInsightsProps) {
         </div>
       </dl>
 
-      <div className="flex flex-col gap-2">
-        <p className="text-label-caps uppercase text-text-secondary">range distribution</p>
-        <ChartContainer config={CONFIG} className="aspect-auto h-40 w-full" data-chart-salary>
-          <BarChart data={bands} margin={{ left: 0, right: 0, top: 4, bottom: 0 }}>
-            <XAxis dataKey="label" tickLine={false} axisLine={false} tickMargin={8} />
-            <ChartTooltip content={<ChartTooltipContent labelKey="label" />} />
-            <Bar
-              dataKey="count"
-              fill="var(--color-accent-default)"
-              radius={[2, 2, 0, 0]}
-              maxBarSize={72}
-              isAnimationActive={!reducedMotion}
-            />
-          </BarChart>
-        </ChartContainer>
-      </div>
-
-      {byCompany.length > 0 && (
-        <div className="flex flex-col gap-2">
-          <p className="text-label-caps uppercase text-text-secondary">average by company</p>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-body-s">
-              <thead>
-                <tr className="border-b border-border-subtle text-left text-text-muted">
-                  <th className="py-2 pr-4 font-medium">company</th>
-                  <th className="py-2 pr-4 text-right font-medium">avg</th>
-                  <th className="py-2 text-right font-medium">jobs</th>
-                </tr>
-              </thead>
-              <tbody>
-                {byCompany.map((row) => (
-                  <tr key={row.company} className="border-b border-border-subtle last:border-b-0">
-                    <td className="max-w-0 truncate py-2 pr-4 text-text-primary">{row.company}</td>
-                    <td className="tabular py-2 pr-4 text-right text-text-secondary">
-                      {money.format(Math.round(row.average))}
-                    </td>
-                    <td className="tabular py-2 text-right text-text-muted">{row.jobs}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {ranges.length > 0 && (
+        <RangePlot ranges={ranges} median={dist.median} money={money} />
       )}
 
       {/*
@@ -152,6 +113,125 @@ export function SalaryInsights({ jobs }: SalaryInsightsProps) {
           not shown &mdash; figures are never converted.
         </p>
       )}
+    </div>
+  )
+}
+
+/**
+ * The posted-range plot, in CSS rather than Recharts.
+ *
+ * Recharts drew this first and its category axis is the reason it does not
+ * any more: a company name is long, the axis reserves a fixed pixel width for
+ * it, and anything that does not fit gets word-wrapped onto two lines and
+ * then ellipsed mid-word -- "Callhounds Global…" over two rows. Widening the
+ * axis eats the plot; narrowing the names makes them unreadable. A CSS row
+ * gives the label a real `truncate` with a `title`, so the full name is one
+ * line and still recoverable on hover.
+ *
+ * This is the same call `FunnelChart` makes and for the same reasons. Both
+ * are horizontal bars against a linear scale, which is arithmetic (`left` and
+ * `width` as percentages), not charting. No library, no ResponsiveContainer,
+ * no measure-then-paint, and the bars exist on the very first render.
+ *
+ * What it draws that the bucket histogram could not: each company's POSTED
+ * BAND, min to max, with its average marked inside it. A wide band around a
+ * low average is a very different proposition from a tight one at the same
+ * number, and bucketing midpoints threw that away -- along with, on a small
+ * account, most of the chart, which collapsed into one or two bars.
+ */
+function RangePlot({
+  ranges,
+  median,
+  money,
+}: {
+  ranges: CompanyRange[]
+  median: number | null
+  money: Intl.NumberFormat
+}) {
+  // Shared scale across every row, anchored at zero: a band's position has to
+  // mean the same thing on every line or the rows cannot be compared, which is
+  // the only reason to stack them.
+  const max = Math.max(...ranges.map((r) => r.max), 1)
+  const pct = (value: number) => `${(value / max) * 100}%`
+
+  return (
+    <div className="flex flex-1 flex-col gap-2">
+      <p className="text-label-caps uppercase text-text-secondary">posted ranges by company</p>
+
+      {/* The rows take the panel's spare height, capped so three companies do
+          not draw three slabs. Same trick as the funnel: a bar's LENGTH is
+          what carries the number here, so its height is free to stretch. */}
+      <div className="flex flex-1 flex-col justify-center gap-1.5">
+        {ranges.map((row) => (
+          <div key={row.company} className="flex max-h-10 min-h-7 flex-1 items-center gap-3">
+            <span
+              title={row.company}
+              className="w-36 shrink-0 truncate text-body-s text-text-secondary"
+            >
+              {row.company}
+            </span>
+
+            <div className="relative h-full max-h-6 min-h-5 flex-1 rounded-sm bg-bg-inset">
+              {median !== null && (
+                <span
+                  aria-hidden
+                  className="absolute inset-y-0 w-px bg-border-strong"
+                  style={{ left: pct(median) }}
+                />
+              )}
+              {/*
+                accent-default at 35%, NOT accent-subtle. `accent-subtle` is a
+                surface token: in dark mode it resolves to rgb(24,24,27),
+                darker than the rgb(39,39,42) track behind it, so the band read
+                as a hole punched in the row rather than as a bar. A tint of
+                the accent reads as the same colour family as the average
+                marker sitting inside it, which is the relationship the plot is
+                drawing.
+              */}
+              <span
+                className="absolute inset-y-0 rounded-sm bg-accent-default/35"
+                style={{
+                  left: pct(row.min),
+                  // A floor, so a one-ended posting (min === max) is a visible
+                  // tick rather than a zero-width nothing.
+                  width: `max(${pct(row.max - row.min)}, 3px)`,
+                }}
+              />
+              {/*
+                A tick, not a dot. A ringed 10px dot covered an 11px band
+                whole -- measured, on the two tightest rows -- so the reader
+                could not see there was a range there at all. A 2px rule sits
+                INSIDE the band the way a boxplot's median does, and never
+                hides the thing it is marking.
+              */}
+              <span
+                aria-hidden
+                className="absolute inset-y-0.5 w-0.5 -translate-x-1/2 rounded-full bg-accent-default"
+                style={{ left: pct(row.average) }}
+              />
+            </div>
+
+            <span className="tabular w-32 shrink-0 text-right text-body-s text-text-primary">
+              {money.format(Math.round(row.min))}
+              <span className="text-text-muted">
+                {row.max === row.min ? '' : `\u2013${compact(row.max)}`}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-3 text-body-s text-text-muted">
+        <span className="w-36 shrink-0" />
+        <span className="flex-1">
+          {/* The dot and the rule are the only two marks that need naming; the
+              band is self-evident once they are. */}
+          <span className="inline-block h-3 w-0.5 translate-y-0.5 rounded-full bg-accent-default" /> average
+          <span className="ml-3 inline-block h-3 w-px translate-y-0.5 bg-border-strong" /> median
+          {median !== null ? ` ${money.format(Math.round(median))}` : ''}
+        </span>
+        <span className="tabular w-32 shrink-0 text-right">up to {compact(max)}</span>
+      </div>
     </div>
   )
 }

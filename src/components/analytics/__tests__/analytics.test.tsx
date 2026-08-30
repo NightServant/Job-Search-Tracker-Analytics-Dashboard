@@ -154,22 +154,15 @@ describe('Analytics', () => {
     expect(container.querySelector('[data-top-bar] [data-range-picker]')).toBeNull()
   })
 
-  it('leaves a panel off the page entirely rather than showing it empty', () => {
+  it('shows every panel with an explicit empty state rather than hiding it', () => {
+    // An earlier round hid a panel whose query returned nothing; Gabe
+    // reversed it after seeing the result. A panel that vanishes takes its
+    // heading with it, so the reader cannot tell an account with no
+    // interviews from a page that forgot to draw the panel.
     const { container } = render(<Analytics {...emptyProps()} />)
-    // Every query succeeded and returned nothing, so no panel renders at all
-    // -- not six cards each repeating the same "not enough data yet".
-    expect(container.querySelectorAll('[data-analytics-panel]')).toHaveLength(0)
-    // ...but the page is not left as a bare title.
-    expect(screen.getByText(/nothing to chart yet/i)).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'analytics' })).toBeTruthy()
-  })
-
-  it('keeps the range picker reachable on the nothing-to-chart page', () => {
-    // The all-blank branch is a separate return, so it is the one place the
-    // picker could silently go missing -- and a narrowed range is exactly how
-    // a reader lands on an empty page with data still sitting outside it.
-    render(<Analytics {...emptyProps()} />)
-    expect(screen.getByLabelText('Date range')).toBeTruthy()
+    expect(container.querySelectorAll('[data-analytics-panel]')).toHaveLength(6)
+    expect(screen.getByRole('heading', { name: 'pipeline flow' })).toBeTruthy()
+    expect(screen.getAllByText(/not enough data yet/i).length).toBeGreaterThan(0)
   })
 
   it('gives each panel its own loading state rather than gating the whole page on one', () => {
@@ -233,9 +226,10 @@ describe('Analytics', () => {
       error: null,
     }
     render(<Analytics {...zeroed} />)
-    expect(screen.queryByRole('heading', { name: 'time in stage' })).toBeNull()
-    // Its neighbours are untouched -- one blank panel is not a blank page.
-    expect(screen.getByRole('heading', { name: 'conversion funnel' })).toBeTruthy()
+    const panel = screen
+      .getByRole('heading', { name: 'time in stage' })
+      .closest('[data-analytics-panel]')!
+    expect(panel.textContent).toMatch(/not enough data yet/i)
   })
 
   it('keeps a still-loading or failed panel on the page instead of hiding it', () => {
@@ -356,57 +350,48 @@ describe('Analytics', () => {
     expect(rows[1].className).toContain('bg-bg-surface')
   })
 
-  it('balances the two columns instead of pairing panels into shared rows', () => {
-    // Greedy packing on the declared weights. With all five column panels
-    // present the two columns should come out within one panel of each other
-    // -- that balance is what removes the dead space, since a card is only
-    // ever as tall as its content once nothing shares a row height.
+  it('spans the KPI strip and the cohort table, and pairs the four charts', () => {
     const { container } = render(<Analytics {...fullProps()} />)
-    const column = (i: number) =>
-      [...container.querySelectorAll(`[data-panel-column="${i}"]`)].map(
-        (s) => (s as HTMLElement).dataset.panelSlot
-      )
-    // salary is the heavy one (weight 8), so it must not share a column with
-    // the next-heaviest pair -- that was exactly the multicol failure.
-    expect(column(0)).toEqual(['funnel', 'time-in-stage', 'cohort'])
-    expect(column(1)).toEqual(['pipeline', 'salary'])
-    // The KPI strip is the only panel outside the columns.
-    expect(
-      [...container.querySelectorAll('[data-panel-column="full"]')].map(
-        (s) => (s as HTMLElement).dataset.panelSlot
-      )
-    ).toEqual(['overview'])
-  })
-
-  it('gives the last remaining panel the full width rather than leaving a column empty', () => {
-    const { container } = render(
-      <Analytics
-        {...fullProps()}
-        jobs={[]}
-        statusTransitions={ok<StatusTransition[]>([])}
-        timeInStage={ok<TimeInStageMetric[]>([])}
-        cohortAnalysis={ok<CohortAnalysis[]>([])}
-      />
-    )
-    expect(
-      [...container.querySelectorAll('[data-panel-column="full"]')].map(
-        (s) => (s as HTMLElement).dataset.panelSlot
-      )
-    ).toEqual(['overview', 'funnel'])
-    expect(container.querySelectorAll('[data-panel-column="0"]')).toHaveLength(0)
-  })
-
-  it('never stretches a card past its own content', () => {
-    // The dead space Gabe reported four times came from shared row heights.
-    // Each column is its own flex stack now, and items-start keeps the two
-    // stacks from stretching to match each other.
-    const { container } = render(<Analytics {...fullProps()} />)
-    const row = container.querySelector('[data-panel-column="0"]')!.parentElement!.parentElement!
-    expect(row.className).toContain('lg:items-start')
-    expect(row.className).not.toContain('grid')
-    for (const slot of container.querySelectorAll('[data-panel-slot]')) {
-      expect(slot.querySelector('[data-analytics-panel]')!.className).not.toContain('h-full')
+    const span = (key: string) =>
+      container.querySelector(`[data-panel-slot="${key}"]`)!.className.includes('lg:col-span-2')
+    expect(span('overview')).toBe(true)
+    expect(span('cohort')).toBe(true)
+    for (const key of ['funnel', 'pipeline', 'time-in-stage', 'salary']) {
+      expect(span(key)).toBe(false)
     }
+  })
+
+  it('gives a chart the full width when it has no partner to pair with', () => {
+    // layOut walks the list in pairs, so an odd count leaves one chart alone.
+    // It fills its row rather than sitting beside a hole. Reachable through
+    // the public component by giving salary insights no priced jobs, which is
+    // the one panel whose presence is not query-driven.
+    const { container } = render(<Analytics {...fullProps()} jobs={[]} />)
+    expect(
+      container.querySelector('[data-panel-slot="salary"]')!.className
+    ).not.toContain('lg:col-span-2')
+    // It is still on the page, saying it is empty.
+    expect(screen.getByRole('heading', { name: 'salary insights' })).toBeTruthy()
+  })
+
+  it('stretches every card to its row and lets the body fill the difference', () => {
+    // Gabe asked for cards that match their neighbour's height AND carry no
+    // gap inside. Those pull against each other, so both halves are pinned:
+    // the card stretches, and the content claims the height rather than
+    // leaving it as air under one line of text.
+    const { container } = render(<Analytics {...fullProps()} />)
+    for (const slot of container.querySelectorAll('[data-panel-slot]')) {
+      expect(slot.querySelector('[data-analytics-panel]')!.className).toContain('h-full')
+    }
+    const content = container.querySelector(
+      '[data-panel-slot="funnel"] [data-slot="card-content"]'
+    )!
+    expect(content.className).toContain('flex-1')
+    // The funnel absorbs it by growing its bars: a bar's LENGTH encodes the
+    // count, so its height is free to stretch and says nothing different.
+    const stage = container.querySelector('[data-funnel-chain] [data-stage]')!
+    expect(stage.className).toContain('h-full')
+    expect(stage.className).toContain('max-h-12')
   })
 
   it('scrolls the cohort table inside its own container rather than the page body', () => {

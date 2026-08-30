@@ -152,37 +152,39 @@ export function FunnelChart({ data }: FunnelChartProps) {
   const top = Math.max(chain[0]?.count ?? 0, 1)
 
   return (
-    // justify-center on the WHOLE panel, and nothing inside claims the spare
-    // height. Letting the chain take it centred four rows in a 434px region
-    // and stranded the exits row at the far bottom of the card, which read as
-    // two unrelated charts. Now the chain, its divider and the exits stay one
-    // compact group and the leftover height splits above and below it.
-    <div className="flex flex-1 flex-col justify-center gap-4">
+    // The panel fills the card, and it fills it by growing the BARS rather
+    // than by spreading the rows apart or centring the group in the leftover
+    // space. Both of those were tried and both left visible air. A bar's
+    // LENGTH is what encodes its count here, so its height is free: a taller
+    // bar says nothing different, which is exactly what makes it the right
+    // thing to stretch.
+    <div className="flex h-full flex-1 flex-col gap-4">
       {/* An actual funnel, not a bar list: each stage is centred and its width
           is its share of the first stage, so the taper IS the conversion. The
           previous version was left-aligned tracks of equal length, which is a
           bar chart wearing the word "funnel" -- you had to read the numbers to
           see the shape the chart exists to show. */}
-      {/* Rows keep their own compact pitch. An earlier pass spread them with
-          justify-around to fill the card, which put 60px between 28px bars and
-          read as five unrelated bars rather than one funnel. Bar thickness is
-          fixed too -- a bar is a stage marker, not a second quantity. */}
-      <div data-funnel-chain className="flex flex-col items-center gap-2">
+      {/* Rows keep their pitch tight -- an earlier pass spread them with
+          justify-around, which put 60px between 28px bars and read as five
+          unrelated bars rather than one funnel. What absorbs the extra height
+          is each row growing, capped so a two-stage funnel does not draw two
+          slabs. */}
+      <div data-funnel-chain className="flex flex-1 flex-col items-center gap-2">
         {chain.map((d) => {
           const share = d.count / top
           return (
-            <div key={d.stage} className="flex w-full flex-col gap-0.5">
+            <div key={d.stage} className="flex w-full flex-1 flex-col justify-center gap-0.5">
               <div className="flex w-full items-center gap-3">
               <span className="w-24 shrink-0 text-body-s text-text-secondary">
                 {LABELS[d.stage]}
               </span>
               <div
                 data-stage={d.stage}
-                className="flex h-7 flex-1 items-center justify-center"
+                className="flex h-full max-h-12 min-h-7 flex-1 items-center justify-center"
               >
                 <div
                   data-fill={STAGE_FILL[d.stage]}
-                  className="h-7 rounded-sm transition-[width] duration-[--duration-base]"
+                  className="h-full rounded-sm transition-[width] duration-[--duration-base]"
                   style={{
                     // A floor so a zero stage is still a visible tick rather
                     // than nothing -- "0 got here" is information.
@@ -210,7 +212,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
           className="flex flex-col gap-1 border-t border-border-subtle pt-3"
         >
           {exits.map((d) => (
-            <div key={d.stage} className="flex w-full flex-col gap-0.5">
+            <div key={d.stage} className="flex w-full flex-1 flex-col justify-center gap-0.5">
               <div className="flex w-full items-center gap-3">
               <span className="w-24 shrink-0 text-body-s text-text-secondary">
                 {LABELS[d.stage]}

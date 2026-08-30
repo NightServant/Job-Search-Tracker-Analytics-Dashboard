@@ -141,92 +141,60 @@ export function salaryDistribution(jobs: Job[], bucketCount?: number): SalaryDis
   }
 }
 
-/** Fixed classification bands, in the panel's own currency. */
-export interface SalaryBand {
-  label: string
-  from: number
-  /** Inclusive upper bound; `null` on the open-ended top band. */
-  to: number | null
-  count: number
-}
-
-export interface CompanySalary {
+/** One company's posted salary band, for the range chart. */
+export interface CompanyRange {
   company: string
-  /** Mean of the midpoints of that company's priced applications. */
+  /** Lowest `salary_min` this company posted (falling back to whichever end exists). */
+  min: number
+  /** Highest `salary_max`. */
+  max: number
+  /** Mean of this company's midpoints -- the marker inside the band. */
   average: number
   jobs: number
 }
 
-const BAND_STEP = 25_000
-const BAND_COUNT = 4
-
 /**
- * Salary classification -- fixed bands rather than buckets derived from the
- * data's own min and max.
+ * Posted salary bands per company, richest first.
  *
- * The earlier version divided [min, max] into N equal buckets, so the axis
- * labels moved every time a job was added and two accounts could never be
- * compared. Bands are absolute: 0-25k is 0-25k whatever anyone has recorded.
- * That is what makes "most of my applications are entry band" a statement
- * about the market rather than about this row set.
+ * The panel used to chart midpoints dropped into four fixed buckets, which
+ * threw away half of what the rows carry: a job posts a RANGE, and the width
+ * of that range is itself the insight -- "₱20-60k" and "₱39-41k" have the same
+ * midpoint and are not the same offer. Bucketing also meant the whole chart
+ * could collapse into one or two bars, which is what it did on an account with
+ * four salaries.
  *
- * The top band is open-ended, so a salary above the last edge is classified
- * rather than dropped -- the failure mode of a fixed scheme is silently
- * discarding the outliers it cannot place.
+ * A job with only one end recorded gets a zero-width band at that value rather
+ * than being dropped; that is a real posting, just a precise one.
  *
- * Bands are in the distribution's own currency and are NOT converted, the same
- * rule the rest of this module follows.
+ * One currency, never converted, same as everything else in this module.
  */
-export function salaryBands(dist: SalaryDistribution, jobs: Job[]): SalaryBand[] {
-  const bands: SalaryBand[] = []
-  for (let i = 0; i < BAND_COUNT; i += 1) {
-    const from = i * BAND_STEP
-    const last = i === BAND_COUNT - 1
-    bands.push({
-      from,
-      to: last ? null : from + BAND_STEP,
-      label: last ? `${fmtK(from)}+` : `${fmtK(from)}-${fmtK(from + BAND_STEP)}`,
-      count: 0,
-    })
-  }
-  if (dist.currency === null) return bands
-
-  for (const job of jobs) {
-    if ((job.salary_currency || 'PHP') !== dist.currency) continue
-    const value = midpoint(job)
-    if (value === null || value <= 0) continue
-    const index = Math.min(BAND_COUNT - 1, Math.floor(value / BAND_STEP))
-    bands[index].count += 1
-  }
-  return bands
-}
-
-function fmtK(value: number): string {
-  return value === 0 ? '0' : `${Math.round(value / 1000)}k`
-}
-
-/**
- * Average salary per company, richest first.
- *
- * Averages the midpoints of that company's priced applications, and only
- * within the distribution's currency -- averaging PHP with USD would produce a
- * number that is not money in any currency.
- */
-export function salaryByCompany(dist: SalaryDistribution, jobs: Job[], limit = 8): CompanySalary[] {
+export function salaryRanges(dist: SalaryDistribution, jobs: Job[], limit = 8): CompanyRange[] {
   if (dist.currency === null) return []
-  const totals = new Map<string, { sum: number; n: number }>()
+  const acc = new Map<string, { min: number; max: number; sum: number; n: number }>()
   for (const job of jobs) {
     if ((job.salary_currency || 'PHP') !== dist.currency) continue
-    const value = midpoint(job)
-    if (value === null || value <= 0) continue
+    const mid = midpoint(job)
+    if (mid === null || mid <= 0) continue
+    // A missing end collapses to the end that exists, so the band is the
+    // posting itself rather than an invented spread.
+    const lo = job.salary_min ?? job.salary_max ?? mid
+    const hi = job.salary_max ?? job.salary_min ?? mid
     const key = job.company?.trim() || 'unknown'
-    const acc = totals.get(key) ?? { sum: 0, n: 0 }
-    acc.sum += value
-    acc.n += 1
-    totals.set(key, acc)
+    const row = acc.get(key) ?? { min: lo, max: hi, sum: 0, n: 0 }
+    row.min = Math.min(row.min, lo)
+    row.max = Math.max(row.max, hi)
+    row.sum += mid
+    row.n += 1
+    acc.set(key, row)
   }
-  return [...totals.entries()]
-    .map(([company, t]) => ({ company, average: t.sum / t.n, jobs: t.n }))
+  return [...acc.entries()]
+    .map(([company, r]) => ({
+      company,
+      min: r.min,
+      max: r.max,
+      average: r.sum / r.n,
+      jobs: r.n,
+    }))
     .sort((a, b) => b.average - a.average || a.company.localeCompare(b.company))
     .slice(0, limit)
 }
