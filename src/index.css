@@ -585,3 +585,29 @@ body,
     animation: none;
   }
 }
+
+/* --- Toast motion (M5.5 Item 6) ------------------------------------------
+   Figma motion row 43:559: 160ms in, 100ms out, and its rule reads "Out is
+   faster than in. Always." -- a leaving element should not hold attention it
+   no longer needs. sonner owns the animation, so the durations are set on its
+   own state attributes rather than in JS.
+
+   Reduced motion is handled here rather than with a second matchMedia read in
+   the toast code: the app has exactly one JS gate (usePrefersReducedMotion)
+   and adding another is how two code paths end up disagreeing about the same
+   preference. A toast that cannot animate must still appear and still leave,
+   so this collapses the duration rather than removing the transition. */
+[data-sonner-toast] {
+  --toast-enter-duration: 160ms;
+  --toast-exit-duration: 100ms;
+  transition-duration: var(--toast-enter-duration);
+}
+[data-sonner-toast][data-removed='true'] {
+  transition-duration: var(--toast-exit-duration);
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-sonner-toast] {
+    --toast-enter-duration: 1ms;
+    --toast-exit-duration: 1ms;
+  }
+}
