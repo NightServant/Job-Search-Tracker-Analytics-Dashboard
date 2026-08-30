@@ -4,6 +4,7 @@ import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { AlertCircleIcon } from '@/components/icons'
 import { Callout } from './Callout'
 import { SalaryInsights } from './SalaryInsights'
@@ -106,7 +107,7 @@ function AnalyticsPanel({
  * from the code until now. Plain links, not nav: this is the end of a 2560px
  * page, and the sidebar is the navigation.
  */
-function AppFooter() {
+function AppFooter({ className }: { className?: string }) {
   const links = [
     { href: '/dashboard', label: 'overview' },
     { href: '/applications', label: 'applications' },
@@ -118,7 +119,10 @@ function AppFooter() {
   return (
     <footer
       data-app-footer
-      className="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border-subtle pt-6 text-body-s text-text-muted"
+      className={cn(
+        'flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-border-subtle pt-6 text-body-s text-text-muted',
+        className
+      )}
     >
       {links.map((link, i) => (
         <React.Fragment key={link.href}>
@@ -272,8 +276,12 @@ export function Analytics({
   }, [filteredTrends])
 
   return (
-    <div className="flex flex-col gap-8">
-      <PageHeader title="Analytics" action={<RangePicker value={range} onChange={setRange} />} />
+    // Two columns from lg. A 2560px single column meant a lot of scrolling
+    // past half-empty panels; paired, each panel gets a width that suits it and
+    // the page halves in height. The footer spans both (lg:col-span-2) because
+    // it is the end of the page, not a panel.
+    <div className="grid gap-8 lg:grid-cols-2">
+      <PageHeader className="lg:col-span-2" title="Analytics" action={<RangePicker value={range} onChange={setRange} />} />
 
       <AnalyticsPanel
         title="Overview"
@@ -363,7 +371,7 @@ export function Analytics({
         <SalaryInsights jobs={jobs} />
       </AnalyticsPanel>
 
-      <AppFooter />
+      <AppFooter className="lg:col-span-2" />
     </div>
   )
 }

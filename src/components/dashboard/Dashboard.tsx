@@ -7,7 +7,7 @@ import { FollowUpNudge } from './FollowUpNudge'
 import { KpiStrip } from './KpiStrip'
 import { ApplicationsOverTime } from './ApplicationsOverTime'
 import { StatusDonut } from './StatusDonut'
-import { SourceBars } from './SourceBars'
+import { SourceMix } from './SourceMix'
 import { UpcomingEvents } from './UpcomingEvents'
 import { RecentApplicationsTable } from './RecentApplicationsTable'
 import { getStaleApplications } from '@/services/followUp'
@@ -184,7 +184,7 @@ export function Dashboard({
             </CardTitle>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
-            <SourceBars data={sources} />
+            <SourceMix data={sources} />
           </CardContent>
         </Card>
       </div>
