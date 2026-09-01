@@ -22,7 +22,13 @@ export interface StatusDonutProps {
 /**
  * The by-status donut and its legend — the Figma Overview's second panel
  * (23:76), a 180px ring with the total and the word `total` in the centre and
- * a five-row legend beneath.
+ * a five-row legend.
+ *
+ * Chart left, legend right, two columns, at Gabe's instruction. Stacked, the
+ * ring and its five rows made this the tallest panel on the Overview and left
+ * the right half of a 668px card empty; side by side the panel is roughly half
+ * as tall and the legend sits at the ring's own eye level. It collapses back to
+ * one column below `sm`, where two 150px columns would truncate every label.
  *
  * This is shadcn's `chart-pie-donut-text` and the match is structural, not an
  * approximation: `<Pie innerRadius>` plus a centred `<Label>` rendering a value
@@ -47,7 +53,7 @@ export function StatusDonut({ data }: StatusDonutProps) {
   )
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="grid flex-1 items-center gap-4 sm:grid-cols-2">
       <ChartContainer config={CONFIG} className="mx-auto aspect-square h-44" data-chart-donut>
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent nameKey="label" hideLabel />} />
@@ -87,7 +93,9 @@ export function StatusDonut({ data }: StatusDonutProps) {
         </PieChart>
       </ChartContainer>
 
-      <ul data-donut-legend className="flex flex-col gap-1">
+      {/* min-w-0 so a long status label truncates inside its own column
+          rather than widening the grid track and squeezing the ring. */}
+      <ul data-donut-legend className="flex min-w-0 flex-col gap-1">
         {data.map((slice) => (
           <li key={slice.status} className="flex items-center gap-2 text-body-s">
             <span
@@ -95,7 +103,7 @@ export function StatusDonut({ data }: StatusDonutProps) {
               className="size-2 shrink-0"
               style={{ background: `var(--color-status-${slice.status}-mark)` }}
             />
-            <span className="flex-1 text-text-secondary">{slice.label}</span>
+            <span className="min-w-0 flex-1 truncate text-text-secondary">{slice.label}</span>
             <span className="tabular text-text-primary">{slice.count}</span>
           </li>
         ))}

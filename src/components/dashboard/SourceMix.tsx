@@ -42,6 +42,11 @@ export interface SourceMixProps {
  * The legend is the numbers. An arc is good at "which is bigger" and bad at
  * "how many", so the exact counts sit beside it rather than in a tooltip only
  * a mouse can reach.
+ *
+ * Chart left, legend right, two columns, matching `StatusDonut` -- the two
+ * panels sit side by side on the Overview, so a different internal layout in
+ * each would read as an accident. One column below `sm`, where two narrow
+ * tracks would truncate every source name.
  */
 export function SourceMix({ data }: SourceMixProps) {
   const reducedMotion = usePrefersReducedMotion()
@@ -66,7 +71,7 @@ export function SourceMix({ data }: SourceMixProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="grid flex-1 items-center gap-4 sm:grid-cols-2">
       <ChartContainer
         config={CONFIG}
         className="mx-auto aspect-square w-full max-w-56"
@@ -93,7 +98,7 @@ export function SourceMix({ data }: SourceMixProps) {
         </RadialBarChart>
       </ChartContainer>
 
-      <ul data-source-legend className="flex flex-col gap-1">
+      <ul data-source-legend className="flex min-w-0 flex-col gap-1">
         {arcs.map((row) => (
           <li key={row.source} className="flex items-center gap-2 text-body-s">
             <span aria-hidden className="size-2 shrink-0" style={{ background: row.fill }} />

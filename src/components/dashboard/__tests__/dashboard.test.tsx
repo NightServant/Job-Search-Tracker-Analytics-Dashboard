@@ -195,3 +195,35 @@ describe('Overview layout and copy', () => {
     expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
   })
 })
+
+describe('by status and by source internals', () => {
+  const jobs = [
+    makeJob({ id: '1', status: 'applied', source: 'LinkedIn' }),
+    makeJob({ id: '2', status: 'offer', source: 'Referral' }),
+  ]
+
+  it('puts the chart and its legend in two columns, not stacked', () => {
+    // Gabe's ask. Stacked, the ring plus five legend rows made by-status the
+    // tallest panel on the Overview while the right half of a 668px card sat
+    // empty. Measured side by side at 1440px: chart 816-992, legend from
+    // 1074, same row.
+    const { container } = render(<Dashboard jobs={jobs} />)
+    for (const legend of ['[data-donut-legend]', '[data-source-legend]']) {
+      const grid = container.querySelector(legend)!.parentElement!
+      expect(grid.className, legend).toContain('sm:grid-cols-2')
+      // One column below sm: two ~150px tracks would truncate every label.
+      expect(grid.className, legend).not.toContain('grid-cols-2 ')
+    }
+  })
+
+  it('truncates a long label inside its own column rather than widening it', () => {
+    // Without min-w-0 a flex child refuses to shrink below its content, so a
+    // long source name would widen the legend track and squeeze the chart.
+    const { container } = render(
+      <Dashboard jobs={[makeJob({ id: '1', status: 'applied', source: 'A Very Long Job Board Name' })]} />
+    )
+    const legend = container.querySelector('[data-source-legend]')!
+    expect(legend.className).toContain('min-w-0')
+    expect(legend.querySelector('li span:nth-child(2)')!.className).toContain('truncate')
+  })
+})
