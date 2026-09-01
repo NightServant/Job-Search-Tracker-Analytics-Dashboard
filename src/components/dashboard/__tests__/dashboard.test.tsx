@@ -135,3 +135,63 @@ describe('Dashboard', () => {
     expect(link.getAttribute('href')).toBe('/applications/stale-1')
   })
 })
+
+describe('Overview layout and copy', () => {
+  it('lays the panels out two-up in the order Gabe specified, table last and full width', () => {
+    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    const grid = container.querySelector('.lg\\:grid-cols-2')!
+    const titles = [...grid.querySelectorAll('[data-slot="card"] h2')].map((h) => h.textContent)
+    expect(titles).toEqual([
+      'applications over time',
+      'by status',
+      'upcoming events',
+      'by source',
+      'recent applications',
+    ])
+    // The table is the one panel that genuinely wants width -- four columns
+    // read badly at half a screen -- and it closes the page rather than
+    // pairing with anything.
+    const table = [...grid.querySelectorAll('[data-slot="card"]')].find((c) =>
+      c.querySelector('h2')?.textContent === 'recent applications'
+    )!
+    expect(table.className).toContain('lg:col-span-2')
+  })
+
+  it('says what the page and each panel are for', () => {
+    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    expect(container.querySelector('[data-page-description]')!.textContent).toMatch(/at a glance/i)
+    // Every card carries one line, so none of them is a bare title.
+    const cards = [...container.querySelectorAll('[data-slot="card"]')]
+    expect(cards.length).toBeGreaterThan(0)
+    for (const card of cards) {
+      expect(card.querySelector('[data-slot="card-description"]')).toBeTruthy()
+    }
+  })
+
+  it('keeps the page description out of the heading name', () => {
+    // A heading's accessible name should be the page's name, not the name
+    // plus a sentence of prose -- so the description is a sibling of the h1.
+    render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    expect(screen.getByRole('heading', { level: 1, name: 'overview' })).toBeTruthy()
+  })
+
+  it('bands the recent-applications table from the shared accent pair', () => {
+    const { container } = render(
+      <Dashboard
+        jobs={[
+          makeJob({ id: '1', status: 'applied' }),
+          makeJob({ id: '2', status: 'applied' }),
+          makeJob({ id: '3', status: 'applied' }),
+        ]}
+      />
+    )
+    const head = container.querySelector('[data-recent-applications] thead')!
+    expect(head.className).toMatch(/bg-accent-surface/)
+    // accent-default is the TEXT weight (accent-400 in dark); a full-width
+    // band of it is the over-bright header Gabe rejected on the calendar.
+    expect(head.className).not.toMatch(/bg-accent-default/)
+    const rows = [...container.querySelectorAll('[data-recent-applications] tbody tr')]
+    expect(rows[0].className).not.toMatch(/bg-accent-surface/)
+    expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
+  })
+})

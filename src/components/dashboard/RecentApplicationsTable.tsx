@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/table'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { EmptyState } from '@/components/ui/empty-state'
+import { cn } from '@/lib/utils'
 import { formatAppliedDate } from '@/services/date'
 import type { Job } from '@/types'
 
@@ -37,6 +38,12 @@ export interface RecentApplicationsTableProps {
  * `date_applied` is a bare DATE, not an instant, so it goes through
  * `formatAppliedDate` (UTC) rather than `formatTouchedDate` (viewer's zone).
  * Reading a calendar day in local time shifts it by one for half the world.
+ *
+ * Header band and row banding come from `accent-surface`, the same pair
+ * `ApplicationsTable` and `CohortTable` use -- three tables across three
+ * screens, one treatment. `accent-surface`, never `accent-default`: the
+ * latter is picked for TEXT contrast (accent-400 in dark) and a full-width
+ * band of it is the over-bright header Gabe rejected on the calendar.
  */
 export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsTableProps) {
   const rows = jobs.slice(0, limit)
@@ -51,8 +58,8 @@ export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsT
 
   return (
     <Table data-recent-applications>
-      <TableHeader>
-        <TableRow>
+      <TableHeader className="bg-accent-surface [&_th]:text-accent-on-surface">
+        <TableRow className="hover:bg-transparent">
           <TableHead>company</TableHead>
           <TableHead>position</TableHead>
           <TableHead>status</TableHead>
@@ -60,8 +67,10 @@ export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsT
         </TableRow>
       </TableHeader>
       <TableBody>
-        {rows.map((job) => (
-          <TableRow key={job.id}>
+        {rows.map((job, i) => (
+          // Zebra on the odd rows only, so the first row sits on the card and
+          // the banding reads as an aid rather than as a fill.
+          <TableRow key={job.id} className={cn(i % 2 === 1 && 'bg-accent-surface/30')}>
             <TableCell className="max-w-0 truncate text-text-primary">
               <Link href={`/applications/${job.id}`} className="hover:text-accent-default">
                 {job.company}

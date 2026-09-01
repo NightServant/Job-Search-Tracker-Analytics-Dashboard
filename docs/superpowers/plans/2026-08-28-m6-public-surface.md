@@ -28,6 +28,15 @@ section.
 - **Currency:** salary values are Philippine pesos unless a currency column says otherwise. Never assume USD.
 - **Third-party components carry attribution obligations.** Skiper UI free-tier components require crediting Skiper UI. Every external component adopted gets a line in the README, same discipline already applied to CVJunction.
 
+- **New pages are assembled from the installed shadcn catalogue, not hand-rolled.**
+  M5.5 installed the full catalogue into `src/components/ui/` and restyled it to
+  this design system (4px radius cap, hairline borders, no shadow, the semantic
+  tokens, `@/components/icons`). Every M6 page is new, so every M6 page is built
+  from it. Writing a bespoke card, tab strip, accordion, dialog, badge or table
+  when the catalogue already has one restyled is the thing this constraint
+  forbids — it is how a public page ends up looking like a different product
+  from the app behind it. See the per-task component assignments below.
+
 Carried forward from the M5 plan, still binding:
 
 - **Screens write no new component styling.** If a screen needs a visual the design system does not provide, the component goes in `src/components/ui/` with a test, not inline in the page.
@@ -111,6 +120,44 @@ below is a direct response, and reviewers should hold this plan to them.
    The established pattern is: the route calls hooks; a props-taking component
    takes data and is testable without Next routing. Both are named here, every
    time.
+
+## shadcn components per M6 page
+
+Added 2026-09-02 at Gabe's instruction: "modify the M6 plan by implementing
+ShadCN components to the new pages."
+
+**The catalogue is already in `src/components/ui/` and already restyled.** M5.5
+installed it and reconciled it with the tokens, so there is nothing to install
+and no `shadcn init` to run — see the `components.json` row in *Current state*.
+Three house patterns are also there and are NOT shadcn: `StatusMarker`,
+`EmptyState` and `PageHeader`. Use those where they apply rather than a shadcn
+`Badge`, a bare `<p>`, or a hand-rolled `<h1>`.
+
+**Two rules that override "reach for the catalogue":**
+
+1. **Status is never a `Badge`.** The Global Constraints forbid pills; status is
+   `StatusMarker` (2px rule + label). A `Badge` on a public page showing a demo
+   application's status would reintroduce exactly the pattern M4 removed.
+2. **The accent band on a table header is `accent-surface`, never
+   `accent-default`.** `accent-default` is picked for text contrast — accent-400
+   in dark — and a full-width band of it reads as too bright. `ApplicationsTable`,
+   `CohortTable` and `RecentApplicationsTable` all use the `accent-surface` /
+   `accent-on-surface` pair; a public table matches them.
+
+| Task | Page | Components to build from |
+|---|---|---|
+| 2 | Landing page | `Card` + `CardHeader`/`CardTitle`/`CardDescription` for the feature grid; `Accordion` for the FAQ; `Button` + `ButtonGroup` for the hero CTA pair; `Separator` between sections; `AspectRatio` around every screenshot so the page does not reflow as images load; `Avatar` if testimonials ship |
+| 3 | Pinned scroll sequence | `AspectRatio` for each pinned frame; `Progress` for the section indicator if one is wanted. Nothing else — this task is motion, and adding chrome to a pinned sequence fights it |
+| 4 | `/login`, `/signup` | `Field` + `Label` + `Input` for every control (`Field` carries the error slot, which is what stops each form inventing its own error markup); `Button` for submit; `Alert` for the form-level auth error; `Separator` for the "or" divider; `Tabs` ONLY if sign-in and sign-up end up on one route — they do not, they are two routes, so prefer the link |
+| 5 | 404, privacy | `Empty` (or the house `EmptyState`) for the 404 body; `Button` for the way back; `Breadcrumb` on privacy so a deep-linked visitor can climb out; `Separator` between policy sections |
+| 6 | Demo mode | `AlertDialog` to confirm entering demo (it replaces data the visitor can see — a `Dialog` is dismissible by accident, an `AlertDialog` is not); `Alert` for the persistent "you are in demo mode" banner; `Badge` is acceptable HERE and only here, on the banner, because it labels a MODE and not a status; `Skeleton` while the demo dataset loads |
+
+**Verification for every one of these tasks:** the task is not done while a
+hand-rolled equivalent of a catalogue component is still in the diff. Check with
+`grep -n "className=\"[^\"]*border[^\"]*rounded" src/components/<area>/` — a
+bespoke bordered box on a new page is the tell.
+
+---
 
 ## Decisions locked before execution
 
@@ -2658,7 +2705,7 @@ line count.
 - Create: `src/app/privacy/__tests__/page.test.tsx`
 
 **Interfaces:**
-- Consumes: `Button` from `@/components/ui/button`; `PageHeader` from `@/components/ui/page-header` (`{ title, action? }`, emits `[data-body-header]`); `SiteFooter` from `@/components/landing/SiteFooter` (Task 2).
+- Consumes: `Button` from `@/components/ui/button`; `PageHeader` from `@/components/ui/page-header` (`{ title, description?, action? }`, emits `[data-body-header]`, and `[data-page-description]` when `description` is passed); `Empty` from `@/components/ui/empty` or `EmptyState` from `@/components/ui/empty-state`; `Breadcrumb` and `Separator`; `SiteFooter` from `@/components/landing/SiteFooter` (Task 2).
 - Produces: `NotFound()` from `@/components/errors/NotFound`.
 
 Both routes live at the root, outside `(app)`, so neither inherits the auth

@@ -270,6 +270,7 @@ export function ApplicationsPage({
     <div className="flex flex-col gap-8">
       <PageHeader
         title="applications"
+        description="every role you are tracking, from wishlist through to an offer."
         action={
           <Button size="s" onClick={() => setForm({ job: null })}>
             <PlusIcon size={16} aria-hidden />

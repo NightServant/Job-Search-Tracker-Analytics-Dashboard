@@ -72,6 +72,7 @@ export function Calendar({ events, companyByJobId = {} }: CalendarProps) {
     <div className="flex flex-col gap-6">
       <PageHeader
         title="calendar"
+        description="interviews and follow-ups, laid out by month."
         action={
           <div className="hidden items-center gap-3 md:flex">
             <p className="tabular text-body-m text-text-secondary">{monthLabel}</p>

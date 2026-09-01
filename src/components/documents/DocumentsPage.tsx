@@ -69,6 +69,7 @@ export function DocumentsPage({
     <div className="flex flex-col gap-8">
       <PageHeader
         title="documents"
+        description="the CVs you send out, and every version you have saved of them."
         action={
           <Button size="s" onClick={() => setNewCvOpen(true)}>
             <PlusIcon size={16} aria-hidden />

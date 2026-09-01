@@ -427,6 +427,21 @@ describe('Analytics', () => {
     }
   })
 
+  it('says what the page and every panel are for', () => {
+    const { container } = render(<Analytics {...fullProps()} />)
+    expect(container.querySelector('[data-page-description]')!.textContent).toMatch(
+      /how your applications actually move/i
+    )
+    // A panel heading names the panel; the line under it says what question
+    // the panel answers. Every panel carries one, so none is a bare title.
+    const panels = [...container.querySelectorAll('[data-analytics-panel]')]
+    expect(panels.length).toBe(6)
+    for (const panel of panels) {
+      const description = panel.querySelector('[data-slot="card-description"]')
+      expect(description, panel.querySelector('h2')?.textContent ?? '').toBeTruthy()
+    }
+  })
+
   it('scrolls the cohort table inside its own container rather than the page body', () => {
     render(<Analytics {...fullProps()} />)
     const heading = screen.getByRole('heading', { name: 'cohort analysis' })
