@@ -48,6 +48,16 @@ Carried forward from the M5 plan, still binding:
 
 ## Current state this plan starts from
 
+> **Updated 2026-09-02.** M5.5 has merged (PR #1) along with seven follow-up
+> commits (`a9e540c`). What that changes for this plan: the full shadcn
+> catalogue is installed and restyled, AnimateIcons replaced the custom icon
+> set, `recharts` is at 3.8, `sonner` carries toasts, `mammoth` is a dependency
+> for `.docx` import, and three token pairs exist that this plan's tasks should
+> use rather than reinvent — `accent-surface`/`accent-on-surface` for a field
+> of accent, and `chart-1..3` for categorical series. `PageHeader` also takes a
+> `description` now. The table below predates that merge; where it disagrees
+> with the repo, the repo wins.
+
 Verified 2026-08-28 by reading the files and the migrations, not assumed.
 Branch `feat/m5-application-screens` at `7d5bdfb`. Where a row contradicts the
 roadmap, the "Consequence" column says which wins.
@@ -123,39 +133,50 @@ below is a direct response, and reviewers should hold this plan to them.
 
 ## shadcn components per M6 page
 
-Added 2026-09-02 at Gabe's instruction: "modify the M6 plan by implementing
-ShadCN components to the new pages."
+Rewritten 2026-09-02 at Gabe's instruction: "ShadCN components must be used to
+the new pages."
 
 **The catalogue is already in `src/components/ui/` and already restyled.** M5.5
-installed it and reconciled it with the tokens, so there is nothing to install
-and no `shadcn init` to run — see the `components.json` row in *Current state*.
-Three house patterns are also there and are NOT shadcn: `StatusMarker`,
-`EmptyState` and `PageHeader`. Use those where they apply rather than a shadcn
-`Badge`, a bare `<p>`, or a hand-rolled `<h1>`.
+installed it under `base-nova` and reconciled it with this project's tokens, so
+there is nothing to install and no `shadcn init` to run — see the
+`components.json` row in *Current state*. Three house patterns live beside it
+and are NOT shadcn: `StatusMarker`, `EmptyState` and `PageHeader`. Use those
+where they apply rather than a `Badge`, a bare `<p>`, or a hand-rolled `<h1>`.
 
-**Two rules that override "reach for the catalogue":**
+**This is a hard requirement, not a preference.** Every M6 page is new, and a
+public page hand-rolled beside an app built from the catalogue is how the two
+halves of the product end up looking like different products. A task is not
+done while a bespoke equivalent of a catalogue component is still in its diff.
 
-1. **Status is never a `Badge`.** The Global Constraints forbid pills; status is
-   `StatusMarker` (2px rule + label). A `Badge` on a public page showing a demo
-   application's status would reintroduce exactly the pattern M4 removed.
-2. **The accent band on a table header is `accent-surface`, never
-   `accent-default`.** `accent-default` is picked for text contrast — accent-400
-   in dark — and a full-width band of it reads as too bright. `ApplicationsTable`,
-   `CohortTable` and `RecentApplicationsTable` all use the `accent-surface` /
-   `accent-on-surface` pair; a public table matches them.
+**Three rules that override "reach for the catalogue":**
+
+1. **Status is never a `Badge`.** The Global Constraints forbid pills; status
+   is `StatusMarker` (2px rule + label). A `Badge` on a public page showing a
+   demo application's status reintroduces exactly the pattern M4 removed.
+2. **A table header band is `accent-surface`, never `accent-default`.**
+   `accent-default` is picked for text contrast — accent-400 in dark — and a
+   full-width band of it reads as too bright. `ApplicationsTable`,
+   `CohortTable` and `RecentApplicationsTable` all use the
+   `accent-surface` / `accent-on-surface` pair; a public table matches them.
+3. **A chart whose categories are not statuses uses `chart-1..3`**, the
+   categorical series tokens M5.5 added. Not the five status hues, which mean
+   one specific thing everywhere in this app.
 
 | Task | Page | Components to build from |
 |---|---|---|
-| 2 | Landing page | `Card` + `CardHeader`/`CardTitle`/`CardDescription` for the feature grid; `Accordion` for the FAQ; `Button` + `ButtonGroup` for the hero CTA pair; `Separator` between sections; `AspectRatio` around every screenshot so the page does not reflow as images load; `Avatar` if testimonials ship |
-| 3 | Pinned scroll sequence | `AspectRatio` for each pinned frame; `Progress` for the section indicator if one is wanted. Nothing else — this task is motion, and adding chrome to a pinned sequence fights it |
-| 4 | `/login`, `/signup` | `Field` + `Label` + `Input` for every control (`Field` carries the error slot, which is what stops each form inventing its own error markup); `Button` for submit; `Alert` for the form-level auth error; `Separator` for the "or" divider; `Tabs` ONLY if sign-in and sign-up end up on one route — they do not, they are two routes, so prefer the link |
+| 2 | Landing — hero | `Button` + `ButtonGroup` for the CTA pair; `AspectRatio` around the hero media so the page does not reflow as it loads |
+| 2 | Landing — social proof | `Card` for each proof tile; `Separator` between them at narrow widths. **No `Avatar`, no testimonial card** — see the locked decision below |
+| 2 | Landing — problem | `Card` per pain point, or `Item` if the row form reads better; `Separator` closing the section |
+| 2 | Landing — solution | `Card` + `CardHeader`/`CardTitle`/`CardDescription` for the value grid; `Carousel` for the product screens (it already carries the scroll seam Task 3 drives); `Tabs` ONLY if the screens need naming rather than captioning |
+| 2 | Landing — FAQ | `Accordion`, `type="single"` `collapsible`. Five items, which is what Gabe specified |
+| 2 | Landing — CTA | `Card` as the closing panel; `Button` for both routes; `Alert` for the one-line note on what a demo account is and is not |
+| 3 | Pinned scroll sequence | `AspectRatio` per pinned frame; `Progress` for a section indicator if one is wanted. Nothing else — this task is motion, and chrome added to a pinned sequence fights it |
+| 4 | `/login`, `/signup` | `Field` + `Label` + `Input` for every control (`Field` carries the error slot, which is what stops each form inventing its own error markup); `Button` to submit; `Alert` for the form-level auth error; `Separator` for the "or" divider. NOT `Tabs`: sign-in and sign-up are two routes, so the link between them is a link |
 | 5 | 404, privacy | `Empty` (or the house `EmptyState`) for the 404 body; `Button` for the way back; `Breadcrumb` on privacy so a deep-linked visitor can climb out; `Separator` between policy sections |
-| 6 | Demo mode | `AlertDialog` to confirm entering demo (it replaces data the visitor can see — a `Dialog` is dismissible by accident, an `AlertDialog` is not); `Alert` for the persistent "you are in demo mode" banner; `Badge` is acceptable HERE and only here, on the banner, because it labels a MODE and not a status; `Skeleton` while the demo dataset loads |
+| 6 | Demo mode | `AlertDialog` to confirm entering demo — it replaces data the visitor can see, and a `Dialog` is dismissible by accident where an `AlertDialog` is not; `Alert` for the persistent "you are in demo mode" banner; `Badge` is acceptable HERE and only here, on that banner, because it labels a MODE and not a status; `Skeleton` while the demo dataset loads |
 
-**Verification for every one of these tasks:** the task is not done while a
-hand-rolled equivalent of a catalogue component is still in the diff. Check with
-`grep -n "className=\"[^\"]*border[^\"]*rounded" src/components/<area>/` — a
-bespoke bordered box on a new page is the tell.
+**Verification for every one of these tasks:** grep the task's own directory
+for a bordered box built by hand — `grep -rn 'className="[^"]*border[^"]*rounded' src/components/<area>/` — and justify or replace each hit.
 
 ---
 
@@ -876,20 +897,39 @@ git commit -m "feat: adopt skiper51 and gate Skiper UI attribution with a test"
 
 ### Task 2: The landing page in normal flow
 
-Everything in 6.1 except the pinning, which is Task 3. Built in normal document
-flow first so that the reduced-motion path — the one that rots because nobody
-sees it — is the thing that exists before the pinned path is layered on top.
+Rewritten 2026-09-02. Gabe specified the section order:
+
+1. Hero
+2. Social proof
+3. Problem statement
+4. Solution / value
+5. Five FAQs
+6. CTA — demo account and registration
+
+That replaces the earlier hero / carousel / ATS / feature-grid shape. The
+argument the old order made was "here is a thing, here is what it does"; this
+one makes the argument a stranger actually needs — here is the problem you
+have, here is what it costs you, here is the thing that fixes it, here is
+proof, here is how to try it without committing.
+
+Everything except the pinning. Task 3 layers that on top, and this task is
+built in normal document flow first so the reduced-motion path — the one that
+rots because nobody sees it — exists before the pinned path is layered over it.
 
 **Files:**
-- Modify: `src/app/page.tsx` (currently 4 lines: `redirect('/dashboard')`; becomes the landing route)
+- Modify: `src/app/page.tsx` (currently `redirect('/dashboard')`; becomes the landing route)
 - Create: `src/components/landing/Landing.tsx`
 - Create: `src/components/landing/Hero.tsx`
 - Create: `src/components/landing/HeroMedia.tsx`
+- Create: `src/components/landing/SocialProof.tsx`
+- Create: `src/components/landing/ProblemStatement.tsx`
+- Create: `src/components/landing/SolutionValue.tsx`
 - Create: `src/components/landing/ScreenCarousel.tsx`
-- Create: `src/components/landing/AtsSection.tsx`
-- Create: `src/components/landing/FeatureGrid.tsx`
+- Create: `src/components/landing/LandingFaq.tsx`
+- Create: `src/components/landing/ClosingCta.tsx`
 - Create: `src/components/landing/StickyNavbar.tsx`
 - Create: `src/components/landing/SiteFooter.tsx`
+- Create: `src/components/landing/content.ts` (every string on the page, in one file)
 - Create: `src/components/landing/screens.ts`
 - Create: `src/components/landing/__tests__/Landing.test.tsx`
 - Create: `src/components/landing/__tests__/SiteFooter.test.tsx`
@@ -900,14 +940,18 @@ sees it — is the thing that exists before the pinned path is layered on top.
 - Consumes: `SKIPER_ATTRIBUTION` from `@/lib/attribution` (Task 1);
   `carouselOptionsFor(scrollDriven)` from `@/components/landing/carouselOptions` (Task 1);
   the skiper51 component from `@/components/v1/skiper51` (Task 1);
-  `Button` from `@/components/ui/button` (`variant: 'primary' | 'secondary' | 'ghost'`, `size: 'm' | 's'`, emits `data-variant`);
-  `ThemeToggle` from `@/components/ui/theme-toggle` (`size?: 32 | 44`, emits `data-theme-toggle`);
+  `Button`, `ButtonGroup`, `Card` (+ `CardHeader`/`CardTitle`/`CardDescription`/`CardContent`),
+  `Accordion` (+ `AccordionItem`/`AccordionTrigger`/`AccordionContent`),
+  `Carousel` (+ `CarouselContent`/`CarouselItem`/`CarouselPrevious`/`CarouselNext`),
+  `AspectRatio`, `Alert`, `Separator` — all from `@/components/ui/*`;
+  `ThemeToggle` (`size?: 32 | 44`, emits `data-theme-toggle`);
   `usePrefersReducedMotion` from `@/hooks/usePrefersReducedMotion`;
-  icons from `@/components/icons` (`PlayIcon`, `ArrowRightIcon`, `ShieldIcon`, `TargetIcon`, `AnalyticsIcon` all verified present).
+  icons from `@/components/icons`.
 - Produces:
   ```ts
   export interface LandingScreen { src: string; alt: string; caption: string }
   export const SCREENS: LandingScreen[]                       // from ./screens
+
   export interface LandingProps {
     screens: LandingScreen[]
     heroPosterSrc: string
@@ -922,389 +966,186 @@ sees it — is the thing that exists before the pinned path is layered on top.
   export function SiteFooter(): JSX.Element
   export function StickyNavbar(props: { revealed: boolean }): JSX.Element
   ```
-  Task 3 consumes `pinned`, `carouselProgress` and `heroUnpinned` and nothing
-  else. That is the whole seam between the two tasks.
+  **The seam with Task 3 is unchanged by this rewrite.** Task 3 consumes
+  `pinned`, `carouselProgress` and `heroUnpinned` and nothing else, and the two
+  things it pins — the hero and the screen carousel — are still the first
+  section and a child of the fourth. Reordering the page around them does not
+  move them relative to each other, which is the only relationship Task 3
+  depends on.
+
+---
+
+#### LOCKED: social proof on a project with no users
+
+**The problem, stated plainly.** This is a portfolio project built by one
+person. It has no customers, no testimonials, no star count worth printing and
+no logos to display. The section Gabe asked for is the section that most
+tempts a builder into inventing all four.
+
+**Fabricated testimonials, invented user counts, and logo walls of companies
+that never used the product are out of scope for this milestone and every
+milestone after it.** Not because they are hard — because they are false, they
+would be the first thing a technical interviewer checks, and a portfolio piece
+that lies about traction argues against its own author. This is a hard
+constraint, not a preference: an implementer who cannot find real proof must
+escalate rather than fill the section.
+
+**What is real here, and is therefore what the section shows.** Every one of
+these is verifiable by a visitor in under a minute:
+
+| Tile | Claim | Where it is verified |
+|---|---|---|
+| Open source | The whole thing is readable | Link to the GitHub repository |
+| Built in the open | Real commit history, real milestones | Link to the commit log |
+| Tested | The suite size, quoted from the actual run | `npm test`, and the number is regenerated at each milestone rather than typed once |
+| Real stack | Next.js, TypeScript, Supabase, Postgres RLS | The README's stack table |
+
+**The number must not go stale.** A "931 tests" line that says 931 forever is
+the same lie as a fabricated testimonial, just slower. Either read it from a
+generated file at build time, or omit the figure and say "every screen is
+covered by tests" — the qualitative claim stays true without maintenance.
+Decide this in Step 3 and write down which was chosen.
+
+**If Gabe later has real users, this section is where they go.** Nothing about
+the layout needs to change; the tiles are the same shape a testimonial is.
+
+---
+
+#### The six sections
+
+**1. Hero.** The name, one sentence on what it does, and the CTA pair — try the
+demo, create an account. `ButtonGroup` for the pair, `AspectRatio` around the
+hero media so nothing reflows as the poster loads. This is the section Task 3
+pins first.
+
+**2. Social proof.** Four `Card` tiles per the table above. No `Avatar`, no
+quote marks, no company logos.
+
+**3. Problem statement.** Three pains, each a `Card` (or `Item` if the row form
+reads better at width). The copy comes from what this app actually fixes and
+must not invent a statistic:
+- A spreadsheet that stops being updated by week three.
+- No idea which channel is working, so effort goes where it feels productive.
+- A CV rewritten per application, with no record of which version was sent.
+
+Each pain names the feature that answers it, so section 4 is already earned
+when the reader reaches it.
+
+**4. Solution / value.** The product, in two halves. A `Card` grid for the
+value claims — the pipeline, the analytics, the CV editor with its ATS check —
+and beneath it the `ScreenCarousel` showing real screens, which is the second
+thing Task 3 pins. The carousel is `Carousel` from the catalogue, with
+`carouselOptionsFor(scrollDriven)` supplying its options exactly as before.
+
+**5. FAQ — exactly five.** `Accordion`, `type="single"`, `collapsible`. Five
+because Gabe said five; the discipline is that a sixth question means one of
+the five was not worth asking. The five that earn their place:
+1. Is it free? — yes, and what that means for the data.
+2. Do I need an account to look around? — no, there is a demo.
+3. What happens to my data? — RLS, one row per user, and the privacy page.
+4. Can I export what I put in? — CSV export exists; say so plainly.
+5. Is it open source? — yes, with the link.
+
+Answers are short and true. If an answer needs a hedge, the honest hedge goes
+in rather than being smoothed over — a FAQ that oversells is the fastest way
+to lose the reader it just convinced.
+
+**6. Closing CTA.** A `Card` carrying both routes: the demo account and
+registration. An `Alert` states in one line what a demo account is and is not —
+that it is shared, resets, and is not somewhere to keep real applications.
+Task 6 owns the demo mechanics; this section owns the door.
+
+---
 
 - [ ] **Step 1: Capture the five product screenshots and the hero poster**
 
-The carousel shows real screens; `public/` currently holds only `vite.svg`.
-Nothing to fake here — run the app and take the pictures.
+The carousel shows real screens; `public/` currently holds `vite.svg` and
+`backdrop.jpg`. Nothing to fake — run the app and take the pictures.
 
 ```bash
 npm run dev
 ```
 
-Sign in with a real account that has data (or run `npm run seed:demo` first —
-see Task 6), then capture at 1440×900, light theme, and save as:
+Sign in with an account that has data (or run the demo seed from Task 6), then
+capture at 1440×900, light theme, and save as:
 
 | File | Route |
 |---|---|
 | `public/screens/dashboard.png` | `/dashboard` |
 | `public/screens/applications.png` | `/applications` |
-| `public/screens/application-detail.png` | `/applications/<id>` |
 | `public/screens/analytics.png` | `/analytics` |
+| `public/screens/documents.png` | `/documents` |
 | `public/screens/cv.png` | `/cv?draft=<id>` |
 
-Save a 1440×900 crop of the dashboard as `public/hero-poster.png`.
+`documents.png` replaces the old `application-detail.png`: M5.5 rebuilt
+Documents into a Word-style start screen with a template carousel, and it is
+now the most distinctive screen in the app. A detail pane is not.
 
-Each PNG must be under 400 KB — five uncompressed 1440×900 screenshots is
-several megabytes shipped to every visitor on a page whose whole argument is
-restraint. Check with `du -h public/screens/*.png public/hero-poster.png`.
+Save a 1440×900 crop of the dashboard as `public/hero-poster.png`. Each PNG
+must be under 400 KB — five uncompressed screenshots is several megabytes
+shipped to every visitor on a page whose whole argument is restraint. Check
+with `du -h public/screens/*.png public/hero-poster.png`.
 
-- [ ] **Step 2: Write the failing landing test**
+**Screenshots must not contain real personal data.** Seed the demo account
+first, or redact. A landing page that ships a real name, a real email and real
+salary figures in a PNG has published them.
 
-```tsx
-// src/components/landing/__tests__/Landing.test.tsx
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { Landing } from '../Landing'
-import type { LandingScreen } from '../screens'
+- [ ] **Step 2: Put every string in `content.ts` before writing a component**
 
-// ThemeToggle reads next-themes. The landing page mounts the real primitive
-// (there is no landing-specific toggle), so the provider is mocked rather
-// than the component -- mocking the component would let a regression that
-// dropped it pass unnoticed.
-vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'light', setTheme: vi.fn() }) }))
+One file, exported as typed constants: the hero copy, the four proof tiles, the
+three pains, the value claims, the five FAQ entries, the CTA copy.
 
-const SCREENS: LandingScreen[] = [
-  { src: '/screens/dashboard.png', alt: 'The Worktrack dashboard', caption: 'Overview' },
-  { src: '/screens/applications.png', alt: 'The applications list', caption: 'Applications' },
-  { src: '/screens/analytics.png', alt: 'The analytics screen', caption: 'Analytics' },
-]
+Two reasons, and the second is the one that matters. The first is ordinary —
+copy changes far more often than layout, and a rewrite should not be a diff
+across nine components. The second: **it makes the honesty constraint
+reviewable.** Every claim this page makes sits in one file, so "does the
+landing page say anything untrue" is a question someone can answer by reading
+sixty lines instead of auditing nine components' JSX.
 
-function renderLanding(overrides = {}) {
-  return render(
-    <Landing screens={SCREENS} heroPosterSrc="/hero-poster.png" {...overrides} />
-  )
-}
+Lowercase chrome, sentence case for prose — the same rule M5.5 applied to the
+app. The landing page is the one screen allowed a display-size heading.
 
-afterEach(() => vi.clearAllMocks())
+- [ ] **Step 3: Write the failing landing test**
 
-describe('the landing hero', () => {
-  it('leads with the demo and offers account creation beside it', () => {
-    // The demo leads on purpose: this is a portfolio piece and the
-    // frictionless path is the one worth pushing.
-    renderLanding()
-    const demo = screen.getByRole('link', { name: 'try the live demo' })
-    const create = screen.getByRole('link', { name: 'create account' })
-    expect(demo).toHaveAttribute('data-variant', 'primary')
-    expect(create).toHaveAttribute('data-variant', 'secondary')
-    expect(create).toHaveAttribute('href', '/signup')
-  })
+The test file asserts, at minimum:
 
-  it('shows the poster when no video source is given', () => {
-    renderLanding()
-    expect(screen.getByAltText('The Worktrack dashboard, as a still')).toHaveAttribute(
-      'src',
-      '/hero-poster.png'
-    )
-    expect(screen.queryByTestId('hero-video')).toBeNull()
-  })
+- All six sections render, in Gabe's order. Assert the ORDER, not merely
+  presence: a page that renders the FAQ above the problem statement passes a
+  presence check and fails the reader.
+- Exactly five FAQ items, and each `AccordionTrigger` has an
+  `AccordionContent`. Five is a requirement, so it is a test.
+- The FAQ is `collapsible` `type="single"`: opening one closes the last.
+- Both CTAs are present and point at the right routes — demo and `/signup`.
+  Assert the `href`, since a CTA that goes nowhere is the one failure that
+  makes the whole page pointless.
+- The social-proof section contains no `Avatar` and no element carrying a
+  quotation mark. **This is the fabrication guard, and it is a real test with a
+  real failure mode** — it fails the moment someone adds a testimonial.
+- The stale-number guard from the locked decision: either the figure comes from
+  the generated file, or no digit-bearing claim appears in the proof tiles.
+- Under `usePrefersReducedMotion() === true` nothing animates and every section
+  is in flow.
 
-  it('shows a muted, looping video when one is given', () => {
-    // Positive companion to the negative above: proves the poster branch is a
-    // real branch and not the only thing the component can render.
-    renderLanding({ heroVideoSrc: '/hero.mp4' })
-    const video = screen.getByTestId('hero-video') as HTMLVideoElement
-    expect(video).toBeInTheDocument()
-    expect(video.muted).toBe(true)
-    expect(video.loop).toBe(true)
-  })
-})
+- [ ] **Step 4: Build the sections against the catalogue**
 
-describe('the landing navbar', () => {
-  it('carries sign in as a link and sign up as the primary button', () => {
-    renderLanding()
-    const nav = screen.getByRole('banner')
-    const signIn = within(nav).getByRole('link', { name: 'sign in' })
-    const signUp = within(nav).getByRole('link', { name: 'sign up' })
-    expect(signIn).toHaveAttribute('href', '/login')
-    expect(signIn).toHaveAttribute('data-variant', 'ghost')
-    expect(signUp).toHaveAttribute('href', '/signup')
-    expect(signUp).toHaveAttribute('data-variant', 'primary')
-  })
+`Card`, `Accordion`, `Carousel`, `AspectRatio`, `Alert`, `Separator`,
+`Button`, `ButtonGroup` — per the table in *shadcn components per M6 page*. No
+hand-rolled bordered boxes; the grep in that section is the check.
 
-  it('demotes the navbar demo to secondary and hides it below md', () => {
-    // Two filled buttons in one bar have no hierarchy, and 375px cannot hold a
-    // logo plus three controls -- the hero already carries the demo there.
-    renderLanding()
-    const nav = screen.getByRole('banner')
-    const demo = within(nav).getByRole('link', { name: 'open the demo' })
-    expect(demo).toHaveAttribute('data-variant', 'secondary')
-    expect(demo.className).toContain('hidden')
-    expect(demo.className).toContain('md:inline-flex')
-  })
+- [ ] **Step 5: `StickyNavbar` and `SiteFooter`**
 
-  it('is hidden until the hero has scrolled past', () => {
-    renderLanding()
-    expect(screen.getByRole('banner')).toHaveAttribute('data-revealed', 'false')
-  })
-})
+Unchanged from the original plan. The navbar takes `revealed` and Task 3 drives
+it; the footer carries the attribution line Task 1 made a gate.
 
-describe('the landing theme control', () => {
-  it('mounts the same primitive the app shell uses, in the navbar and the footer', () => {
-    // The navbar is hidden until the hero scrolls past, so a toggle only there
-    // is unreachable from the top of the page. Two, deliberately.
-    const { container } = renderLanding()
-    expect(container.querySelectorAll('[data-theme-toggle]')).toHaveLength(2)
-  })
-})
+- [ ] **Step 6: Point `/` at the landing page**
 
-describe('the landing carousel', () => {
-  it('renders one slide per screen, each with real alt text', () => {
-    renderLanding()
-    for (const s of SCREENS) {
-      expect(screen.getByAltText(s.alt)).toHaveAttribute('src', s.src)
-    }
-  })
+`src/app/page.tsx` stops redirecting to `/dashboard` and renders `Landing`.
 
-  it('gives keyboard users the navigation arrows', () => {
-    // Touch is off in the scroll-driven mode, so without these there is no
-    // control at all.
-    renderLanding()
-    expect(screen.getByRole('button', { name: 'Previous screen' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Next screen' })).toBeInTheDocument()
-  })
-})
-```
-
-Add `import { within } from '@testing-library/react'` to the import line above.
-
-- [ ] **Step 3: Run it and watch it fail**
-
-Run: `npx vitest run src/components/landing/__tests__/Landing.test.tsx`
-Expected: FAIL — `Failed to resolve import "../Landing"`.
-
-- [ ] **Step 4: Write the failing footer test**
-
-```tsx
-// src/components/landing/__tests__/SiteFooter.test.tsx
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { SiteFooter } from '../SiteFooter'
-import { SKIPER_ATTRIBUTION } from '@/lib/attribution'
-
-vi.mock('next-themes', () => ({ useTheme: () => ({ resolvedTheme: 'light', setTheme: vi.fn() }) }))
-
-describe('the landing footer', () => {
-  it('credits Skiper UI with the same sentences the README carries', () => {
-    // Attribution is a licence obligation, not a nicety. Reading the strings
-    // from the shared module is what stops the footer and the README drifting.
-    render(<SiteFooter />)
-    expect(SKIPER_ATTRIBUTION.length).toBeGreaterThan(0)
-    for (const entry of SKIPER_ATTRIBUTION) {
-      expect(screen.getByText(entry.credit)).toBeInTheDocument()
-    }
-    expect(screen.getByRole('link', { name: 'Skiper UI' })).toHaveAttribute(
-      'href',
-      'https://skiper-ui.com/components'
-    )
-  })
-
-  it('repeats the theme control so it is reachable from the top of the page', () => {
-    const { container } = render(<SiteFooter />)
-    expect(container.querySelectorAll('[data-theme-toggle]')).toHaveLength(1)
-  })
-
-  it('links to the auth routes and the source', () => {
-    render(<SiteFooter />)
-    expect(screen.getByRole('link', { name: 'sign in' })).toHaveAttribute('href', '/login')
-    expect(screen.getByRole('link', { name: 'sign up' })).toHaveAttribute('href', '/signup')
-    expect(screen.getByRole('link', { name: 'privacy' })).toHaveAttribute('href', '/privacy')
-  })
-})
-```
-
-The `privacy` link points at a route Task 5 creates. It is a plain `<a href>`,
-so this test passes before that route exists; the route's own test in Task 5 is
-what proves the destination is real.
-
-- [ ] **Step 5: Run it and watch it fail**
-
-Run: `npx vitest run src/components/landing/__tests__/SiteFooter.test.tsx`
-Expected: FAIL — `Failed to resolve import "../SiteFooter"`.
-
-- [ ] **Step 6: Write `screens.ts`**
-
-```ts
-// src/components/landing/screens.ts
-
-/**
- * The screens the carousel shows. Real captures of the running app, not
- * div-based fake screenshots -- the anti-slop pass bans those outright.
- *
- * Order is the order a visitor would meet them: what the product opens on,
- * what they will spend their time in, what a single application looks like,
- * what the data says, and the piece nobody expects a tracker to have.
- */
-export interface LandingScreen {
-  src: string
-  alt: string
-  caption: string
-}
-
-export const SCREENS: LandingScreen[] = [
-  { src: '/screens/dashboard.png', alt: 'The Worktrack dashboard', caption: 'Overview' },
-  { src: '/screens/applications.png', alt: 'The applications list', caption: 'Applications' },
-  { src: '/screens/application-detail.png', alt: 'A single application', caption: 'Detail' },
-  { src: '/screens/analytics.png', alt: 'The analytics screen', caption: 'Analytics' },
-  { src: '/screens/cv.png', alt: 'The CV editor', caption: 'CV builder' },
-]
-```
-
-- [ ] **Step 7: Write `HeroMedia.tsx`**
-
-```tsx
-// src/components/landing/HeroMedia.tsx
-'use client'
-
-import * as React from 'react'
-
-/**
- * The hero's background: a video when one exists, the poster otherwise.
- *
- * Figma draws a background video on desktop and a poster on mobile, but no
- * video asset exists yet and none can be produced by writing code. Rather than
- * block the hero on it, the video path is built and tested and gated behind a
- * source; dropping a file into public/ and passing its path is then the whole
- * change.
- *
- * `paused` is driven by the pinned sequence (M6 6.1a): once the hero unpins the
- * video is off-screen, so decoding it is battery spent on something nobody can
- * see. The effect calls play/pause imperatively rather than binding an
- * attribute, because `autoPlay` only fires once on mount and there is no
- * declarative way back.
- */
-export interface HeroMediaProps {
-  posterSrc: string
-  videoSrc?: string
-  paused?: boolean
-}
-
-export function HeroMedia({ posterSrc, videoSrc, paused = false }: HeroMediaProps) {
-  const ref = React.useRef<HTMLVideoElement>(null)
-
-  React.useEffect(() => {
-    const el = ref.current
-    if (!el) return
-    if (paused) el.pause()
-    else void el.play()?.catch(() => {})
-  }, [paused])
-
-  if (!videoSrc) {
-    return (
-      <img
-        src={posterSrc}
-        alt="The Worktrack dashboard, as a still"
-        className="h-full w-full rounded-md object-cover"
-      />
-    )
-  }
-
-  return (
-    <video
-      ref={ref}
-      data-testid="hero-video"
-      src={videoSrc}
-      poster={posterSrc}
-      muted
-      loop
-      playsInline
-      autoPlay
-      aria-label="The Worktrack dashboard, in motion"
-      className="h-full w-full rounded-md object-cover"
-    />
-  )
-}
-```
-
-- [ ] **Step 8: Write the remaining landing components**
-
-`Hero.tsx`, `ScreenCarousel.tsx`, `AtsSection.tsx`, `FeatureGrid.tsx`,
-`StickyNavbar.tsx`, `SiteFooter.tsx` and `Landing.tsx`. Composition rules,
-all of them enforced by the Global Constraints above:
-
-- Every button is `@/components/ui/button`. No new button styling.
-- Every section separator is a hairline `border-t border-border-subtle`. No
-  cards, no shadows, no radius above `rounded-md`.
-- `StickyNavbar` renders `<header role="banner" data-revealed={revealed ? 'true' : 'false'}>`
-  with `className="sticky top-0 …"` and `data-revealed="false"` translating it
-  out of view. It is legitimately the page's only `banner` here — unlike the
-  authenticated shell, where `TopBar` already owns that landmark and M5 Task 7
-  correctly refused a second one.
-- `ScreenCarousel` renders the skiper51 component with
-  `{...carouselOptionsFor(scrollDriven)}` and `onSwiper` forwarded to its own
-  `onSwiper` prop, plus two arrow buttons labelled exactly
-  `Previous screen` / `Next screen`. In this task `scrollDriven` is always
-  `false` — nothing is pinned yet, so the carousel is conventional and
-  touchable. Task 3 is what starts passing `true`.
-- `SiteFooter` maps `SKIPER_ATTRIBUTION` to `<li>{entry.credit}</li>` and
-  renders one `ThemeToggle`.
-- `Landing` composes: `StickyNavbar`, `Hero`, `ScreenCarousel`, `AtsSection`,
-  `FeatureGrid`, `SiteFooter` — in that order, matching the Figma section
-  order — and passes `pinned`, `carouselProgress` and `heroUnpinned` straight
-  through with the defaults in the Interfaces block.
-
-**Anti-slop bans, from `design-taste-frontend`, applied here:** no em-dashes in
-landing copy, no eyebrow labels above every heading, no div-based fake
-screenshots (the PNGs from Step 1 are real captures), no section-number labels.
-
-- [ ] **Step 9: Run both tests and watch them pass**
-
-Run: `npx vitest run src/components/landing`
-Expected: PASS.
-
-- [ ] **Step 10: Replace the root route**
-
-```tsx
-// src/app/page.tsx
-import { Landing } from '@/components/landing/Landing'
-import { SCREENS } from '@/components/landing/screens'
-
-/**
- * The public landing page. This route used to redirect to /dashboard, which
- * meant the only people with an account -- the only people likely to look --
- * could never see it. On a portfolio piece that is backwards.
- *
- * It reads no auth state deliberately: touching the session here would make
- * the page dynamic, and the sign in / sign up controls are correct for a
- * signed-in visitor too (both land somewhere sensible).
- */
-export default function Page() {
-  return <Landing screens={SCREENS} heroPosterSrc="/hero-poster.png" />
-}
-```
-
-- [ ] **Step 11: Verify the route in the real build**
-
-```bash
-rm -rf .next && npm run build
-```
-
-Expected: `/` appears in the route table as a static route with a non-zero
-size. A 0 B route means a contended `.next` — the M5 ledger records that
-happening twice, both times reporting success while proving nothing. If any
-route reads 0 B, `rm -rf .next` and build again before believing it.
-
-- [ ] **Step 12: Run the whole suite and the typecheck**
-
-```bash
-npx vitest run
-npx tsc --noEmit
-```
-
-Expected: green, exit 0. The typecheck covers
-`src/components/landing/__tests__/` as well as the components, because Task 0
-un-excluded test files from `tsconfig.json`.
-
-- [ ] **Step 13: Commit**
-
-```bash
-git add src/app/page.tsx src/components/landing public/screens public/hero-poster.png
-git commit -m "feat: build the public landing page in normal flow"
-```
-
----
+**The open question in *Open questions for Gabe* about whether `/` should
+redirect a signed-in visitor is now weightier, not resolved.** With a demo CTA
+on this page, a signed-in visitor who clicks "try the live demo" would be
+signed OUT into the demo and lose their session. Task 6 must not ship until
+that interaction is decided.
 
 ### Task 3: 6.1a — the pinned scroll sequence
 
@@ -3803,6 +3644,26 @@ things it did not.
 3. **"Attribution is a shipping requirement... `skiper4`, `skiper26`, `skiper51`, `skiper106` all require crediting."** — only skiper51 and skiper106 will ship source. The obligation attaches to two, not four. The plan still credits all four with accurate wording, but a reviewer should know the difference between the two that are compliance and the two that are courtesy.
 4. **"Is `shadcn` initialised — does `components.json` exist? The roadmap says it was not, as of M4 planning."** — it exists. The brief was right to ask.
 5. Minor: the brief says the icon set is 34 icons in `src/components/icons/index.tsx` — **correct**, verified. And that `lucide-react` is being removed in M5 Task 10 — **correct**, and still outstanding at `7d5bdfb`.
+
+## Settled by Gabe, 2026-09-02
+
+Recorded after M5.5 merged (PR #1, plus the seven follow-up commits merged as
+`a9e540c`). These are decisions, not live questions.
+
+1. **The landing page has six sections, in this order** — hero, social proof,
+   problem statement, solution/value, five FAQs, closing CTA with the demo
+   account and registration. → **Task 2**, rewritten around it. The earlier
+   hero / carousel / ATS / feature-grid shape is gone.
+2. **shadcn components are required on every new page**, not merely available.
+   → the *shadcn components per M6 page* table, which now names the components
+   per section and carries a grep to catch hand-rolled equivalents.
+3. **Social proof must be true.** → the locked decision inside Task 2. This
+   project has no users, so the section shows only what a visitor can verify
+   in a minute — the repository, the commit history, the test suite, the
+   stack — and the plan forbids testimonials, invented user counts and logo
+   walls outright. A test in Step 3 fails if a testimonial is ever added, and
+   a second guards the test-count figure from going stale, which is the same
+   lie told slowly.
 
 ## Settled by Gabe, 2026-08-28
 
