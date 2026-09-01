@@ -123,3 +123,64 @@ export function sourceBreakdown(jobs: Job[], limit = 6): SourceCount[] {
     .sort((a, b) => b.count - a.count || a.source.localeCompare(b.source))
     .slice(0, limit)
 }
+
+/** A source's place in the ranking. `tertiary` is the aggregate, never one source. */
+export type SourceRank = 'primary' | 'secondary' | 'tertiary'
+
+export interface RankedSource extends SourceCount {
+  rank: SourceRank
+  /** How many distinct sources this row stands for. Always 1 except on `tertiary`. */
+  sources: number
+  /** Share of all applications that have a source, 0-100. */
+  share: number
+}
+
+/**
+ * The busiest source, the runner-up, and everything else as one row.
+ *
+ * Gabe's shape: "jobstreet is the primary source, LinkedIn is the secondary
+ * source, and tertiary sources should be displayed as others."
+ *
+ * The point is that a job search has one or two channels that actually work
+ * and a long tail that does not. Six equal rows made the reader do that
+ * ranking themselves every time they looked; naming the top two and collapsing
+ * the rest states the conclusion the panel exists to deliver.
+ *
+ * The tail collapses only when there is a tail. Two sources produce two rows,
+ * not two rows and an empty "others" -- a row reading "others 0" is a claim
+ * about nothing.
+ *
+ * Ties break alphabetically, inherited from `sourceBreakdown`, so the answer is
+ * stable across reloads rather than depending on row order. That does mean two
+ * sources on equal counts are named primary and secondary arbitrarily; `share`
+ * is on every row so a reader can see they are level rather than inferring a
+ * lead that is not there.
+ */
+export function rankedSources(jobs: Job[]): RankedSource[] {
+  // No limit: the tail has to be counted in full before it can be collapsed.
+  const all = sourceBreakdown(jobs, Number.MAX_SAFE_INTEGER)
+  const total = all.reduce((sum, row) => sum + row.count, 0)
+  if (total === 0) return []
+
+  const pct = (count: number) => (count / total) * 100
+  const ranked: RankedSource[] = []
+
+  const [primary, secondary, ...rest] = all
+  ranked.push({ ...primary, rank: 'primary', sources: 1, share: pct(primary.count) })
+  if (secondary) {
+    ranked.push({ ...secondary, rank: 'secondary', sources: 1, share: pct(secondary.count) })
+  }
+
+  if (rest.length > 0) {
+    const count = rest.reduce((sum, row) => sum + row.count, 0)
+    ranked.push({
+      source: 'others',
+      count,
+      rank: 'tertiary',
+      sources: rest.length,
+      share: pct(count),
+    })
+  }
+
+  return ranked
+}

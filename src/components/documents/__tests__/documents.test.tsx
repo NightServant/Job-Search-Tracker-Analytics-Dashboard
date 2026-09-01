@@ -3,7 +3,7 @@ import { render, screen, within, cleanup, fireEvent } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import type { ResumeSummary } from '@/services/resumeService'
 import { formatTouchedDate } from '@/services/date'
-import { DocumentRow } from '../DocumentRow'
+import { DocumentRow, DOCUMENT_GRID } from '../DocumentRow'
 import { VersionHistory } from '../VersionHistory'
 import { DocumentsPage } from '../DocumentsPage'
 
@@ -63,7 +63,14 @@ describe('DocumentRow', () => {
     const row = container.querySelector('[data-document-row]')!
     const actions = row.querySelector('[data-row-actions]')!
     expect(actions.parentElement).toBe(row)
-    expect(row.className).toContain('md:grid-cols-[1fr_7rem_6rem_6rem_auto]')
+    // Asserted through the shared constant, not a copy of the class string:
+    // the header strip and the row each used to spell this out, they drifted
+    // (`auto` here against a fixed 8.5rem there), and every column between
+    // them sat at a different x in the labels than in the data.
+    expect(row.className).toContain(DOCUMENT_GRID)
+    // The actions track is fixed, never `auto` -- `auto` makes the whole row's
+    // geometry depend on how many buttons a caller happened to pass.
+    expect(DOCUMENT_GRID).not.toContain('auto')
   })
 
   it('renders no actions cell when a caller passes none', () => {
@@ -200,10 +207,12 @@ describe('DocumentsPage', () => {
     expect(within(header).getByRole('button', { name: /new cv/i })).toBeTruthy()
   })
 
-  it('offers exactly one way to start a CV, and it is the body header control', () => {
-    // Content controls belong to the content, not to the Top Bar, which is
-    // chrome and identical on five of the seven app screens. This fails both
-    // if the control leaves the header and if a second one appears elsewhere.
+  it('puts `new CV` in the body header exactly once, never in the Top Bar', () => {
+    // Renamed: the old name said "exactly one way to start a CV", which stopped
+    // being true when the template gallery and import arrived. It never
+    // checked that anyway -- it checks that the HEADER carries one `new CV`
+    // and no more. Content controls belong to the content, not to the Top Bar,
+    // which is chrome and identical on five of the seven app screens.
     const { container } = render(<DocumentsPage docs={[DOC]} />)
     const header = container.querySelector('[data-body-header]')!
     const triggers = within(header as HTMLElement).getAllByRole('button', { name: /new cv/i })
@@ -252,7 +261,10 @@ describe('DocumentsPage', () => {
     )
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
+    // The `versions` button is gone at Gabe's request; the version cell is the
+    // control now, so the number the column already showed is what opens the
+    // history behind it.
+    fireEvent.click(screen.getByRole('button', { name: /version history for/i }))
     expect(onToggleVersions).toHaveBeenCalledWith(DOC)
 
     rerender(<DocumentsPage docs={[DOC]} openVersionsFor="cv-1" versions={[]} />)
@@ -264,5 +276,119 @@ describe('DocumentsPage', () => {
     render(<DocumentsPage docs={[DOC]} onDelete={onDelete} />)
     fireEvent.click(screen.getByRole('button', { name: /delete backend cv/i }))
     expect(onDelete).toHaveBeenCalledWith(DOC)
+  })
+})
+
+describe('the Word-style start screen', () => {
+  it('offers templates only, both engines in one row, and no blank card', () => {
+    // The gallery is why the in-editor dropdown could go: templates are now a
+    // starting point rather than an overwrite of what is already open.
+    const { container } = render(<DocumentsPage docs={[]} />)
+    const cards = [...container.querySelectorAll('[data-template-card]')].map(
+      (c) => (c as HTMLElement).dataset.templateCard
+    )
+    // No blank card: `new CV` is already a primary button on this screen, so a
+    // blank card would be a third route to the same blank document.
+    expect(cards.some((c) => c!.startsWith('blank'))).toBe(false)
+    // Word and LaTeX in one row, not behind two tabs: the choice of engine and
+    // the choice of layout are the same decision made once.
+    expect(cards.some((c) => c!.startsWith('word-'))).toBe(true)
+    expect(cards.some((c) => c!.startsWith('latex-'))).toBe(true)
+  })
+
+  it('reports which template was picked, with its mode', async () => {
+    const onChooseTemplate = vi.fn()
+    const user = userEvent.setup()
+    const { container } = render(<DocumentsPage docs={[]} onChooseTemplate={onChooseTemplate} />)
+
+    await user.click(container.querySelector('[data-template-card="word-classic"]')!)
+    expect(onChooseTemplate.mock.calls[0][0].mode).toBe('word')
+    expect(onChooseTemplate.mock.calls[0][0].template.id).toBe('word-classic')
+
+    await user.click(container.querySelector('[data-template-card="latex-compact"]')!)
+    expect(onChooseTemplate.mock.calls[1][0].mode).toBe('latex')
+    expect(onChooseTemplate.mock.calls[1][0].template.id).toBe('latex-compact')
+  })
+
+  it('keeps `new CV` out of the header until there is a list to act on', () => {
+    // Gabe's rule. With no documents the empty state already owns the screen
+    // and already carries the call to action; a second identical button in the
+    // corner is the same offer made twice, three inches apart.
+    const empty = render(<DocumentsPage docs={[]} />)
+    expect(empty.container.querySelector('[data-body-header]')!.textContent).not.toMatch(/new CV/)
+    empty.unmount()
+
+    render(<DocumentsPage docs={[DOC]} />)
+    expect(screen.getByRole('heading', { level: 1 }).closest('[data-body-header]')!.textContent).toMatch(
+      /new CV/
+    )
+  })
+
+  it('gives the empty state the primary button, and import beside it', () => {
+    const { container } = render(<DocumentsPage docs={[]} />)
+    const state = container.querySelector('[data-empty-state]')!
+    const newCv = [...state.querySelectorAll('button')].find((b) => b.textContent?.includes('new CV'))!
+    const importBtn = [...state.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('import')
+    )!
+    // With the header action gone this is the only call to action on the
+    // screen, so a secondary here would leave the page with no primary at all.
+    expect(newCv.className).not.toMatch(/border-border/)
+    expect(importBtn).toBeTruthy()
+  })
+
+  it('hands the picked file straight to the caller and resets the input', () => {
+    // Reset unconditionally, or picking the same file twice in a row fires
+    // change once and the second import silently does nothing.
+    const onImport = vi.fn()
+    const { container } = render(<DocumentsPage docs={[]} onImport={onImport} />)
+    const input = container.querySelector('[data-import-input]') as HTMLInputElement
+    const file = new File(['hello'], 'cv.txt', { type: 'text/plain' })
+    fireEvent.change(input, { target: { files: [file] } })
+    expect(onImport).toHaveBeenCalledWith(file)
+    expect(input.value).toBe('')
+  })
+
+  it('labels the document columns, which nothing did before', () => {
+    const { container } = render(<DocumentsPage docs={[DOC]} />)
+    const columns = container.querySelector('[data-document-columns]')!
+    expect(columns.textContent).toMatch(/name/)
+    expect(columns.textContent).toMatch(/version/)
+    expect(columns.textContent).toMatch(/modified/)
+  })
+})
+
+describe('column labels line up with the data under them', () => {
+  it('declares the same tracks in the header strip and in every row', () => {
+    // jsdom has no layout, so this pins the mechanism rather than the pixels:
+    // both come from DOCUMENT_GRID, so they cannot disagree. Measured in the
+    // browser after the fix, every label sits at the same x as its column.
+    const { container } = render(<DocumentsPage docs={[DOC]} />)
+    const columns = container.querySelector('[data-document-columns]')!
+    const row = container.querySelector('[data-document-row]')!
+    expect(columns.className).toContain(DOCUMENT_GRID)
+    expect(row.className).toContain(DOCUMENT_GRID)
+    // Five tracks each: the label strip carries an empty actions cell so the
+    // count matches rather than relying on the browser to forgive a short row.
+    expect(columns.children).toHaveLength(5)
+  })
+
+  it('does not make "no versions" a control, since there is nothing behind it', () => {
+    // A control that opens an empty panel is a promise the data cannot keep.
+    const { container } = render(
+      <DocumentsPage
+        docs={[{ ...DOC, version: null, hasVersions: false }]}
+        onToggleVersions={vi.fn()}
+      />
+    )
+    expect(container.querySelector('[data-row-versions]')).toBeNull()
+    expect(screen.getByText('no versions')).toBeTruthy()
+  })
+
+  it('leaves the row with one control now that `versions` has gone', () => {
+    const { container } = render(<DocumentsPage docs={[DOC]} onDelete={vi.fn()} />)
+    const actions = container.querySelector('[data-row-actions]')!
+    expect(actions.querySelectorAll('button')).toHaveLength(1)
+    expect(actions.textContent).not.toMatch(/versions/i)
   })
 })

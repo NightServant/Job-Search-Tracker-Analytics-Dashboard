@@ -5,14 +5,14 @@ import { PolarAngleAxis, RadialBar, RadialBarChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { EmptyState } from '@/components/ui/empty-state'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
-import type { SourceCount } from '@/lib/overviewSeries'
+import type { RankedSource } from '@/lib/overviewSeries'
 
 const CONFIG = {
   count: { label: 'applications' },
 } satisfies ChartConfig
 
 export interface SourceMixProps {
-  data: SourceCount[]
+  data: RankedSource[]
 }
 
 /**
@@ -35,24 +35,66 @@ export interface SourceMixProps {
  * doughnut beside it — a second donut here would read as the same chart drawn
  * twice.
  *
- * The accent carries every arc, stepped in opacity by rank. A source is not a
- * status, so the five status hues would borrow a vocabulary that means
- * something specific elsewhere in this app.
+ * Each rank gets its own colour, from the `chart-1..3` series tokens. Stepped
+ * OPACITY of one accent was the previous version and Gabe rejected it: a
+ * single colour at three alphas is one colour, and against a tinted track the
+ * faintest step was nearly the track itself.
+ *
+ * The series tokens are three steps of the accent ramp rather than three hues.
+ * A source is not a status, so the five status hues would borrow a vocabulary
+ * that means something specific everywhere else in this app -- and inventing
+ * three new hues for one panel would put colours on screen that mean nothing
+ * anywhere else. The ramp inverts in dark so rank 1 stays the most prominent
+ * against its own ground.
+ *
+ * Three rows, not six: the busiest source, the runner-up, and everything else
+ * as one `others`. Gabe's shape, and the point of it is that a job search has
+ * one or two channels that actually work and a long tail that does not -- six
+ * equal rows made the reader do that ranking themselves every time. The rank
+ * is written on the row (`primary` / `secondary` / `tertiary`) so the
+ * conclusion is stated rather than implied by sort order, and `others` says
+ * how many sources it stands for so the tail is visible as a tail.
  *
  * The legend is the numbers. An arc is good at "which is bigger" and bad at
  * "how many", so the exact counts sit beside it rather than in a tooltip only
  * a mouse can reach.
+ *
+ * Chart left, legend right, two columns, matching `StatusDonut` -- the two
+ * panels sit side by side on the Overview, so a different internal layout in
+ * each would read as an accident. One column below `sm`, where two narrow
+ * tracks would truncate every source name.
  */
+const RANK_LABELS: Record<RankedSource['rank'], string> = {
+  primary: 'primary',
+  secondary: 'secondary',
+  tertiary: 'tertiary',
+}
+
+/**
+ * Written out rather than indexed, the discipline `STAGE_FILL` and the status
+ * marker's `RULES` map already follow: these are raw CSS custom-property
+ * references, so a typo fails loudly and greps rather than silently drawing
+ * nothing.
+ */
+const RANK_FILL: Record<RankedSource['rank'], string> = {
+  primary: 'var(--color-chart-1)',
+  secondary: 'var(--color-chart-2)',
+  tertiary: 'var(--color-chart-3)',
+}
+
 export function SourceMix({ data }: SourceMixProps) {
   const reducedMotion = usePrefersReducedMotion()
 
   const max = React.useMemo(() => Math.max(1, ...data.map((d) => d.count)), [data])
   const arcs = React.useMemo(
     () =>
-      data.map((row, i) => ({
+      data.map((row) => ({
         ...row,
-        // Stepped, floored so the last arc never fades into the track.
-        fill: `color-mix(in oklab, var(--color-accent-default) ${Math.max(40, 100 - i * 16)}%, transparent)`,
+        // Keyed on RANK, not on index: the row's own identity decides its
+        // colour, so a two-source account and a five-source one give
+        // `primary` the same colour rather than reusing whatever index 0
+        // happened to be.
+        fill: RANK_FILL[row.rank],
       })),
     [data]
   )
@@ -66,10 +108,13 @@ export function SourceMix({ data }: SourceMixProps) {
   }
 
   return (
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="grid flex-1 items-center gap-4 sm:grid-cols-2">
       <ChartContainer
         config={CONFIG}
-        className="mx-auto aspect-square w-full max-w-56"
+        // max-w-64, matching StatusDonut exactly: the two panels sit side by
+        // side on the Overview, so two rings at different diameters read as a
+        // mistake rather than as a distinction.
+        className="mx-auto aspect-square w-full max-w-64"
         data-chart-sources
       >
         <RadialBarChart
@@ -93,12 +138,31 @@ export function SourceMix({ data }: SourceMixProps) {
         </RadialBarChart>
       </ChartContainer>
 
-      <ul data-source-legend className="flex flex-col gap-1">
+      <ul data-source-legend className="flex min-w-0 flex-col gap-3">
         {arcs.map((row) => (
-          <li key={row.source} className="flex items-center gap-2 text-body-s">
-            <span aria-hidden className="size-2 shrink-0" style={{ background: row.fill }} />
-            <span className="min-w-0 flex-1 truncate text-text-secondary">{row.source}</span>
-            <span className="tabular text-text-primary">{row.count}</span>
+          <li key={row.source} data-source-rank={row.rank} className="flex min-w-0 gap-2">
+            <span
+              aria-hidden
+              className="mt-1.5 size-2 shrink-0"
+              style={{ background: row.fill }}
+            />
+            <div className="min-w-0 flex-1">
+              <p className="text-label-caps uppercase text-text-muted">{RANK_LABELS[row.rank]}</p>
+              <p className="flex items-baseline gap-2">
+                <span className="min-w-0 flex-1 truncate text-body-s text-text-primary">
+                  {row.source}
+                </span>
+                <span className="tabular shrink-0 text-body-s text-text-primary">{row.count}</span>
+              </p>
+              <p className="text-body-s text-text-muted">
+                {Math.round(row.share)}%
+                {/* Only the tail needs explaining -- a named source stands for
+                    itself, `others` does not. */}
+                {row.rank === 'tertiary'
+                  ? ` \u00b7 ${row.sources} ${row.sources === 1 ? 'source' : 'sources'}`
+                  : ''}
+              </p>
+            </div>
           </li>
         ))}
       </ul>

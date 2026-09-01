@@ -39,5 +39,30 @@ if (typeof (globalThis as { ResizeObserver?: unknown }).ResizeObserver === 'unde
   ;(globalThis as { ResizeObserver: unknown }).ResizeObserver = ResizeObserverStub
 }
 
+// Same story for IntersectionObserver, which embla-carousel constructs on
+// mount to decide which slides are in view -- the template gallery on
+// /documents renders one. Without this every test that mounts that screen
+// throws "IntersectionObserver is not defined" before a single assertion.
+//
+// The stub reports nothing rather than faking visibility. jsdom has no
+// layout, so any answer it invented about which slides are on screen would be
+// fiction; embla degrades to "no slides observed", which is exactly as true
+// as its 0x0 measurements already are.
+if (typeof (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver === 'undefined') {
+  class IntersectionObserverStub {
+    readonly root = null
+    readonly rootMargin = ''
+    readonly thresholds: number[] = []
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+    takeRecords() {
+      return []
+    }
+  }
+  ;(globalThis as { IntersectionObserver: unknown }).IntersectionObserver =
+    IntersectionObserverStub
+}
+
 // Mock global variables set by Vite
 

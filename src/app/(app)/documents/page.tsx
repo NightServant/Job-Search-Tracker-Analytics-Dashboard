@@ -8,6 +8,8 @@ import { RouteError, RouteLoading } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DocumentsPage } from '@/components/documents/DocumentsPage'
 import { DEFAULT_LATEX_SOURCE, DEFAULT_WORD_CONTENT } from '@/components/cv/content'
+import { importDocument, UnsupportedDocumentError } from '@/lib/documentImport'
+import type { TemplateChoice } from '@/components/documents/TemplateGallery'
 import type { ResumeContent, ResumeMode, ResumeSummary } from '@/services/resumeService'
 
 /**
@@ -59,19 +61,48 @@ export default function Page() {
     }
   }
 
-  const createDraft = async (mode: ResumeMode) => {
-    const content: ResumeContent =
-      mode === 'latex' ? { type: 'latex', source: DEFAULT_LATEX_SOURCE } : DEFAULT_WORD_CONTENT
+  /**
+   * One writer for every way a CV starts -- blank, from a template, or from an
+   * imported file. Three call sites creating resumes three slightly different
+   * ways is how the title strings and the toast copy drift apart.
+   */
+  const createDraft = async (mode: ResumeMode, title: string, content: ResumeContent) => {
     try {
-      const created = await createResume.mutateAsync({
-        mode,
-        title: mode === 'latex' ? 'Untitled LaTeX CV' : 'Untitled CV',
-        content,
-      })
+      const created = await createResume.mutateAsync({ mode, title, content })
       info('Draft created', `${mode === 'latex' ? 'LaTeX' : 'Word'} CV ready.`)
       router.push(`/cv?draft=${created.id}`)
     } catch (err) {
       showError('Create failed', err instanceof Error ? err.message : 'Could not create the CV')
+    }
+  }
+
+  const createBlank = (mode: ResumeMode) =>
+    createDraft(
+      mode,
+      mode === 'latex' ? 'Untitled LaTeX CV' : 'Untitled CV',
+      mode === 'latex' ? { type: 'latex', source: DEFAULT_LATEX_SOURCE } : DEFAULT_WORD_CONTENT
+    )
+
+  // Blank drafts do not come through here: the gallery carries templates only,
+  // since `new CV` is already a primary button on that screen.
+  const createFromTemplate = ({ mode, template }: TemplateChoice) =>
+    createDraft(mode, `${template.name} CV`, template.content as ResumeContent)
+
+  /**
+   * The import failure is shown, never swallowed. `.docx` is deliberately
+   * unreadable for now (see `lib/documentImport`), and a reader who picked one
+   * needs to be told why nothing happened rather than left watching a screen
+   * that did not change.
+   */
+  const importFile = async (file: File) => {
+    try {
+      const draft = await importDocument(file)
+      await createDraft(draft.mode, draft.title, draft.content)
+    } catch (err) {
+      showError(
+        err instanceof UnsupportedDocumentError ? 'Cannot import that file' : 'Import failed',
+        err instanceof Error ? err.message : 'Could not read the document'
+      )
     }
   }
 
@@ -106,7 +137,9 @@ export default function Page() {
         }))}
         versionsLoading={versionsQuery.isLoading}
         versionsError={!!versionsQuery.error}
-        onCreateDraft={(mode) => void createDraft(mode)}
+        onCreateDraft={(mode) => void createBlank(mode)}
+        onChooseTemplate={(choice) => void createFromTemplate(choice)}
+        onImport={(file) => void importFile(file)}
         creatingDraft={createResume.isPending}
       />
       <ConfirmDialog

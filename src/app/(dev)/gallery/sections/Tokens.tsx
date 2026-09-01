@@ -7,6 +7,7 @@ const SEMANTIC = [
   ['accent/default', 'bg-accent-default'], ['accent/hover', 'bg-accent-hover'],
   ['accent/subtle', 'bg-accent-subtle'], ['accent/on-accent', 'bg-accent-on-accent'],
   ['accent/surface', 'bg-accent-surface'], ['accent/on-surface', 'bg-accent-on-surface'],
+  ['chart/1', 'bg-chart-1'], ['chart/2', 'bg-chart-2'], ['chart/3', 'bg-chart-3'],
 ] as const
 
 // Written out in full, never interpolated. Tailwind scans source text for

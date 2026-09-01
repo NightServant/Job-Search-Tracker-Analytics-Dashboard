@@ -376,6 +376,263 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
       ],
     },
   },
+  {
+    id: 'word-ats',
+    name: 'ATS-safe',
+    description:
+      'One column, standard section names, no tables. The layout parsers read most reliably.',
+    mode: 'word',
+    content: {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'Your Name' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'City, Country | email@example.com | +63 900 000 0000 | linkedin.com/in/you' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Summary' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'One or two sentences naming your role, your years of experience, and the work you want next. This is the densest place for the keywords a screener searches on.' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Skills' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Languages: | Frameworks: | Tools: | Databases:' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Experience' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Job Title, Company - City (Month Year - Month Year)' }],
+        },
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Did X, which produced Y. Lead with the outcome and name the number.' }],
+                },
+              ],
+            },
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Owned Z end to end, from A to B.' }],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Education' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Degree, Institution - City (Year)' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Keep every heading on its own line, and avoid columns, text boxes and tables: those are the three things that most often make a parser read a CV out of order.' }],
+        },
+      ],
+    },
+  },
+  {
+    id: 'word-entry',
+    name: 'Entry level',
+    description:
+      'Education and projects first, for a first job or a career change.',
+    mode: 'word',
+    content: {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'Your Name' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'email@example.com | +63 900 000 0000 | github.com/you' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Summary' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Recent graduate in [field] looking for a [role]. Strongest in [skill] and [skill], with project work in [domain].' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Education' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Degree, Institution - City (Year - Year)' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Relevant coursework: | Thesis: | Honours:' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Projects' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Project Name - one line on what it does and who it is for' }],
+        },
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Built with [stack]. Say what you personally wrote.' }],
+                },
+              ],
+            },
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Name the result: users, load handled, time saved, grade.' }],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Experience' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Internship or part-time role, Company (Month Year - Month Year). Include coursework-adjacent work; a screener reads it as evidence you have shipped something.' }],
+        },
+      ],
+    },
+  },
+  {
+    id: 'word-technical',
+    name: 'Technical',
+    description:
+      'Stack up front, projects with impact bullets. For engineering roles.',
+    mode: 'word',
+    content: {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [{ type: 'text', text: 'Your Name' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Software Engineer | email@example.com | github.com/you | yoursite.dev' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Stack' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Languages: TypeScript, Python | Frontend: React, Next.js | Backend: Node, PostgreSQL | Infra: Docker, CI' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Experience' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Job Title, Company (Month Year - Present)' }],
+        },
+        {
+          type: 'bulletList',
+          content: [
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Shipped [feature] to [n] users and cut [metric] by [n] percent.' }],
+                },
+              ],
+            },
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Reduced [cost or latency] from A to B by [what you changed].' }],
+                },
+              ],
+            },
+            {
+              type: 'listItem',
+              content: [
+                {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: 'Owned [system]: design, rollout, and the on-call for it.' }],
+                },
+              ],
+            },
+          ],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Selected projects' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Project - stack - what it does, and the one number that shows it worked' }],
+        },
+        {
+          type: 'heading',
+          attrs: { level: 2 },
+          content: [{ type: 'text', text: 'Education' }],
+        },
+        {
+          type: 'paragraph',
+          content: [{ type: 'text', text: 'Degree, Institution (Year)' }],
+        },
+      ],
+    },
+  },
 ]
 
 // LaTeX mode templates
@@ -575,6 +832,98 @@ Organization
 \\textbf{Research:} Methodology, Techniques\\\\
 \\textbf{Technical:} Languages, Tools\\\\
 \\textbf{Languages:} English, [Language]
+
+\\end{document}`,
+    },
+  },
+  {
+    id: 'latex-ats',
+    name: 'ATS-safe',
+    description:
+      'Plain article class, no exotic packages. Compiles anywhere and copies out as clean text.',
+    mode: 'latex',
+    content: {
+      type: 'latex',
+      source: `\\documentclass[11pt,a4paper]{article}
+\\usepackage[margin=2cm]{geometry}
+\\usepackage[hidelinks]{hyperref}
+\\pagestyle{empty}
+\\setlength{\\parindent}{0pt}
+
+% Deliberately no multicol, no tikz, no custom fonts. A CV that a converter
+% can turn into plain text in the right order beats one that looks better and
+% comes out scrambled.
+
+\\begin{document}
+
+{\\LARGE\\bfseries Your Name}\\\\[2pt]
+City, Country \\textbar{} email@example.com \\textbar{} +63 900 000 0000
+
+\\section*{Summary}
+One or two sentences naming your role, your years of experience, and the work
+you want next.
+
+\\section*{Skills}
+Languages: \\textbar{} Frameworks: \\textbar{} Tools: \\textbar{} Databases:
+
+\\section*{Experience}
+\\textbf{Job Title}, Company --- City \\hfill Month Year -- Month Year
+\\begin{itemize}
+  \\item Did X, which produced Y. Lead with the outcome and name the number.
+  \\item Owned Z end to end, from A to B.
+\\end{itemize}
+
+\\section*{Education}
+\\textbf{Degree}, Institution \\hfill Year
+
+\\end{document}`,
+    },
+  },
+  {
+    id: 'latex-technical',
+    name: 'Technical',
+    description: 'Stack table and project entries, for engineering roles.',
+    mode: 'latex',
+    content: {
+      type: 'latex',
+      source: `\\documentclass[11pt,a4paper]{article}
+\\usepackage[margin=1.8cm]{geometry}
+\\usepackage[hidelinks]{hyperref}
+\\usepackage{enumitem}
+\\usepackage{titlesec}
+\\titleformat{\\section}{\\large\\bfseries}{}{0pt}{}[\\titlerule]
+\\titlespacing{\\section}{0pt}{10pt}{6pt}
+\\setlist[itemize]{leftmargin=*,itemsep=1pt,topsep=2pt}
+\\pagestyle{empty}
+\\setlength{\\parindent}{0pt}
+
+\\begin{document}
+
+{\\LARGE\\bfseries Your Name}\\\\[2pt]
+Software Engineer \\textbar{} email@example.com \\textbar{} github.com/you
+
+\\section{Stack}
+\\textbf{Languages} TypeScript, Python \\\\
+\\textbf{Frontend} React, Next.js \\\\
+\\textbf{Backend} Node, PostgreSQL \\\\
+\\textbf{Infra} Docker, CI
+
+\\section{Experience}
+\\textbf{Job Title}, Company \\hfill Month Year -- Present
+\\begin{itemize}
+  \\item Shipped [feature] to [n] users and cut [metric] by [n] percent.
+  \\item Reduced [cost or latency] from A to B by [what you changed].
+  \\item Owned [system]: design, rollout, and the on-call for it.
+\\end{itemize}
+
+\\section{Selected projects}
+\\textbf{Project} --- stack
+\\begin{itemize}
+  \\item What it does, and the one number that shows it worked.
+\\end{itemize}
+
+\\section{Education}
+\\textbf{Degree}, Institution \\hfill Year
 
 \\end{document}`,
     },

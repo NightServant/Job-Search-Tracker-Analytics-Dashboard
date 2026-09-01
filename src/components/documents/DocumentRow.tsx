@@ -64,9 +64,37 @@ export interface DocumentRowProps extends React.HTMLAttributes<HTMLDivElement> {
    * every row lines up.
    */
   actions?: React.ReactNode
+  /**
+   * Opens this CV's version history. When given, the version cell becomes the
+   * control -- see `VersionCell`.
+   */
+  onOpenVersions?: () => void
 }
 
-export function DocumentRow({ doc, actions, className, ...props }: DocumentRowProps) {
+/**
+ * The one grid definition, shared by the row and by the column-labels strip
+ * above it.
+ *
+ * It was written out twice, once in each file, and they drifted: the row's
+ * last track was `auto` (sized by whatever controls it held) while the header
+ * reserved a fixed 8.5rem, so every column between them sat at a different x
+ * in the labels than in the data. A shared constant makes that class of bug
+ * impossible rather than merely fixed -- there is no second copy to fall out
+ * of step.
+ *
+ * The last track is a fixed width, not `auto`, for the same reason: `auto`
+ * makes the whole row's geometry depend on how many buttons a caller passed.
+ */
+export const DOCUMENT_GRID =
+  'md:grid-cols-[1fr_7rem_6rem_6rem_2.5rem] md:gap-4'
+
+export function DocumentRow({
+  doc,
+  actions,
+  onOpenVersions,
+  className,
+  ...props
+}: DocumentRowProps) {
   const ats = lintSections(doc.sections)
 
   return (
@@ -77,7 +105,8 @@ export function DocumentRow({ doc, actions, className, ...props }: DocumentRowPr
         // Figma 48:548 is an 80px row; py-3 around ~40px of content made 68px,
         // which is what left the controls looking cramped against cells that
         // are vertically centred.
-        'md:grid-cols-[1fr_7rem_6rem_6rem_auto] md:items-center md:gap-4 md:py-5',
+        DOCUMENT_GRID,
+        'md:items-center md:py-5',
         className
       )}
       {...props}
@@ -101,13 +130,7 @@ export function DocumentRow({ doc, actions, className, ...props }: DocumentRowPr
         ) : (
           <span className="text-body-s text-text-muted">not checked</span>
         )}
-        {doc.version !== null ? (
-          <span className="tabular text-body-s text-text-secondary">v{doc.version}</span>
-        ) : doc.hasVersions ? (
-          <span className="text-body-s text-text-muted">unnumbered</span>
-        ) : (
-          <span className="text-body-s text-text-muted">no versions</span>
-        )}
+        <VersionCell doc={doc} onOpenVersions={onOpenVersions} />
         <time dateTime={doc.updated_at} className="tabular text-body-s text-text-muted">
           {formatTouchedDate(doc.updated_at)}
         </time>
@@ -119,5 +142,51 @@ export function DocumentRow({ doc, actions, className, ...props }: DocumentRowPr
         </div>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * The version column, which is also how version history opens.
+ *
+ * Gabe had the `versions` button removed from the row. Dropping the panel with
+ * it would have deleted a feature he did not ask to delete, and hiding it
+ * behind nothing at all would have left the VERSION column stating a number
+ * with no way to see what it counts. So the number IS the control: the cell
+ * already says "v5" or "no versions", and clicking it opens the history behind
+ * that answer.
+ *
+ * A row with no history is not a button. "no versions" is a complete answer,
+ * and a control that opens an empty panel is a promise the data cannot keep.
+ */
+function VersionCell({
+  doc,
+  onOpenVersions,
+}: {
+  doc: ResumeSummary
+  onOpenVersions?: () => void
+}) {
+  const label =
+    doc.version !== null ? `v${doc.version}` : doc.hasVersions ? 'unnumbered' : 'no versions'
+  const tone = doc.version !== null ? 'text-text-secondary' : 'text-text-muted'
+
+  if (!onOpenVersions || (doc.version === null && !doc.hasVersions)) {
+    return <span className={cn('tabular text-body-s', tone)}>{label}</span>
+  }
+
+  return (
+    <button
+      type="button"
+      data-row-versions
+      onClick={onOpenVersions}
+      aria-label={`Version history for ${doc.title}`}
+      className={cn(
+        'tabular justify-self-start rounded-md text-left text-body-s underline-offset-4',
+        'hover:text-accent-default hover:underline',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+        tone
+      )}
+    >
+      {label}
+    </button>
   )
 }

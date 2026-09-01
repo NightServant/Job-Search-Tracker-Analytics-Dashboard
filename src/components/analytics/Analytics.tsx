@@ -2,7 +2,14 @@
 
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
-import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardAction,
+  CardContent,
+} from '@/components/ui/card'
 import { AlertCircleIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Callout } from './Callout'
@@ -60,11 +67,14 @@ export interface AnalyticsProps {
  */
 function AnalyticsPanel({
   title,
+  description,
   action,
   error,
   children,
 }: {
   title: string
+  /** One lowercase line saying what the panel answers. */
+  description?: string
   action?: React.ReactNode
   error?: string
   children: React.ReactNode
@@ -85,6 +95,7 @@ function AnalyticsPanel({
         <CardTitle>
           <h2>{title}</h2>
         </CardTitle>
+        {description ? <CardDescription>{description}</CardDescription> : null}
         {action ? <CardAction>{action}</CardAction> : null}
       </CardHeader>
       <CardContent className="flex flex-1 flex-col">
@@ -285,6 +296,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="overview"
+        description="the headline numbers for everything you have tracked."
           action={<Span>all time</Span>}
           error={conversionMetrics.error ? errorMessage(conversionMetrics.error) : undefined}
         >
@@ -299,6 +311,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="conversion funnel"
+        description="how far applications get, and how long each stage takes to reach."
           action={<Span>all time</Span>}
           error={conversionFunnel.error ? errorMessage(conversionFunnel.error) : undefined}
         >
@@ -317,6 +330,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="pipeline flow"
+        description="where applications actually went, stage to stage."
           action={<Span>all time</Span>}
           error={statusTransitions.error ? errorMessage(statusTransitions.error) : undefined}
         >
@@ -335,6 +349,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="time in stage"
+        description="the average days an application sits before it moves on."
           action={<Span>all time</Span>}
           error={timeInStage.error ? errorMessage(timeInStage.error) : undefined}
         >
@@ -354,7 +369,11 @@ export function Analytics({
       key: 'salary',
       span: 'half',
       node: (
-        <AnalyticsPanel title="salary insights" action={<Span>all time</Span>}>
+        <AnalyticsPanel
+          title="salary insights"
+          description="the bands companies posted, with each one’s average marked."
+          action={<Span>all time</Span>}
+        >
           <SalaryInsights jobs={jobs} />
         </AnalyticsPanel>
       ),
@@ -368,6 +387,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="cohort analysis"
+        description="each month of applications, followed through to its outcome."
           action={<Span>{rangeLabel(range)}</Span>}
           error={cohortAnalysis.error ? errorMessage(cohortAnalysis.error) : undefined}
         >
@@ -415,6 +435,7 @@ export function Analytics({
       <PageHeader
         className="lg:col-span-2"
         title="analytics"
+        description="how your applications actually move, how long each step takes, and what they pay."
         action={<RangePicker value={range} onChange={setRange} />}
       />
 

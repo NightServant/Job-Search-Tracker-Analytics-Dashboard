@@ -3,7 +3,14 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui/page-header'
-import { Card, CardHeader, CardTitle, CardAction, CardContent } from '@/components/ui/card'
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardAction,
+  CardContent,
+} from '@/components/ui/card'
 import { FollowUpNudge } from './FollowUpNudge'
 import { KpiStrip } from './KpiStrip'
 import { ApplicationsOverTime } from './ApplicationsOverTime'
@@ -12,7 +19,7 @@ import { SourceMix } from './SourceMix'
 import { UpcomingEvents } from './UpcomingEvents'
 import { RecentApplicationsTable } from './RecentApplicationsTable'
 import { getStaleApplications } from '@/services/followUp'
-import { applicationsPerMonth, statusBreakdown, sourceBreakdown } from '@/lib/overviewSeries'
+import { applicationsPerMonth, statusBreakdown, rankedSources } from '@/lib/overviewSeries'
 import type { CalendarEvent } from '@/services/events'
 import type { Job } from '@/types'
 
@@ -49,12 +56,22 @@ const TREND_MONTHS = 6
  * component on this screen specifically. The rule the frame does specify --
  * the 2px one under the page title -- stays.
  *
- * Layout, top to bottom, matching the frame: header, rule, five-KPI strip with
- * dividers, follow-up nudge, then a three-panel content grid at 460/300/280,
- * then the recent-applications table. The one departure is the fourth panel,
- * `by source` -- Gabe asked for a bar chart and the three Figma panels cover
- * time, status and events, so source is the dimension none of them shows. It
- * also preserves the data the retired `DashboardBlocks` surfaced as text.
+ * Layout, top to bottom: header, rule, five-KPI strip with dividers,
+ * follow-up nudge, then a TWO-COLUMN grid, then the recent-applications table
+ * across the full width. The column order is Gabe's: `applications over time`
+ * beside `by status`, then `upcoming events` beside `by source`, then the
+ * table.
+ *
+ * That replaces a 460/300/280 three-panel row plus a 2fr/1fr row. Six panels
+ * at four different widths meant no two charts on the screen shared a scale,
+ * so a bar in one could not be read against a bar in another. Equal halves
+ * make the pairs comparable, and the table -- the one panel that genuinely
+ * wants width, at four columns -- gets the whole row instead of two thirds of
+ * one.
+ *
+ * `by source` is not in the Figma at all; it is the chart Gabe asked for, and
+ * source is the dimension the frame's three panels do not cover. It also
+ * preserves the data the retired `DashboardBlocks` surfaced as text.
  *
  * `events` arrives as a prop from the route, which reads `useEvents`. That
  * hook already existed and `/calendar` already used it; the Overview never
@@ -89,7 +106,7 @@ export function Dashboard({
 
   const trend = React.useMemo(() => applicationsPerMonth(jobs, TREND_MONTHS), [jobs])
   const statuses = React.useMemo(() => statusBreakdown(jobs), [jobs])
-  const sources = React.useMemo(() => sourceBreakdown(jobs), [jobs])
+  const sources = React.useMemo(() => rankedSources(jobs), [jobs])
   const companyByJobId = React.useMemo(
     () => Object.fromEntries(jobs.map((job) => [job.id, job.company])),
     [jobs]
@@ -112,6 +129,7 @@ export function Dashboard({
             was why its title was 28px while five other screens were 20px. */}
         <PageHeader
           title="overview"
+          description="your search at a glance — what is moving, what has stalled, and what is next."
           action={<p className="tabular text-body-s text-text-muted">{today}</p>}
         />
         <hr data-header-rule className="mt-6 border-0 border-t-2 border-border-default" />
@@ -121,32 +139,39 @@ export function Dashboard({
 
       <FollowUpNudge stale={stale} />
 
-      <div className="grid gap-8 lg:grid-cols-[460fr_300fr_280fr]">
+      {/* Two equal columns from lg, in Gabe's order: over-time beside status,
+          events beside source, and the table across both. */}
+      <div className="grid gap-8 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>
               <h2>applications over time</h2>
             </CardTitle>
+            <CardDescription>how many you sent each month, over the last six.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <ApplicationsOverTime data={trend} />
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>
               <h2>by status</h2>
             </CardTitle>
+            <CardDescription>where everything you are tracking currently sits.</CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="flex flex-1 flex-col">
             <StatusDonut data={statuses} />
           </CardContent>
         </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>
               <h2>upcoming events</h2>
             </CardTitle>
+            <CardDescription>interviews and calls already on the calendar.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <UpcomingEvents
@@ -157,19 +182,27 @@ export function Dashboard({
             />
           </CardContent>
         </Card>
-      </div>
 
-      {/* `by source` shares this row rather than owning a full-width one of
-          its own. It is not in the Figma at all -- it is the bar chart Gabe
-          asked for -- and a lone full-bleed panel gave a handful of bars the
-          visual weight of the whole screen. The table is the frame's own
-          bottom block (26:76) and keeps the larger share. */}
-      <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
         <Card>
+          <CardHeader>
+            <CardTitle>
+              <h2>by source</h2>
+            </CardTitle>
+            <CardDescription>your best channel, the runner-up, and the tail behind them.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-1 flex-col">
+            <SourceMix data={sources} />
+          </CardContent>
+        </Card>
+
+        {/* Full width: four columns of table read badly at half a screen, and
+            it is the end of the page rather than one of a pair. */}
+        <Card className="lg:col-span-2">
           <CardHeader>
             <CardTitle>
               <h2>recent applications</h2>
             </CardTitle>
+            <CardDescription>the five most recent, newest first.</CardDescription>
             <CardAction>
               <Link href="/applications" className="text-body-s text-accent-default hover:underline">
                 view all
@@ -178,16 +211,6 @@ export function Dashboard({
           </CardHeader>
           <CardContent>
             <RecentApplicationsTable jobs={jobs} />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <h2>by source</h2>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-1 flex-col">
-            <SourceMix data={sources} />
           </CardContent>
         </Card>
       </div>
