@@ -3,7 +3,7 @@ import { render, screen, within, cleanup, fireEvent } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import type { ResumeSummary } from '@/services/resumeService'
 import { formatTouchedDate } from '@/services/date'
-import { DocumentRow } from '../DocumentRow'
+import { DocumentRow, DOCUMENT_GRID } from '../DocumentRow'
 import { VersionHistory } from '../VersionHistory'
 import { DocumentsPage } from '../DocumentsPage'
 
@@ -63,7 +63,14 @@ describe('DocumentRow', () => {
     const row = container.querySelector('[data-document-row]')!
     const actions = row.querySelector('[data-row-actions]')!
     expect(actions.parentElement).toBe(row)
-    expect(row.className).toContain('md:grid-cols-[1fr_7rem_6rem_6rem_auto]')
+    // Asserted through the shared constant, not a copy of the class string:
+    // the header strip and the row each used to spell this out, they drifted
+    // (`auto` here against a fixed 8.5rem there), and every column between
+    // them sat at a different x in the labels than in the data.
+    expect(row.className).toContain(DOCUMENT_GRID)
+    // The actions track is fixed, never `auto` -- `auto` makes the whole row's
+    // geometry depend on how many buttons a caller happened to pass.
+    expect(DOCUMENT_GRID).not.toContain('auto')
   })
 
   it('renders no actions cell when a caller passes none', () => {
@@ -254,7 +261,10 @@ describe('DocumentsPage', () => {
     )
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
 
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
+    // The `versions` button is gone at Gabe's request; the version cell is the
+    // control now, so the number the column already showed is what opens the
+    // history behind it.
+    fireEvent.click(screen.getByRole('button', { name: /version history for/i }))
     expect(onToggleVersions).toHaveBeenCalledWith(DOC)
 
     rerender(<DocumentsPage docs={[DOC]} openVersionsFor="cv-1" versions={[]} />)
@@ -345,5 +355,40 @@ describe('the Word-style start screen', () => {
     expect(columns.textContent).toMatch(/name/)
     expect(columns.textContent).toMatch(/version/)
     expect(columns.textContent).toMatch(/modified/)
+  })
+})
+
+describe('column labels line up with the data under them', () => {
+  it('declares the same tracks in the header strip and in every row', () => {
+    // jsdom has no layout, so this pins the mechanism rather than the pixels:
+    // both come from DOCUMENT_GRID, so they cannot disagree. Measured in the
+    // browser after the fix, every label sits at the same x as its column.
+    const { container } = render(<DocumentsPage docs={[DOC]} />)
+    const columns = container.querySelector('[data-document-columns]')!
+    const row = container.querySelector('[data-document-row]')!
+    expect(columns.className).toContain(DOCUMENT_GRID)
+    expect(row.className).toContain(DOCUMENT_GRID)
+    // Five tracks each: the label strip carries an empty actions cell so the
+    // count matches rather than relying on the browser to forgive a short row.
+    expect(columns.children).toHaveLength(5)
+  })
+
+  it('does not make "no versions" a control, since there is nothing behind it', () => {
+    // A control that opens an empty panel is a promise the data cannot keep.
+    const { container } = render(
+      <DocumentsPage
+        docs={[{ ...DOC, version: null, hasVersions: false }]}
+        onToggleVersions={vi.fn()}
+      />
+    )
+    expect(container.querySelector('[data-row-versions]')).toBeNull()
+    expect(screen.getByText('no versions')).toBeTruthy()
+  })
+
+  it('leaves the row with one control now that `versions` has gone', () => {
+    const { container } = render(<DocumentsPage docs={[DOC]} onDelete={vi.fn()} />)
+    const actions = container.querySelector('[data-row-actions]')!
+    expect(actions.querySelectorAll('button')).toHaveLength(1)
+    expect(actions.textContent).not.toMatch(/versions/i)
   })
 })

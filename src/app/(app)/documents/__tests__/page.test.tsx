@@ -103,7 +103,7 @@ describe('Documents route wrapper', () => {
     render(<Page />)
     expect(useResumeVersionsMock).toHaveBeenLastCalledWith(null)
 
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
+    fireEvent.click(screen.getByRole('button', { name: /version history for/i }))
     expect(useResumeVersionsMock).toHaveBeenLastCalledWith('cv-1')
   })
 
@@ -118,7 +118,7 @@ describe('Documents route wrapper', () => {
     useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
     render(<Page />)
 
-    await user.click(screen.getByRole('button', { name: /^versions$/i }))
+    await user.click(screen.getByRole('button', { name: /version history for/i }))
     expect(useResumeVersionsMock).toHaveBeenLastCalledWith('cv-1')
 
     await user.keyboard('{Escape}')
@@ -129,7 +129,7 @@ describe('Documents route wrapper', () => {
     useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
     useResumeVersionsMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('x') })
     render(<Page />)
-    fireEvent.click(screen.getByRole('button', { name: /versions/i }))
+    fireEvent.click(screen.getByRole('button', { name: /version history for/i }))
     expect(screen.getByText(/could not load the saved versions/i)).toBeTruthy()
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
   })

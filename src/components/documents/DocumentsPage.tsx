@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { AppDialog } from '@/components/ui/app-dialog'
@@ -8,7 +9,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { PlusIcon, TrashIcon, UploadIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ModeChooser } from '@/components/cv/ModeChooser'
-import { DocumentRow } from './DocumentRow'
+import { DocumentRow, DOCUMENT_GRID } from './DocumentRow'
 import { TemplateGallery, type TemplateChoice } from './TemplateGallery'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
 import { IMPORT_ACCEPT } from '@/lib/documentImport'
@@ -144,30 +145,25 @@ export function DocumentsPage({
                 four columns and nothing said what any of them were. */}
             <div
               data-document-columns
-              className="hidden border-b border-border-subtle pb-2 md:grid md:grid-cols-[1fr_7rem_6rem_6rem_auto] md:gap-4"
+              className={cn('hidden border-b border-border-subtle pb-2 md:grid', DOCUMENT_GRID)}
             >
               <span className="text-label-caps uppercase text-text-muted">name</span>
               <span className="text-label-caps uppercase text-text-muted">ATS</span>
               <span className="text-label-caps uppercase text-text-muted">version</span>
               <span className="text-label-caps uppercase text-text-muted">modified</span>
-              <span className="w-[8.5rem]" />
+              {/* The actions track, empty. Present so the label row declares
+                  the same five tracks the data rows do. */}
+              <span />
             </div>
             {docs.map((doc) => (
               <DocumentRow
                 key={doc.id}
                 doc={doc}
+                onOpenVersions={() => onToggleVersions?.(doc)}
                 actions={
-                  <>
-                    <Button variant="secondary" size="s" onClick={() => onToggleVersions?.(doc)}>
-                      versions
-                    </Button>
-                    <IconButton
-                      aria-label={`Delete ${doc.title}`}
-                      onClick={() => onDelete?.(doc)}
-                    >
-                      <TrashIcon size={16} aria-hidden className="[&_svg]:size-4" />
-                    </IconButton>
-                  </>
+                  <IconButton aria-label={`Delete ${doc.title}`} onClick={() => onDelete?.(doc)}>
+                    <TrashIcon size={16} aria-hidden className="[&_svg]:size-4" />
+                  </IconButton>
                 }
               />
             ))}
