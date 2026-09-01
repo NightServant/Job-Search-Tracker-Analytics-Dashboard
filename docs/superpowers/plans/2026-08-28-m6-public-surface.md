@@ -207,7 +207,11 @@ a 375x812 screen and is jankier under touch, which is the roadmap's own
 reasoning for calling normal flow a legitimate answer. Tested, not merely
 omitted.
 
-**The demo's front door is one click.** Settled by Gabe on 2026-08-28. The
+**The demo's front door is one click.** Settled 2026-08-28, and **superseded
+2026-09-02**: the click is now a link to `/demo/dashboard` rather than a
+sign-in. One click either way; no session involved. The paragraph below
+describes the retired design and is kept only so a reader who finds
+`is_demo()` in the schema knows why it is there. The
 landing CTA signs the visitor into the seeded account and lands them on
 `/dashboard` — no printed credentials, no pre-filled form. The credentials are
 public by design and named `NEXT_PUBLIC_*` to say so; the boundary is
@@ -1050,10 +1054,11 @@ Answers are short and true. If an answer needs a hedge, the honest hedge goes
 in rather than being smoothed over — a FAQ that oversells is the fastest way
 to lose the reader it just convinced.
 
-**6. Closing CTA.** A `Card` carrying both routes: the demo account and
-registration. An `Alert` states in one line what a demo account is and is not —
-that it is shared, resets, and is not somewhere to keep real applications.
-Task 6 owns the demo mechanics; this section owns the door.
+**6. Closing CTA.** A `Card` carrying both routes: `/demo/dashboard` and
+`/signup`. Both are plain `Link`s — the demo is a URL space, not a sign-in, so
+nothing here touches auth. An `Alert` states in one line what the demo is:
+invented data, read-only, nothing you enter is kept. Task 6 owns the demo
+routes; this section owns the door.
 
 ---
 
@@ -1141,11 +1146,11 @@ it; the footer carries the attribution line Task 1 made a gate.
 
 `src/app/page.tsx` stops redirecting to `/dashboard` and renders `Landing`.
 
-**The open question in *Open questions for Gabe* about whether `/` should
-redirect a signed-in visitor is now weightier, not resolved.** With a demo CTA
-on this page, a signed-in visitor who clicks "try the live demo" would be
-signed OUT into the demo and lose their session. Task 6 must not ship until
-that interaction is decided.
+**Settled 2026-09-02: `/` is the homepage for everyone, signed in or not.**
+Gabe decided it, and moving the demo to `/demo/*` removed the reason it was
+ever fraught — a signed-in visitor clicking "try the demo" now opens a page,
+not a session swap, and stays signed in throughout. `src/app/page.tsx` renders
+`Landing` unconditionally and redirects nobody.
 
 ### Task 3: 6.1a — the pinned scroll sequence
 
@@ -2705,669 +2710,165 @@ git commit -m "feat: add a recovering 404 and a privacy page written from the re
 
 ---
 
-### Task 6: Demo mode
+### Task 6: Demo mode at `/demo/*`
 
-A seeded, read-only account a stranger can open **in one click** from the
-landing page. The security boundary already exists in RLS; this task adds the
-front door, the affordances and the runbook, and closes the SECURITY DEFINER
-hole class permanently rather than patching it a second time.
+**Rewritten 2026-09-02.** Gabe: "`/` should be the homepage. `/demo/<page-name>`
+should be the demo account."
 
-**Settled: the front door is a single button, not printed credentials and not a
-pre-filled login form.** Gabe decided this on 2026-08-28. The visitor clicks
-`try the live demo` and lands on `/dashboard` signed in. This matches the
-roadmap's stated position that the frictionless path is the one worth pushing
-for a portfolio piece — and every step between the click and the data is a step
-where a reviewer gives up.
+That is a different architecture from the one this task carried, and it is a
+better one. The old design signed a visitor into a shared account with
+published credentials. The new one is a **public URL space rendering the app
+screens over a fixture** — `/demo/dashboard`, `/demo/applications`,
+`/demo/analytics`, `/demo/calendar`, `/demo/documents`. Nobody signs in.
 
-**The demo credentials are public on purpose, and the plan says so out loud.**
-They ship in `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD`, which
-means they are compiled into the client bundle and readable by anyone with
-devtools. That is not a leak and must not be written as though it were: the
-account is *designed* to be shared, and the boundary is `is_demo()` plus the
-RESTRICTIVE `demo_block_*` policies, which refuse every write no matter who
-holds the password. A reader six months from now must not "fix" this by moving
-the credentials server-side, so the naming (`NEXT_PUBLIC_`), the docblock and
-the README all state it. What would be a real leak is the service role key,
-which never reaches the browser and is not involved here.
+**What the change dissolves, rather than solves.** Each of these was real work
+in the old plan and is now simply absent:
+
+| Old problem | Why it is gone |
+|---|---|
+| A signed-in visitor clicking "try the demo" gets signed OUT and loses their session | `/demo/*` is a page, not a session. Nothing touches auth. **This closes the open question this plan has carried since 2026-08-28.** |
+| Published credentials in `NEXT_PUBLIC_DEMO_EMAIL` / `_PASSWORD`, and a long defence of why that is not a leak | There are no credentials |
+| A stranger vandalising the shared demo data | The data is a fixture in the repo. It cannot be edited because there is no write path to edit it |
+| RESTRICTIVE `demo_block_*` policies, and gating writes on five screens | The demo never authenticates, so it never has a session that could write |
+| A runbook for reseeding the demo account | `git checkout` is the runbook |
+
+**It is also faster and cheaper.** With no auth and no queries these routes are
+statically renderable — a reviewer opening the demo gets HTML, not a spinner
+followed by a round trip to Supabase.
+
+**Why this is cheap to build: M5 already did the hard part.** Every screen
+takes plain props and owns no fetching — `Dashboard`, `ApplicationsPage`,
+`Analytics`, `Calendar` and `DocumentsPage` are all rendered by thin route
+wrappers that do the reads. That split was made so the screens could be tested
+without Next routing; it turns out to be exactly what a second, data-free set
+of routes needs. **Verify this before building** — if a screen has grown its
+own `useQuery` since, hoist it to its route first, in its own commit.
 
 **Files:**
-- Modify: `src/lib/env.ts` (add `NEXT_PUBLIC_DEMO_USER_IDS`, `NEXT_PUBLIC_DEMO_EMAIL` and `NEXT_PUBLIC_DEMO_PASSWORD` as literals in `nextPublicEnv()`, and `demoUserIds: string[]` + `demoEmail: string` + `demoPassword: string` to `RuntimeFlags`)
-- Modify: `src/lib/__tests__/env.test.ts` (existing file; add the parsing cases)
-- Create: `src/hooks/useIsDemo.ts`
-- Create: `src/hooks/__tests__/useIsDemo.test.tsx`
+- Create: `src/app/demo/layout.tsx` (the app shell, in demo dress, no auth guard)
+- Create: `src/app/demo/page.tsx` (redirects to `/demo/dashboard`)
+- Create: `src/app/demo/dashboard/page.tsx`
+- Create: `src/app/demo/applications/page.tsx`
+- Create: `src/app/demo/analytics/page.tsx`
+- Create: `src/app/demo/calendar/page.tsx`
+- Create: `src/app/demo/documents/page.tsx`
+- Create: `src/app/demo/__tests__/demo.test.tsx`
+- Create: `src/lib/demoFixture.ts` (every row the demo shows)
+- Create: `src/lib/__tests__/demoFixture.test.ts`
 - Create: `src/components/shell/DemoBanner.tsx`
 - Create: `src/components/shell/__tests__/DemoBanner.test.tsx`
-- Modify: `src/components/shell/AppShell.tsx` (render `DemoBanner` above `main`)
-- Create: `src/components/landing/DemoSignInButton.tsx`
-- Create: `src/components/landing/__tests__/DemoSignInButton.test.tsx`
-- Modify: `src/components/landing/Hero.tsx` and `src/components/landing/StickyNavbar.tsx` (the demo CTAs become `DemoSignInButton` instead of links)
-- Modify: `src/components/settings/SettingsPage.tsx` (the danger zone's demo copy)
-- Modify: `src/app/(app)/applications/page.tsx` (gate the Add / import / export writes)
-- Modify: `src/app/(app)/settings/page.tsx` (gate the danger zone and the currency write)
-- Create: `supabase/__tests__/securityDefiner.test.ts`
-- Modify: `.env.example`
-- Modify: `README.md` (the demo runbook section)
+- Modify: `src/components/landing/ClosingCta.tsx` and `Hero.tsx` (the demo CTA is a `Link` to `/demo/dashboard`)
+- Create: `supabase/__tests__/securityDefiner.test.ts` (see the note below — kept, reframed)
+- Modify: `README.md`
 
 **Interfaces:**
-- Consumes:
-  - `isDemoUser(userId: string | null, demoUserIds: string[]): boolean` from `@/services/demoMode` — exists, tested, docblocked as affordance-only.
-  - `useAuth()` from `@/contexts/AuthContext`.
-  - `readRuntimeFlags(source)` from `@/lib/env`.
-- Produces:
-  ```ts
-  // added to RuntimeFlags in src/lib/env.ts
-  demoUserIds: string[]
-  demoEmail: string
-  demoPassword: string
-
-  // src/hooks/useIsDemo.ts
-  export function useIsDemo(): boolean
-
-  // src/components/shell/DemoBanner.tsx
-  export function DemoBanner(props: { visible: boolean }): JSX.Element | null
-
-  // src/components/landing/DemoSignInButton.tsx
-  export interface DemoSignInButtonProps {
-    variant?: 'primary' | 'secondary'
-    className?: string
-    children: React.ReactNode
+```ts
+// src/lib/demoFixture.ts
+export interface DemoFixture {
+  jobs: Job[]
+  events: CalendarEvent[]
+  resumes: ResumeSummary[]
+  // Analytics takes MetricState<T> per panel; the fixture supplies resolved ones.
+  analytics: {
+    timeInStage: TimeInStageMetric[]
+    conversionFunnel: ConversionFunnelMetric[]
+    statusTransitions: StatusTransition[]
+    cohortAnalysis: CohortAnalysis[]
+    conversionMetrics: ConversionMetrics
   }
-  export function DemoSignInButton(props: DemoSignInButtonProps): JSX.Element
-  ```
-  `DemoSignInButton` replaces the `try the live demo` and `open the demo`
-  links Task 2 built as `<Link href>`. Task 2's tests assert those are links
-  with an `href`; **this task updates those two assertions** to expect a
-  button, because the element genuinely changes. Say so in the commit rather
-  than leaving a reviewer to wonder why a Task 2 test moved.
-
-- [ ] **Step 1: Write the failing env-parsing test**
-
-```ts
-// append to src/lib/__tests__/env.test.ts
-describe('readRuntimeFlags demoUserIds', () => {
-  it('parses a comma separated list and trims each id', () => {
-    expect(readRuntimeFlags({ NEXT_PUBLIC_DEMO_USER_IDS: 'a, b ,c' }).demoUserIds)
-      .toEqual(['a', 'b', 'c'])
-  })
-
-  it('drops empty segments rather than yielding blank ids', () => {
-    // A blank id would match a blank user id and silently mark a real user as
-    // a demo one.
-    expect(readRuntimeFlags({ NEXT_PUBLIC_DEMO_USER_IDS: 'a,,b,' }).demoUserIds)
-      .toEqual(['a', 'b'])
-  })
-
-  it('is an empty list when the variable is absent', () => {
-    expect(readRuntimeFlags({}).demoUserIds).toEqual([])
-  })
-
-  it('leaves the other flags alone', () => {
-    // Positive companion: proves the field was added rather than the function
-    // rewritten.
-    const flags = readRuntimeFlags({ NEXT_PUBLIC_APP_VERSION: '2.1.0', NEXT_PUBLIC_DEMO_USER_IDS: 'x' })
-    expect(flags.appVersion).toBe('2.1.0')
-    expect(flags.demoUserIds).toEqual(['x'])
-  })
-})
-
-describe('readRuntimeFlags demo credentials', () => {
-  it('reads the published demo email and password', () => {
-    // Public by design: the demo account is meant to be shared, and the RLS
-    // demo_block_* policies refuse every write regardless of who holds the
-    // password. NEXT_PUBLIC_ is the correct prefix, not an oversight.
-    const flags = readRuntimeFlags({
-      NEXT_PUBLIC_DEMO_EMAIL: 'demo@worktrack.app',
-      NEXT_PUBLIC_DEMO_PASSWORD: 'published-on-purpose',
-    })
-    expect(flags.demoEmail).toBe('demo@worktrack.app')
-    expect(flags.demoPassword).toBe('published-on-purpose')
-  })
-
-  it('is empty strings when unconfigured, never undefined', () => {
-    // The button reads these directly; undefined would reach supabase-js as
-    // "undefined" and produce a confusing auth error instead of a clean
-    // "demo is not configured" state.
-    const flags = readRuntimeFlags({})
-    expect(flags.demoEmail).toBe('')
-    expect(flags.demoPassword).toBe('')
-  })
-})
-```
-
-- [ ] **Step 2: Run it and watch it fail**
-
-Run: `npx vitest run src/lib/__tests__/env.test.ts`
-Expected: FAIL — `demoUserIds` does not exist on `RuntimeFlags`.
-
-- [ ] **Step 3: Add the field and the literal**
-
-In `nextPublicEnv()`, add all three — **written out in full**, because the
-docblock in that file explains that Next only substitutes the exact literal
-text and a computed key yields nothing in a browser bundle:
-
-```ts
-      NEXT_PUBLIC_DEMO_USER_IDS: process.env.NEXT_PUBLIC_DEMO_USER_IDS,
-      NEXT_PUBLIC_DEMO_EMAIL: process.env.NEXT_PUBLIC_DEMO_EMAIL,
-      NEXT_PUBLIC_DEMO_PASSWORD: process.env.NEXT_PUBLIC_DEMO_PASSWORD,
-```
-
-In `RuntimeFlags` add the three fields, and in `readRuntimeFlags`:
-
-```ts
-    demoUserIds: (source.NEXT_PUBLIC_DEMO_USER_IDS ?? '')
-      .split(',')
-      .map((id) => id.trim())
-      .filter(Boolean),
-    // Public on purpose. See the note above readRuntimeFlags.
-    demoEmail: source.NEXT_PUBLIC_DEMO_EMAIL ?? '',
-    demoPassword: source.NEXT_PUBLIC_DEMO_PASSWORD ?? '',
-```
-
-Put this docblock above them, because the next person to read
-`NEXT_PUBLIC_DEMO_PASSWORD` will reach for a security fix otherwise:
-
-```ts
-/**
- * The published demo account's credentials.
- *
- * NEXT_PUBLIC_ is deliberate: these are compiled into the client bundle and
- * anyone can read them out of devtools. That is the design. The demo account
- * exists to be shared, the landing page signs visitors in with one click, and
- * the read-only boundary is public.is_demo() plus the RESTRICTIVE demo_block_*
- * policies in 20260825043057 -- which refuse every write no matter who holds
- * the password. Moving these server-side would protect nothing and would cost
- * the one-click front door.
- *
- * This is not the pattern for any other credential. The service role key never
- * reaches the browser.
- */
-```
-
-Add all three to `.env.example` with those comments: `NEXT_PUBLIC_DEMO_USER_IDS`
-is the seeded account's `auth.users.id` (comma separated if there is ever more
-than one), and the email/password are the published demo login.
-
-- [ ] **Step 4: Run it and watch it pass**
-
-Run: `npx vitest run src/lib/__tests__/env.test.ts`
-Expected: PASS.
-
-- [ ] **Step 5: Write the failing demo-affordance tests**
-
-```tsx
-// src/components/shell/__tests__/DemoBanner.test.tsx
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import { DemoBanner } from '../DemoBanner'
-
-describe('the demo banner', () => {
-  it('says the account is read-only and offers a way to make a real one', () => {
-    render(<DemoBanner visible />)
-    expect(screen.getByText(/read-only demo/i)).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'create your own account' })).toHaveAttribute(
-      'href',
-      '/signup'
-    )
-  })
-
-  it('renders nothing for a normal account', () => {
-    const { container } = render(<DemoBanner visible={false} />)
-    expect(container).toBeEmptyDOMElement()
-  })
-
-  it('is not a status pill', () => {
-    // Global Constraint: no status pills, and orange is never a status. The
-    // banner is a hairline-ruled strip, not a filled rounded badge.
-    const { container } = render(<DemoBanner visible />)
-    const el = container.firstElementChild as HTMLElement
-    expect(el.className).toContain('border-b')
-    expect(el.className).not.toMatch(/rounded-(full|lg|xl|2xl)/)
-  })
-})
-```
-
-```tsx
-// src/hooks/__tests__/useIsDemo.test.tsx
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook } from '@testing-library/react'
-
-const useAuthMock = vi.fn()
-vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => useAuthMock() }))
-vi.mock('@/lib/env', async (orig) => {
-  const actual = await orig<typeof import('@/lib/env')>()
-  return { ...actual, runtimeFlags: { ...actual.runtimeFlags, demoUserIds: ['demo-1'] } }
-})
-
-import { useIsDemo } from '../useIsDemo'
-
-beforeEach(() => vi.clearAllMocks())
-
-describe('useIsDemo', () => {
-  it('is true for the configured demo account', () => {
-    useAuthMock.mockReturnValue({ user: { id: 'demo-1' } })
-    expect(renderHook(() => useIsDemo()).result.current).toBe(true)
-  })
-
-  it('is false for any other signed-in account', () => {
-    useAuthMock.mockReturnValue({ user: { id: 'someone-else' } })
-    expect(renderHook(() => useIsDemo()).result.current).toBe(false)
-  })
-
-  it('is false when nobody is signed in', () => {
-    useAuthMock.mockReturnValue({ user: null })
-    expect(renderHook(() => useIsDemo()).result.current).toBe(false)
-  })
-})
-```
-
-- [ ] **Step 6: Run them, watch them fail, then write the two modules**
-
-Run: `npx vitest run src/components/shell/__tests__/DemoBanner.test.tsx src/hooks/__tests__/useIsDemo.test.tsx`
-Expected: FAIL on both imports.
-
-```ts
-// src/hooks/useIsDemo.ts
-'use client'
-
-import { useAuth } from '@/contexts/AuthContext'
-import { runtimeFlags } from '@/lib/env'
-import { isDemoUser } from '@/services/demoMode'
-
-/**
- * Whether the signed-in account is the published demo.
- *
- * Affordances only. Demo credentials are public, so anyone can call the REST
- * API directly with them; the restrictive demo_block_* policies and
- * public.is_demo() are what actually refuse the write. A disabled button in
- * the UI is an affordance, not a boundary -- the phrase is lifted verbatim
- * from 20260825043057's own comment, which is where the boundary lives.
- */
-export function useIsDemo(): boolean {
-  const { user } = useAuth()
-  return isDemoUser(user?.id ?? null, runtimeFlags.demoUserIds)
 }
+export const DEMO: DemoFixture
 ```
 
-`DemoBanner` is a `border-b border-border-subtle` strip with body copy and a
-link to `/signup`. No fill, no radius, no orange — orange is never a status and
-this is closest to a status.
+- [ ] **Step 1: Write the fixture, and make it a good argument**
 
-- [ ] **Step 7: Run them and watch them pass**
+This fixture IS the product demo. A reviewer's whole impression comes from it,
+so it is content work, not scaffolding:
 
-Run: `npx vitest run src/components/shell src/hooks/__tests__/useIsDemo.test.tsx`
-Expected: PASS, 6 new tests.
+- **Enough rows that every panel has something to say.** Analytics hides
+  nothing now — panels render with an explicit empty state — so a thin fixture
+  produces a screen of "not enough data yet", which is the worst possible first
+  impression. Target ~25 applications across all five statuses, spread over six
+  months so the trend chart has a shape, with sources skewed so
+  `rankedSources` yields a real primary / secondary / others split.
+- **`job_status_history` transitions**, or the pipeline flow Sankey shows its
+  empty state. This is the panel most likely to be forgotten, because Gabe's
+  own account has no history and has never seen it populated.
+- **Salaries in one currency**, PHP, so the salary panel charts rather than
+  disclosing an exclusion. Add one USD row ONLY if the intent is to show the
+  disclosure line working.
+- **At least two resumes**, one Word and one LaTeX, with versions, so Documents
+  shows its list rather than its empty state.
+- **No real personal data.** Invented companies and invented names. A fixture
+  committed to a public repo is published.
 
-- [ ] **Step 8: Write the failing write-control gate test**
+Dates must be **relative to now**, computed at module load, not hardcoded.
+Hardcoded dates mean the demo says "applied 8 months ago" by spring and the
+trend chart runs off the left edge of its six-month window. This is the
+fixture's one piece of real logic and it gets its own test.
 
-Every gated control gets a positive companion in the same test, proving the
-screen rendered and its read content is intact — a demo mode that disables the
-buttons by rendering nothing at all would otherwise pass.
+- [ ] **Step 2: Write the failing demo tests**
 
-```tsx
-// append to src/app/(app)/applications/__tests__/page.test.tsx
-describe('the applications screen in demo mode', () => {
-  it('disables every write control while still showing the applications', () => {
-    render(<ApplicationsPage jobs={[makeJob({ id: 'j1', status: 'applied' })]} demo /* …existing required props */ />)
-    // Positive companions first: the screen really rendered its data.
-    expect(screen.getByText('Acme')).toBeInTheDocument()
-    expect(screen.getByText('Staff Engineer')).toBeInTheDocument()
-    // Then the gate.
-    expect(screen.getByRole('button', { name: 'Add' })).toBeDisabled()
-    expect(screen.getByRole('button', { name: 'Import CSV' })).toBeDisabled()
-  })
+- Each of the five routes renders its screen with the fixture, and no route
+  reads from Supabase. Assert the second one: `vi.mock('@/lib/supabase')` with
+  a throwing proxy, so a stray query FAILS the test rather than silently
+  working in dev because the developer happened to be signed in.
+- No panel shows an empty state on the demo dashboard or analytics. This is the
+  test that keeps the fixture honest as panels are added — it fails when a new
+  panel has no fixture data, which is exactly when someone needs telling.
+- `/demo` redirects to `/demo/dashboard`.
+- The banner renders on every demo route and names the page as a demo.
+- Nothing in `/demo/*` renders a control that would write. Enumerate the
+  screens' write affordances and assert their absence.
 
-  it('leaves the same controls enabled for a normal account', () => {
-    // Without this the test above would pass against a screen that disables
-    // its buttons unconditionally.
-    render(<ApplicationsPage jobs={[makeJob({ id: 'j1', status: 'applied' })]} demo={false} /* … */ />)
-    expect(screen.getByRole('button', { name: 'Add' })).toBeEnabled()
-  })
+- [ ] **Step 3: The demo layout and banner**
 
-  it('keeps export enabled, because reading your own data out is not a write', () => {
-    render(<ApplicationsPage jobs={[makeJob({ id: 'j1', status: 'applied' })]} demo /* … */ />)
-    expect(screen.getByRole('button', { name: 'Export CSV' })).toBeEnabled()
-  })
-})
-```
+The layout is `AppShell` without the auth guard, with `DemoBanner` above
+`main`. The banner is an `Alert` carrying a `Badge` — the one place in this app
+a `Badge` is correct, because it labels a MODE and not a status — and it says
+three things: this is a demo, the data is invented, and here is where to make a
+real account. It is not dismissible: a visitor who scrolls past it and then
+wonders why nothing saves is the failure it exists to prevent.
 
-The exact prop list for `ApplicationsPage` must be read from the existing
-component before writing this — it was built in M5 Task 4 and revised twice.
-Do not copy the ellipsis.
+**The sidebar's links must point inside `/demo`.** A demo visitor clicking
+"applications" and landing on the real `/applications` gets bounced to
+`/login`, which reads as the demo being broken. `NavItem` takes an `href`, so
+the demo layout supplies a demo-scoped nav rather than the app one.
 
-- [ ] **Step 9: Thread `demo` through the two routes**
+- [ ] **Step 4: The five routes**
 
-`src/app/(app)/applications/page.tsx` and `src/app/(app)/settings/page.tsx`
-each call `useIsDemo()` and pass `demo` into their props-taking component,
-following the route-owns-the-hooks split every other route uses. On
-`/settings`, the danger-zone delete button and the currency control are both
-gated; sign-out is not, because signing out of the demo is the one write-shaped
-thing a visitor genuinely needs.
+Each is a few lines: import the fixture, render the screen. Writes are not
+wired. Where a screen requires a handler prop, pass one that surfaces a
+`sonner` toast saying the demo is read-only — silence would read as a bug.
 
-- [ ] **Step 10: Write the SECURITY DEFINER guard test**
+- [ ] **Step 5: Point the landing CTAs at `/demo/dashboard`**
 
-The M5 ledger records that `delete_own_account()` shipped as SECURITY DEFINER
-with no `is_demo()` guard, and that SECURITY DEFINER bypasses RLS entirely — so
-a demo visitor clicking Delete account would have destroyed the shared demo and
-cascaded through every user-owned table. It was caught by hand. This turns that
-catch into something CI does.
+Plain `Link`s. `DemoSignInButton` from the old plan is not built.
 
-```ts
-// supabase/__tests__/securityDefiner.test.ts
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { describe, it, expect } from 'vitest'
+- [ ] **Step 6: Keep the SECURITY DEFINER audit, reframed**
 
-const DIR = 'supabase/migrations'
+`supabase/__tests__/securityDefiner.test.ts` survives this rewrite, but its
+justification changes and the plan must not leave the old one in place.
 
-/**
- * SECURITY DEFINER functions that have been reviewed and need no demo guard,
- * with the reason. Anything else that defines one and writes data must guard
- * against is_demo(), because a SECURITY DEFINER function runs as its owner and
- * never consults RLS -- the demo_block_* policies cannot protect it.
- */
-const REVIEWED_WITHOUT_GUARD: Record<string, string> = {
-  '20260825043057_add_demo_accounts.sql':
-    'defines is_demo() itself, which cannot guard itself, and writes no data',
-}
+It was written to protect a shared demo account from writes. There is no
+shared demo account now — but the underlying defect is not about demos at all:
+a `SECURITY DEFINER` function bypasses RLS by definition, so one missing its
+guard is a hole for **every** user, not just a demo one. M5 found exactly that
+in `delete_own_account`, and found `anon` holding EXECUTE on it through
+Supabase's default grants. The test asserts that every `SECURITY DEFINER`
+function either guards its caller or is not executable by `anon`.
 
-describe('SECURITY DEFINER migrations', () => {
-  const files = readdirSync(DIR).filter((f) => f.endsWith('.sql'))
-  const definers = files.filter((f) => /SECURITY\s+DEFINER/i.test(readFileSync(join(DIR, f), 'utf8')))
+**Also decide what happens to the old demo machinery.** `is_demo()` in the
+database and `src/services/demoMode.ts` in the app were built for the shared
+account. With the demo moved to `/demo/*` they may have no remaining caller.
+**Do not delete them as part of this task.** Grep for callers, report what is
+found, and let Gabe decide — a security guard removed on the assumption it is
+unused is the worst possible thing to be wrong about.
 
-  it('finds the SECURITY DEFINER migrations at all', () => {
-    // Positive companion: without this, a broken glob would make every
-    // assertion below pass over an empty list.
-    expect(definers.length).toBeGreaterThanOrEqual(2)
-    expect(definers).toContain('20260828090000_add_delete_own_account_rpc.sql')
-  })
+- [ ] **Step 7: README**
 
-  it('guards every data-writing SECURITY DEFINER function against demo accounts', () => {
-    for (const file of definers) {
-      if (file in REVIEWED_WITHOUT_GUARD) continue
-      const sql = readFileSync(join(DIR, file), 'utf8')
-      expect(sql, `${file}: SECURITY DEFINER with no public.is_demo() guard`).toMatch(/is_demo\(\)/)
-    }
-  })
-
-  it('guards them against unauthenticated callers too', () => {
-    for (const file of definers) {
-      if (file in REVIEWED_WITHOUT_GUARD) continue
-      const sql = readFileSync(join(DIR, file), 'utf8')
-      expect(sql, `${file}: no auth.uid() IS NULL guard`).toMatch(/auth\.uid\(\)\s+IS\s+NULL/i)
-    }
-  })
-})
-```
-
-- [ ] **Step 11: Run it and confirm it passes against the current migrations**
-
-Run: `npx vitest run supabase/__tests__/securityDefiner.test.ts`
-Expected: PASS — `20260828090000` already carries both guards, added under
-Gabe's decision during M5 Task 9.
-
-Then prove it has teeth: temporarily delete the `public.is_demo()` line from
-`20260828090000`, run again, watch the second test go red, restore, confirm
-green and `git diff --stat` clean. A gate that has never been seen to fail is
-not a gate.
-
-- [ ] **Step 12: Seed the demo account and register it**
-
-**Order matters and reversing it silently fails every insert.** The seed script
-signs in as the demo user and writes as that user, so RLS applies exactly as it
-will for a visitor — which means the account must not yet be in
-`demo_accounts` when it runs.
-
-1. Create the demo auth user in the Supabase dashboard, auto-confirmed.
-   Project must be `somyuulytwgzltiboewm`; verify with
-   `supabase projects list` before touching anything.
-2. Put `DEMO_USER_EMAIL` and `DEMO_USER_PASSWORD` in `.env` (not `.env.example`,
-   and never committed).
-3. `npm run seed:demo`
-   Expected output: `Inserting 27 applications...` through
-   `Done. Seeded 27 applications for <email>.` plus the `insert into
-   public.demo_accounts …` line with the real user id.
-4. Run that printed SQL against the project. The account is now read-only.
-5. Put the same user id in `NEXT_PUBLIC_DEMO_USER_IDS` locally and in the
-   Vercel project's environment variables.
-
-Then verify the boundary rather than assuming it — the M5 ledger's closing
-lesson is that reading the file proved the guard existed in source while
-querying the live catalog found a privilege the file could not have shown:
-
-```sql
--- as the demo user, expect a policy violation, not a success
-insert into public.jobs (user_id, company, role, status) values (auth.uid(), 'x', 'y', 'wishlist');
-select public.is_demo();  -- expect true
-```
-
-Also confirm `supabase migration list --linked` shows local == remote. The
-Global Constraint requires it after every milestone and M5 closed with it met;
-M6 adds no migrations, so it should still hold.
-
-- [ ] **Step 13: Deal with the seeded CV's `structured` mode**
-
-The demo CV is seeded with `mode: 'structured'`. `resumeService.normalizeMode`
-settles that to `word`, and the M5 ledger records that opening such a row in
-the Word editor and letting autosave fire rewrites `mode` and `content` and
-orphans `sections`. On the demo account RLS refuses the write, so nothing is
-lost — but the visitor sees a Word editor holding a starter template and an
-autosave that keeps failing, which is a bad first impression of the CV builder
-and reads as a bug.
-
-Ruling: **change the seed to `mode: 'word'` with real `content`**, and keep
-`sections` for the ATS panel. That is a two-line change in
-`scripts/demoSeedData.mjs`, it makes the demo show the editor actually working,
-and it sidesteps a latent data-loss path rather than relying on RLS to mask it.
-Fixing `normalizeMode` properly is the structured editor's job (roadmap 1.7 /
-M2 2.5) and stays parked.
-
-Re-run the seed after the change (remove from `demo_accounts`, seed, add back).
-
-- [ ] **Step 14: Build the one-click demo front door**
-
-Write the failing test first:
-
-```tsx
-// src/components/landing/__tests__/DemoSignInButton.test.tsx
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-
-const push = vi.fn()
-const signIn = vi.fn()
-vi.mock('next/navigation', () => ({ useRouter: () => ({ push, replace: vi.fn() }) }))
-vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({ user: null, session: null, loading: false, signIn, signUp: vi.fn(), signOut: vi.fn() }),
-}))
-vi.mock('@/lib/env', async (orig) => {
-  const actual = await orig<typeof import('@/lib/env')>()
-  return {
-    ...actual,
-    runtimeFlags: {
-      ...actual.runtimeFlags,
-      demoEmail: 'demo@worktrack.app',
-      demoPassword: 'published-on-purpose',
-    },
-  }
-})
-
-import { DemoSignInButton } from '../DemoSignInButton'
-
-beforeEach(() => vi.clearAllMocks())
-
-describe('the demo sign-in button', () => {
-  it('signs the visitor in and lands them on the dashboard in one click', async () => {
-    signIn.mockResolvedValue(undefined)
-    render(<DemoSignInButton>try the live demo</DemoSignInButton>)
-    await userEvent.click(screen.getByRole('button', { name: 'try the live demo' }))
-    expect(signIn).toHaveBeenCalledWith('demo@worktrack.app', 'published-on-purpose')
-    expect(push).toHaveBeenCalledWith('/dashboard')
-  })
-
-  it('says it is working rather than looking dead during the round trip', async () => {
-    let release: () => void = () => {}
-    signIn.mockImplementation(() => new Promise<void>((r) => { release = () => r() }))
-    render(<DemoSignInButton>try the live demo</DemoSignInButton>)
-    const button = screen.getByRole('button', { name: 'try the live demo' })
-    await userEvent.click(button)
-    expect(button).toBeDisabled()
-    expect(screen.getByText('Opening the demo')).toBeInTheDocument()
-    release()
-  })
-
-  it('explains a failure in place and stays clickable', async () => {
-    // A dead primary CTA on the landing page is the worst possible failure on
-    // the most-visited path in the portfolio.
-    signIn.mockRejectedValue(new Error('Failed to fetch'))
-    render(<DemoSignInButton>try the live demo</DemoSignInButton>)
-    const button = screen.getByRole('button', { name: 'try the live demo' })
-    await userEvent.click(button)
-    expect(await screen.findByText(/could not open the demo/i)).toBeInTheDocument()
-    expect(button).toBeEnabled()
-    expect(push).not.toHaveBeenCalled()
-  })
-})
-
-describe('the demo sign-in button when the demo is not configured', () => {
-  it('does not render a button that cannot work', async () => {
-    // Positive companion below: proves the component renders SOMETHING, so
-    // this is not a component that renders nothing in every case.
-    vi.resetModules()
-    vi.doMock('@/lib/env', async (orig) => {
-      const actual = await orig<typeof import('@/lib/env')>()
-      return { ...actual, runtimeFlags: { ...actual.runtimeFlags, demoEmail: '', demoPassword: '' } }
-    })
-    const { DemoSignInButton: Unconfigured } = await import('../DemoSignInButton')
-    render(<Unconfigured>try the live demo</Unconfigured>)
-    expect(screen.queryByRole('button', { name: 'try the live demo' })).toBeNull()
-    expect(screen.getByRole('link', { name: 'create account' })).toHaveAttribute('href', '/signup')
-    vi.doUnmock('@/lib/env')
-  })
-})
-```
-
-Run: `npx vitest run src/components/landing/__tests__/DemoSignInButton.test.tsx`
-Expected: FAIL — `Failed to resolve import "../DemoSignInButton"`.
-
-Then write it. `DemoSignInButton` renders `Button` from `@/components/ui/button`
-(no new styling), calls `signIn(runtimeFlags.demoEmail, runtimeFlags.demoPassword)`,
-pushes `/dashboard` on success, and on failure sets a message rendered next to
-the button. It disables itself only while the call is in flight and re-enables
-in a `finally`. When `demoEmail` or `demoPassword` is empty it degrades to the
-`create account` link rather than offering a control that cannot work — a
-build without the env vars is a real deployment state, not a hypothetical.
-
-Then replace the two CTAs from Task 2: the hero's `try the live demo` and the
-navbar's `open the demo` become `DemoSignInButton` with `variant="primary"` and
-`variant="secondary"` respectively, keeping the same visible text and the same
-`data-variant` values. **Update Task 2's two assertions** in
-`Landing.test.tsx` from `getByRole('link', …)` to `getByRole('button', …)` and
-drop the `href` checks on those two — the element changed, so the test changes
-with it. `create account` stays a `<Link>` to `/signup` and its assertion is
-untouched.
-
-- [ ] **Step 15: Decide what a demo visitor sees in the danger zone**
-
-`/settings` carries a Delete account button. For a demo visitor it must never
-reach the RPC, and if it somehow does, the refusal must read as an explanation
-rather than a crash. Two layers, because the first is an affordance and the
-second is the boundary:
-
-```tsx
-// in SettingsPage's danger zone, gated on the `demo` prop from useIsDemo()
-{demo ? (
-  <p className="text-body-s text-text-muted">
-    This is the shared demo account, so it cannot be deleted.{' '}
-    <Link href="/signup" className="underline">Create your own account</Link> to
-    try this.
-  </p>
-) : (
-  <Button variant="secondary" size="s" onClick={onDeleteAccount}>Delete account</Button>
-)}
-```
-
-Prose replacing the control, not a disabled button with a tooltip: a disabled
-destructive control invites a visitor to hunt for why it is disabled, and the
-answer here is genuinely interesting and worth just saying.
-
-The second layer covers the case the affordance cannot: if
-`NEXT_PUBLIC_DEMO_USER_IDS` is unset on a deploy, `useIsDemo()` is `false`, the
-button renders, and the RPC fires. `delete_own_account()` raises
-`insufficient_privilege` — Postgres error code `42501` — from the `is_demo()`
-guard added in `20260828090000`. Map it:
-
-```ts
-// src/app/(app)/settings/page.tsx, in the delete handler's error branch
-const isDemoRefusal =
-  (error as { code?: string })?.code === '42501' ||
-  /insufficient_privilege|demo/i.test(error.message)
-
-showError(
-  isDemoRefusal ? 'The demo account cannot be deleted' : 'Could not delete your account',
-  isDemoRefusal
-    ? 'This is the shared demo everyone uses. Create your own account to try this.'
-    : error.message
-)
-```
-
-Write the failing test for the mapping before the mapping:
-
-```tsx
-// append to src/app/(app)/settings/__tests__/page.test.tsx
-it('explains the demo refusal instead of showing a raw Postgres error', async () => {
-  // The single most-visited path in the portfolio. A generic failure toast
-  // reading "insufficient_privilege" is not an acceptable thing for a
-  // reviewer to meet there.
-  supabaseRpc.mockResolvedValue({
-    error: { code: '42501', message: 'permission denied: demo accounts cannot be deleted' },
-  })
-  render(<Page />)
-  await userEvent.click(screen.getByRole('button', { name: 'Delete account' }))
-  expect(await screen.findByText('The demo account cannot be deleted')).toBeInTheDocument()
-  expect(screen.queryByText(/insufficient_privilege/)).toBeNull()
-})
-
-it('still surfaces a real failure for a normal account', async () => {
-  // Positive companion: proves the branch above is a branch, not a blanket
-  // rewrite that would now swallow every genuine deletion error.
-  supabaseRpc.mockResolvedValue({ error: { code: '08006', message: 'connection failure' } })
-  render(<Page />)
-  await userEvent.click(screen.getByRole('button', { name: 'Delete account' }))
-  expect(await screen.findByText('Could not delete your account')).toBeInTheDocument()
-  expect(screen.getByText('connection failure')).toBeInTheDocument()
-})
-```
-
-Read the existing `settings/__tests__/page.test.tsx` for how it mocks
-`supabase.rpc` before writing `supabaseRpc` — M5 Task 9 built that file and its
-mock shape is not guessed here.
-
-- [ ] **Step 16: Run the whole suite and the typecheck**
-
-```bash
-npx vitest run
-npx tsc --noEmit
-rm -rf .next && npm run build
-```
-
-- [ ] **Step 17: Commit**
-
-```bash
-git add src/lib/env.ts src/lib/__tests__/env.test.ts src/hooks/useIsDemo.ts \
-  src/hooks/__tests__/useIsDemo.test.tsx src/components/shell supabase/__tests__ \
-  "src/app/(app)/applications/page.tsx" "src/app/(app)/settings/page.tsx" \
-  src/components/settings/SettingsPage.tsx src/components/landing \
-  scripts/demoSeedData.mjs .env.example
-git commit -m "feat: one-click demo sign-in, read-only affordances, and a SECURITY DEFINER gate"
-```
-
-Then check nothing was left behind — `git commit -- <pathspec>` does not pick
-up untracked files, which caught M5 out once:
-
-Run: `git status --short`
-Expected: clean.
-
----
+The demo is a URL. Say so, say the data is invented and read-only, and delete
+the credentials runbook, which now documents a thing that does not exist.
 
 ### Task 7: README rewrite, and the milestone gates
 
@@ -3559,7 +3060,7 @@ git commit -m "docs: rewrite the README against what the app actually is"
 | 6.2 — one focused field at a time; reveal control anchored to the field edge | **Already solved in M4.** Recorded in the Current-state table; Task 4 reuses `Input`/`PasswordInput` and its test proves the reveal works. |
 | 6.3 — custom 404 with recovery links; privacy page | 5 |
 | 6.4 — seeded read-only account, banner, write controls disabled | 6 |
-| 6.4 — the demo's front door | **Settled: one click.** Task 6 Steps 14–15 — `DemoSignInButton`, public-by-design credentials, and a demo-aware danger zone. |
+| 6.4 — the demo's front door | **Settled: one click, to `/demo/dashboard`.** Task 6, rewritten 2026-09-02 as a public route space over a fixture. No sign-in, no credentials, no session. |
 | 6.4 — `is_demo()` is enforced in RLS; SECURITY DEFINER bypasses RLS | 6 (Steps 10–11, the CI gate) |
 | 6.5 — README rewrite with live link and screenshots | 7 |
 | 6.5 — credit Skiper UI in README and landing footer, with upstreams | 1 (Steps 11–14), 2 (Step 4) |
@@ -3657,7 +3158,16 @@ Recorded after M5.5 merged (PR #1, plus the seven follow-up commits merged as
 2. **shadcn components are required on every new page**, not merely available.
    → the *shadcn components per M6 page* table, which now names the components
    per section and carries a grep to catch hand-rolled equivalents.
-3. **Social proof must be true.** → the locked decision inside Task 2. This
+3. **`/` is the homepage; the demo lives at `/demo/<page-name>`.** → **Task 6**,
+   rewritten as a public URL space rendering the app screens over a fixture
+   (`/demo/dashboard`, `/demo/applications`, `/demo/analytics`,
+   `/demo/calendar`, `/demo/documents`). Nobody signs in. This deleted more
+   work than it added: no published credentials, no RESTRICTIVE demo policies,
+   no write-gating on five screens, no reseed runbook, and no way for a
+   stranger to vandalise the demo — the data is a fixture in the repo. It also
+   ANSWERED the open question this plan had carried since 2026-08-28, because a
+   signed-in visitor opening the demo no longer loses their session.
+4. **Social proof must be true.** → the locked decision inside Task 2. This
    project has no users, so the section shows only what a visitor can verify
    in a minute — the repository, the commit history, the test suite, the
    stack — and the plan forbids testimonials, invented user counts and logo
@@ -3681,10 +3191,10 @@ the tail does not mistake a decision for a live question.
    conflict cannot arise, so there is no touch-arbitration path anywhere, and
    `carouselOptionsFor` now keys on one `scrollDriven` question instead of
    branching per condition.
-3. **The demo front door is one click.** → **Task 6**, as `DemoSignInButton`,
-   with the credentials published on purpose in `NEXT_PUBLIC_DEMO_*` and said
-   out loud in three places, and with the danger zone answering a demo visitor
-   in prose rather than a generic failure toast.
+3. **The demo front door is one click.** → **Task 6**. Still one click, but
+   **superseded on 2026-09-02**: it links to `/demo/dashboard` instead of
+   signing the visitor in, so `DemoSignInButton`, the `NEXT_PUBLIC_DEMO_*`
+   credentials and the demo-aware danger zone are all no longer built.
 
 ## Open questions for Gabe
 
@@ -3692,7 +3202,7 @@ Decisions the roadmap does not settle, listed rather than settled unilaterally.
 
 1. **Do `skiper4` and `skiper26` get credited?** Neither ships. By the roadmap's own reference-only rule they carry no obligation, and the same line already keeps CVJunction out of the attribution list. This plan credits them in prose as influences (`toggles.dev` / Alfie Jones, `rudrodip/theme-toggle-effect`) while keeping them out of `SKIPER_ATTRIBUTION`, which is the licence-obligation list. If you would rather they were in the obligation list, it is one line in `src/lib/attribution.ts` and two in the README — but then the test asserts a credit for source that is not in the repo, which is a slightly dishonest gate.
 
-2. **Should `/` still redirect signed-in visitors to `/dashboard`?** Today it redirects everyone. This plan makes `/` always render the landing page, on the argument that the landing page is the artefact a reviewer is meant to see and hiding it from the only person with an account is backwards. The alternative — read the session and redirect — makes the landing route dynamic, costs its static render, and means the page you are building for strangers is one you can never casually look at. Reversible either way, one file. Now slightly weightier than when first asked: with the one-click demo button settled, a signed-in visitor who lands on `/` and clicks `try the live demo` would be signed out of their own account and into the demo. Task 6's button should probably say something different when a session already exists, or the redirect answers it for free.
+2. ~~**Should `/` still redirect signed-in visitors to `/dashboard`?**~~ **Answered 2026-09-02: no. `/` is the homepage for everyone.** Gabe decided it, and moving the demo to `/demo/*` removed what made it fraught — a signed-in visitor clicking "try the demo" now opens a page rather than swapping their session, so there is no longer a case where the landing page's own CTA logs someone out. `src/app/page.tsx` renders `Landing` unconditionally.
 
 3. **Does the smooth-caret input go on password fields too?** This plan uses `SmoothInput` for email and M4's `PasswordInput` for both password fields. On a masked field there is no visible caret to smooth, and skiper106's redrawn caret would have to share a box with `PasswordInput`'s absolutely-positioned reveal control. If you want the smooth caret on password fields, it needs `SmoothInput` and the reveal control merged into one component, which is a real piece of work and its own task.
 
