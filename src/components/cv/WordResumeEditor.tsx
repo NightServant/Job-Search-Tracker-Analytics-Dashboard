@@ -14,10 +14,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
-import { TemplatePresetSelector } from './TemplatePresetSelector'
 import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
-import type { ResumeTemplate } from '@/services/resumeTemplateService'
 import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeService'
 import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 
@@ -306,15 +304,12 @@ export function WordResumeEditor({
     info('Template reset', 'The editor has been reset to the starter template.')
   }
 
-  const applyTemplate = (template: ResumeTemplate) => {
-    if (template.mode !== 'word' || (template.content as { type?: string }).type === 'latex') {
-      showError('Invalid template', 'Cannot apply LaTeX template to Word editor')
-      return
-    }
-    editor?.commands.setContent(template.content as JSONContent)
-    markDirty()
-    success('Template applied', `"${template.name}" template has been applied.`)
-  }
+  // applyTemplate and its dropdown are gone. Templates are chosen on
+  // /documents now, before the document exists, at Gabe's instruction. In the
+  // editor the action was destructive dressed as a preset -- it REPLACED
+  // whatever was on screen, from a control sitting between `reset` and `save`
+  // in the same toolbar. `reset` still restores the starter content, which is
+  // the one in-editor case that is genuinely a reset rather than a swap.
 
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'doc') {
@@ -342,7 +337,6 @@ export function WordResumeEditor({
         {user && (
           <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
         )}
-        <TemplatePresetSelector mode="word" onSelect={applyTemplate} />
         <Button variant="secondary" size="s" onClick={resetTemplate} disabled={!editor}>
           <RotateCcwIcon size={14} aria-hidden />
           reset

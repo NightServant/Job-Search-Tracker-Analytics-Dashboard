@@ -10,7 +10,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
-import { TemplatePresetSelector } from './TemplatePresetSelector'
 import {
   DEFAULT_LATEX_SOURCE,
   buildLatexPreviewHtml,
@@ -18,7 +17,6 @@ import {
   normalizeLatexSource,
 } from './content'
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
-import type { ResumeTemplate } from '@/services/resumeTemplateService'
 import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeService'
 
 /**
@@ -270,14 +268,8 @@ export function LatexResumeEditor({
     info('Template reset', 'The editor has been reset to the starter template.')
   }
 
-  const applyTemplate = (template: ResumeTemplate) => {
-    if (template.mode !== 'latex' || (template.content as { type?: string }).type !== 'latex') {
-      showError('Invalid template', 'Cannot apply Word template to LaTeX editor')
-      return
-    }
-    setSource((template.content as { source: string }).source)
-    success('Template applied', `"${template.name}" template has been applied.`)
-  }
+  // applyTemplate and its dropdown are gone -- templates are chosen on
+  // /documents now, before the document exists. See WordResumeEditor for why.
 
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'latex') {
@@ -301,7 +293,6 @@ export function LatexResumeEditor({
         {user && (
           <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
         )}
-        <TemplatePresetSelector mode="latex" onSelect={applyTemplate} />
         <Button variant="secondary" size="s" onClick={resetTemplate}>
           <RotateCcwIcon size={14} aria-hidden />
           reset
