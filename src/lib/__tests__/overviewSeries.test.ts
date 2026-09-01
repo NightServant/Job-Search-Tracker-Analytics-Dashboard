@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { applicationsPerMonth, statusBreakdown, sourceBreakdown } from '../overviewSeries'
+import {
+  applicationsPerMonth,
+  statusBreakdown,
+  sourceBreakdown,
+  rankedSources,
+} from '../overviewSeries'
 import { makeJob } from '@/test/fixtures'
 import { STATUSES } from '@/components/ui/status-marker'
 
@@ -97,5 +102,60 @@ describe('sourceBreakdown', () => {
       source: `src-${i}`,
     }))
     expect(sourceBreakdown(jobs, 4)).toHaveLength(4)
+  })
+})
+
+describe('rankedSources', () => {
+  const from = (sources: string[]) =>
+    sources.map((source, i) => makeJob({ id: `j${i}`, status: 'applied', source }))
+
+  it('names the top two and collapses the rest into one others row', () => {
+    // Gabe's shape: a job search has one or two channels that work and a tail
+    // that does not. Six equal rows made the reader do the ranking themselves.
+    const jobs = from([
+      'Jobstreet', 'Jobstreet', 'Jobstreet',
+      'LinkedIn', 'LinkedIn',
+      'Indeed',
+      'Referral',
+    ])
+    const ranked = rankedSources(jobs)
+    expect(ranked.map((r) => [r.rank, r.source, r.count])).toEqual([
+      ['primary', 'Jobstreet', 3],
+      ['secondary', 'LinkedIn', 2],
+      ['tertiary', 'others', 2],
+    ])
+    // The others row stands for more than one source, and says how many.
+    expect(ranked[2].sources).toBe(2)
+    expect(ranked[0].sources).toBe(1)
+  })
+
+  it('does not invent an others row when there is no tail', () => {
+    // "others 0" is a claim about nothing.
+    expect(rankedSources(from(['Jobstreet', 'LinkedIn'])).map((r) => r.rank)).toEqual([
+      'primary',
+      'secondary',
+    ])
+    expect(rankedSources(from(['Jobstreet'])).map((r) => r.rank)).toEqual(['primary'])
+  })
+
+  it('shares add up to the whole, so the tail is never silently dropped', () => {
+    const jobs = from(['A', 'A', 'B', 'C', 'D'])
+    const ranked = rankedSources(jobs)
+    expect(ranked.reduce((sum, r) => sum + r.count, 0)).toBe(jobs.length)
+    expect(Math.round(ranked.reduce((sum, r) => sum + r.share, 0))).toBe(100)
+  })
+
+  it('counts an unlabelled source rather than discarding it', () => {
+    // "where did these come from" is answered badly by excluding the ones you
+    // never labelled.
+    const jobs = [
+      makeJob({ id: 'a', status: 'applied', source: 'Jobstreet' }),
+      makeJob({ id: 'b', status: 'applied', source: null }),
+    ]
+    expect(rankedSources(jobs).map((r) => r.source)).toEqual(['Jobstreet', 'unknown'])
+  })
+
+  it('returns nothing at all rather than a zero row for an empty list', () => {
+    expect(rankedSources([])).toEqual([])
   })
 })

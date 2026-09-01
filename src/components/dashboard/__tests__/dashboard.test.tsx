@@ -224,6 +224,93 @@ describe('by status and by source internals', () => {
     )
     const legend = container.querySelector('[data-source-legend]')!
     expect(legend.className).toContain('min-w-0')
-    expect(legend.querySelector('li span:nth-child(2)')!.className).toContain('truncate')
+    const name = [...legend.querySelectorAll('span')].find((el) =>
+      el.textContent?.includes('A Very Long Job Board Name')
+    )!
+    expect(name.className).toContain('truncate')
+    expect(name.className).toContain('min-w-0')
+  })
+})
+
+describe('over-time statistics and source ranking on the Overview', () => {
+  it('states the total, the busiest month and the change the curve only implies', () => {
+    // A curve answers "what shape" and is poor at "how many": reading a total
+    // off six stacked areas means adding them up by eye.
+    const { container } = render(
+      <Dashboard
+        jobs={[
+          makeJob({ id: '1', status: 'applied', created_at: '2026-08-01T00:00:00Z' }),
+          makeJob({ id: '2', status: 'applied', created_at: '2026-08-02T00:00:00Z' }),
+          makeJob({ id: '3', status: 'applied', created_at: '2026-07-02T00:00:00Z' }),
+        ]}
+      />
+    )
+    const stats = container.querySelector('[data-over-time-stats]')!
+    expect(stats.textContent).toMatch(/total/i)
+    expect(stats.textContent).toMatch(/busiest month/i)
+    // "month on month", not "vs last month": the figure skips the month in
+    // progress, which has had less time to accumulate than anything it would
+    // be compared against. -100% on the first of every month is true and
+    // tells the reader nothing except what day it is.
+    expect(stats.textContent).toMatch(/month on month/i)
+    // Rules between the figures, drawn by divide-x on the row so there is no
+    // trailing rule after the last one.
+    expect(stats.className).toContain('divide-x')
+  })
+
+  it('writes a dash rather than a percentage against zero', () => {
+    // +100% "against" a month with nothing in it is not a percentage, and
+    // Infinity is worse.
+    const { container } = render(
+      <Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />
+    )
+    const stats = container.querySelector('[data-over-time-stats]')!
+    expect(stats.textContent).not.toMatch(/Infinity|NaN/)
+  })
+
+  it('labels the source rows primary, secondary and others', () => {
+    const { container } = render(
+      <Dashboard
+        jobs={[
+          // Counts are 3 / 2 / 1, deliberately unambiguous: on a tie the
+          // ranking breaks alphabetically, so equal counts would make which
+          // source is "secondary" a property of its name.
+          makeJob({ id: '1', status: 'applied', source: 'Jobstreet' }),
+          makeJob({ id: '2', status: 'applied', source: 'Jobstreet' }),
+          makeJob({ id: '3', status: 'applied', source: 'Jobstreet' }),
+          makeJob({ id: '4', status: 'applied', source: 'LinkedIn' }),
+          makeJob({ id: '5', status: 'applied', source: 'LinkedIn' }),
+          makeJob({ id: '6', status: 'applied', source: 'Indeed' }),
+        ]}
+      />
+    )
+    const rows = [...container.querySelectorAll('[data-source-rank]')]
+    expect(rows.map((r) => (r as HTMLElement).dataset.sourceRank)).toEqual([
+      'primary',
+      'secondary',
+      'tertiary',
+    ])
+    expect(rows[0].textContent).toContain('Jobstreet')
+    expect(rows[1].textContent).toContain('LinkedIn')
+    // The tail is named `others` and says how many sources it stands for, so
+    // it reads as a tail rather than as a source called "others".
+    expect(rows[2].textContent).toContain('others')
+    expect(rows[2].textContent).toMatch(/1 source\b/)
+  })
+
+  it('draws no others row when every source is already named', () => {
+    const { container } = render(
+      <Dashboard
+        jobs={[
+          makeJob({ id: '1', status: 'applied', source: 'Jobstreet' }),
+          makeJob({ id: '2', status: 'applied', source: 'LinkedIn' }),
+        ]}
+      />
+    )
+    const rows = [...container.querySelectorAll('[data-source-rank]')]
+    expect(rows.map((r) => (r as HTMLElement).dataset.sourceRank)).toEqual([
+      'primary',
+      'secondary',
+    ])
   })
 })

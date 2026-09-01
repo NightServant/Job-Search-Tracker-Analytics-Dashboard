@@ -19,7 +19,7 @@ import { SourceMix } from './SourceMix'
 import { UpcomingEvents } from './UpcomingEvents'
 import { RecentApplicationsTable } from './RecentApplicationsTable'
 import { getStaleApplications } from '@/services/followUp'
-import { applicationsPerMonth, statusBreakdown, sourceBreakdown } from '@/lib/overviewSeries'
+import { applicationsPerMonth, statusBreakdown, rankedSources } from '@/lib/overviewSeries'
 import type { CalendarEvent } from '@/services/events'
 import type { Job } from '@/types'
 
@@ -106,7 +106,7 @@ export function Dashboard({
 
   const trend = React.useMemo(() => applicationsPerMonth(jobs, TREND_MONTHS), [jobs])
   const statuses = React.useMemo(() => statusBreakdown(jobs), [jobs])
-  const sources = React.useMemo(() => sourceBreakdown(jobs), [jobs])
+  const sources = React.useMemo(() => rankedSources(jobs), [jobs])
   const companyByJobId = React.useMemo(
     () => Object.fromEntries(jobs.map((job) => [job.id, job.company])),
     [jobs]
@@ -188,7 +188,7 @@ export function Dashboard({
             <CardTitle>
               <h2>by source</h2>
             </CardTitle>
-            <CardDescription>which boards and referrals your applications came from.</CardDescription>
+            <CardDescription>your best channel, the runner-up, and the tail behind them.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <SourceMix data={sources} />

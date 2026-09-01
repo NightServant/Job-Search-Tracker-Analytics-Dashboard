@@ -30,6 +30,12 @@ export interface StatusDonutProps {
  * as tall and the legend sits at the ring's own eye level. It collapses back to
  * one column below `sm`, where two 150px columns would truncate every label.
  *
+ * The ring is sized as a proportion of its column rather than at a fixed 176px
+ * -- Gabe asked for it larger, and a fixed square would sit small in the middle
+ * of a card that grows. Radii are percentages for the same reason: at fixed
+ * 54/80 the ring would keep its original thickness inside a bigger box and
+ * read as a thin hoop.
+ *
  * This is shadcn's `chart-pie-donut-text` and the match is structural, not an
  * approximation: `<Pie innerRadius>` plus a centred `<Label>` rendering a value
  * and a caption is exactly what Figma nodes 23:84/23:85 draw.
@@ -54,15 +60,25 @@ export function StatusDonut({ data }: StatusDonutProps) {
 
   return (
     <div className="grid flex-1 items-center gap-4 sm:grid-cols-2">
-      <ChartContainer config={CONFIG} className="mx-auto aspect-square h-44" data-chart-donut>
+      {/* Enlarged at Gabe's request. `w-full` with a max rather than a fixed
+          h-44: the ring now takes whatever its grid column gives it, so it
+          grows with the card instead of sitting small in the middle of it,
+          and the max stops it outgrowing the legend beside it on a wide
+          screen. The radii are proportions of that, not the old fixed 54/80,
+          or the ring would keep its original thickness inside a larger box. */}
+      <ChartContainer
+        config={CONFIG}
+        className="mx-auto aspect-square w-full max-w-64"
+        data-chart-donut
+      >
         <PieChart>
           <ChartTooltip content={<ChartTooltipContent nameKey="label" hideLabel />} />
           <Pie
             data={slices}
             dataKey="count"
             nameKey="label"
-            innerRadius={54}
-            outerRadius={80}
+            innerRadius="62%"
+            outerRadius="94%"
             strokeWidth={0}
             isAnimationActive={!reducedMotion}
           >
@@ -74,13 +90,13 @@ export function StatusDonut({ data }: StatusDonutProps) {
                     <tspan
                       x={viewBox.cx}
                       y={viewBox.cy}
-                      className="tabular fill-text-primary text-heading-l"
+                      className="tabular fill-text-primary text-display-m"
                     >
                       {total}
                     </tspan>
                     <tspan
                       x={viewBox.cx}
-                      y={(viewBox.cy ?? 0) + 20}
+                      y={(viewBox.cy ?? 0) + 24}
                       className="fill-text-muted text-body-s"
                     >
                       total
