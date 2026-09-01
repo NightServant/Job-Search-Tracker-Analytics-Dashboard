@@ -35,9 +35,17 @@ export interface SourceMixProps {
  * doughnut beside it — a second donut here would read as the same chart drawn
  * twice.
  *
- * The accent carries every arc, stepped in opacity by rank. A source is not a
- * status, so the five status hues would borrow a vocabulary that means
- * something specific elsewhere in this app.
+ * Each rank gets its own colour, from the `chart-1..3` series tokens. Stepped
+ * OPACITY of one accent was the previous version and Gabe rejected it: a
+ * single colour at three alphas is one colour, and against a tinted track the
+ * faintest step was nearly the track itself.
+ *
+ * The series tokens are three steps of the accent ramp rather than three hues.
+ * A source is not a status, so the five status hues would borrow a vocabulary
+ * that means something specific everywhere else in this app -- and inventing
+ * three new hues for one panel would put colours on screen that mean nothing
+ * anywhere else. The ramp inverts in dark so rank 1 stays the most prominent
+ * against its own ground.
  *
  * Three rows, not six: the busiest source, the runner-up, and everything else
  * as one `others`. Gabe's shape, and the point of it is that a job search has
@@ -62,16 +70,31 @@ const RANK_LABELS: Record<RankedSource['rank'], string> = {
   tertiary: 'tertiary',
 }
 
+/**
+ * Written out rather than indexed, the discipline `STAGE_FILL` and the status
+ * marker's `RULES` map already follow: these are raw CSS custom-property
+ * references, so a typo fails loudly and greps rather than silently drawing
+ * nothing.
+ */
+const RANK_FILL: Record<RankedSource['rank'], string> = {
+  primary: 'var(--color-chart-1)',
+  secondary: 'var(--color-chart-2)',
+  tertiary: 'var(--color-chart-3)',
+}
+
 export function SourceMix({ data }: SourceMixProps) {
   const reducedMotion = usePrefersReducedMotion()
 
   const max = React.useMemo(() => Math.max(1, ...data.map((d) => d.count)), [data])
   const arcs = React.useMemo(
     () =>
-      data.map((row, i) => ({
+      data.map((row) => ({
         ...row,
-        // Stepped, floored so the last arc never fades into the track.
-        fill: `color-mix(in oklab, var(--color-accent-default) ${Math.max(40, 100 - i * 28)}%, transparent)`,
+        // Keyed on RANK, not on index: the row's own identity decides its
+        // colour, so a two-source account and a five-source one give
+        // `primary` the same colour rather than reusing whatever index 0
+        // happened to be.
+        fill: RANK_FILL[row.rank],
       })),
     [data]
   )

@@ -314,3 +314,42 @@ describe('over-time statistics and source ranking on the Overview', () => {
     ])
   })
 })
+
+describe('source chart colours', () => {
+  const jobs = [
+    makeJob({ id: '1', status: 'applied', source: 'Jobstreet' }),
+    makeJob({ id: '2', status: 'applied', source: 'Jobstreet' }),
+    makeJob({ id: '3', status: 'applied', source: 'LinkedIn' }),
+    makeJob({ id: '4', status: 'applied', source: 'Indeed' }),
+  ]
+
+  it('gives each rank its own colour rather than one accent at three opacities', () => {
+    const { container } = render(<Dashboard jobs={jobs} />)
+    const swatches = [...container.querySelectorAll('[data-source-rank] span[aria-hidden]')].map(
+      (el) => (el as HTMLElement).style.background
+    )
+    expect(new Set(swatches).size).toBe(swatches.length)
+    // A single colour at three alphas is one colour, which is what Gabe
+    // rejected -- and against a tinted track the faintest step was nearly the
+    // track itself.
+    for (const swatch of swatches) {
+      expect(swatch).not.toMatch(/color-mix/)
+    }
+  })
+
+  it('never bakes a resolved colour in, and never borrows a status hue', () => {
+    // Always the token reference, so the browser resolves it live at paint --
+    // that is what lets the ramp invert on a theme change. And a source is
+    // not a status: the five status hues mean one specific thing everywhere
+    // else in this app.
+    const { container } = render(<Dashboard jobs={jobs} />)
+    const swatches = [...container.querySelectorAll('[data-source-rank] span[aria-hidden]')].map(
+      (el) => (el as HTMLElement).style.background
+    )
+    expect(swatches.length).toBe(3)
+    for (const swatch of swatches) {
+      expect(swatch).toMatch(/^var\(--color-chart-[123]\)$/)
+      expect(swatch).not.toMatch(/status/)
+    }
+  })
+})

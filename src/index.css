@@ -85,6 +85,18 @@
      stays quiet in both. */
   --color-accent-surface: var(--color-accent-100);
   --color-accent-on-surface: var(--color-accent-800);
+  /* Categorical series colours, for a chart whose categories are NOT
+     application statuses. The five status hues mean one specific thing
+     everywhere in this app, so a source, a channel or any other dimension
+     must not borrow them -- and a single accent at three opacities is one
+     colour, not three, which is what Gabe rejected on the source chart.
+
+     Three steps of the accent ramp: in-brand, genuinely distinct, and ordered
+     so series 1 is always the most prominent against its own ground. That
+     ordering INVERTS in dark, where the light steps are the visible ones. */
+  --color-chart-1: var(--color-accent-700);
+  --color-chart-2: var(--color-accent-500);
+  --color-chart-3: var(--color-accent-300);
 
   /* --- shadcn semantic aliases ----------------------------------------------
      shadcn components are copied into this tree and reference `bg-primary`,
@@ -252,6 +264,11 @@
      reads as a tinted surface rather than a slab of signal colour. */
   --color-accent-surface: var(--color-accent-900);
   --color-accent-on-surface: var(--color-accent-200);
+  /* Inverted: on a near-black ground the LIGHT steps read strongest, so
+     series 1 stays the most prominent rather than becoming the faintest. */
+  --color-chart-1: var(--color-accent-300);
+  --color-chart-2: var(--color-accent-500);
+  --color-chart-3: var(--color-accent-700);
 
   --color-status-wishlist-fill: var(--color-neutral-800);
   --color-status-applied-fill: var(--color-neutral-800);
