@@ -2,6 +2,8 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { scrollToSection } from '@/lib/scrollToSection'
 
 /**
  * The vertical progress rail down the side of the landing page.
@@ -10,6 +12,18 @@ import { cn } from '@/lib/utils'
  * through the page you are, it says which section you are in, and it lets you
  * jump. A long scrolling page without one asks the reader to hold their own
  * position in their head.
+ *
+ * THE THIRD JOB ONLY STARTED WORKING ON 2026-09-03. The dots were already
+ * anchors, and five of the six pointed at ids no element carried -- sections
+ * identified themselves with `data-landing-section` and nothing else, so the
+ * browser had nothing to jump to and did nothing. The FAQ dot worked by
+ * accident, being the one section that happened to set an id.
+ *
+ * Two halves to the fix. Section now derives a real `id` from its name, so the
+ * plain href works with JavaScript off. And the click is intercepted here to
+ * scroll SMOOTHLY and to resolve the target through `data-landing-section` --
+ * the same attribute that decides which dot is lit, so the dot you click and
+ * the dot that lights up cannot disagree about what a section is.
  *
  * PURELY PRESENTATIONAL, AND THAT IS DELIBERATE. It takes `progress` and
  * `activeId` and computes neither. Right now `Landing` derives them from page
@@ -67,6 +81,11 @@ export function SectionRail({
   progress,
   overHero = false,
 }: SectionRailProps) {
+  const prefersReducedMotion = usePrefersReducedMotion()
+
+  // Hooks before the early return. `sections` is a constant in practice, but
+  // an empty one must not change the hook order -- that is the rules-of-hooks
+  // violation this milestone already shipped once, in AppShell.
   if (sections.length === 0) return null
 
   return (
@@ -123,7 +142,32 @@ export function SectionRail({
                 data-rail-item={section.id}
                 data-active={active ? 'true' : undefined}
                 aria-current={active ? 'true' : undefined}
-                className="group flex items-center gap-3 outline-none"
+                onClick={(event) => {
+                  // Modified clicks belong to the browser: cmd/ctrl-click
+                  // opens a new tab, shift-click a window. Swallowing those
+                  // would make a link that is not a link.
+                  if (
+                    event.defaultPrevented ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                  ) {
+                    return
+                  }
+                  // preventDefault ONLY if the section was found. Otherwise the
+                  // native anchor still gets its chance, which is the whole
+                  // reason the href is still here.
+                  if (scrollToSection(section.id, { reducedMotion: prefersReducedMotion })) {
+                    event.preventDefault()
+                  }
+                }}
+                // `py-2 -my-2` grows a 7px dot into a 23px-tall click target
+                // without moving anything: the padding is cancelled by the
+                // negative margin, so the dot spacing the fill percentage is
+                // measured against is unchanged. A dot you have to aim at is
+                // not really clickable, which is half of what was reported.
+                className="group -my-2 flex items-center gap-3 py-2 outline-none"
               >
                 <span
                   aria-hidden

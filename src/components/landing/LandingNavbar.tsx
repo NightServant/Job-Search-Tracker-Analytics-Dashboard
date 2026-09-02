@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { scrollToSection } from '@/lib/scrollToSection'
 import { BrandLockup } from '@/components/ui/brand-mark'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { NAV_LINKS } from './content'
@@ -61,6 +63,8 @@ export interface LandingNavbarProps {
 }
 
 export function LandingNavbar({ overHero }: LandingNavbarProps) {
+  const prefersReducedMotion = usePrefersReducedMotion()
+
   return (
     <header
       data-landing-nav
@@ -138,6 +142,29 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
             key={link.label}
             href={link.href}
             {...(link.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+            {...(link.external
+              ? {}
+              : {
+                  // The same handler the rail uses, for the same two reasons:
+                  // the jump should glide rather than teleport, and it should
+                  // clear the bar this link is sitting in. `href` stays a real
+                  // anchor, so this is enhancement rather than replacement.
+                  onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
+                    if (
+                      event.defaultPrevented ||
+                      event.metaKey ||
+                      event.ctrlKey ||
+                      event.shiftKey ||
+                      event.altKey
+                    ) {
+                      return
+                    }
+                    const id = link.href.replace(/^#/, '')
+                    if (scrollToSection(id, { reducedMotion: prefersReducedMotion })) {
+                      event.preventDefault()
+                    }
+                  },
+                })}
             className={cn(
               'text-body-s transition-colors',
               overHero

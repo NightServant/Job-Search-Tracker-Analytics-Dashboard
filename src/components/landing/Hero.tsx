@@ -57,6 +57,7 @@ export interface HeroProps {
 export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
   return (
     <section
+      id="hero"
       data-landing-section="hero"
       className="relative isolate flex h-full min-h-[88svh] flex-col justify-center overflow-hidden px-5 pb-24 pt-32 md:px-8 md:pb-32 md:pt-40 lg:min-h-[92svh]"
     >

@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Landing } from '../Landing'
 import { SCREENS } from '../screens'
-import { FAQ, HERO, CLOSING_CTA } from '../content'
+import { FAQ, HERO, CLOSING_CTA, NAV_LINKS, RAIL_SECTIONS } from '../content'
 
 vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: 'light', setTheme: vi.fn() }),
@@ -42,12 +42,49 @@ describe('the landing page structure', () => {
     ])
   })
 
-  it('gives the two nav anchors real targets to jump to', () => {
-    // The nav links are in-page anchors. An anchor pointing at an id nothing
-    // carries is a link that silently does nothing.
+  it('gives every in-page nav anchor a real target to jump to', () => {
+    // An anchor pointing at an id nothing carries is a link that silently does
+    // nothing. Driven from NAV_LINKS rather than hard-coded, because the
+    // hard-coded version passed for a year while FIVE OF THE SIX RAIL DOTS
+    // pointed at ids nothing carried -- it only ever checked the two links it
+    // happened to name.
     const { container } = renderLanding()
-    expect(container.querySelector('#how-it-works')).not.toBeNull()
-    expect(container.querySelector('#faq')).not.toBeNull()
+    const internal = NAV_LINKS.filter((l) => !l.external)
+    expect(internal.length).toBeGreaterThan(0)
+    for (const link of internal) {
+      expect(
+        container.querySelector(link.href),
+        `nav link "${link.label}" points at ${link.href}, which nothing carries`
+      ).not.toBeNull()
+    }
+  })
+
+  it('gives every rail dot a real target too', () => {
+    // The reported bug, as a test. The rail linked to #hero, #social-proof,
+    // #problem, #solution and #cta; only the FAQ carried a matching id, so
+    // five of six dots did nothing when clicked.
+    const { container } = renderLanding()
+    expect(RAIL_SECTIONS.length).toBe(6)
+    for (const section of RAIL_SECTIONS) {
+      expect(
+        container.querySelector(`#${section.id}`),
+        `rail dot "${section.label}" points at #${section.id}, which nothing carries`
+      ).not.toBeNull()
+    }
+  })
+
+  it('keeps the rail id and the tracking attribute in one vocabulary', () => {
+    // The click resolves through data-landing-section and the highlight is
+    // computed from it. If a section's id and its data attribute drifted
+    // apart, the dot you click and the dot that lights up would be different
+    // sections -- the M5 sidebar/bottom-nav disagreement, again.
+    const { container } = renderLanding()
+    for (const section of RAIL_SECTIONS) {
+      const byId = container.querySelector(`#${section.id}`)
+      const byData = container.querySelector(`[data-landing-section="${section.id}"]`)
+      expect(byData, `no section tracks as ${section.id}`).not.toBeNull()
+      expect(byId).toBe(byData)
+    }
   })
 })
 

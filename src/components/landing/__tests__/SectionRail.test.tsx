@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { SectionRail } from '../SectionRail'
 
 const SECTIONS = [
@@ -105,5 +105,65 @@ describe('SectionRail', () => {
     render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
     expect(rail().className).toContain('hidden')
     expect(rail().className).toContain('lg:block')
+  })
+})
+
+describe('SectionRail clicking', () => {
+  const scrollTo = vi.fn()
+
+  beforeEach(() => {
+    scrollTo.mockClear()
+    vi.stubGlobal('scrollTo', scrollTo)
+    // The sections the rail scrolls to. Without them in the document the
+    // handler correctly declines and falls through to the native anchor,
+    // which is what the last test here asserts.
+    document.body.insertAdjacentHTML(
+      'beforeend',
+      SECTIONS.map((s) => `<section data-landing-section="${s.id}"></section>`).join('')
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    document.querySelectorAll('[data-landing-section]').forEach((n) => n.remove())
+  })
+
+  it('scrolls to the section a dot names, instead of doing nothing', () => {
+    // The reported bug: the dots were anchors pointing at ids nothing carried,
+    // so clicking one silently did nothing.
+    render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
+    const event = fireEvent.click(screen.getByRole('link', { name: /proof/ }))
+    expect(scrollTo).toHaveBeenCalledOnce()
+    expect(scrollTo.mock.calls[0][0].behavior).toBe('smooth')
+    expect(event).toBe(false) // preventDefault was called
+  })
+
+  it('leaves modified clicks to the browser', () => {
+    // cmd/ctrl-click opens a new tab and shift-click a window. Swallowing
+    // those would make a link that is not a link.
+    render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
+    fireEvent.click(screen.getByRole('link', { name: /proof/ }), { metaKey: true })
+    expect(scrollTo).not.toHaveBeenCalled()
+  })
+
+  it('falls through to the anchor when the section is missing', () => {
+    // Only preventDefault on a hit, so a rail configured with a section that
+    // is not on this page degrades to the browser's own handling rather than
+    // becoming a dead control.
+    document.querySelectorAll('[data-landing-section]').forEach((n) => n.remove())
+    render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
+    const event = fireEvent.click(screen.getByRole('link', { name: /proof/ }))
+    expect(scrollTo).not.toHaveBeenCalled()
+    expect(event).toBe(true) // default not prevented
+  })
+
+  it('gives the 7px dot a click target worth aiming at', () => {
+    // Half of the report was "should be clickable". A 7px dot is a 7px
+    // target; the padding grows the row and the negative margin cancels it,
+    // so the dot spacing the fill percentage is measured against is unchanged.
+    render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
+    const cls = screen.getAllByRole('link')[0].className
+    expect(cls).toContain('py-2')
+    expect(cls).toContain('-my-2')
   })
 })

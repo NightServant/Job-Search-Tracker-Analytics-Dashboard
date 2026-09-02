@@ -24,10 +24,21 @@ import { LANDING_TYPE } from './typography'
  * design system separates with hairlines and surface changes, never with
  * borders and shadows, and a full-bleed surface change is what gives a long
  * page rhythm without adding chrome.
+ *
+ * EVERY SECTION GETS A REAL `id`, defaulting to its `name`. It used to be
+ * optional and only two sections passed one, so the rail's `href="#problem"`
+ * and `href="#cta"` pointed at nothing and the dots silently did nothing --
+ * Gabe reported it on 2026-09-03. Defaulting rather than asking each section
+ * to remember is what makes "the rail can link to any section" true by
+ * construction instead of by six separate acts of discipline.
  */
 export interface SectionProps extends React.HTMLAttributes<HTMLElement> {
   /** Becomes `data-landing-section`, which the tests assert order against. */
   name: string
+  /**
+   * The DOM id. Defaults to `name`, so every section is linkable without each
+   * one remembering to say so -- see below.
+   */
   id?: string
   tone?: 'canvas' | 'surface'
   children: React.ReactNode
@@ -43,10 +54,21 @@ export function Section({
 }: SectionProps) {
   return (
     <section
-      id={id}
+      id={id ?? name}
       data-landing-section={name}
       className={cn(
-        'w-full px-5 py-20 md:px-8 md:py-28',
+        // scroll-mt is the NO-JAVASCRIPT FALLBACK, at the navbar's own 60/80px
+        // heights. Without it a native anchor jump puts the section's top at
+        // y=0, underneath the fixed bar, so the heading is hidden and the
+        // section looks like it starts at its first paragraph.
+        //
+        // It deliberately does NOT try to match lib/scrollToSection exactly.
+        // That path scrolls to the section's CONTENT so the padding does not
+        // become an empty band, which here would need a NEGATIVE scroll
+        // margin -- 80 + 24 - 112 -- to express. A fallback that clears the
+        // bar is the right amount of fidelity for a path that only runs when
+        // the handler could not.
+        'w-full scroll-mt-[60px] px-5 py-20 md:scroll-mt-[80px] md:px-8 md:py-28',
         tone === 'surface' ? 'bg-bg-surface' : 'bg-bg-canvas',
         className
       )}

@@ -15,9 +15,17 @@ import { SOLUTION } from './content'
  * sections after the hero. Keeping the wrapper outside means this component
  * knows nothing about pinning.
  *
- * `id="how-it-works"` is the nav anchor. It is on the SECTION rather than the
- * heading so a jump lands at the top of the block, which is where the hold
- * begins once Task 3 pins the carousel inside it.
+ * ITS ANCHOR IS `#solution`, not `#how-it-works`. This section carried a
+ * hand-written `id="how-it-works"` for the navbar while the rail linked to
+ * `#solution` and the progress tracking keyed on
+ * `data-landing-section="solution"` -- three names for one section, and the
+ * rail's was the one with nothing behind it. Section now derives the id from
+ * `name`, so there is a single vocabulary and the navbar link was changed to
+ * match rather than the section keeping a second name for one caller.
+ *
+ * The anchor is on the SECTION rather than the heading so a jump lands at the
+ * top of the block, which is where the hold begins now the carousel is pinned
+ * inside it.
  *
  * THE THREE CLAIMS KEEP THEIR COLUMNS, unlike the problem and proof sections
  * which both became rows on 2026-09-03. That is not an inconsistency, it is
@@ -38,7 +46,7 @@ export interface SolutionValueProps {
 
 export function SolutionValue({ children }: SolutionValueProps) {
   return (
-    <Section name="solution" id="how-it-works">
+    <Section name="solution">
       <SectionHeading
         eyebrow="the product"
         title={SOLUTION.heading}

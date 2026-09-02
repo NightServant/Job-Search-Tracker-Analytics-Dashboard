@@ -62,7 +62,9 @@ export const HERO = {
 } as const
 
 export const NAV_LINKS = [
-  { label: 'how it works', href: '#how-it-works', external: false },
+  // #solution, not #how-it-works: Section derives its id from its `name`, so
+  // the anchor, the rail's target and the scroll tracking are all one string.
+  { label: 'how it works', href: '#solution', external: false },
   { label: 'faq', href: '#faq', external: false },
   { label: 'open source', href: REPO_URL, external: true },
 ] as const
