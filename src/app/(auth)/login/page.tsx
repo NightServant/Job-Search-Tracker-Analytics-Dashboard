@@ -15,7 +15,7 @@ import { AuthScreen } from '@/components/auth/AuthScreen'
  */
 export default function Page() {
   const router = useRouter()
-  const { signIn } = useAuth()
+  const { signIn, signInWithProvider } = useAuth()
 
   return (
     <AuthScreen
@@ -24,6 +24,10 @@ export default function Page() {
         await signIn(email, password)
         router.push('/dashboard')
       }}
+      // No router call on this path: signInWithProvider hands the browser to
+      // the provider, so the page is on its way out. Pushing a route into a
+      // navigation that is already happening is a race with no winner.
+      onProvider={signInWithProvider}
     />
   )
 }

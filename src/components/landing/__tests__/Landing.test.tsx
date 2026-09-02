@@ -116,6 +116,44 @@ describe('social proof, which must stay true', () => {
     expect(section.textContent ?? '').not.toMatch(/["“”]/)
   })
 
+  it('presents the claims as a description list, not as cards or an accordion', () => {
+    // Gabe ruled out both on 2026-09-03. Asserted on the RENDERED OUTPUT
+    // rather than on the imports, so a hand-rolled bordered box or a
+    // hand-rolled disclosure fails it just as a re-imported Card would.
+    const section = proofSection()
+
+    // The shape that replaced them: one <dl>, four term/definition pairs.
+    const list = section.querySelector('dl')
+    expect(list).not.toBeNull()
+    expect(list!.querySelectorAll('dt')).toHaveLength(4)
+    expect(list!.querySelectorAll('dd')).toHaveLength(4)
+
+    // No accordion: nothing here toggles, so nothing carries the state a
+    // disclosure has to expose.
+    expect(section.querySelector('[aria-expanded]')).toBeNull()
+    expect(section.querySelector('details')).toBeNull()
+
+    // No cards: the entries are separated by rules, so no entry is a box.
+    // A Card draws a border on all four sides; a row draws one below.
+    for (const entry of section.querySelectorAll('[data-proof-entry]')) {
+      const cls = entry.className
+      expect(cls, 'a proof entry is boxed like a card').not.toMatch(
+        /\bborder\b(?!-)|\brounded-/
+      )
+      expect(cls).toContain('border-b')
+    }
+  })
+
+  it('gives every claim the full measure rather than a quarter of it', () => {
+    // The reason the section looked empty was the four-across grid: each
+    // claim got ~290px, so each body had to be one short line. This asserts
+    // the entries stack instead of sitting side by side -- the change that
+    // fills the height.
+    const section = proofSection()
+    const list = section.querySelector('dl')!
+    expect(list.className).not.toMatch(/grid-cols-|sm:grid-cols-|lg:grid-cols-/)
+  })
+
   it('quotes no figure that could go stale', () => {
     // The locked decision chose the qualitative claim over a generated test
     // count. A "931 tests" line that says 931 forever is the same lie as a

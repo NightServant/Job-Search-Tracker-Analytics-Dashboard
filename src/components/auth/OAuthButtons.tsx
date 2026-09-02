@@ -21,10 +21,18 @@ import { OAUTH_PROVIDERS, type OAuthProviderId } from '@/lib/oauthProviders'
  * hunting for a Google button; it is the most recognisable thing on the page
  * either way.
  *
- * These carry no provider logos. Google's brand guidelines are specific about
- * how its mark may be drawn, and an approximated logo is worse than none --
- * this design system also has exactly one icon vocabulary, and neither mark is
- * in it. The label carries the meaning.
+ * THEY CARRY THE PROVIDERS' OWN MARKS, which reverses what this file used to
+ * say. The old argument was that Google's guidelines are specific about how
+ * its mark may be drawn and an approximated logo is worse than none. True, and
+ * the conclusion did not follow: the answer to an approximation is an accurate
+ * mark. Both are drawn from the vendors' published geometry and palettes in
+ * @/components/brand/provider-marks, which is a separate directory precisely
+ * because they are fixed-colour artwork rather than members of this design
+ * system's one stroke-icon vocabulary.
+ *
+ * A provider button is also the one place a logo does real work. People do not
+ * read these buttons, they recognise them, and the four-colour G is faster to
+ * find than the word Google in the middle of a sentence.
  */
 export interface OAuthButtonsProps {
   onSelect: (provider: OAuthProviderId) => Promise<void> | void
@@ -50,6 +58,10 @@ export function OAuthButtons({ onSelect, disabled = false }: OAuthButtonsProps) 
             variant="secondary"
             size="m"
             data-provider={provider.id}
+            // The spinner goes on the button that was CLICKED; the others are
+            // merely disabled. One provider redirecting is not three providers
+            // thinking, and three spinners would say it was.
+            loading={busy === provider.id}
             disabled={disabled || busy !== null}
             onClick={async () => {
               setBusy(provider.id)
@@ -63,6 +75,7 @@ export function OAuthButtons({ onSelect, disabled = false }: OAuthButtonsProps) 
               }
             }}
           >
+            <provider.mark size={18} />
             {provider.label}
           </Button>
         ))}

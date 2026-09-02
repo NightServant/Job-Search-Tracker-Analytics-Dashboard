@@ -13,8 +13,14 @@ const useSetDefaultCurrencyMock = vi.hoisted(() => vi.fn())
 const rpcMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
+const replaceMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: useAuthMock }))
+// The route navigates on sign-out, so it needs a router. jsdom has no app
+// router mounted and useRouter throws an invariant without this.
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ replace: replaceMock, push: vi.fn(), refresh: vi.fn() }),
+}))
 vi.mock('@/hooks/useUserPreferences', () => ({
   useUserPreferences: useUserPreferencesMock,
   useSetDefaultCurrency: useSetDefaultCurrencyMock,
@@ -33,6 +39,7 @@ vi.mock('@/lib/supabase', () => ({
 import Page from '../page'
 
 afterEach(() => {
+  replaceMock.mockClear()
   cleanup()
   showErrorMock.mockClear()
   showSuccessMock.mockClear()
@@ -95,6 +102,19 @@ describe('Settings route wrapper', () => {
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
   })
 
+  it('sends the person to the homepage after signing out, not to the sign-in form', async () => {
+    // Gabe's 2026-09-03 ruling. Before it nothing here navigated at all: the
+    // person sat on /settings until AppLayout's guard noticed the session was
+    // gone and pushed them to /login -- the wrong destination, arrived at by
+    // a race. `replace` rather than `push`, so Back cannot return them to a
+    // page the guard will immediately bounce them off again.
+    const { signOut } = setup()
+    render(<Page />)
+    fireEvent.click(screen.getByRole('button', { name: /^sign out$/i }))
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/'))
+  })
+
   it('calls the delete_own_account RPC and signs out once account deletion is confirmed', async () => {
     const { signOut } = setup()
     rpcMock.mockResolvedValue({ error: null })
@@ -102,6 +122,9 @@ describe('Settings route wrapper', () => {
     await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('delete_own_account'))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
+    // Same destination, and more obviously right here -- there is no account
+    // left to sign back into.
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/'))
   })
 
   // CRITICAL from the review round: supabase.rpc() resolves { error } as a

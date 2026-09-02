@@ -136,7 +136,7 @@ export function SignUpFlow({
     <div className="flex min-h-screen">
       <AuthBrandPanel />
 
-      <div className="flex w-full flex-col px-5 py-10 lg:w-1/2 lg:px-16">
+      <div className="flex w-full flex-col px-5 py-10 lg:min-w-0 lg:flex-1 lg:px-24">
         <div data-switch-desktop className="hidden text-body-s lg:block lg:self-end">
           <span className="text-text-muted">have an account? </span>
           <Link href="/login" className="text-accent-default underline underline-offset-4">
@@ -146,7 +146,7 @@ export function SignUpFlow({
 
         <div className="flex-1" />
 
-        <div className="mx-auto flex w-full max-w-[400px] flex-col gap-8">
+        <div className="mx-auto flex w-full max-w-[480px] flex-col gap-8">
           <RegistrationProgress steps={STEPS} current={step} />
 
           {step === 0 && (
@@ -203,7 +203,7 @@ export function SignUpFlow({
                 />
               </Field>
 
-              <Button type="submit" variant="primary" size="m" disabled={busy}>
+              <Button type="submit" variant="primary" size="m" loading={busy}>
                 Create account
               </Button>
 

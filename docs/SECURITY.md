@@ -102,31 +102,67 @@ These are the actual boundary and none of them live in this repository:
 |---|---|---|
 | Auth rate limits | Dashboard → Authentication → Rate Limits | The only thing that throttles a script hitting the API directly. |
 | CAPTCHA (hCaptcha or Turnstile) | Dashboard → Authentication → Bot and Abuse Protection | The control that actually stops automated sign-up floods. |
-| Email confirmations ON | Dashboard → Authentication → Providers → Email | Without it an unverified address becomes a usable account. |
+| ~~Email confirmations ON~~ | now `supabase/config.toml` | Moved into the repo on 2026-09-03; see below. Still needs `config push` to take effect. |
 | Redirect allow-list | Dashboard → Authentication → URL Configuration | Constrains where an OAuth flow may return a token. |
 | Leaked-password protection | Dashboard → Authentication → Password | Rejects passwords in known breach corpora, which no client-side rule can. |
 
-## The OTP step needs a template change
+## The OTP step is configured in this repo, not in the dashboard
 
 Registration sends a six-digit code and verifies it with `verifyOtp(...,
 type: 'signup')`. Supabase's default "Confirm signup" template contains
-`{{ .ConfirmationURL }}` and **no token**, so with the default template no code
-is ever sent and verification will keep failing against a code that never
-existed.
+`{{ .ConfirmationURL }}` and **no token**, so on the stock template no code is
+ever sent and verification keeps failing against a code that never existed.
 
-Dashboard → Authentication → Email Templates → Confirm signup, and include:
+This used to be a manual dashboard edit. It is now `supabase/config.toml` plus
+`supabase/templates/confirmation.html`, so the setting is reviewable,
+diffable and revertible:
 
+| Setting | Value | Why |
+|---|---|---|
+| `auth.email.enable_confirmations` | `true` | Without it `signUp()` returns a usable session immediately and the OTP screen is theatre in front of an account that already exists. |
+| `auth.email.template.confirmation` | the local template | Carries `{{ .Token }}`. This is the switch that makes step 2 real. |
+| `auth.email.otp_length` / `otp_expiry` | `6` / `3600` | Matches what `OtpStep` asks for. |
+| `auth.email.max_frequency` | `60s` | A **server-side** resend limit, so unlike `authRateLimit` it is a real boundary. The CLI default is 1s, at which a held key is a mail flood billed to us and delivered to someone else. |
+| `auth.minimum_password_length` | `10` | Matches `PASSWORD_MIN_LENGTH`. |
+| `auth.password_requirements` | `lower_upper_letters_digits_symbols` | Matches `isPasswordStrong`. |
+
+The last two close the "client validation is duplicated by nothing on the
+server" gap for passwords specifically: a rule the browser enforces and the
+server does not is a rule anyone can skip with curl.
+
+### Applying it — read before you push
+
+```bash
+SUPABASE_AUTH_SITE_URL=https://your-deployed-origin npx supabase config push
 ```
-{{ .Token }}
-```
+
+**`config push` sends the WHOLE file, and this file was generated from CLI
+defaults.** Anything left at a default overwrites whatever the dashboard has
+now. `site_url` is the one that bites: the generated default is
+`http://127.0.0.1:3000`, and pushing that points every auth email and OAuth
+return at a developer's laptop. It is therefore `env(SUPABASE_AUTH_SITE_URL)`
+with **no fallback**, so an unset variable fails the push loudly instead of
+shipping localhost to production.
+
+Diff the file against the dashboard's current Auth settings before the first
+push. This has not been pushed from here — it changes a live project, which is
+not a call this repo should make on its own.
 
 ## OAuth providers
 
-Google and GitHub. **Yahoo is not available** — Supabase Auth ships a fixed
-provider list and Yahoo is not on it, so a Yahoo button would either need a
-custom OIDC integration or would be a button that cannot work. Each provider
-must be enabled with a client ID and secret in the dashboard; those secrets live
-there and never in this repository.
+Google and Microsoft. **Microsoft is `azure`** in the SDK — Supabase names the
+provider after the identity platform behind it, so `provider: 'microsoft'`
+typechecks against nothing and fails at the call.
+
+**Yahoo is not available** — Supabase Auth ships a fixed provider list and
+Yahoo is not on it, so a Yahoo button would either need a custom OIDC
+integration or would be a button that cannot work. GitHub was the stand-in
+until 2026-09-03; Microsoft replaced it because it carries Outlook, Hotmail,
+Live and every work account, which is a far larger share of the addresses
+people actually job-hunt from.
+
+Each provider must be enabled with a client ID and secret in the dashboard;
+those secrets live there and never in this repository.
 
 ## Fixed since the audit
 

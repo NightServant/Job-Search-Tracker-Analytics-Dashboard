@@ -130,6 +130,34 @@ describe('the password requirements checklist', () => {
     expect(list.querySelectorAll('[data-met="true"]')).toHaveLength(0)
   })
 
+  it('opens neutral, then marks unmet rules with a red cross once typing starts', async () => {
+    // Gabe asked for red crosses on unmet rules on 2026-09-03. The pristine
+    // exception is deliberate and is the whole reason this test has two
+    // halves: the list is permanently on the form now, so without it the
+    // screen would OPEN as six red failures against somebody who has done
+    // nothing. Red means "you got this wrong", and nobody can be wrong before
+    // they have typed.
+    setup()
+    const states = () =>
+      [...document.querySelectorAll('[data-requirement]')].map((e) =>
+        e.getAttribute('data-state')
+      )
+    const crosses = () =>
+      document.querySelectorAll('[data-requirement][data-state="unmet"] svg').length
+
+    expect(states().every((s) => s === 'pristine')).toBe(true)
+    expect(crosses()).toBe(0)
+
+    await userEvent.type(screen.getByLabelText(/^Password/), 'worktrackpass')
+
+    // Long, lowercase and space-free are satisfied; upper, digit and symbol
+    // are not -- so exactly three should be red, each with a glyph.
+    expect(states().filter((s) => s === 'unmet')).toHaveLength(3)
+    expect(states().filter((s) => s === 'met')).toHaveLength(3)
+    expect(states()).not.toContain('pristine')
+    expect(crosses()).toBe(3)
+  })
+
   it('ticks each rule as it is met, live', async () => {
     setup()
     await userEvent.type(screen.getByLabelText(/^Password/), 'abc')
@@ -269,12 +297,32 @@ describe('the faster options', () => {
       .toBeTruthy()
   })
 
+  it('carries each provider its own mark, in the provider colours', () => {
+    // OAuthButtons argued against logos entirely until 2026-09-03. The marks
+    // are fixed brand artwork, so they are asserted on the ONE property that
+    // separates them from this design system's stroke icons: a real fill,
+    // theme-independent, rather than currentColor.
+    setup()
+    for (const [id, fill] of [
+      ['google', '#4285F4'],
+      ['azure', '#F25022'],
+    ] as const) {
+      const button = document.querySelector(`[data-provider="${id}"]`)!
+      const svg = button.querySelector('svg')
+      expect(svg, `${id} has no mark`).not.toBeNull()
+      expect(svg!.innerHTML).toContain(fill)
+      expect(svg!.getAttribute('stroke')).toBeNull()
+    }
+  })
+
   it('offers the providers Supabase can actually serve', async () => {
     const props = setup()
     const buttons = document.querySelectorAll('[data-oauth-buttons] [data-provider]')
+    // 'azure' IS Microsoft. Supabase names the provider after the identity
+    // platform behind it, so 'microsoft' typechecks against nothing.
     expect([...buttons].map((b) => b.getAttribute('data-provider'))).toEqual([
       'google',
-      'github',
+      'azure',
     ])
     await userEvent.click(screen.getByRole('button', { name: /Continue with Google/i }))
     expect(props.onProvider).toHaveBeenCalledWith('google')

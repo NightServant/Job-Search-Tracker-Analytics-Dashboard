@@ -121,6 +121,52 @@ describe('Input', () => {
   })
 })
 
+describe('Button pending state', () => {
+  // A submit that was `disabled` and nothing else is indistinguishable from a
+  // broken control, which on a sign-in form is the exact moment people click
+  // again. Three things have to happen together, so they are one prop.
+  it('shows a spinner, disables itself and says so, all from one prop', () => {
+    const { container } = render(<Button loading>Sign in</Button>)
+    const button = container.querySelector('button')!
+
+    expect(button.querySelector('[role="status"]')).not.toBeNull()
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute('aria-busy')).toBe('true')
+  })
+
+  it('keeps the label rather than collapsing to a glyph', () => {
+    // Swapping the label for a bare spinner loses the only text saying what is
+    // being waited on, and a button that changes width mid-click moves the
+    // pointer off whatever is beside it.
+    const { container } = render(<Button loading>Sign in</Button>)
+    expect(container.querySelector('button')!.textContent).toContain('Sign in')
+  })
+
+  it('is an ordinary button when it is not loading', () => {
+    // Positive companion: without it every assertion above would hold for a
+    // button that was permanently busy.
+    const { container } = render(<Button>Sign in</Button>)
+    const button = container.querySelector('button')!
+    expect(button.querySelector('[role="status"]')).toBeNull()
+    expect(button.disabled).toBe(false)
+    expect(button.getAttribute('aria-busy')).toBeNull()
+  })
+
+  it('stays disabled when the caller disables it for its own reasons', () => {
+    // OtpStep passes both: `disabled` means "the code is not six digits yet",
+    // `loading` means "it has gone to the server". Folding one into the other
+    // would show a spinner for an incomplete field.
+    const { container } = render(
+      <Button disabled loading={false}>
+        Verify
+      </Button>
+    )
+    const button = container.querySelector('button')!
+    expect(button.disabled).toBe(true)
+    expect(button.querySelector('[role="status"]')).toBeNull()
+  })
+})
+
 describe('Input with the smooth caret merged in', () => {
   // The merge Gabe asked for on 2026-09-02. Before it, the auth screens
   // imported skiper106's SmoothInput directly and re-typed Input's border and

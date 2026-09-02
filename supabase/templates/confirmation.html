@@ -1,0 +1,35 @@
+<!--
+  The signup confirmation email.
+
+  THIS FILE IS THE WHOLE REASON THE OTP STEP WORKS. Supabase's stock "Confirm
+  signup" template contains {{ .ConfirmationURL }} and NO TOKEN, so a project
+  on the default template sends a link and never sends a code -- and
+  verifyOtp({ type: 'signup' }) then fails forever against a code that was
+  never generated. docs/SECURITY.md flagged this as a manual dashboard edit;
+  this template plus [auth.email.template.confirmation] in config.toml is that
+  edit, in version control, where it can be reviewed and reverted.
+
+  The link is deliberately absent rather than offered alongside the code. Two
+  ways to confirm one signup means two code paths to keep working, and the
+  clicked link lands on a redirect target this app does not implement -- the
+  registration flow is three steps in one page, not a round trip through the
+  inbox.
+
+  Inline styles only, and a table for the code. Email clients strip <style>
+  blocks (Gmail's web client still does), so a stylesheet here would leave the
+  code rendered as unstyled body text.
+-->
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #18181b; line-height: 1.5;">
+  <p style="margin: 0 0 16px;">Here is your Worktrack verification code:</p>
+
+  <p style="margin: 0 0 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #c2410c;">
+    {{ .Token }}
+  </p>
+
+  <p style="margin: 0 0 16px;">Enter it on the sign-up screen to finish creating your account.</p>
+
+  <p style="margin: 0; font-size: 13px; color: #71717a;">
+    The code expires in one hour. If you did not ask to create a Worktrack
+    account, you can ignore this email — nothing was created.
+  </p>
+</div>

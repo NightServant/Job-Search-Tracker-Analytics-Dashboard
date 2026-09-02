@@ -6,7 +6,9 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, PasswordInput } from '@/components/ui/input'
+import type { OAuthProviderId } from '@/lib/oauthProviders'
 import { AuthBrandPanel } from './AuthBrandPanel'
+import { OAuthButtons } from './OAuthButtons'
 
 /**
  * Sign in and sign up, as one screen in two modes.
@@ -40,6 +42,11 @@ import { AuthBrandPanel } from './AuthBrandPanel'
  * The masked fields get it too. The note this replaces claimed a password
  * field has "no visible caret to smooth" -- it has one, moving between
  * bullets, and skiper106 measures masked text deliberately.
+ *
+ * `onProvider` is OPTIONAL and the providers are omitted without it, rather
+ * than rendered disabled or wired to a no-op. A "Continue with Google" button
+ * that does nothing is worse than no button: it reads as broken auth, which
+ * is the least reassuring thing a sign-in page can say.
  */
 export type AuthMode = 'signin' | 'signup'
 
@@ -47,6 +54,11 @@ export interface AuthScreenProps {
   mode: AuthMode
   /** Rejects with an Error whose message is shown to the user. */
   onSubmit: (email: string, password: string) => Promise<void>
+  /**
+   * Starts an OAuth round trip. Optional: without it the providers are not
+   * offered at all, rather than rendered as buttons that do nothing.
+   */
+  onProvider?: (provider: OAuthProviderId) => Promise<void>
 }
 
 const COPY = {
@@ -68,7 +80,7 @@ const COPY = {
   },
 } as const
 
-export function AuthScreen({ mode, onSubmit }: AuthScreenProps) {
+export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
   const copy = COPY[mode]
   const isSignUp = mode === 'signup'
 
@@ -115,7 +127,7 @@ export function AuthScreen({ mode, onSubmit }: AuthScreenProps) {
     <div className="flex min-h-screen">
       <AuthBrandPanel />
 
-      <div className="relative flex w-full flex-col px-5 py-10 lg:w-1/2 lg:px-16">
+      <div className="relative flex w-full flex-col px-5 py-10 lg:min-w-0 lg:flex-1 lg:px-24">
         {/*
           Two switch links, one per breakpoint. A top-right link on a 375px
           screen is an awkward tap target beside nothing else, so mobile gets
@@ -128,7 +140,7 @@ export function AuthScreen({ mode, onSubmit }: AuthScreenProps) {
         {/* Two flex-1 spacers keep the form optically centred on tall screens. */}
         <div className="flex-1" />
 
-        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-[400px] flex-col gap-6">
+        <form onSubmit={handleSubmit} className="mx-auto flex w-full max-w-[480px] flex-col gap-6">
           <div className="flex flex-col gap-2">
             <h1 className="text-heading-l text-text-primary">{copy.title}</h1>
             <p className="text-body-m text-text-secondary">{copy.lede}</p>
@@ -178,9 +190,25 @@ export function AuthScreen({ mode, onSubmit }: AuthScreenProps) {
             </Field>
           )}
 
-          <Button type="submit" variant="primary" size="m" disabled={busy}>
+          {/*
+            `loading` rather than `disabled`: Button derives the disable from
+            it, and adds the spinner and aria-busy that say the request was
+            received. A dead control with no motion is what makes people click
+            a sign-in button a second time.
+          */}
+          <Button type="submit" variant="primary" size="m" loading={busy}>
             {copy.submit}
           </Button>
+
+          {/*
+            AFTER the form, matching the sign-up screen. Gabe settled the order
+            there on 2026-09-02 and asked for the same buttons here on
+            2026-09-03: the manual fields state the default, the divider then
+            offers the shortcut. Two auth screens that disagree about where
+            the providers live would be the same inconsistency the input merge
+            just removed.
+          */}
+          {onProvider && <OAuthButtons onSelect={onProvider} disabled={busy} />}
 
           <div data-switch-mobile className="text-body-s lg:hidden">
             {switchLink}
@@ -189,7 +217,7 @@ export function AuthScreen({ mode, onSubmit }: AuthScreenProps) {
 
         <div className="flex-1" />
 
-        <p className="mx-auto w-full max-w-[400px] text-caption text-text-muted">
+        <p className="mx-auto w-full max-w-[480px] text-caption text-text-muted">
           By continuing you agree to how this application stores your data, which is described
           on the{' '}
           <Link href="/privacy" className="underline underline-offset-4">

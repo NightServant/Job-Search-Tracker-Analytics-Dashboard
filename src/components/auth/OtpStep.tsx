@@ -97,7 +97,18 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
         />
       </Field>
 
-      <Button type="submit" variant="primary" size="m" disabled={!ready || busy}>
+      {/*
+        Both props, and they mean different things: `disabled` is "the code is
+        not six digits yet", `loading` is "it has gone to the server". Folding
+        the first into the second would show a spinner for an incomplete field.
+      */}
+      <Button
+        type="submit"
+        variant="primary"
+        size="m"
+        disabled={!ready}
+        loading={busy}
+      >
         Verify and continue
       </Button>
 
