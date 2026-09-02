@@ -161,13 +161,31 @@ done while a bespoke equivalent of a catalogue component is still in its diff.
 3. **A chart whose categories are not statuses uses `chart-1..3`**, the
    categorical series tokens M5.5 added. Not the five status hues, which mean
    one specific thing everywhere in this app.
+4. **The landing carousel is skiper51 (Swiper.js), NOT shadcn's `Carousel`.**
+   This is the one named exception to the rule above, settled 2026-09-02 after
+   the rewrite briefly asked for both.
+
+   The rule exists so new pages are not hand-rolled. skiper51 is not
+   hand-rolled — it is a deliberate adoption that Task 1 vendors and credits,
+   and the credit is a build gate. Swapping it for shadcn's `Carousel` (which
+   is embla) would strip Task 1 of most of its reason to exist, leave
+   `SKIPER_ATTRIBUTION` with nothing to credit, and force a rewrite of Task 3,
+   whose whole pinning mechanism is written against Swiper's instance API —
+   `onSwiper`, and a `SwiperCarouselOptions` type that says so in its name.
+
+   **shadcn's `Carousel` still applies everywhere else**, including the
+   template gallery M5.5 already shipped on `/documents`. Two carousel
+   libraries in one codebase is a real cost; it is accepted here because the
+   pinned sequence is the one place the choice is load-bearing, and rejected
+   anywhere it is not. An implementer who finds themselves reaching for embla
+   inside the landing page's pinned sequence has taken a wrong turn.
 
 | Task | Page | Components to build from |
 |---|---|---|
 | 2 | Landing — hero | `Button` + `ButtonGroup` for the CTA pair; `AspectRatio` around the hero media so the page does not reflow as it loads |
 | 2 | Landing — social proof | `Card` for each proof tile; `Separator` between them at narrow widths. **No `Avatar`, no testimonial card** — see the locked decision below |
 | 2 | Landing — problem | `Card` per pain point, or `Item` if the row form reads better; `Separator` closing the section |
-| 2 | Landing — solution | `Card` + `CardHeader`/`CardTitle`/`CardDescription` for the value grid; `Carousel` for the product screens (it already carries the scroll seam Task 3 drives); `Tabs` ONLY if the screens need naming rather than captioning |
+| 2 | Landing — solution | `Card` + `CardHeader`/`CardTitle`/`CardDescription` for the value grid. The product screens use **skiper51 (Swiper)**, not shadcn's `Carousel` — see exception 4 above. `Tabs` ONLY if the screens need naming rather than captioning |
 | 2 | Landing — FAQ | `Accordion`, `type="single"` `collapsible`. Five items, which is what Gabe specified |
 | 2 | Landing — CTA | `Card` as the closing panel; `Button` for both routes; `Alert` for the one-line note on what a demo account is and is not |
 | 3 | Pinned scroll sequence | `AspectRatio` per pinned frame; `Progress` for a section indicator if one is wanted. Nothing else — this task is motion, and chrome added to a pinned sequence fights it |
@@ -946,8 +964,9 @@ rots because nobody sees it — exists before the pinned path is layered over it
   the skiper51 component from `@/components/v1/skiper51` (Task 1);
   `Button`, `ButtonGroup`, `Card` (+ `CardHeader`/`CardTitle`/`CardDescription`/`CardContent`),
   `Accordion` (+ `AccordionItem`/`AccordionTrigger`/`AccordionContent`),
-  `Carousel` (+ `CarouselContent`/`CarouselItem`/`CarouselPrevious`/`CarouselNext`),
-  `AspectRatio`, `Alert`, `Separator` — all from `@/components/ui/*`;
+  `AspectRatio`, `Alert`, `Separator` — all from `@/components/ui/*`.
+  **Not `Carousel`**: the screen carousel is skiper51, from
+  `@/components/v1/skiper51` (Task 1), driven by `carouselOptionsFor`;
   `ThemeToggle` (`size?: 32 | 44`, emits `data-theme-toggle`);
   `usePrefersReducedMotion` from `@/hooks/usePrefersReducedMotion`;
   icons from `@/components/icons`.
@@ -1038,8 +1057,14 @@ when the reader reaches it.
 **4. Solution / value.** The product, in two halves. A `Card` grid for the
 value claims — the pipeline, the analytics, the CV editor with its ATS check —
 and beneath it the `ScreenCarousel` showing real screens, which is the second
-thing Task 3 pins. The carousel is `Carousel` from the catalogue, with
-`carouselOptionsFor(scrollDriven)` supplying its options exactly as before.
+thing Task 3 pins.
+
+`ScreenCarousel` wraps **skiper51**, not shadcn's `Carousel` — exception 4 in
+*shadcn components per M6 page*, and the reason is Task 3: its pinning is
+written against Swiper's instance API, so changing the library here would
+rewrite a task that is not otherwise affected by this milestone's replanning.
+`carouselOptionsFor(scrollDriven)` supplies its options exactly as before, and
+the `SwiperCarouselOptions` type keeps its name because it is accurate.
 
 **5. FAQ — exactly five.** `Accordion`, `type="single"`, `collapsible`. Five
 because Gabe said five; the discipline is that a sixth question means one of
@@ -1133,9 +1158,10 @@ The test file asserts, at minimum:
 
 - [ ] **Step 4: Build the sections against the catalogue**
 
-`Card`, `Accordion`, `Carousel`, `AspectRatio`, `Alert`, `Separator`,
-`Button`, `ButtonGroup` — per the table in *shadcn components per M6 page*. No
-hand-rolled bordered boxes; the grep in that section is the check.
+`Card`, `Accordion`, `AspectRatio`, `Alert`, `Separator`, `Button`,
+`ButtonGroup` — per the table in *shadcn components per M6 page*. The screen
+carousel is the one exception and comes from skiper51. No hand-rolled bordered
+boxes; the grep in that section is the check.
 
 - [ ] **Step 5: `StickyNavbar` and `SiteFooter`**
 
@@ -3167,7 +3193,14 @@ Recorded after M5.5 merged (PR #1, plus the seven follow-up commits merged as
    stranger to vandalise the demo — the data is a fixture in the repo. It also
    ANSWERED the open question this plan had carried since 2026-08-28, because a
    signed-in visitor opening the demo no longer loses their session.
-4. **Social proof must be true.** → the locked decision inside Task 2. This
+4. **The landing carousel stays skiper51 (Swiper), not shadcn's `Carousel`.**
+   → exception 4 in *shadcn components per M6 page*. The "shadcn on new pages"
+   rule as first written asked for both at once, which was a contradiction:
+   Task 1 vendors and credits skiper51 as a build gate, and Task 3's pinning is
+   written against Swiper's instance API. The rule exists to stop hand-rolled
+   components, and skiper51 is not one. shadcn's `Carousel` still applies
+   everywhere else, including the `/documents` template gallery M5.5 shipped.
+5. **Social proof must be true.** → the locked decision inside Task 2. This
    project has no users, so the section shows only what a visitor can verify
    in a minute — the repository, the commit history, the test suite, the
    stack — and the plan forbids testimonials, invented user counts and logo
