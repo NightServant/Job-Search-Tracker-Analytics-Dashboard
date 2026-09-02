@@ -13,7 +13,14 @@ import { SettingsIcon } from '@/components/icons'
  * the 55px it used to be. Body scroll absorbs the difference; the bottom nav
  * does not move.
  */
-export function TopBar({ settingsActive }: { settingsActive: boolean }) {
+export function TopBar({
+  settingsActive,
+  settingsHref = '/settings',
+}: {
+  settingsActive: boolean
+  /** null omits the control. The demo has no settings screen to reach. */
+  settingsHref?: string | null
+}) {
   return (
     <header
       data-top-bar
@@ -22,8 +29,9 @@ export function TopBar({ settingsActive }: { settingsActive: boolean }) {
       <BrandLockup />
       <div className="flex-1" />
       <ThemeToggle size={44} />
+      {settingsHref && (
       <Link
-        href="/settings"
+        href={settingsHref}
         data-settings-link
         data-active={settingsActive ? '' : undefined}
         aria-label="Settings"
@@ -35,6 +43,7 @@ export function TopBar({ settingsActive }: { settingsActive: boolean }) {
       >
         <SettingsIcon size={18} />
       </Link>
+      )}
     </header>
   )
 }

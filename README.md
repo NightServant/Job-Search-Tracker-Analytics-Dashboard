@@ -8,7 +8,31 @@ Track job applications, visualise the pipeline, and build a CV — a full-stack 
 
 ## Status
 
-Active development. The database schema, migrations, and test suite are current; a public demo is **not deployed at the moment** while hosting is migrated. Run it locally with the instructions below.
+Active development. The database schema, migrations, and test suite are current. Run it locally with the instructions below.
+
+---
+
+## Demo
+
+**`/demo/dashboard`** — the app's real screens over invented data. No account, no
+sign-in, nothing to enter.
+
+It is a public URL space rather than a shared account: every figure comes from
+`src/lib/demoFixture.ts`, a file in this repository, so there is no session, no
+database connection and no write path behind those pages. That is a stronger
+guarantee than a read-only account, and a much smaller one to make — there are
+no credentials to publish, nothing for a stranger to vandalise, and `git
+checkout` is the entire reseeding procedure. The routes are statically
+rendered, so opening the demo serves HTML rather than a spinner.
+
+The screens' write controls (new application, import, delete) still render,
+because they are the *real* screens rather than a reduced copy. They explain
+themselves instead of writing: silence would be indistinguishable from a broken
+button.
+
+The dates move with the clock. A fixture pinned to literal dates would say
+"applied 8 months ago" by spring, and the six-month trend chart would run off
+its own left edge.
 
 ---
 
@@ -181,7 +205,6 @@ texts/              Design and reference documentation
 
 ## Roadmap
 
-- [ ] Restore a public demo deployment
 - [ ] Break up the oversized page components
 - [ ] Migrate to Next.js and Vercel
 - [ ] Design system pass (shadcn/ui + motion)

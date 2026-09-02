@@ -1,7 +1,7 @@
 'use client'
 
 import { usePathname } from 'next/navigation'
-import { Sidebar, NAV } from '@/components/ui/sidebar'
+import { Sidebar, NAV, type NavEntry } from '@/components/ui/sidebar'
 import { AppBackground } from './AppBackground'
 import { activeNavHref, isUnder } from '@/lib/activeNav'
 import { TopBar } from './TopBar'
@@ -15,10 +15,29 @@ import { BottomNav } from './BottomNav'
  * which destination a route belongs to the way they did when Sidebar derived
  * its own active state from a bare `pathname === item.href` check.
  */
-export function AppShell({ children }: { children: React.ReactNode }) {
+export interface AppShellProps {
+  children: React.ReactNode
+  /**
+   * The primary destinations. Defaults to the app's own NAV; /demo/* passes a
+   * demo-scoped copy so its links stay inside the demo rather than bouncing a
+   * visitor to /login.
+   */
+  nav?: NavEntry[]
+  /** Where settings points, or null to omit it. The demo has no settings. */
+  settingsHref?: string | null
+  /** Rendered above <main>. The demo puts its persistent banner here. */
+  banner?: React.ReactNode
+}
+
+export function AppShell({
+  children,
+  nav = NAV,
+  settingsHref = '/settings',
+  banner,
+}: AppShellProps) {
   const pathname = usePathname()
-  const active = activeNavHref(pathname, NAV.map((n) => n.href))
-  const settingsActive = isUnder(pathname, '/settings')
+  const active = activeNavHref(pathname, nav.map((n) => n.href))
+  const settingsActive = settingsHref ? isUnder(pathname, settingsHref) : false
 
   return (
     // NO bg-* on this container, deliberately. It used to carry
@@ -30,13 +49,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // every time. Two "raise the opacity" fixes could never have worked.
     <div className="flex min-h-screen">
       <AppBackground />
-      <Sidebar pathname={pathname} activeHref={active} className="hidden md:flex" />
+      <Sidebar
+        pathname={pathname}
+        activeHref={active}
+        nav={nav}
+        settingsHref={settingsHref}
+        className="hidden md:flex"
+      />
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar settingsActive={settingsActive} />
+        <TopBar settingsActive={settingsActive} settingsHref={settingsHref} />
+        {banner}
         {/* pb-20 clears the fixed bottom nav; without it the last row of every
             list sits under it and looks like the page is cut off. */}
         <main className="min-w-0 flex-1 p-4 pb-20 md:p-8 md:pb-8">{children}</main>
-        <BottomNav activeHref={active} />
+        <BottomNav activeHref={active} nav={nav} />
       </div>
     </div>
   )
