@@ -182,7 +182,7 @@ done while a bespoke equivalent of a catalogue component is still in its diff.
 
 | Task | Page | Components to build from |
 |---|---|---|
-| 2 | Landing — hero | `Button` + `ButtonGroup` for the CTA pair; `AspectRatio` around the hero media so the page does not reflow as it loads |
+| 2 | Landing — hero | `Button` + `ButtonGroup` for the CTA trio; `AspectRatio` around the hero media so the page does not reflow as it loads. The navbar lives here too — `BrandLockup` from `@/components/ui/brand-mark`, `Button` for `open the demo` and `sign up`, `ThemeToggle`. **No `NavigationMenu`**: six links and no submenus do not earn a menu primitive, and it would fight the two-treatment colour swap |
 | 2 | Landing — social proof | `Card` for each proof tile; `Separator` between them at narrow widths. **No `Avatar`, no testimonial card** — see the locked decision below |
 | 2 | Landing — problem | `Card` per pain point, or `Item` if the row form reads better; `Separator` closing the section |
 | 2 | Landing — solution | `Card` + `CardHeader`/`CardTitle`/`CardDescription` for the value grid. The product screens use **skiper51 (Swiper)**, not shadcn's `Carousel` — see exception 4 above. `Tabs` ONLY if the screens need naming rather than captioning |
@@ -949,11 +949,14 @@ rots because nobody sees it — exists before the pinned path is layered over it
 - Create: `src/components/landing/ScreenCarousel.tsx`
 - Create: `src/components/landing/LandingFaq.tsx`
 - Create: `src/components/landing/ClosingCta.tsx`
-- Create: `src/components/landing/StickyNavbar.tsx`
+- Create: `src/components/landing/LandingNavbar.tsx` (was `StickyNavbar.tsx` — renamed by the navbar decision below, because it no longer merely sticks)
 - Create: `src/components/landing/SiteFooter.tsx`
 - Create: `src/components/landing/content.ts` (every string on the page, in one file)
 - Create: `src/components/landing/screens.ts`
+- Create: `src/lib/landingNav.ts`
+- Create: `src/lib/__tests__/landingNav.test.ts`
 - Create: `src/components/landing/__tests__/Landing.test.tsx`
+- Create: `src/components/landing/__tests__/LandingNavbar.test.tsx`
 - Create: `src/components/landing/__tests__/SiteFooter.test.tsx`
 - Create: `public/screens/*.png` (five files, named in Step 1)
 - Create: `public/hero-poster.png`
@@ -987,14 +990,46 @@ rots because nobody sees it — exists before the pinned path is layered over it
   }
   export function Landing(props: LandingProps): JSX.Element
   export function SiteFooter(): JSX.Element
-  export function StickyNavbar(props: { revealed: boolean }): JSX.Element
+  export function LandingNavbar(props: { overHero: boolean }): JSX.Element
+
+  // src/lib/landingNav.ts
+  export const LANDING_NAV_HEIGHT_PX = 80
+  export function navOverHero(
+    scrollYPx: number,
+    heroBottomPx: number,
+    navHeightPx?: number
+  ): boolean
   ```
-  **The seam with Task 3 is unchanged by this rewrite.** Task 3 consumes
-  `pinned`, `carouselProgress` and `heroUnpinned` and nothing else, and the two
-  things it pins — the hero and the screen carousel — are still the first
-  section and a child of the fourth. Reordering the page around them does not
-  move them relative to each other, which is the only relationship Task 3
-  depends on.
+
+  **The seam with Task 3 is NOT unchanged, and an earlier draft of this plan
+  said it was.** That claim — "the two things it pins are still the first
+  section and a child of the fourth, [so] reordering the page around them does
+  not move them relative to each other" — is wrong in the way that matters.
+  Task 3's `PinnedSequence` renders `pinned-hero` and `pinned-carousel` as
+  **adjacent siblings** and then everything else beneath them. Under the
+  2026-09-02 six-section order, social proof and the problem statement sit
+  BETWEEN the hero and the carousel, so a component that emits the two pin
+  wrappers back to back cannot express the page. Three consequences, recorded
+  here because Task 2 is what surfaces them and Task 3 is what pays for them:
+
+  1. `PinnedSequence` must become **two independently placed pinned wrappers**
+     rather than one component emitting both. The obvious shape is a single
+     `usePinnedSection({ slideCount?, viewportHeightPx, viewportWidthPx })`
+     hook plus a `<PinnedBlock>` wrapper used twice, so sections 2 and 3 can
+     be ordinary children in between.
+  2. `navbarRevealed(scrollY, heroPinHeightPx, carouselPinHeightPx)` is
+     **retired**. Its whole premise was the Figma annotation "hidden over the
+     hero, slides down after the carousel", which the navbar decision below
+     overturns. `navOverHero` replaces it, and it keys on the hero's bottom
+     edge — not the carousel's, which is now four sections away.
+  3. `PinnedSequence`'s render-prop state field `navbarRevealed` becomes
+     `overHero`, with the inverted meaning. A rename that flips polarity is
+     exactly the kind of thing that survives a careless port and produces a
+     navbar that is opaque over the hero and transparent over the page, so the
+     test in Step 3 asserts both states rather than only the interesting one.
+
+  What IS unchanged: Task 3 still consumes `pinned`, `carouselProgress` and
+  `heroUnpinned`, and `HeroMedia`'s `paused` seam is untouched.
 
 ---
 
@@ -1034,12 +1069,109 @@ the layout needs to change; the tiles are the same shape a testimonial is.
 
 ---
 
+#### LOCKED: the navbar lives in the hero and changes colour at social proof
+
+**Settled by Gabe, 2026-09-02.** "Navigation header must be included in the
+hero section but make sure it blends with it, but the color must change when
+the scroll[er] scrolls into social proof."
+
+**This overrules the Figma file, deliberately.** Frame `39:355` is named
+`Sticky Navbar (reveals after hero)`, sits at y=1414 — precisely hero (607) +
+carousel (807) — and carries the annotation "STICKY · hidden over the hero,
+slides down after the carousel". That design is from 2026-08-23, before the
+six-section order existed, and in it the carousel was section 2. Under the new
+order the carousel is section 4, so "after the carousel" would leave a stranger
+scrolling through three sections with no navigation at all. **Gabe wins over
+Figma here**, the same way the repo wins over the roadmap elsewhere in this
+plan. Everything else about frame `39:355` is still the spec.
+
+**Why the colour has to change at all — read from the design, not assumed.**
+The hero is dark *in both themes*: `get_design_context` on node `39:369` returns
+a background image under a left-to-right scrim from `rgba(5,5,7,0.92)` to
+`rgba(5,5,7,0.3)`, body copy at `rgba(250,250,250,0.82)`, and an eyebrow in
+`accent/400` (#fb923c) rather than `accent/default` (#c2410c) — the dark-mode
+accent, chosen because accent-700 on near-black fails contrast. Social proof is
+an ordinary themed surface on `bg/canvas`. A navbar that blends into the first
+is illegible on the second. The colour change is not decoration; it is the only
+way one bar can sit on two grounds.
+
+**The two treatments.** Both are the same DOM; only tokens differ.
+
+| | `overHero: true` | `overHero: false` |
+|---|---|---|
+| background | none | `bg-bg-canvas` |
+| bottom border | none | `border-b border-border-subtle` |
+| lockup + links | `#fafafa` / `rgba(250,250,250,0.82)` | `text-text-primary` / `text-text-secondary` |
+| `open the demo` | hairline `border-[rgba(250,250,250,0.5)]`, transparent fill | `bg-bg-surface`, `border-border-default` |
+| `sign up` | `bg-accent-default`, `text-accent-on-accent` | identical |
+
+`sign up` is deliberately identical in both. It is a filled accent button, it
+clears contrast on either ground, and a CTA that restyles itself mid-scroll
+reads as a different button.
+
+**`BrandLockup` already does the hard part.** `src/components/ui/brand-mark.tsx:79`
+puts `text-text-primary` on the container and lets the wordmark inherit, and
+`BrandMark`'s three static cells are `currentColor` while the active cell binds
+to `var(--color-accent-default)`. So overriding the container's text colour
+flips mark and wordmark together, and the accent cell stays accent in both
+treatments. Do not fork the component or add a `variant` prop; pass a class.
+
+**The switch point is the hero's bottom edge, and it is a pure function.**
+`navOverHero(scrollYPx, heroBottomPx, navHeightPx = LANDING_NAV_HEIGHT_PX)`
+returns `scrollYPx + navHeightPx < heroBottomPx` — true while the hero still
+covers the band the navbar occupies. `heroBottomPx` is measured from the hero
+element, NOT computed from `heroPinHeightPx`: the hero is pinned on desktop and
+in normal flow on mobile and under reduced motion, so a computed value would
+need to know which, and would be wrong in two of the three cases. Same reason
+`lib/pinnedScroll.ts` exists — jsdom has no layout engine, so the maths is pure
+and the measuring lives in the component.
+
+*Rejected: an `IntersectionObserver` sentinel at the boundary.* It is the
+conventional answer and it is cheaper at runtime, but jsdom does not implement
+it, so every test would assert against a mock of our own construction; and the
+page already derives scroll state from one `useScroll` subscription, so a
+second mechanism would be a second source of truth about where the reader is.
+
+**The contrast hazard Figma never had.** Figma's navbar is opaque white, so its
+links never sat on video. Ours do — and the nav controls are on the RIGHT of
+the bar, where the hero scrim has decayed to `rgba(5,5,7,0.3)`. Over a light
+frame of the background video, `rgba(250,250,250,0.82)` on that is not readable.
+**The navbar in its `overHero` treatment therefore carries its own scrim**: a
+`bg-gradient-to-b from-[rgba(5,5,7,0.55)] to-transparent` spanning the bar and
+a little below it, `pointer-events-none`, behind the content. This is a real
+requirement, not polish — without it the blend is only legible against the dark
+left third of the hero, which is where the headline is and where the nav is not.
+
+**The transition is 150ms on colour only, and is skipped under reduced motion.**
+Background, border and text colour, nothing else — no transform, no height
+change, no slide. A navbar that resizes or moves on scroll is the pattern this
+design system's restraint rules out, and a state change is not an animation, so
+`prefers-reduced-motion` gets the same swap instantly rather than losing it.
+
+**Open, for Gabe:** the Figma nav links are `features` / `ats` / `open source`,
+which are the OLD sections and two of them no longer exist. The six-section page
+suggests `how it works` (to solution/value), `faq`, and `open source` (external,
+to the repository). Named here rather than chosen silently.
+
 #### The six sections
 
-**1. Hero.** The name, one sentence on what it does, and the CTA pair — try the
-demo, create an account. `ButtonGroup` for the pair, `AspectRatio` around the
-hero media so nothing reflows as the poster loads. This is the section Task 3
-pins first.
+**1. Hero.** The navbar, the name, one sentence on what it does, and the CTA
+pair — try the demo, create an account. `ButtonGroup` for the pair,
+`AspectRatio` around the hero media so nothing reflows as the poster loads.
+This is the section Task 3 pins first, and per the locked decision above it is
+also the section the navbar is part of.
+
+Figma's hero (`39:369`) carries **three** CTAs, not two: `try the live demo`
+(filled accent), `create account` (hairline) and `read the source` (hairline),
+plus the line `no signup · the demo opens with sample data, read only`. The
+plan's "CTA pair" predates that frame being read. Build all three — the third
+is a link to the repository, it costs nothing, and it is the same claim the
+social-proof section is built on.
+
+Type, read from the frame rather than guessed: eyebrow is Label/Caps —
+Helvetica Bold 11px, +6% tracking, uppercase, `accent-400`; the headline is
+Display/XL — Helvetica Bold 56px, −3% tracking, leading 1, `#fafafa`, and it is
+the one display-size heading the whole product allows.
 
 **2. Social proof.** Four `Card` tiles per the table above. No `Avatar`, no
 quote marks, no company logos.
@@ -1155,6 +1287,20 @@ The test file asserts, at minimum:
   the generated file, or no digit-bearing claim appears in the proof tiles.
 - Under `usePrefersReducedMotion() === true` nothing animates and every section
   is in flow.
+- **Both navbar treatments, not just one.** `overHero` true and false each get
+  a test asserting the background, the border and the lockup colour, because
+  the rename from `revealed` inverts the polarity and a port that drops the
+  `!` produces a navbar that is opaque over the hero and transparent over the
+  page — which looks deliberate and is wrong in both places.
+- The `sign up` control is byte-identical across the two treatments. It is the
+  one thing that must NOT change, so it is the one thing a colour-swap
+  refactor will change by accident.
+- `navOverHero` gets its own unit tests in `src/lib/__tests__/landingNav.test.ts`:
+  true at `scrollY = 0`; true one pixel before the band clears the hero; false
+  exactly when `scrollY + navHeight === heroBottom`; and false for a
+  `heroBottom` of 0, which is what the measuring ref reports on first render —
+  defaulting to the transparent treatment there would flash light-on-light text
+  on a themed page before the effect runs.
 
 - [ ] **Step 4: Build the sections against the catalogue**
 
@@ -1163,10 +1309,36 @@ The test file asserts, at minimum:
 carousel is the one exception and comes from skiper51. No hand-rolled bordered
 boxes; the grep in that section is the check.
 
-- [ ] **Step 5: `StickyNavbar` and `SiteFooter`**
+- [ ] **Step 5: `LandingNavbar` and `SiteFooter`**
 
-Unchanged from the original plan. The navbar takes `revealed` and Task 3 drives
-it; the footer carries the attribution line Task 1 made a gate.
+The footer is unchanged: it carries the attribution line Task 1 made a gate,
+rendering `SKIPER_ATTRIBUTION`'s `credit` strings so the README and the page
+cannot drift.
+
+The navbar is the locked decision above, built from `39:355`: `px-[64px]
+py-[24px]`, `gap-[32px]`, 80px tall, `BrandLockup` at the left, a flex spacer,
+then links, `open the demo`, `sign in`, `sign up`. Body/S is 13px/1.5. Take the
+composition from the frame and the two treatments from the table.
+
+**Position it `fixed top-0 inset-x-0 z-50`, rendered from `Landing`'s own root
+— not from inside the hero's JSX.** This is the one place the implementation
+cannot follow "included in the hero section" literally, and the reason is
+mechanical rather than stylistic: `Hero` and `ScreenCarousel` are wrapped in
+`motion.div`s that animate `translateY`, and a transformed ancestor becomes the
+containing block for `position: fixed` descendants — so a navbar nested in the
+hero would silently degrade to `absolute`, scroll away with the hero, and never
+reach social proof at all. It is visually part of the hero, which is what the
+decision is about; it is a DOM sibling, which is what makes it work. Say this
+in the component's docblock, because it looks like a mistake to anyone who
+reads the decision and then the JSX.
+
+`Landing` owns the state: a ref on the hero section, a `resize`-and-`scroll`
+subscription reading `heroRef.current.getBoundingClientRect().bottom + scrollY`
+into `heroBottomPx`, and `overHero = navOverHero(scrollY, heroBottomPx)` passed
+down. `LandingNavbar` itself takes the boolean and reads nothing — same rule
+Task 3 Step 14 applies to `scrollDriven`, and for the same reason: one
+component deciding it is over the hero while another decides it is not is M5's
+sidebar-and-bottom-nav defect wearing a different hat.
 
 - [ ] **Step 6: Point `/` at the landing page**
 
@@ -1179,6 +1351,30 @@ not a session swap, and stays signed in throughout. `src/app/page.tsx` renders
 `Landing` unconditionally and redirects nobody.
 
 ### Task 3: 6.1a — the pinned scroll sequence
+
+> ⚠️ **STALE IN TWO PLACES — read Task 2's Interfaces block before executing
+> this task.** Task 2 was rewritten on 2026-09-02 for the navbar decision, and
+> that rewrite invalidated two things below. **Do not implement this task from
+> the code samples in it until they are reconciled.**
+>
+> 1. **`navbarRevealed` is retired.** Every occurrence in this task — the
+>    `lib/pinnedScroll.ts` export, its test block, the `useMotionValueEvent`
+>    call, the render-prop field, and Step 14's wiring — belongs to a design
+>    where the navbar was hidden until the carousel ended. It is now present
+>    from the top and only swaps colour. The replacement is `navOverHero` in
+>    Task 2's `src/lib/landingNav.ts`, keyed on the hero's bottom edge.
+> 2. **`PinnedSequence` cannot emit both pin wrappers as adjacent siblings.**
+>    Under the six-section order the hero is section 1 and the carousel is
+>    inside section 4, with social proof and the problem statement between
+>    them. Split it into one `usePinnedSection` hook plus a `PinnedBlock`
+>    wrapper used twice.
+>
+> Everything else here — `shouldPin`, the pin heights, `carouselProgressFrom`,
+> `useCarouselProgress`, the reduced-motion and mobile paths, the dispatching
+> `matchMedia` mock, the hero-video pause test — is unaffected and still the
+> spec. One further correction from Task 1's execution: the imports say
+> `framer-motion`, but this repo depends on `motion` and every import in `src`
+> is `motion/react`. `useScroll` and `useMotionValueEvent` come from there.
 
 The hardest task in the milestone, and its own task because the roadmap says
 so. Hero holds the viewport while it scrolls, releases; carousel holds,
@@ -3059,7 +3255,7 @@ git commit -m "docs: rewrite the README against what the app actually is"
 | 6.1 landing — hero, carousel, ATS section, footer | 2 |
 | 6.1 — skiper51 install, `swiper` + `framer-motion`, autoplay off | 1 |
 | 6.1 — Swiper CSS reconciled with M4 tokens, `shadow: true` killed | 1 (Steps 5–6) |
-| 6.1 — theme toggle in the sticky navbar **and** the footer | 2 (Steps 2, 4) |
+| 6.1 — theme toggle in the sticky navbar **and** the footer | 2 (Steps 2, 5). In the navbar it inherits the `overHero` treatment like every other control — a sun/moon glyph at `text-text-secondary` over a dark hero is the same illegibility the whole decision exists to fix |
 | 6.1 — landing routes to auth; navbar `sign in` link + `sign up` button both breakpoints | 2 |
 | 6.1 — desktop navbar keeps `open the demo`, demoted to secondary; mobile drops it | 2 (Step 2) |
 | 6.1 — hero gains `create account` secondary beside primary `try the live demo` | 2 (Step 2) |
@@ -3075,7 +3271,7 @@ git commit -m "docs: rewrite the README against what the app actually is"
 | 6.1a — both paths tested | 3 (every describe block is paired) |
 | 6.1a — pin length scales with slide count | 3 (Step 1, the constant-pace invariant) |
 | 6.1a — pause the hero video once the hero unpins | 2 (`HeroMedia`), 3 (Step 13) |
-| 6.1a — navbar reveals at the carousel's end | 3 (`navbarRevealed`) |
+| 6.1a — navbar reveals at the carousel's end | **Overturned by Gabe, 2026-09-02.** The navbar is in the hero from the top and swaps treatment at social proof. `navbarRevealed` is retired; `navOverHero` in Task 2's `lib/landingNav.ts` replaces it. Figma's `39:355` annotation is superseded — see the locked navbar decision in Task 2 |
 | 6.1a — decide whether mobile pins | **Settled: it does not.** Task 3 — `shouldPin(reduced, width)`, `PIN_MIN_WIDTH_PX = 768`, four tests asserting the mobile path is unpinned, and Step 16's manual check at 375px. |
 | 6.2 — skiper106, `dialkit` | 4 (Steps 1–2) |
 | 6.2 — name collision, take only `SmoothInput` | 4 (Step 2) |
@@ -3207,6 +3403,19 @@ Recorded after M5.5 merged (PR #1, plus the seven follow-up commits merged as
    walls outright. A test in Step 3 fails if a testimonial is ever added, and
    a second guards the test-count figure from going stale, which is the same
    lie told slowly.
+
+6. **The navigation header lives in the hero, blended, and changes colour when
+   the reader scrolls into social proof.** → the locked navbar decision inside
+   Task 2. `StickyNavbar { revealed }` becomes `LandingNavbar { overHero }`,
+   and `navOverHero` in a new `src/lib/landingNav.ts` replaces Task 3's
+   `navbarRevealed`. This **overturns Figma frame `39:355`**, whose own
+   annotation reads "hidden over the hero, slides down after the carousel" —
+   true when the carousel was section 2, absurd now that it is section 4 and
+   three sections would scroll past with no navigation. It also **falsified
+   this plan's claim that the six-section reorder left Task 3's seam
+   untouched**: `PinnedSequence` emits its two pin wrappers as adjacent
+   siblings, and social proof and the problem statement now sit between them,
+   so Task 3 must split it into two independently placed wrappers.
 
 ## Settled by Gabe, 2026-08-28
 
