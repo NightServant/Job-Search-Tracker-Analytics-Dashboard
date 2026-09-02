@@ -20,12 +20,23 @@
  * Arrows are on in both. They are the keyboard affordance, and with touch off
  * the scroll-driven mode would otherwise have no control at all.
  *
- * UNRECONCILED: these names are taken from the M6 plan's description of
- * skiper51, NOT from the vendored source -- `src/components/v1/skiper51.tsx`
- * does not exist yet, because `shadcn add @skiper-ui/skiper51` has not been
- * run. When it lands, read its props and reconcile this interface against
- * them; the plan's own Step 2 is explicit that the prop list was written from
- * the website rather than from the file.
+ * Reconciled against the vendored source at src/components/v1/skiper51.tsx
+ * once it landed. Three of the six fields below are NOT props on
+ * `Carousel005Props`, and knowing where each one is actually applied is the
+ * difference between this file being a config object and being a lie:
+ *
+ *   loop, autoplay, showNavigation  -- real props, passed straight through.
+ *   allowTouchMove, simulateTouch   -- set on the Swiper INSTANCE by
+ *                                      useCarouselProgress (6.1a), not passed
+ *                                      as props. Swiper shadows params.* with
+ *                                      an instance property, so that hook
+ *                                      writes both.
+ *   shadow                          -- baked into the copied source as the
+ *                                      creative effect's `prev` shadow, and
+ *                                      held off there. It is carried here so
+ *                                      the flat-surface rule is asserted by a
+ *                                      test rather than resting on a vendor
+ *                                      file nobody re-reads.
  */
 export interface SwiperCarouselOptions {
   loop: false
