@@ -1,10 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
 const push = vi.fn()
 const signIn = vi.fn()
 const signUp = vi.fn()
+const verifySignUpOtp = vi.fn()
+const resendSignUpOtp = vi.fn()
+const signInWithProvider = vi.fn()
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn() }),
 }))
@@ -15,6 +18,9 @@ vi.mock('@/contexts/AuthContext', () => ({
     loading: false,
     signIn,
     signUp,
+    verifySignUpOtp,
+    resendSignUpOtp,
+    signInWithProvider,
     signOut: vi.fn(),
   }),
 }))
@@ -26,6 +32,10 @@ beforeEach(() => {
   push.mockClear()
   signIn.mockReset()
   signUp.mockReset()
+  verifySignUpOtp.mockReset()
+  resendSignUpOtp.mockReset()
+  signInWithProvider.mockReset()
+  window.localStorage.clear()
 })
 
 async function fill(password = 'hunter22') {
@@ -56,14 +66,26 @@ describe('the /login route', () => {
 })
 
 describe('the /signup route', () => {
-  it('creates the account and sends the user to the dashboard', async () => {
+  // The route now renders the three-step flow rather than a single screen, so
+  // a successful signUp advances to verification -- it does NOT navigate. The
+  // dashboard is reached only after the code is accepted, which is the whole
+  // point of adding the step: an unverified address must not become a usable
+  // session.
+  async function fillDetails(email = 'a@b.test') {
+    await userEvent.type(screen.getByLabelText(/^Email/), email)
+    await userEvent.type(screen.getByLabelText(/^Password/), 'Str0ng!Passw0rd')
+    await userEvent.type(screen.getByLabelText(/^Confirm password/), 'Str0ng!Passw0rd')
+    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  }
+
+  it('creates the account and asks for the emailed code', async () => {
     signUp.mockResolvedValue(undefined)
     render(<SignupRoute />)
-    await fill()
-    await userEvent.type(screen.getByLabelText(/^Confirm password/), 'hunter22')
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
-    expect(signUp).toHaveBeenCalledWith('a@b.test', 'hunter22')
-    expect(push).toHaveBeenCalledWith('/dashboard')
+    await fillDetails()
+    expect(signUp).toHaveBeenCalledWith('a@b.test', 'Str0ng!Passw0rd')
+    expect(await screen.findByLabelText(/^Verification code/)).toBeInTheDocument()
+    // Not yet: the address is unverified.
+    expect(push).not.toHaveBeenCalled()
   })
 
   it('calls signUp, not signIn', async () => {
@@ -71,20 +93,30 @@ describe('the /signup route', () => {
     // a copy-paste gets wrong, and the wrong one still compiles.
     signUp.mockResolvedValue(undefined)
     render(<SignupRoute />)
-    await fill()
-    await userEvent.type(screen.getByLabelText(/^Confirm password/), 'hunter22')
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await fillDetails()
     expect(signUp).toHaveBeenCalled()
     expect(signIn).not.toHaveBeenCalled()
   })
 
-  it('does not navigate when the signup is refused', async () => {
+  it('reaches the dashboard only after the code is verified', async () => {
+    signUp.mockResolvedValue(undefined)
+    verifySignUpOtp.mockResolvedValue(undefined)
+    render(<SignupRoute />)
+    await fillDetails()
+    await userEvent.type(await screen.findByLabelText(/^Verification code/), '123456')
+    await userEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
+
+    expect(verifySignUpOtp).toHaveBeenCalledWith('a@b.test', '123456')
+    expect(await screen.findByText('you are all set')).toBeInTheDocument()
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard'), { timeout: 4000 })
+  })
+
+  it('does not advance when the signup is refused', async () => {
     signUp.mockRejectedValue(new Error('User already registered'))
     render(<SignupRoute />)
-    await fill()
-    await userEvent.type(screen.getByLabelText(/^Confirm password/), 'hunter22')
-    await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+    await fillDetails()
     expect(await screen.findByText('User already registered')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Verification code/)).toBeNull()
     expect(push).not.toHaveBeenCalled()
   })
 })

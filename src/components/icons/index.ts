@@ -49,6 +49,8 @@ import { ClockIcon as ClockIconBase } from './clock'
 import { DownloadIcon as DownloadIconBase } from './download'
 import { EllipsisVerticalIcon } from './ellipsis-vertical'
 import { ExternalLinkIcon } from './external-link'
+import { EyeIcon as EyeIconBase } from './eye'
+import { EyeOffIcon as EyeOffIconBase } from './eye-off'
 import { FileTextIcon } from './file-text'
 import { HistoryIcon } from './history'
 import { LayoutDashboardIcon } from './layout-dashboard'
@@ -94,6 +96,8 @@ export const DownloadIcon = withDefaultSize(DownloadIconBase)
 export const CloseIcon = withDefaultSize(XIcon)
 export const ClockIcon = withDefaultSize(ClockIconBase)
 export const ExternalIcon = withDefaultSize(ExternalLinkIcon)
+export const EyeIcon = withDefaultSize(EyeIconBase)
+export const EyeOffIcon = withDefaultSize(EyeOffIconBase)
 export const LockIcon = withDefaultSize(LockIconBase)
 export const MailIcon = withDefaultSize(MailIconBase)
 export const SunIcon = withDefaultSize(SunIconBase)
@@ -147,6 +151,8 @@ export const icons = {
   Check: asIconComponent(CheckIcon),
   Clock: asIconComponent(ClockIcon),
   External: asIconComponent(ExternalIcon),
+  Eye: asIconComponent(EyeIcon),
+  EyeOff: asIconComponent(EyeOffIcon),
   Lock: asIconComponent(LockIcon),
   Mail: asIconComponent(MailIcon),
   Sun: asIconComponent(SunIcon),

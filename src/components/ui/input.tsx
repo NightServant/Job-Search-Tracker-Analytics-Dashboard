@@ -2,7 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { LockIcon, SearchIcon } from '@/components/icons'
+import { EyeIcon, EyeOffIcon } from '@/components/icons'
 
 /**
  * Four states from Figma: Default, Focus, Error, Disabled.
@@ -57,11 +57,26 @@ Input.displayName = 'Input'
  * `right-2` on a wrapper that shrink-wraps the input, not a fixed left offset.
  * A fixed offset was measured against the desktop field width and walked off
  * the canvas at 375px, where the field is roughly half as wide.
+ *
+ * THE GLYPH IS AN EYE, and that is a correction. This control shipped drawing
+ * a MAGNIFIER for "show" and a PADLOCK for "hide", because those were the two
+ * nearest glyphs already in the barrel. Both say the wrong thing next to a
+ * password: a magnifier is the universal affordance for SEARCH, so on the
+ * signup screen it read as a search box sitting inside the password field,
+ * and a padlock is the universal decoration for "this field is secure" --
+ * a state, not a button. Neither invites a click, which is the entire job.
+ * lu-eye and lu-eye-off were pulled from the AnimateIcons registry rather
+ * than drawn here, per the M5.5 rule against hand-authored SVG geometry.
+ *
+ * The eye shows while the password is MASKED. The icon names the action the
+ * click performs -- reveal -- not the state the field is in, which matches
+ * the aria-label beside it and is the convention every password field the
+ * user has already met follows.
  */
 export const PasswordInput = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, ...props }, ref) => {
     const [revealed, setRevealed] = React.useState(false)
-    const Reveal = revealed ? LockIcon : SearchIcon
+    const Reveal = revealed ? EyeOffIcon : EyeIcon
     return (
       <div className="relative w-full">
         <Input

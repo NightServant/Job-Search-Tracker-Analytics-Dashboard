@@ -135,6 +135,35 @@ describe('PasswordInput', () => {
     fireEvent.click(screen.getByLabelText('Show password'))
     expect(field.type).toBe('text')
   })
+
+  it('draws an eye rather than the magnifier it used to', () => {
+    // This shipped with SearchIcon for "show" and LockIcon for "hide", which
+    // put a search affordance inside the signup form's password field. The
+    // assertion is on GEOMETRY, not on the imported name: the eye's pupil is
+    // a circle at 12,12 r=3, the magnifier's lens is 11,11 r=8 and its handle
+    // is the only path in the set containing 4.34. Swapping the import back
+    // fails both halves.
+    const { container } = render(<PasswordInput id="pw" />)
+    const svg = container.querySelector('button svg')!
+
+    expect(svg.querySelector('circle[cx="12"][cy="12"][r="3"]')).toBeTruthy()
+    expect(svg.querySelector('circle[r="8"]')).toBeNull()
+    expect(svg.innerHTML).not.toContain('4.34')
+  })
+
+  it('swaps the eye for a struck-through eye once revealed', () => {
+    // Positive companion to the above: without this, an eye hard-coded in
+    // both states would pass. eye-off is the same pupil plus a slash, so the
+    // discriminator is the extra line, not the circle.
+    const { container } = render(<PasswordInput id="pw" />)
+    const before = container.querySelectorAll('button svg *').length
+
+    fireEvent.click(screen.getByLabelText('Show password'))
+
+    const after = container.querySelectorAll('button svg *').length
+    expect(after).toBeGreaterThan(before)
+    expect(screen.getByLabelText('Hide password')).toBeTruthy()
+  })
 })
 
 describe('Breadcrumb', () => {

@@ -3,6 +3,27 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { hasValidSupabaseConfig, supabase, supabaseConfigError } from '@/lib/supabase'
+import { normalizeEmail } from '@/lib/credentials'
+import type { OAuthProviderId } from '@/lib/oauthProviders'
+
+/**
+ * Turns a Supabase auth error into an Error with a usable message.
+ *
+ * Replaces three copies of `const anyErr = error as any`. `as any` on an error
+ * object is how a message that is actually an object ends up rendered as
+ * "[object Object]" in front of a person trying to sign in -- and it silences
+ * the compiler on the one value in the function that is least under our
+ * control. AuthError always carries a string `message`; the fallback is for
+ * the shapes that are not AuthError at all.
+ */
+function authError(error: unknown): Error {
+  if (error instanceof Error && error.message) return new Error(error.message)
+  if (typeof error === 'object' && error !== null && 'message' in error) {
+    const message = (error as { message: unknown }).message
+    if (typeof message === 'string' && message) return new Error(message)
+  }
+  return new Error('Authentication failed. Please try again.')
+}
 
 interface AuthContextType {
   user: User | null
@@ -11,6 +32,20 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
+  /**
+   * Confirms a sign-up with the 6-digit code emailed to the address.
+   *
+   * Requires the Supabase email template for "Confirm signup" to contain
+   * {{ .Token }}. Out of the box it contains {{ .ConfirmationURL }} only, and
+   * with that template no code is ever sent -- the call below will keep
+   * returning "Token has expired or is invalid" against a code that never
+   * existed. See docs/SECURITY.md.
+   */
+  verifySignUpOtp: (email: string, token: string) => Promise<void>
+  /** Re-sends the sign-up code. Supabase applies its own cooldown. */
+  resendSignUpOtp: (email: string) => Promise<void>
+  /** Starts an OAuth redirect. Resolves when the browser is handed over. */
+  signInWithProvider: (provider: OAuthProviderId) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -43,14 +78,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!hasValidSupabaseConfig) {
       throw new Error(supabaseConfigError || 'Supabase is not configured')
     }
+    // Normalised at the boundary, so Gabe@x.com and gabe@x.com are one
+    // identity rather than two rows -- see lib/credentials.
     const { error } = await supabase.auth.signInWithPassword({
-      email,
+      email: normalizeEmail(email),
       password,
     })
-    if (error) {
-      const anyErr = error as any
-      throw new Error(anyErr.message || JSON.stringify(anyErr))
-    }
+    if (error) throw authError(error)
   }
 
   const signUp = async (email: string, password: string) => {
@@ -58,13 +92,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(supabaseConfigError || 'Supabase is not configured')
     }
     const { error } = await supabase.auth.signUp({
-      email,
+      email: normalizeEmail(email),
       password,
     })
-    if (error) {
-      const anyErr = error as any
-      throw new Error(anyErr.message || JSON.stringify(anyErr))
+    if (error) throw authError(error)
+  }
+
+  const verifySignUpOtp = async (email: string, token: string) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
     }
+    // `type: 'signup'` and not 'email': they are different flows, and using
+    // the wrong one rejects a perfectly good code.
+    const { error } = await supabase.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: token.trim(),
+      type: 'signup',
+    })
+    if (error) throw new Error(error.message)
+  }
+
+  const resendSignUpOtp = async (email: string) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email: normalizeEmail(email),
+    })
+    if (error) throw new Error(error.message)
+  }
+
+  const signInWithProvider = async (provider: OAuthProviderId) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: {
+        // Back to the app, not to a URL the caller supplied: an
+        // attacker-controlled redirectTo on an OAuth flow is how a token ends
+        // up somewhere it should not. window.location.origin is ours by
+        // definition. The destination must also be listed in the Supabase
+        // dashboard's redirect allow-list, which is the real enforcement.
+        redirectTo: `${window.location.origin}/dashboard`,
+      },
+    })
+    if (error) throw new Error(error.message)
   }
 
   const signOut = async () => {
@@ -72,10 +146,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(supabaseConfigError || 'Supabase is not configured')
     }
     const { error } = await supabase.auth.signOut()
-    if (error) {
-      const anyErr = error as any
-      throw new Error(anyErr.message || JSON.stringify(anyErr))
-    }
+    if (error) throw authError(error)
   }
 
   return (
@@ -86,6 +157,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         signIn,
         signUp,
+        verifySignUpOtp,
+        resendSignUpOtp,
+        signInWithProvider,
         signOut,
       }}
     >
