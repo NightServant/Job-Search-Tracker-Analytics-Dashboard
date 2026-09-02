@@ -697,3 +697,51 @@ body,
   filter: var(--app-backdrop-filter);
 }
 
+
+/* --- Swiper (skiper51, M6 6.1) --------------------------------------------
+   Swiper ships its own stylesheet and its own DOM (.swiper-slide,
+   .swiper-pagination, .swiper-button-next), and the vendor's guidance for
+   changing any of it is !important overrides. They are kept in this one block
+   rather than inline on the component so a later reader can see the whole
+   vendor reconciliation at once -- the copied source at
+   src/components/v1/skiper51.tsx had an inline <style> element doing half of
+   this, and it was removed in favour of these rules.
+
+   Radius caps at 4px here as everywhere; the vendor drew 25px slide corners.
+
+   The `content: none` matters. Swiper draws its arrows as an ::after glyph
+   from its own icon font, which is a second icon vocabulary and the Global
+   Constraint forbids it. Killing the pseudo-element is what lets the
+   @/components/icons chevrons show. */
+.swiper-slide {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+}
+.swiper-pagination-bullet {
+  background: var(--color-text-muted);
+  opacity: 1;
+  border-radius: var(--radius-sm);
+}
+.swiper-pagination-bullet-active {
+  background: var(--color-accent-default);
+}
+.swiper-button-next,
+.swiper-button-prev {
+  color: var(--color-text-secondary);
+}
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  content: none;
+}
+
+/* The carousel's own stage. `Carousal_005` is the vendor's spelling of the
+   class it puts on the Swiper root -- kept as-is so the selector still matches
+   the copied source. The bottom padding is the gutter the pagination bullets
+   sit in; without it they overlap the last slide. */
+.Carousal_005 {
+  width: 100%;
+  height: 440px;
+  padding-bottom: 50px;
+}
