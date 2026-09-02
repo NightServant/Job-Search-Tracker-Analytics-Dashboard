@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { HeroMedia } from './HeroMedia'
 import { HERO } from './content'
@@ -13,9 +12,14 @@ import { HERO } from './content'
  * accent-700 on near-black fails contrast, and the frame already made that
  * choice. Transcribed from Figma 39:369.
  *
- * ONE call to action: "read the source". Gabe removed the demo and
- * create-account buttons on 2026-09-02, and the frame's three-button group
- * with them. The hero therefore makes an argument rather than asking for a
+ * ONE call to action: "read the source", and it is PRIMARY. Gabe removed the
+ * demo and create-account buttons on 2026-09-02 and promoted the survivor.
+ *
+ * Filled accent rather than the hairline-on-dark treatment it had while it was
+ * the third of three: a lone secondary button reads as a button someone forgot
+ * to finish. With nothing to be secondary to, the only honest weight is
+ * primary -- and the accent fill is the one element that carries colour on an
+ * otherwise desaturated hero, so it is also where the eye lands. The hero therefore makes an argument rather than asking for a
  * decision. Both removed routes are still one click away -- `sign in` and
  * `sign up` are in the navbar directly above, and the closing CTA carries the
  * demo and the signup together with the sentence that says what the demo is.
@@ -70,11 +74,8 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
             href={HERO.sourceCta.href}
             target="_blank"
             rel="noreferrer noopener"
-            data-variant="secondary"
-            className={cn(
-              buttonVariants({ variant: 'secondary', size: 'm' }),
-              'border-[rgba(250,250,250,0.5)] bg-transparent text-[#fafafa] backdrop-blur-sm transition-colors hover:bg-[rgba(250,250,250,0.12)]'
-            )}
+            data-variant="primary"
+            className={buttonVariants({ variant: 'primary', size: 'm' })}
           >
             {HERO.sourceCta.label}
           </Link>

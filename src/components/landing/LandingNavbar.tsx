@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { BrandLockup } from '@/components/ui/brand-mark'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { buttonVariants } from '@/components/ui/button'
-import { NAV_ACTIONS, NAV_LINKS } from './content'
+import { NAV_LINKS } from './content'
 
 /**
  * The landing page's navigation header.
@@ -40,11 +39,21 @@ import { NAV_ACTIONS, NAV_LINKS } from './content'
  * own active route and disagreeing cost a fix round, and the ruling was that
  * the parent computes once and both consume.
  *
- * No theme toggle below md. Read from Figma 64:1020: at 375 the bar is 60px
- * and holds the lockup, sign in and sign up -- no links, no demo button, no
- * toggle. On mobile the theme control lives in the footer only, which still
- * satisfies 6.1's "navbar AND footer" because the desktop bar carries both.
- * This is a design decision, not an omission; do not "fix" it.
+ * NO AUTH CONTROLS. Gabe removed `sign in` and `sign up` from the bar on
+ * 2026-09-02, after the demo button went the same way. What is left is
+ * identity (the lockup), orientation (three links) and one preference (the
+ * theme toggle) -- the bar orients, it does not ask.
+ *
+ * Auth is still reachable: the closing CTA carries `create an account` and the
+ * footer carries `sign in`. Both are further down the page than a persistent
+ * bar, which is the trade being made deliberately -- a landing page that asks
+ * for a decision in its top-right corner asks before it has argued anything.
+ *
+ * Below md the bar is the lockup and nothing else: the links hide, and the
+ * theme toggle hides with them (Figma 64:1020 draws no toggle at 375). With
+ * the footer's toggle also removed, that leaves NO theme control on this page
+ * at phone widths -- see SiteFooter, which records the same consequence and
+ * the one-line fix.
  */
 export interface LandingNavbarProps {
   /** True while the hero still covers the band the bar occupies. */
@@ -140,32 +149,6 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
           </Link>
         ))}
       </nav>
-
-      <Link
-        href={NAV_ACTIONS.signIn.href}
-        className={cn(
-          'text-body-s transition-colors',
-          overHero
-            ? 'text-[rgba(250,250,250,0.82)] hover:text-[#fafafa]'
-            : 'text-text-secondary hover:text-text-primary'
-        )}
-      >
-        {NAV_ACTIONS.signIn.label}
-      </Link>
-
-      {/*
-        Identical in both treatments, deliberately. It is a filled accent
-        button, it clears contrast on either ground, and a call to action that
-        restyles itself mid-scroll reads as a different button.
-      */}
-      <Link
-        href={NAV_ACTIONS.signUp.href}
-        data-nav-signup
-        data-variant="primary"
-        className={buttonVariants({ variant: 'primary', size: 's' })}
-      >
-        {NAV_ACTIONS.signUp.label}
-      </Link>
 
       <div data-nav-toggle className="hidden md:block">
         <ThemeToggle size={32} className={cn(overHero && 'text-[#fafafa]')} />

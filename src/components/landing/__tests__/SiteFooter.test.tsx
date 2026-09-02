@@ -18,12 +18,18 @@ describe('the site footer', () => {
     }
   })
 
-  it('carries the theme toggle, which is the mobile theme control', () => {
-    // The navbar drops its toggle below md (Figma 64:1020 has none), so on a
-    // phone this is the ONLY theme control on the page. 6.1 asks for navbar
-    // and footer; losing this one loses mobile entirely.
+  it('carries no theme toggle', () => {
+    // Removed by Gabe 2026-09-02. Asserted rather than merely deleted, because
+    // the previous test claimed the opposite and a reader finding neither
+    // would not know which way the decision went.
+    //
+    // CONSEQUENCE, recorded here too: the navbar hides its toggle below md, so
+    // there is now no theme control anywhere on this page at phone widths.
     const { container } = render(<SiteFooter />)
-    expect(container.querySelector('[data-theme-toggle]')).not.toBeNull()
+    expect(container.querySelector('[data-theme-toggle]')).toBeNull()
+    // Positive companion: the footer still rendered, so this is about the
+    // toggle and not about an empty component.
+    expect(screen.getByRole('link', { name: 'privacy' })).toBeInTheDocument()
   })
 
   it('links to the privacy page the milestone actually builds', () => {

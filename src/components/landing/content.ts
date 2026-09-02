@@ -68,19 +68,6 @@ export const NAV_LINKS = [
 ] as const
 
 /**
- * The navbar's two actions. There is deliberately no `open the demo` here:
- * the hero's primary CTA sits directly below the bar and says "try the live
- * demo", so a second demo button one line above it is the same call to action
- * twice in one viewport. Removed 2026-09-02 at Gabe's instruction; the Figma
- * frame (39:355) draws it because that bar was never meant to be visible over
- * the hero at all.
- */
-export const NAV_ACTIONS = {
-  signIn: { label: 'sign in', href: '/login' },
-  signUp: { label: 'sign up', href: '/signup' },
-} as const
-
-/**
  * The rail's sections, in page order.
  *
  * The ids are the same `data-landing-section` values the sections already

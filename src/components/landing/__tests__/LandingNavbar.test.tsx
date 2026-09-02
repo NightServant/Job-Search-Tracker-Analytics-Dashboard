@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { LandingNavbar } from '../LandingNavbar'
-import { NAV_LINKS, NAV_ACTIONS } from '../content'
+import { NAV_LINKS } from '../content'
 
 vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: 'light', setTheme: vi.fn() }),
@@ -91,27 +91,25 @@ describe('LandingNavbar across both treatments', () => {
       for (const link of NAV_LINKS) {
         expect(screen.getByRole('link', { name: link.label })).toBeInTheDocument()
       }
-      expect(
-        screen.getByRole('link', { name: NAV_ACTIONS.signUp.label })
-      ).toHaveAttribute('href', '/signup')
-      expect(
-        screen.getByRole('link', { name: NAV_ACTIONS.signIn.label })
-      ).toHaveAttribute('href', '/login')
       unmount()
     }
   })
 
-  it('keeps the sign-up button byte-identical', () => {
-    // The one control that must NOT change, which makes it the one a
-    // colour-swap refactor changes by accident. It is a filled accent button;
-    // it clears contrast on either ground, and a CTA that restyles itself
-    // mid-scroll reads as a different button.
-    const over = renderNav(true)
-    const past = renderNav(false)
-    const signUp = (bar: HTMLElement) =>
-      bar.querySelector('[data-nav-signup]')?.className
-    expect(signUp(over)).toBeDefined()
-    expect(signUp(over)).toBe(signUp(past))
+  it('carries no auth control at all', () => {
+    // Removed 2026-09-02, after the demo button went the same way. The bar
+    // orients -- identity, three links, one preference -- and does not ask for
+    // a decision from its top-right corner before the page has argued
+    // anything. Auth lives in the closing CTA and the footer.
+    for (const overHero of [true, false]) {
+      const { unmount } = render(<LandingNavbar overHero={overHero} />)
+      expect(screen.queryByRole('link', { name: 'sign up' })).toBeNull()
+      expect(screen.queryByRole('link', { name: 'sign in' })).toBeNull()
+      expect(document.querySelector('[data-nav-signup]')).toBeNull()
+      // Positive companion: the bar really did render, so the absences above
+      // are about auth and not about an empty component.
+      expect(screen.getByRole('link', { name: 'faq' })).toBeInTheDocument()
+      unmount()
+    }
   })
 
   it('sends the external link out safely and without a glyph', () => {
@@ -136,9 +134,9 @@ describe('LandingNavbar has no duplicate demo call to action', () => {
     for (const overHero of [true, false]) {
       const { unmount } = render(<LandingNavbar overHero={overHero} />)
       expect(screen.queryByRole('link', { name: 'open the demo' })).toBeNull()
-      // Positive companion: the auth pair IS still there, so this is not
+      // Positive companion: the bar IS still rendering links, so this is not
       // passing on a bar that renders nothing.
-      expect(screen.getByRole('link', { name: 'sign up' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'how it works' })).toBeInTheDocument()
       unmount()
     }
   })

@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { Separator } from '@/components/ui/separator'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { BrandLockup } from '@/components/ui/brand-mark'
 import { SKIPER_ATTRIBUTION } from '@/lib/attribution'
 import { FOOTER } from './content'
@@ -17,9 +16,13 @@ import { FOOTER } from './content'
  * and the registry copies source in-tree, so the obligation is on what ships,
  * and this page ships.
  *
- * The theme toggle here is not a duplicate of the navbar's. Below md the
- * navbar has no toggle at all (Figma 64:1020 draws none), so on a phone this
- * is the only theme control on the page.
+ * NO THEME TOGGLE. Removed by Gabe on 2026-09-02.
+ *
+ * KNOWN CONSEQUENCE, recorded rather than quietly accepted: the navbar hides
+ * its own toggle below md, so with this one gone there is NO theme control
+ * anywhere on the landing page at phone widths. A visitor on a phone cannot
+ * change the theme from `/`. The one-line fix, if that is not wanted, is to
+ * drop `hidden md:block` from the navbar's toggle wrapper.
  */
 export function SiteFooter() {
   return (
@@ -43,7 +46,6 @@ export function SiteFooter() {
               </Link>
             ))}
           </nav>
-          <ThemeToggle size={32} />
         </div>
       </div>
 

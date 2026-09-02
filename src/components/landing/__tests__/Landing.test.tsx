@@ -65,17 +65,23 @@ describe('the hero', () => {
     expect(ctas).toHaveLength(1)
     expect(ctas[0]).toHaveAttribute('href', HERO.sourceCta.href)
     expect(ctas[0]).toHaveTextContent(HERO.sourceCta.label)
+    // PRIMARY, not the hairline treatment it had while it was the third of
+    // three buttons. With nothing to be secondary to, a lone outlined button
+    // reads as one somebody forgot to finish.
+    expect(ctas[0]).toHaveAttribute('data-variant', 'primary')
   })
 
   it('leaves the demo and the signup reachable elsewhere on the page', () => {
-    // The point of removing them from the hero was to stop it competing with
-    // the closing CTA -- not to make either route unreachable. If this ever
-    // fails, the removal went too far.
+    // The point of removing these from the hero -- and later from the navbar
+    // -- was to stop them competing with the closing CTA, not to make either
+    // route unreachable. With the bar now carrying no auth at all, this is the
+    // test that would catch the removals having gone one step too far.
     renderLanding()
-    expect(screen.getByRole('link', { name: 'sign up' })).toHaveAttribute('href', '/signup')
     expect(
-      screen.getAllByRole('link', { name: /demo/i }).length
-    ).toBeGreaterThan(0)
+      screen.getByRole('link', { name: CLOSING_CTA.secondary.label })
+    ).toHaveAttribute('href', '/signup')
+    expect(screen.getByRole('link', { name: 'sign in' })).toHaveAttribute('href', '/login')
+    expect(screen.getAllByRole('link', { name: /demo/i }).length).toBeGreaterThan(0)
   })
 
   it('is the one display-size heading on the page', () => {
