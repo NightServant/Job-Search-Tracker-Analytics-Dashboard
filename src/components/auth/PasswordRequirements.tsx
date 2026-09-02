@@ -18,15 +18,26 @@ import { passwordRequirements } from '@/lib/credentials'
  *
  * The list is `aria-live="polite"` so a screen reader hears rules being met as
  * they are typed, rather than only discovering them on a rejected submit.
+ *
+ * IT IS ALWAYS ON THE FORM. It used to hide until the password field was
+ * touched, on the reasoning that an untouched form should not open as a wall
+ * of red -- Gabe overruled that on 2026-09-02, and the reasoning was wrong on
+ * its own terms anyway: unmet rules render MUTED GREY, not red, so there was
+ * never a wall of red to prevent. What hiding them actually cost was the one
+ * moment they are worth most. Someone decides what to type BEFORE they reach
+ * the field; rules that appear only once they have started have arrived after
+ * the decision, and the second attempt at a password is the one people
+ * abandon over.
+ *
+ * That is also why there is no `show` prop any more rather than a `show`
+ * defaulted to true: a prop that must always be passed the same value is a
+ * way for one caller to quietly disagree.
  */
 export interface PasswordRequirementsProps {
   password: string
-  /** Hidden until the field has been touched, so an empty form is not a wall of red. */
-  show: boolean
 }
 
-export function PasswordRequirements({ password, show }: PasswordRequirementsProps) {
-  if (!show) return null
+export function PasswordRequirements({ password }: PasswordRequirementsProps) {
   const reqs = passwordRequirements(password)
 
   return (

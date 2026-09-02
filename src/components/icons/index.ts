@@ -42,6 +42,7 @@ import { ArrowRightIcon as ArrowRightIconBase } from './arrow-right'
 import { CalendarIcon as CalendarIconBase } from './calendar'
 import { ChartLineIcon } from './chart-line'
 import { CheckIcon as CheckIconBase } from './check'
+import { CircleCheckIcon as CircleCheckIconBase } from './circle-check'
 import { ChevronDownIcon as ChevronDownIconBase } from './chevron-down'
 import { ChevronLeftIcon as ChevronLeftIconBase } from './chevron-left'
 import { ChevronRightIcon as ChevronRightIconBase } from './chevron-right'
@@ -61,10 +62,12 @@ import { MoonIcon as MoonIconBase } from './moon'
 import { PlusIcon as PlusIconBase } from './plus'
 import { SearchIcon as SearchIconBase } from './search'
 import { SettingsIcon as SettingsIconBase } from './settings'
+import { ShieldCheckIcon as ShieldCheckIconBase } from './shield-check'
 import { SunIcon as SunIconBase } from './sun'
 import { TrashIcon as TrashIconBase } from './trash'
 import { TriangleAlertIcon } from './triangle-alert'
 import { UploadIcon as UploadIconBase } from './upload'
+import { UserRoundIcon as UserRoundIconBase } from './user-round'
 import { XIcon } from './x'
 
 import { BriefcaseIcon } from './briefcase'
@@ -108,6 +111,9 @@ export const ChevronLeftIcon = withDefaultSize(ChevronLeftIconBase)
 export const ChevronRightIcon = withDefaultSize(ChevronRightIconBase)
 export const TrashIcon = withDefaultSize(TrashIconBase)
 export const CheckIcon = withDefaultSize(CheckIconBase)
+export const CircleCheckIcon = withDefaultSize(CircleCheckIconBase)
+export const ShieldCheckIcon = withDefaultSize(ShieldCheckIconBase)
+export const UserRoundIcon = withDefaultSize(UserRoundIconBase)
 export const GripVerticalIcon = withDefaultSize(EllipsisVerticalIcon)
 export const RotateCcwIcon = withDefaultSize(HistoryIcon)
 
@@ -149,6 +155,9 @@ export const icons = {
   Download: asIconComponent(DownloadIcon),
   Close: asIconComponent(CloseIcon),
   Check: asIconComponent(CheckIcon),
+  CircleCheck: asIconComponent(CircleCheckIcon),
+  ShieldCheck: asIconComponent(ShieldCheckIcon),
+  UserRound: asIconComponent(UserRoundIcon),
   Clock: asIconComponent(ClockIcon),
   External: asIconComponent(ExternalIcon),
   Eye: asIconComponent(EyeIcon),

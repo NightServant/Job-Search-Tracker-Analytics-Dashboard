@@ -36,9 +36,68 @@ describe('the registration progress bar', () => {
     expect(bar).toBeInTheDocument()
     const steps = [...bar.querySelectorAll('[data-step]')].map((s) => s.getAttribute('data-step'))
     expect(steps).toEqual(['your details', 'verify', 'done'])
-    expect(bar.querySelector('[data-state="current"]')?.getAttribute('data-step')).toBe(
-      'your details'
+    // Scoped to [data-step], not a bare [data-state]: the icon row above the
+    // track carries a state too, so an unscoped query returns whichever row
+    // happens to come first in the DOM.
+    expect(
+      bar.querySelector('[data-step][data-state="current"]')?.getAttribute('data-step')
+    ).toBe('your details')
+  })
+
+  it('carries an icon per step, above the track', async () => {
+    setup()
+    const bar = document.querySelector('[data-registration-progress]')!
+    const icons = [...bar.querySelectorAll('[data-step-icon]')]
+    expect(icons.map((i) => i.getAttribute('data-step-icon'))).toEqual([
+      'your details',
+      'verify',
+      'done',
+    ])
+    // Each one renders a real glyph rather than an empty span reserving space.
+    expect(icons.every((i) => i.querySelector('svg') !== null)).toBe(true)
+
+    // ABOVE the track, which is the half of the request that is about
+    // position. compareDocumentPosition is the order the DOM actually has,
+    // not the order the source happens to read in.
+    const track = bar.querySelector('[data-progress-fill]')!.parentElement!
+    expect(icons[0].compareDocumentPosition(track) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy()
+  })
+
+  it('centres each icon over its own label rather than hugging an edge', () => {
+    // justify-between put the first glyph on the container's left edge and the
+    // last on its right, while the labels beneath them are several times
+    // wider -- so an 18px icon sat at the corner of its label, not over it.
+    // The fix is one shared column model, asserted here as: both rows are
+    // grids with the SAME template, and the content of each cell is centred.
+    setup()
+    const bar = document.querySelector('[data-registration-progress]')!
+    const iconRow = bar.querySelector('[data-progress-icons]') as HTMLElement
+    const labelRow = bar.querySelector('ol') as HTMLElement
+
+    expect(iconRow.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))')
+    expect(labelRow.style.gridTemplateColumns).toBe(iconRow.style.gridTemplateColumns)
+    expect(iconRow.className).not.toContain('justify-between')
+    expect(labelRow.className).not.toContain('justify-between')
+    expect((iconRow.firstElementChild as HTMLElement).className).toContain('justify-center')
+    expect((labelRow.firstElementChild as HTMLElement).className).toContain('text-center')
+  })
+
+  it('keeps each icon in the same state as its own label', async () => {
+    // Two rows rendered from one list is how they drift: an icon row still
+    // showing step one while the labels have moved on says nothing useful.
+    setup()
+    const bar = () => document.querySelector('[data-registration-progress]')!
+    const stateOf = (sel: string) =>
+      [...bar().querySelectorAll(sel)].map((n) => n.getAttribute('data-state'))
+
+    expect(stateOf('[data-step-icon]')).toEqual(stateOf('[data-step]'))
+
+    await fillDetails()
+    await waitFor(() =>
+      expect(stateOf('[data-step-icon]')).toEqual(['done', 'current', 'todo'])
     )
+    expect(stateOf('[data-step-icon]')).toEqual(stateOf('[data-step]'))
   })
 
   it('advances as the person moves through the flow', async () => {
@@ -52,15 +111,20 @@ describe('the registration progress bar', () => {
 })
 
 describe('the password requirements checklist', () => {
-  it('stays hidden until the field is touched, so an empty form is not a wall of red', () => {
+  it('is on the form before anything is typed, not revealed by touching the field', () => {
+    // This asserted the OPPOSITE until 2026-09-02 -- the list hid until the
+    // field was touched. Gabe overruled it: the rules are worth most while
+    // someone is still deciding what to type, which is before they reach the
+    // field at all.
     setup()
-    expect(document.querySelector('[data-password-requirements]')).toBeNull()
+    const list = document.querySelector('[data-password-requirements]')
+    expect(list).not.toBeNull()
+    expect(list!.querySelectorAll('[data-requirement]')).toHaveLength(6)
   })
 
-  it('shows every rule at once, unmet, rather than revealing them as they break', async () => {
+  it('shows every rule at once, unmet, rather than revealing them as they break', () => {
     // Revealing rules one at a time turns one decision into a guessing game.
     setup()
-    await userEvent.click(screen.getByLabelText(/^Password/))
     const list = document.querySelector('[data-password-requirements]')!
     expect(list.querySelectorAll('[data-requirement]')).toHaveLength(6)
     expect(list.querySelectorAll('[data-met="true"]')).toHaveLength(0)
@@ -188,6 +252,23 @@ describe('the thank-you step', () => {
 })
 
 describe('the faster options', () => {
+  it('sits below the manual form, not above it', () => {
+    // Gabe's 2026-09-02 ruling, from a reference layout: the email and
+    // password fields come first, then the divider, then the providers.
+    // Asserted on DOM ORDER rather than on a class or a wrapper, because the
+    // order is the whole request -- a flex-col-reverse that looked right would
+    // still read wrong to a screen reader and to the keyboard.
+    setup()
+    const email = screen.getByLabelText(/^Email/)
+    const submit = screen.getByRole('button', { name: 'Create account' })
+    const providers = document.querySelector('[data-oauth-buttons]')!
+
+    expect(email.compareDocumentPosition(providers) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy()
+    expect(submit.compareDocumentPosition(providers) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy()
+  })
+
   it('offers the providers Supabase can actually serve', async () => {
     const props = setup()
     const buttons = document.querySelectorAll('[data-oauth-buttons] [data-provider]')

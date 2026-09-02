@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Button } from '../button'
@@ -117,6 +118,85 @@ describe('Input', () => {
   it('marks a disabled field disabled rather than just dimming it', () => {
     render(<Input id="a" disabled />)
     expect(screen.getByRole('textbox')).toHaveProperty('disabled', true)
+  })
+})
+
+describe('Input with the smooth caret merged in', () => {
+  // The merge Gabe asked for on 2026-09-02. Before it, the auth screens
+  // imported skiper106's SmoothInput directly and re-typed Input's border and
+  // background into a `wrapperClassName` -- a copy that had already fallen
+  // behind on the focus ring, the error border and the disabled state. These
+  // assert the two branches are ONE component with one class string, which is
+  // the only thing that stops it drifting apart again.
+  const classesOf = (el: Element) => el.className.split(/\s+/).filter(Boolean)
+
+  it('gives the caret branch every class the plain one has', () => {
+    // Containment, not string equality: SmoothInput adds four STRUCTURAL
+    // classes of its own -- the grid cell it shares with the caret, and the
+    // outline reset -- and those are not chrome. What must not differ is a
+    // single one of the design system's own classes.
+    const plain = render(<Input id="a" />)
+    const plainClasses = classesOf(plain.container.querySelector('input')!)
+    plain.unmount()
+
+    const smooth = render(<Input id="b" smoothCaret />)
+    const smoothClasses = classesOf(smooth.container.querySelector('input')!)
+
+    expect(plainClasses.length).toBeGreaterThan(10)
+    expect(smoothClasses).toEqual(expect.arrayContaining(plainClasses))
+
+    const extra = smoothClasses.filter((c) => !plainClasses.includes(c))
+    expect(extra.sort()).toEqual([
+      'col-end-2',
+      'col-start-1',
+      'outline-none',
+      'row-end-2',
+      'row-start-1',
+    ])
+  })
+
+  it('drops the vendor background rather than layering it over ours', () => {
+    // SmoothInput ships `bg-transparent text-inherit`, which on a page with a
+    // tinted section would render a see-through field. tailwind-merge resolves
+    // that in our favour because Input passes its classes LAST -- this is the
+    // assertion that notices if that order is ever reversed.
+    const { container } = render(<Input id="bg" smoothCaret />)
+    const cls = classesOf(container.querySelector('input')!)
+    expect(cls).not.toContain('bg-transparent')
+    expect(cls).not.toContain('text-inherit')
+    expect(cls).toContain('bg-bg-canvas')
+  })
+
+  it('carries the error state through the caret branch too', () => {
+    // The hand-copied wrapperClassName never had this at all: a failed
+    // validation on the sign-in email field drew no error border.
+    const { container } = render(<Input id="c" smoothCaret error="Nope" />)
+    const field = container.querySelector('input')!
+    expect(field.className).toContain('border-status-rejected-mark')
+    expect(field.getAttribute('aria-invalid')).toBe('true')
+    expect(field.getAttribute('aria-describedby')).toBe('c-error')
+    expect(screen.getByText('Nope')).toBeTruthy()
+  })
+
+  it('draws a caret only when asked', () => {
+    // Positive/negative pair on the FEATURE, so "chrome is identical" cannot
+    // be satisfied by the caret branch quietly rendering a plain input.
+    const off = render(<Input id="d" />)
+    expect(off.container.querySelector('[style*="caret-color"]')).toBeNull()
+    off.unmount()
+
+    const on = render(<Input id="e" smoothCaret />)
+    expect(on.container.querySelector('[style*="caret-color"]')).not.toBeNull()
+  })
+
+  it('hands a ref the real input, not the wrapper', () => {
+    // SmoothInput was a plain function component and swallowed refs entirely.
+    // Input is a forwardRef, so delegating to it without fixing that would
+    // have been a silent regression at every call site that focuses a field.
+    const ref = React.createRef<HTMLInputElement>()
+    render(<Input id="f" smoothCaret ref={ref} />)
+    expect(ref.current).toBeInstanceOf(HTMLInputElement)
+    expect(ref.current!.id).toBe('f')
   })
 })
 

@@ -5,8 +5,7 @@ import Link from 'next/link'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
-import { PasswordInput } from '@/components/ui/input'
-import { SmoothInput } from '@/components/v1/skiper106'
+import { Input, PasswordInput } from '@/components/ui/input'
 import { AuthBrandPanel } from './AuthBrandPanel'
 
 /**
@@ -30,12 +29,17 @@ import { AuthBrandPanel } from './AuthBrandPanel'
  * typed fields, an editor that dropped keystrokes mid-save), so it is a test
  * rather than an intention.
  *
- * The email field is skiper106's SmoothInput; the password fields are M4's
- * PasswordInput. On a masked field there is no visible caret to smooth -- the
- * characters are dots -- so the technique buys nothing there, while the
- * redrawn caret would have to share a box with PasswordInput's absolutely
- * positioned reveal control. That control's `right-2` anchor is M4's fix for
- * the Figma frame's off-canvas button at 335px, and reusing it is the point.
+ * EVERY FIELD HERE IS @/components/ui/input, and that is a correction. The
+ * email field used to be skiper106's SmoothInput directly, styled by a
+ * hand-copied `wrapperClassName` that re-typed Input's border and background
+ * -- so this screen's email box and its password boxes were two different
+ * components wearing the same clothes, and the copy had already fallen behind
+ * on the focus ring, the error border and the disabled state. The caret lives
+ * inside Input now, behind `smoothCaret`; see that file for why it is opt-in.
+ *
+ * The masked fields get it too. The note this replaces claimed a password
+ * field has "no visible caret to smooth" -- it has one, moving between
+ * bullets, and skiper106 measures masked text deliberately.
  */
 export type AuthMode = 'signin' | 'signup'
 
@@ -137,17 +141,16 @@ export function AuthScreen({ mode, onSubmit }: AuthScreenProps) {
           )}
 
           <Field id="auth-email" label="Email" required>
-            <SmoothInput
+            <Input
               id="auth-email"
               name="email"
               type="text"
               inputMode="email"
               autoComplete="email"
               required
+              smoothCaret
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              wrapperClassName="rounded-md border border-border-default bg-bg-canvas px-3 py-2 focus-within:border-accent-default"
-              className="text-body-m text-text-primary placeholder:text-text-muted"
             />
           </Field>
 

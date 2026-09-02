@@ -1,7 +1,14 @@
 'use client'
 
 import { motion, useMotionValue, useSpring } from 'motion/react'
-import React, { type ComponentPropsWithoutRef, useEffect, useRef, useState } from 'react'
+import React, {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ComponentPropsWithoutRef,
+} from 'react'
 
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { cn } from '@/lib/utils'
@@ -49,6 +56,15 @@ import { cn } from '@/lib/utils'
  *    the field's border, background and focus ring come from the caller, which
  *    is what lets this sit inside the app's own Field/Input language rather
  *    than beside it.
+ * 7. forwardRef ADDED. The vendor is a plain function component and keeps its
+ *    input on an internal ref, so a caller could not reach the element at all
+ *    -- no focus(), no select(), no react-hook-form registration. That was
+ *    survivable while this was imported directly by two screens; it stopped
+ *    being survivable when @/components/ui/input started delegating to it,
+ *    because Input IS a forwardRef and silently dropping the ref would be a
+ *    regression the caller cannot see. useImperativeHandle hands back the real
+ *    <input>, not a wrapper, so a ref behaves exactly as it does on the plain
+ *    field.
  */
 
 /**
@@ -71,16 +87,19 @@ export type SmoothInputProps = Omit<ComponentPropsWithoutRef<'input'>, 'type'> &
   wrapperClassName?: string
 }
 
-const SmoothInput = ({
-  className,
-  wrapperClassName,
-  value,
-  defaultValue,
-  onChange,
-  onBlur,
-  type = 'text',
-  ...props
-}: SmoothInputProps) => {
+const SmoothInput = forwardRef<HTMLInputElement, SmoothInputProps>(function SmoothInput(
+  {
+    className,
+    wrapperClassName,
+    value,
+    defaultValue,
+    onChange,
+    onBlur,
+    type = 'text',
+    ...props
+  },
+  forwardedRef
+) {
   const [internalValue, setInternalValue] = useState(defaultValue ?? '')
   const caretX = useMotionValue(0)
   const caretOpacity = useMotionValue(0)
@@ -88,6 +107,11 @@ const SmoothInput = ({
   const inputRef = useRef<HTMLInputElement>(null)
   const measureRef = useRef<HTMLSpanElement>(null)
   const prefersReducedMotion = usePrefersReducedMotion()
+
+  // The real element, not a facade: callers focus(), select() and read .value
+  // off this, and anything less than the node itself would be a subtly
+  // different field from the one the non-caret branch renders.
+  useImperativeHandle(forwardedRef, () => inputRef.current as HTMLInputElement, [])
 
   const isControlled = value !== undefined
   const inputValue = isControlled ? String(value) : internalValue
@@ -282,7 +306,7 @@ const SmoothInput = ({
       </div>
     </div>
   )
-}
+})
 
 export { SmoothInput }
 

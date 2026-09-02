@@ -88,6 +88,11 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
           maxLength={CODE_LENGTH}
           required
           autoFocus
+          // The last field in the flow, so it gets the same caret as the three
+          // before it. The wide tracking is not a problem for it: skiper106's
+          // measuring span copies letterSpacing off the computed style, so the
+          // caret lands between the digits rather than drifting left of them.
+          smoothCaret
           className="tabular tracking-[0.4em]"
         />
       </Field>

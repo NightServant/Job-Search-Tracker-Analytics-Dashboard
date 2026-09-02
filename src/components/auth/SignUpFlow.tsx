@@ -5,9 +5,8 @@ import Link from 'next/link'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
-import { PasswordInput } from '@/components/ui/input'
-import { SmoothInput } from '@/components/v1/skiper106'
-import { CheckIcon } from '@/components/icons'
+import { Input, PasswordInput } from '@/components/ui/input'
+import { CheckIcon, CircleCheckIcon, ShieldCheckIcon, UserRoundIcon } from '@/components/icons'
 import {
   isPasswordStrong,
   isValidEmail,
@@ -53,7 +52,17 @@ export interface SignUpFlowProps {
   doneDelayMs?: number
 }
 
-const STEPS = ['your details', 'verify', 'done'] as const
+/**
+ * The glyphs are chosen to say what the step ASKS OF YOU, not what it is
+ * called. A person for the details you hand over, a shield for the check that
+ * the address is really yours, a tick for being through. A numbered circle
+ * would have said nothing the label does not already say.
+ */
+const STEPS = [
+  { label: 'your details', icon: UserRoundIcon },
+  { label: 'verify', icon: ShieldCheckIcon },
+  { label: 'done', icon: CircleCheckIcon },
+]
 type Step = 0 | 1 | 2
 
 export function SignUpFlow({
@@ -68,7 +77,6 @@ export function SignUpFlow({
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
-  const [touchedPassword, setTouchedPassword] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
 
@@ -96,7 +104,6 @@ export function SignUpFlow({
           ? `Passwords are limited to ${PASSWORD_MAX_LENGTH} characters.`
           : 'Your password does not meet every requirement below yet.'
       )
-      setTouchedPassword(true)
       return
     }
     if (password !== confirm) {
@@ -140,7 +147,7 @@ export function SignUpFlow({
         <div className="flex-1" />
 
         <div className="mx-auto flex w-full max-w-[400px] flex-col gap-8">
-          <RegistrationProgress steps={[...STEPS]} current={step} />
+          <RegistrationProgress steps={STEPS} current={step} />
 
           {step === 0 && (
             <form onSubmit={handleDetails} className="flex flex-col gap-6">
@@ -151,8 +158,6 @@ export function SignUpFlow({
                 </p>
               </div>
 
-              <OAuthButtons onSelect={onProvider} disabled={busy} />
-
               {error && (
                 <Alert variant="destructive" role="alert">
                   <AlertDescription>{error}</AlertDescription>
@@ -160,17 +165,16 @@ export function SignUpFlow({
               )}
 
               <Field id="signup-email" label="Email" required>
-                <SmoothInput
+                <Input
                   id="signup-email"
                   name="email"
                   type="text"
                   inputMode="email"
                   autoComplete="email"
                   required
+                  smoothCaret
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  wrapperClassName="rounded-md border border-border-default bg-bg-canvas px-3 py-2 focus-within:border-accent-default"
-                  className="text-body-m text-text-primary placeholder:text-text-muted"
                 />
               </Field>
 
@@ -182,11 +186,10 @@ export function SignUpFlow({
                     autoComplete="new-password"
                     required
                     value={password}
-                    onFocus={() => setTouchedPassword(true)}
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </Field>
-                <PasswordRequirements password={password} show={touchedPassword} />
+                <PasswordRequirements password={password} />
               </div>
 
               <Field id="signup-confirm" label="Confirm password" required>
@@ -203,6 +206,8 @@ export function SignUpFlow({
               <Button type="submit" variant="primary" size="m" disabled={busy}>
                 Create account
               </Button>
+
+              <OAuthButtons onSelect={onProvider} disabled={busy} />
 
               <div data-switch-mobile className="text-body-s lg:hidden">
                 <span className="text-text-muted">have an account? </span>
