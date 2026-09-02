@@ -54,6 +54,18 @@ import { cn } from '@/lib/utils'
  *    library under its old name. Every other import in src/ is motion/react.
  * 6. Hardcoded colours and radii -> tokens, radius capped at 4px
  *    (`rounded-md`). The vendor drew 25px slide corners and a #f5f4f3 stage.
+ * 7b. The slide image carries a hairline `border-border-subtle`. These are
+ *    screenshots of a mostly-white application shown on a mostly-white
+ *    section, so without a frame the app's own edges dissolve into the page
+ *    and the screen looks like it is bleeding rather than being presented.
+ *    A hairline is how this design system contains things; a shadow is not.
+ *
+ * 7a. `scale-105` removed from the slide image. The vendor zooms each slide
+ *    5% to hide the seams of its own sample photography; our slides are
+ *    SCREENSHOTS, where a 5% zoom crops the app chrome at every edge -- the
+ *    sidebar on the left, the last table row at the bottom. A screenshot has
+ *    no seams to hide and every edge of it is content.
+ *
  * 7. The vendor's `Skiper51` demo export was dropped. It hardcoded eleven
  *    /images/x.com/*.jpeg paths that do not exist in this repo's public/, so
  *    it could only ever render eleven broken images. `Carousel_005` is the
@@ -152,7 +164,7 @@ const Carousel_005 = ({
           {images.map((image, index) => (
             <SwiperSlide key={index} className="">
               <img
-                className="h-full w-full scale-105 rounded-md object-cover"
+                className="h-full w-full rounded-md border border-border-subtle object-cover"
                 src={image.src}
                 alt={image.alt}
               />

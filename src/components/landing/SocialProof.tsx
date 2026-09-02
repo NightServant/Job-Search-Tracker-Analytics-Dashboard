@@ -1,5 +1,8 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Reveal } from '@/components/motion/Reveal'
+import { CheckIcon, ExternalIcon } from '@/components/icons'
+import { Section, SectionHeading } from './Section'
 import { SOCIAL_PROOF } from './content'
 
 /**
@@ -19,30 +22,40 @@ import { SOCIAL_PROOF } from './content'
  */
 export function SocialProof() {
   return (
-    <section
-      data-landing-section="social-proof"
-      className="px-5 py-20 md:px-16"
-    >
-      <h2 className="mb-10 text-heading-l text-text-primary">{SOCIAL_PROOF.heading}</h2>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {SOCIAL_PROOF.tiles.map((tile) => (
-          <Card key={tile.title}>
-            <CardHeader>
-              <CardTitle className="text-heading-s">{tile.title}</CardTitle>
-              <CardDescription className="text-body-s">{tile.body}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link
-                href={tile.href}
-                {...(tile.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
-                className="text-body-s text-accent-default underline underline-offset-4"
-              >
-                {tile.linkLabel}
-              </Link>
-            </CardContent>
-          </Card>
+    <Section name="social-proof">
+      <SectionHeading
+        eyebrow="verifiable"
+        title={SOCIAL_PROOF.heading}
+        icon={CheckIcon}
+      />
+      <div className="grid gap-px overflow-hidden rounded-md border border-border-subtle bg-border-subtle sm:grid-cols-2 lg:grid-cols-4">
+        {SOCIAL_PROOF.tiles.map((tile, i) => (
+          <Reveal key={tile.title} delay={i * 0.06} className="h-full">
+            {/*
+              A hairline grid rather than four floating cards: the gap-px on a
+              border-coloured ground draws one-pixel rules between tiles, which
+              is how this design system separates things. Four bordered boxes
+              with gaps between them would be four islands.
+            */}
+            <Card className="h-full rounded-none border-0 bg-bg-canvas transition-colors hover:bg-bg-surface">
+              <CardHeader>
+                <CardTitle className="text-heading-s">{tile.title}</CardTitle>
+                <CardDescription className="text-body-s">{tile.body}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link
+                  href={tile.href}
+                  {...(tile.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+                  className="group inline-flex items-center gap-1.5 text-body-s text-accent-default"
+                >
+                  <span className="underline underline-offset-4">{tile.linkLabel}</span>
+                  <ExternalIcon size={14} aria-hidden />
+                </Link>
+              </CardContent>
+            </Card>
+          </Reveal>
         ))}
       </div>
-    </section>
+    </Section>
   )
 }

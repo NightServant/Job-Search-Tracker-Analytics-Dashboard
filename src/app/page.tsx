@@ -18,5 +18,11 @@ import { SCREENS } from '@/components/landing/screens'
  * route dynamic, and the whole page is static content.
  */
 export default function Page() {
-  return <Landing screens={SCREENS} heroPosterSrc="/hero-poster.png" />
+  return (
+    <Landing
+      screens={SCREENS}
+      heroPosterSrc="/hero-poster.jpg"
+      heroVideoSrc="/hero.mp4"
+    />
+  )
 }

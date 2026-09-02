@@ -739,9 +739,29 @@ body,
 /* The carousel's own stage. `Carousal_005` is the vendor's spelling of the
    class it puts on the Swiper root -- kept as-is so the selector still matches
    the copied source. The bottom padding is the gutter the pagination bullets
-   sit in; without it they overlap the last slide. */
+   sit in; without it they overlap the last slide.
+
+   HEIGHT IS DERIVED FROM THE SLIDE ASPECT, NOT FIXED. The vendor hardcodes
+   440px, which against a 1440x900 screenshot (16:10) crops roughly a third of
+   the image -- the app's sidebar and its lowest panels -- so the carousel
+   showed a detail of each screen rather than the screen. The slides are sized
+   16/10 to match what public/screens/*.png actually are, and the stage takes
+   its height from them. Re-capture at a different size and this follows.
+
+   ONE SLIDE WIDE, so the presented screen is centred with nothing beside it.
+   The vendor sizes slides narrower than the stage so its sample photos peek in
+   from the sides -- fine for photography, wrong here: a half-visible second
+   copy of the app chrome at the right edge reads as a rendering fault rather
+   than as a carousel, and it pulls the eye off the screen being presented.
+   The creative effect still has its neighbours, they are simply translated
+   fully off-stage (next sits at 100%), which is what makes the transition a
+   clean push instead of a shuffle. */
 .Carousal_005 {
   width: 100%;
-  height: 440px;
-  padding-bottom: 50px;
+  height: auto;
+  padding-bottom: 44px;
+}
+.Carousal_005 .swiper-slide {
+  width: 100%;
+  aspect-ratio: 16 / 10;
 }

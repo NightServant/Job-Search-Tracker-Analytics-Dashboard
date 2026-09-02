@@ -21,6 +21,15 @@ import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
  * the children are simply shown; there is nobody watching an entrance anyway.
  */
 export interface RevealProps extends React.HTMLAttributes<HTMLDivElement> {
+  /**
+   * Stagger, in SECONDS -- it is handed straight to motion's
+   * `transition.delay`, which is a seconds API.
+   *
+   * Stated because it has already been got wrong once: a caller staggering a
+   * four-card row passed `i * 60` meaning milliseconds, which is one to three
+   * MINUTES, and three of the four cards sat at opacity 0 looking like a
+   * rendering bug rather than a slow animation.
+   */
   delay?: number
 }
 
@@ -29,12 +38,28 @@ export function Reveal({ delay = 0, className, children, ...props }: RevealProps
   const ref = React.useRef<HTMLDivElement>(null)
   const [shown, setShown] = React.useState(false)
 
+  /**
+   * Render the children plainly, with no motion wrapper at all.
+   *
+   * Setting `shown` is NOT enough on its own, which is what an earlier version
+   * of this component got wrong. motion animates opacity on requestAnimationFrame,
+   * and a hidden document -- a background tab, a prerender, a headless capture --
+   * has rAF paused, so the element stays at its `initial` opacity of 0 no
+   * matter what `shown` says. The escape hatch flipped the flag and the
+   * content stayed invisible anyway.
+   *
+   * So in every case where the entrance cannot be watched or should not run,
+   * this skips the animation entirely rather than starting one that may never
+   * advance. A missing animation is a cosmetic loss; invisible content is a
+   * broken page, and this is a landing page.
+   */
+  const noAnimation =
+    reduced ||
+    typeof IntersectionObserver === 'undefined' ||
+    (typeof document !== 'undefined' && document.visibilityState === 'hidden')
+
   React.useEffect(() => {
-    if (reduced) return setShown(true)
-    if (typeof IntersectionObserver === 'undefined') return setShown(true)
-    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-      return setShown(true)
-    }
+    if (noAnimation) return setShown(true)
 
     const el = ref.current
     if (!el) return
@@ -51,11 +76,17 @@ export function Reveal({ delay = 0, className, children, ...props }: RevealProps
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [reduced])
+  }, [noAnimation])
 
-  if (reduced) {
+  if (noAnimation) {
     return (
-      <div ref={ref} data-reveal data-reduced className={className} {...props}>
+      <div
+        ref={ref}
+        data-reveal
+        data-reduced={reduced ? '' : undefined}
+        className={className}
+        {...props}
+      >
         {children}
       </div>
     )

@@ -1,5 +1,7 @@
 import * as React from 'react'
-import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Reveal } from '@/components/motion/Reveal'
+import { AnalyticsIcon } from '@/components/icons'
+import { Section, SectionHeading } from './Section'
 import { SOLUTION } from './content'
 
 /**
@@ -21,26 +23,26 @@ export interface SolutionValueProps {
 
 export function SolutionValue({ children }: SolutionValueProps) {
   return (
-    <section
-      id="how-it-works"
-      data-landing-section="solution"
-      className="px-5 py-20 md:px-16"
-    >
-      <h2 className="text-heading-l text-text-primary">{SOLUTION.heading}</h2>
-      <p className="mt-3 max-w-2xl text-body-l text-text-secondary">{SOLUTION.lede}</p>
+    <Section name="solution" id="how-it-works">
+      <SectionHeading
+        eyebrow="the product"
+        title={SOLUTION.heading}
+        lede={SOLUTION.lede}
+        icon={AnalyticsIcon}
+      />
 
-      <div className="mt-10 grid gap-4 md:grid-cols-3">
-        {SOLUTION.claims.map((claim) => (
-          <Card key={claim.title}>
-            <CardHeader>
-              <CardTitle className="text-heading-s">{claim.title}</CardTitle>
-              <CardDescription className="text-body-s">{claim.body}</CardDescription>
-            </CardHeader>
-          </Card>
+      <div className="grid gap-px overflow-hidden rounded-md border border-border-subtle bg-border-subtle md:grid-cols-3">
+        {SOLUTION.claims.map((claim, i) => (
+          <Reveal key={claim.title} delay={i * 0.08} className="h-full">
+            <div className="flex h-full flex-col gap-2 bg-bg-canvas p-6">
+              <h3 className="text-heading-s text-text-primary">{claim.title}</h3>
+              <p className="text-body-s text-text-secondary">{claim.body}</p>
+            </div>
+          </Reveal>
         ))}
       </div>
 
-      <div className="mt-12">{children}</div>
-    </section>
+      {children && <div className="mt-16">{children}</div>}
+    </Section>
   )
 }

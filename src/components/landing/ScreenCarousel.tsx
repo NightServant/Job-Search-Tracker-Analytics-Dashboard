@@ -47,7 +47,12 @@ export function ScreenCarousel({
         showNavigation={options.showNavigation}
         showPagination
         onSwiper={onSwiper}
-        className="mx-auto"
+        // The vendor caps its stage at max-w-4xl (896px), sized for its own
+        // sample photography. Ours sits in the page's 1200px container and
+        // holds 1440x900 app screenshots, where 896px renders the UI too small
+        // to read -- which defeats the point of showing screenshots at all.
+        // twMerge resolves max-w-none over the vendor's max-w-4xl.
+        className="mx-auto max-w-none px-0"
       />
     </div>
   )
