@@ -6,7 +6,7 @@
 
 **Architecture:** The public surface lives outside the `(app)` route group and therefore outside its auth guard. `src/app/page.tsx` stops redirecting to `/dashboard` and becomes the landing route. Every screen follows the split this branch already established seven times: the route calls the hooks and owns the data, a props-taking component in `src/components/` takes plain props and renders without Next routing, react-query or AuthProvider. Motion maths that a jsdom test cannot exercise through real layout is extracted into pure functions under `src/lib/`, the way `lib/calendar.ts` and `lib/analyticsRange.ts` already are, so pinning and carousel progress are unit-testable rather than merely inspectable.
 
-**Tech Stack:** Next 15 App Router, React 19, Tailwind v4, `framer-motion` ^13.1.1 (already installed), `next-themes` ^0.4.6 (already installed), `swiper` (new, arrives with skiper51), `dialkit` (new, arrives with skiper106), Vitest + React Testing Library.
+**Tech Stack:** Next 15 App Router, React 19, Tailwind v4, `motion` ^13.1.1 (already installed — imported as `motion/react`; **not** `framer-motion`, which is the same library's old name and is not a dependency here), `next-themes` ^0.4.6 (already installed), `swiper` ^14.2.0 (arrived with skiper51 in Task 1), `dialkit` (new, arrives with skiper106), Vitest + React Testing Library.
 
 **Spec:** `docs/superpowers/plans/2026-08-23-worktrack-roadmap.md` — milestone M6, items 6.1, 6.1a, 6.2, 6.3, 6.4, 6.5, plus the "Third-party components — Skiper UI" section and the Global Constraints at the top of that file. Figma file `si641ecd9VS70DJPLvtPfo`, frames `Desktop / Landing Page`, `Mobile / Landing Page`, `Sign In`, `Sign Up` and their Dark twins. Predecessor plan: `docs/superpowers/plans/2026-08-25-m5-application-screens.md`. Predecessor execution ledger: `.superpowers/sdd/2026-08-25-m5-application-screens/progress.md` — read it; every rule in this plan's "How this plan was written" section is a scar from it.
 
@@ -68,7 +68,7 @@ roadmap, the "Consequence" column says which wins.
 | `src/components/v1/` | **Does not exist** | No Skiper component has ever been installed. Tasks 1 and 4 create it. |
 | `skiper4` / `skiper26` | **Never adopted.** `src/components/ui/theme-toggle.tsx` was written against skiper4's *technique* and its docblock states why skiper26 was declined (it mounts a second theme provider and pulls lucide). | The roadmap's "All four adopted components" is **wrong about two of them — the repo wins**. Attribution handling in Task 1; open question 1. |
 | `useThemeToggle()` | **Does not exist.** No such export anywhere in `src`. | The roadmap's 6.1 line "skiper4's button driven by 4.6's `useThemeToggle()`" is **wrong — the repo wins**. The primitive is `ThemeToggle` from `@/components/ui/theme-toggle`, props `{ size?: 32 \| 44 }`, marked with `data-theme-toggle`. |
-| `framer-motion` | `^13.1.1`, real dependency | Roadmap correct. Used by `ThemeToggle` and `Reveal`. |
+| `framer-motion` | **Not a dependency.** The repo depends on `motion` `^13.1.1` — the same library renamed — and every import in `src` is `motion/react` (`ThemeToggle`, `Reveal`, the AnimateIcons glyphs). Verified 2026-09-02 during Task 1 | The roadmap and this plan's own Tech Stack line both said `framer-motion`; **the repo wins**. Task 1's skiper51 install pulled `framer-motion` in as a second copy and it was rewritten to `motion/react` and uninstalled. Task 3 imports `useScroll` / `useMotionValueEvent` from `motion/react` |
 | `next-themes` | `^0.4.6`, real dependency; `ThemeProvider attribute="class" defaultTheme="system" enableSystem` in `src/app/providers.tsx` | Roadmap correct. |
 | `swiper`, `dialkit` | **Not installed** | Arrive with skiper51 (Task 1) and skiper106 (Task 4). |
 | `lucide-react` | `^0.400.0` installed. Three hits in `src`: `contexts/ToastContext.tsx:4` (`X`), `screens/LoginPage.tsx:6` (`Mail, Lock, Briefcase, AlertCircle`), and `ui/theme-toggle.tsx:53` (prose in a docblock, not an import) | M5 Task 10 removes it and is **not yet done**. M6 Task 4 deletes `LoginPage.tsx` outright, which retires four of the five imports on its own. M6 must not add any. |
@@ -209,7 +209,7 @@ the app shell mounts, which is what 6.1 asks for; the roadmap's `useThemeToggle(
 never existed. It carries `data-theme-toggle`, which is the test hook.
 
 **Pinning is CSS `position: sticky`, never JS scroll hijacking.** The roadmap
-settles this. `framer-motion`'s `useScroll` supplies a progress value *inside*
+settles this. `motion/react`'s `useScroll` supplies a progress value *inside*
 an already-pinned section; it never takes over scrolling.
 
 **Scroll drives the slides; the carousel is not touchable.** Settled by the
@@ -534,7 +534,10 @@ pnpm dlx shadcn add @skiper-ui/skiper51
 ```
 
 Expected: a new file under `src/components/v1/` and `swiper` (plus possibly
-`framer-motion`, already present) added to `package.json`.
+`framer-motion`) added to `package.json`. **It did add `framer-motion`** — a
+second copy of the `motion` package this repo already had, under its old name.
+Rewrite the vendored file's import to `motion/react` and `npm uninstall
+framer-motion`.
 
 Then **read the installed file end to end** and write down, in the task report:
 its exported component name, its full prop list, whether it already forwards
@@ -1009,24 +1012,28 @@ rots because nobody sees it — exists before the pinned path is layered over it
   **adjacent siblings** and then everything else beneath them. Under the
   2026-09-02 six-section order, social proof and the problem statement sit
   BETWEEN the hero and the carousel, so a component that emits the two pin
-  wrappers back to back cannot express the page. Three consequences, recorded
-  here because Task 2 is what surfaces them and Task 3 is what pays for them:
+  wrappers back to back cannot express the page. **Task 3 was rewritten on
+  2026-09-02 to fix this**; the three consequences below are recorded here
+  because Task 2 is what surfaced them, and they are already reflected there.
 
-  1. `PinnedSequence` must become **two independently placed pinned wrappers**
-     rather than one component emitting both. The obvious shape is a single
-     `usePinnedSection({ slideCount?, viewportHeightPx, viewportWidthPx })`
-     hook plus a `<PinnedBlock>` wrapper used twice, so sections 2 and 3 can
-     be ordinary children in between.
+  1. `PinnedSequence` is **gone**, replaced by three pieces: `useViewportSize`
+     (the page's one `resize` subscription), `usePinnedSection(holdHeightPx,
+     pinned)` called once per block, and a `<PinnedBlock section name>` wrapper
+     placed twice — so sections 2 and 3 are ordinary siblings in between.
+     `Landing` calls `shouldPin` once and hands the same boolean to both, so
+     the two blocks cannot disagree.
   2. `navbarRevealed(scrollY, heroPinHeightPx, carouselPinHeightPx)` is
-     **retired**. Its whole premise was the Figma annotation "hidden over the
-     hero, slides down after the carousel", which the navbar decision below
-     overturns. `navOverHero` replaces it, and it keys on the hero's bottom
-     edge — not the carousel's, which is now four sections away.
-  3. `PinnedSequence`'s render-prop state field `navbarRevealed` becomes
-     `overHero`, with the inverted meaning. A rename that flips polarity is
-     exactly the kind of thing that survives a careless port and produces a
-     navbar that is opaque over the hero and transparent over the page, so the
-     test in Step 3 asserts both states rather than only the interesting one.
+     **retired and deleted from `lib/pinnedScroll.ts`**. Its whole premise was
+     the Figma annotation "hidden over the hero, slides down after the
+     carousel", which the navbar decision below overturns. `navOverHero`
+     replaces it, keyed on the hero's measured bottom edge — not the
+     carousel's, which is now four sections away.
+  3. There is no render-prop state bag any more, so `navbarRevealed` does not
+     become a field on one: the navbar's state is `overHero`, owned by
+     `Landing` via `navOverHero`, and Task 3 touches it nowhere. The polarity
+     still flipped, though, which is why Step 3's test asserts BOTH treatments
+     — a careless port that drops the `!` produces a navbar that is opaque
+     over the hero and transparent over the page, and looks deliberate.
 
   What IS unchanged: Task 3 still consumes `pinned`, `carouselProgress` and
   `heroUnpinned`, and `HeroMedia`'s `paused` seam is untouched.
@@ -1336,7 +1343,7 @@ reads the decision and then the JSX.
 subscription reading `heroRef.current.getBoundingClientRect().bottom + scrollY`
 into `heroBottomPx`, and `overHero = navOverHero(scrollY, heroBottomPx)` passed
 down. `LandingNavbar` itself takes the boolean and reads nothing — same rule
-Task 3 Step 14 applies to `scrollDriven`, and for the same reason: one
+Task 3 Step 18 applies to `scrollDriven`, and for the same reason: one
 component deciding it is over the hero while another decides it is not is M5's
 sidebar-and-bottom-nav defect wearing a different hat.
 
@@ -1352,34 +1359,30 @@ not a session swap, and stays signed in throughout. `src/app/page.tsx` renders
 
 ### Task 3: 6.1a — the pinned scroll sequence
 
-> ⚠️ **STALE IN TWO PLACES — read Task 2's Interfaces block before executing
-> this task.** Task 2 was rewritten on 2026-09-02 for the navbar decision, and
-> that rewrite invalidated two things below. **Do not implement this task from
-> the code samples in it until they are reconciled.**
->
-> 1. **`navbarRevealed` is retired.** Every occurrence in this task — the
->    `lib/pinnedScroll.ts` export, its test block, the `useMotionValueEvent`
->    call, the render-prop field, and Step 14's wiring — belongs to a design
->    where the navbar was hidden until the carousel ended. It is now present
->    from the top and only swaps colour. The replacement is `navOverHero` in
->    Task 2's `src/lib/landingNav.ts`, keyed on the hero's bottom edge.
-> 2. **`PinnedSequence` cannot emit both pin wrappers as adjacent siblings.**
->    Under the six-section order the hero is section 1 and the carousel is
->    inside section 4, with social proof and the problem statement between
->    them. Split it into one `usePinnedSection` hook plus a `PinnedBlock`
->    wrapper used twice.
->
-> Everything else here — `shouldPin`, the pin heights, `carouselProgressFrom`,
-> `useCarouselProgress`, the reduced-motion and mobile paths, the dispatching
-> `matchMedia` mock, the hero-video pause test — is unaffected and still the
-> spec. One further correction from Task 1's execution: the imports say
-> `framer-motion`, but this repo depends on `motion` and every import in `src`
-> is `motion/react`. `useScroll` and `useMotionValueEvent` come from there.
+**Rewritten 2026-09-02**, after Task 2's navbar decision falsified two of this
+task's premises. What changed and why is at the end of the task, under
+*What this rewrite changed*; the task itself now reads straight through.
 
 The hardest task in the milestone, and its own task because the roadmap says
-so. Hero holds the viewport while it scrolls, releases; carousel holds,
-releases; the sticky navbar appears and Features onward scroll normally to the
-footer.
+so. The hero holds the viewport while it scrolls and releases; later, four
+sections down, the screen carousel holds and releases; everything else scrolls
+normally to the footer.
+
+**The two pinned blocks are no longer adjacent, and that is the structural
+fact this task is built around.** Under the six-section order the hero is
+section 1 and the carousel lives inside section 4, with social proof and the
+problem statement in between. So there is no single component that owns "the
+pinned sequence" — there is one hook, `usePinnedSection`, called twice, and one
+wrapper, `PinnedBlock`, placed twice, with ordinary sections between them. An
+earlier draft of this plan had a `PinnedSequence` that emitted both wrappers as
+siblings and claimed the reorder had not touched it. It had.
+
+**The navbar is not this task's business any more.** It used to appear at the
+carousel's end, which is why `navbarRevealed` lived in `lib/pinnedScroll.ts`.
+Task 2 now owns it: the navbar is inside the hero from the first paint and only
+swaps colour treatment, driven by `navOverHero` in `src/lib/landingNav.ts`,
+keyed on the hero's measured bottom edge rather than on any pin height. Nothing
+in this task reads or writes navbar state.
 
 **This is pinning, not parallax.** Classic parallax moves layers at different
 speeds. What is specified is two stacked sections that each hold the viewport
@@ -1409,11 +1412,15 @@ collapse to one question rather than three branches.
 **Files:**
 - Create: `src/lib/pinnedScroll.ts`
 - Create: `src/lib/__tests__/pinnedScroll.test.ts`
+- Create: `src/components/landing/useViewportSize.ts`
+- Create: `src/components/landing/__tests__/useViewportSize.test.ts`
+- Create: `src/components/landing/usePinnedSection.ts`
+- Create: `src/components/landing/__tests__/usePinnedSection.test.ts`
+- Create: `src/components/landing/PinnedBlock.tsx`
+- Create: `src/components/landing/__tests__/PinnedBlock.test.tsx`
 - Create: `src/components/landing/useCarouselProgress.ts`
 - Create: `src/components/landing/__tests__/useCarouselProgress.test.ts`
-- Create: `src/components/landing/PinnedSequence.tsx`
-- Create: `src/components/landing/__tests__/PinnedSequence.test.tsx`
-- Modify: `src/components/landing/Landing.tsx` (wrap Hero + ScreenCarousel in `PinnedSequence`)
+- Modify: `src/components/landing/Landing.tsx` (compute pin state once; wrap Hero and ScreenCarousel in a `PinnedBlock` each, four sections apart)
 - Modify: `src/components/landing/Hero.tsx` (accept `unpinned` and pass it to `HeroMedia` as `paused`)
 - Modify: `src/components/landing/ScreenCarousel.tsx` (accept `onSwiper` and `scrollDriven`, and expose the Swiper instance upward)
 
@@ -1422,7 +1429,7 @@ collapse to one question rather than three branches.
   - `usePrefersReducedMotion(): boolean` from `@/hooks/usePrefersReducedMotion` — already subscribes to `matchMedia` changes via `useSyncExternalStore`; this is the live read the roadmap requires and there must not be a second one.
   - `carouselOptionsFor(scrollDriven)`, `SCROLL_DRIVEN_OPTIONS`, `REDUCED_MOTION_OPTIONS` from Task 1.
   - `Landing`'s `pinned` / `carouselProgress` / `heroUnpinned` props from Task 2.
-  - `useScroll` and `useMotionValueEvent` from `framer-motion` ^13.1.1.
+  - `useScroll` and `useMotionValueEvent` from **`motion/react`**. Not `framer-motion`: this repo depends on `motion` ^13.1.1 and every import in `src` is `motion/react`. Task 1 found the Skiper registry had pulled `framer-motion` in beside it — the same library under its old name — and removed it. Do not reintroduce it.
 - Produces:
   ```ts
   // src/lib/pinnedScroll.ts
@@ -1434,7 +1441,35 @@ collapse to one question rather than three branches.
   export function heroPinHeightPx(viewportHeightPx: number): number
   export function carouselPinHeightPx(slideCount: number, viewportHeightPx: number): number
   export function carouselProgressFrom(sectionProgress: number): number
-  export function navbarRevealed(scrollYPx: number, heroPinHeightPx: number, carouselPinHeightPx: number): boolean
+
+  // src/components/landing/useViewportSize.ts
+  export interface ViewportSize { widthPx: number; heightPx: number }
+  /** {0,0} until the measuring effect runs. Overrides are for tests. */
+  export function useViewportSize(override?: Partial<ViewportSize>): ViewportSize
+
+  // src/components/landing/usePinnedSection.ts
+  export interface PinnedSection {
+    /** Goes on the tall outer element that supplies the scroll distance. */
+    ref: React.RefObject<HTMLDivElement | null>
+    /** Passed in, not decided here. See the note below. */
+    pinned: boolean
+    /** 0..1 across this section's own hold. Always 0 when not pinned. */
+    progress: number
+    /** progress >= 1. The hero uses it to pause its background video. */
+    released: boolean
+    /** Outer height, or undefined in normal flow so no style is written. */
+    heightPx: number | undefined
+  }
+  export function usePinnedSection(holdHeightPx: number, pinned: boolean): PinnedSection
+
+  // src/components/landing/PinnedBlock.tsx
+  export interface PinnedBlockProps {
+    section: PinnedSection
+    /** 'hero' | 'carousel'. Becomes data-testid="pinned-<name>". */
+    name: string
+    children: React.ReactNode
+  }
+  export function PinnedBlock(props: PinnedBlockProps): JSX.Element
 
   // src/components/landing/useCarouselProgress.ts
   export interface DrivableSwiper {
@@ -1448,6 +1483,20 @@ collapse to one question rather than three branches.
     scrollDriven: boolean
   ): void
   ```
+
+  **`usePinnedSection` takes `pinned` rather than computing it.** Both blocks
+  must agree, and there is exactly one thing they could disagree about. If each
+  call ran `shouldPin(usePrefersReducedMotion(), width)` itself, a viewport
+  resize could land between the two renders and pin the hero while the carousel
+  sat in flow — the same defect as M5's sidebar and bottom nav each deriving
+  their own active route and disagreeing, which cost a fix round and was ruled
+  on: the parent computes once, both consume. `Landing` calls
+  `shouldPin(reduced, size.widthPx)` one time and hands the boolean down.
+
+  **There is one viewport subscription, not two.** `useViewportSize` owns the
+  `resize` listener; `usePinnedSection` never touches `window`. Two hooks each
+  measuring the window is two listeners, two re-render cascades, and two
+  answers to a question with one answer.
   `PIN_MIN_WIDTH_PX` is 768 rather than a new number: it is the `md` breakpoint
   the rest of this codebase already turns on, the same one that hides the
   sidebar (`hidden md:flex`) and the one M5's "no kanban below 768px"
@@ -1469,7 +1518,6 @@ import {
   heroPinHeightPx,
   carouselPinHeightPx,
   carouselProgressFrom,
-  navbarRevealed,
   CAROUSEL_HOLD_VIEWPORTS_PER_SLIDE,
   PIN_MIN_WIDTH_PX,
 } from '../pinnedScroll'
@@ -1558,25 +1606,14 @@ describe('carouselProgressFrom', () => {
   })
 })
 
-describe('navbarRevealed', () => {
-  const hero = 1600
-  const carousel = 4000
-
-  it('stays hidden through the hero and the whole carousel hold', () => {
-    expect(navbarRevealed(0, hero, carousel)).toBe(false)
-    expect(navbarRevealed(1599, hero, carousel)).toBe(false)
-    expect(navbarRevealed(5599, hero, carousel)).toBe(false)
-  })
-
-  it('appears exactly where the carousel ends, which is where Figma puts it', () => {
-    // On both breakpoints the navbar sits precisely at the carousel's end, so
-    // the reveal point is already designed. The frame's name ("reveals after
-    // hero") is loose; its position is right.
-    expect(navbarRevealed(5600, hero, carousel)).toBe(true)
-    expect(navbarRevealed(9000, hero, carousel)).toBe(true)
-  })
-})
 ```
+
+There is no `navbarRevealed` block. The navbar no longer reveals — it is in the
+hero from the first paint and swaps colour at the hero's bottom edge, which is
+Task 2's `navOverHero` in `src/lib/landingNav.ts` and is tested there. Recorded
+rather than silently dropped, because the Figma frame is still named
+`Sticky Navbar (reveals after hero)` and a reader coming from the design file
+will look for it here.
 
 - [ ] **Step 2: Run it and watch it fail**
 
@@ -1661,7 +1698,7 @@ export function carouselPinHeightPx(slideCount: number, viewportHeightPx: number
 /**
  * The pinned section's own 0..1 progress, mapped onto Swiper's setProgress.
  *
- * One to one, and clamped. framer-motion's useScroll can report slightly
+ * One to one, and clamped. motion/react's useScroll can report slightly
  * outside 0..1 at the boundaries depending on layout rounding, and Swiper
  * treats an out-of-range progress as a request to translate past the last
  * slide.
@@ -1669,26 +1706,22 @@ export function carouselPinHeightPx(slideCount: number, viewportHeightPx: number
 export function carouselProgressFrom(sectionProgress: number): number {
   return clamp01(sectionProgress)
 }
-
-/**
- * Whether the sticky navbar has been revealed.
- *
- * Exactly at the carousel's end, which is where the Figma frames put it on
- * both breakpoints (desktop 1414, mobile 1170 in frame coordinates).
- */
-export function navbarRevealed(
-  scrollYPx: number,
-  heroPinHeightPx: number,
-  carouselPinHeightPx: number
-): boolean {
-  return scrollYPx >= heroPinHeightPx + carouselPinHeightPx
-}
 ```
+
+This file deliberately knows nothing about the navbar. It used to export
+`navbarRevealed(scrollY, heroPinHeightPx, carouselPinHeightPx)`, because the
+navbar appeared at the carousel's end — Figma puts it at y=1414 on desktop,
+which is exactly hero (607) + carousel (807). Under the six-section order the
+carousel is section 4, so that position means "after two thirds of the page"
+rather than "after the intro", and Gabe's 2026-09-02 decision replaced it: the
+navbar is in the hero from the start and swaps colour at the hero's bottom.
+That boundary has nothing to do with pin heights, so it lives in
+`src/lib/landingNav.ts` and not here.
 
 - [ ] **Step 4: Run it and watch it pass**
 
 Run: `npx vitest run src/lib/__tests__/pinnedScroll.test.ts`
-Expected: PASS, 14 tests.
+Expected: PASS, 12 tests. (It was 14 before the navbar moved out of this file.)
 
 - [ ] **Step 5: Write the failing carousel-drive hook test**
 
@@ -1888,13 +1921,288 @@ confirm the file is byte-identical (`git diff --stat` shows nothing). That
 guard is what protects both the reduced-motion path and every mobile visitor,
 and neither is visible from a desktop browser with motion on.
 
-- [ ] **Step 9: Write the failing pinned-sequence test**
+- [ ] **Step 9: Write the failing viewport and pinned-section hook tests**
+
+Two hooks, two files. `useViewportSize` owns the only `resize` subscription on
+the page; `usePinnedSection` turns a hold height and a pinned flag into the
+four values a block needs.
+
+```ts
+// src/components/landing/__tests__/useViewportSize.test.ts
+import { describe, it, expect, afterEach } from 'vitest'
+import { renderHook, act } from '@testing-library/react'
+import { useViewportSize } from '../useViewportSize'
+
+function setWindow(w: number, h: number) {
+  Object.defineProperty(window, 'innerWidth', { value: w, writable: true, configurable: true })
+  Object.defineProperty(window, 'innerHeight', { value: h, writable: true, configurable: true })
+}
+
+afterEach(() => setWindow(1024, 768))
+
+describe('useViewportSize', () => {
+  it('measures the window on mount', () => {
+    setWindow(1440, 900)
+    const { result } = renderHook(() => useViewportSize())
+    expect(result.current).toEqual({ widthPx: 1440, heightPx: 900 })
+  })
+
+  it('follows a resize rather than capturing once', () => {
+    // Someone drags a window across 768px with the page open. A value read
+    // once at mount strands the page in whichever mode it started in.
+    setWindow(1440, 900)
+    const { result } = renderHook(() => useViewportSize())
+    expect(result.current.widthPx).toBe(1440)
+
+    act(() => {
+      setWindow(600, 900)
+      window.dispatchEvent(new Event('resize'))
+    })
+    expect(result.current.widthPx).toBe(600)
+  })
+
+  it('lets a test inject a size without touching the window', () => {
+    // Positive companion to the override: the two assertions above prove the
+    // real path works, so this is not a hook that only ever returns its props.
+    const { result } = renderHook(() => useViewportSize({ widthPx: 375, heightPx: 812 }))
+    expect(result.current).toEqual({ widthPx: 375, heightPx: 812 })
+  })
+
+  it('removes its listener on unmount', () => {
+    // Landing mounts this once, but /demo and the tests mount and unmount it
+    // repeatedly; a leaked listener holding a setState is a React warning and
+    // a real leak in a long session.
+    setWindow(1440, 900)
+    const { unmount } = renderHook(() => useViewportSize())
+    unmount()
+    // Does not throw, and no act() warning is emitted by the dispatch below.
+    expect(() => window.dispatchEvent(new Event('resize'))).not.toThrow()
+  })
+})
+```
+
+```ts
+// src/components/landing/__tests__/usePinnedSection.test.ts
+import { describe, it, expect } from 'vitest'
+import { renderHook } from '@testing-library/react'
+import { usePinnedSection } from '../usePinnedSection'
+
+describe('usePinnedSection when pinned', () => {
+  it('reports the hold height so the block can allocate scroll distance', () => {
+    const { result } = renderHook(() => usePinnedSection(1600, true))
+    expect(result.current.pinned).toBe(true)
+    expect(result.current.heightPx).toBe(1600)
+  })
+
+  it('starts at zero progress and unreleased', () => {
+    // jsdom has no layout engine, so useScroll reports nothing here. That is
+    // the point of the split: this hook's contract at rest is testable, and
+    // the scroll-driven behaviour is exercised through useCarouselProgress
+    // with a fake Swiper instead of by pretending jsdom can scroll.
+    const { result } = renderHook(() => usePinnedSection(1600, true))
+    expect(result.current.progress).toBe(0)
+    expect(result.current.released).toBe(false)
+  })
+
+  it('hands back a ref for the tall outer element', () => {
+    const { result } = renderHook(() => usePinnedSection(1600, true))
+    expect(result.current.ref).toHaveProperty('current')
+  })
+})
+
+describe('usePinnedSection when not pinned', () => {
+  // Reached three ways -- reduced motion, a viewport below 768px, and the
+  // first render before the viewport has been measured.
+  it('writes no height, so the section costs no extra scroll distance', () => {
+    // The entire cost of pinning on a 375x812 screen is the scroll distance.
+    // If the height survives, the mobile decision did not.
+    const { result } = renderHook(() => usePinnedSection(1600, false))
+    expect(result.current.heightPx).toBeUndefined()
+  })
+
+  it('pins nothing and reports no progress', () => {
+    const { result } = renderHook(() => usePinnedSection(1600, false))
+    expect(result.current.pinned).toBe(false)
+    expect(result.current.progress).toBe(0)
+  })
+
+  it('reports released so a paused hero video does not stay paused forever', () => {
+    // `released` drives HeroMedia's `paused`. In normal flow the hero is never
+    // "past" -- it is simply a section -- so the video must be allowed to play.
+    // Getting this backwards leaves every mobile visitor with a frozen poster.
+    const { result } = renderHook(() => usePinnedSection(1600, false))
+    expect(result.current.released).toBe(false)
+  })
+
+  it('switches modes when the pinned flag flips mid-session', () => {
+    // Positive companion to the three negatives above: proves this is a gate
+    // and not a hook that never pins.
+    const { result, rerender } = renderHook(
+      ({ p }: { p: boolean }) => usePinnedSection(1600, p),
+      { initialProps: { p: false } }
+    )
+    expect(result.current.heightPx).toBeUndefined()
+
+    rerender({ p: true })
+    expect(result.current.heightPx).toBe(1600)
+
+    rerender({ p: false })
+    expect(result.current.heightPx).toBeUndefined()
+  })
+})
+```
+
+- [ ] **Step 10: Run them and watch them fail**
+
+```bash
+npx vitest run src/components/landing/__tests__/useViewportSize.test.ts
+npx vitest run src/components/landing/__tests__/usePinnedSection.test.ts
+```
+
+Expected: both FAIL with `Failed to resolve import`.
+
+- [ ] **Step 11: Write the two hooks**
+
+```ts
+// src/components/landing/useViewportSize.ts
+'use client'
+
+import * as React from 'react'
+
+/**
+ * The one viewport subscription on the landing page.
+ *
+ * Width decides whether anything pins at all; height decides how much scroll a
+ * hold costs. Both come from here so there is a single listener and a single
+ * answer. Two hooks each measuring the window is two re-render cascades and
+ * two chances to disagree about what "mobile" means mid-resize.
+ *
+ * Returns {0,0} before the effect runs, which is deliberate: shouldPin() reads
+ * a zero width as "not pinned", so the first paint on a phone is never a
+ * pinned layout that then collapses.
+ */
+export interface ViewportSize {
+  widthPx: number
+  heightPx: number
+}
+
+export function useViewportSize(override?: Partial<ViewportSize>): ViewportSize {
+  const [measured, setMeasured] = React.useState<ViewportSize>({ widthPx: 0, heightPx: 0 })
+
+  const fullyOverridden = override?.widthPx !== undefined && override?.heightPx !== undefined
+
+  React.useEffect(() => {
+    if (fullyOverridden) return
+    const read = () => setMeasured({ widthPx: window.innerWidth, heightPx: window.innerHeight })
+    read()
+    window.addEventListener('resize', read)
+    return () => window.removeEventListener('resize', read)
+  }, [fullyOverridden])
+
+  return {
+    widthPx: override?.widthPx ?? measured.widthPx,
+    heightPx: override?.heightPx ?? measured.heightPx,
+  }
+}
+```
+
+```ts
+// src/components/landing/usePinnedSection.ts
+'use client'
+
+import * as React from 'react'
+import { useScroll, useMotionValueEvent } from 'motion/react'
+import { clamp01 } from '@/lib/pinnedScroll'
+
+/**
+ * One pinned section: the hero, or the screen carousel.
+ *
+ * PINNING, NOT PARALLAX. Parallax moves layers at different speeds; this holds
+ * one section in the viewport while scroll advances it, then releases it. CSS
+ * position: sticky does the holding (see PinnedBlock) -- never JavaScript.
+ * Sticky is native, keeps the scrollbar honest, survives keyboard paging and
+ * in-page anchors, and degrades to normal flow where unsupported. useScroll is
+ * used ONLY to read a progress value inside an already-pinned section; it
+ * never takes over scrolling.
+ *
+ * This is a hook called twice, not a component owning both sections, because
+ * the two pinned blocks are FOUR SECTIONS APART: the hero is section 1 and the
+ * carousel lives inside section 4, with social proof and the problem statement
+ * between them. An earlier draft emitted both pin wrappers as adjacent
+ * siblings and could not express that page at all.
+ *
+ * `pinned` is a parameter, not a decision made here. Both calls must agree,
+ * and Landing computes shouldPin(reduced, width) once for exactly that reason
+ * -- two callers each deriving it could straddle a resize and pin the hero
+ * while the carousel sat in flow.
+ */
+export interface PinnedSection {
+  ref: React.RefObject<HTMLDivElement | null>
+  pinned: boolean
+  progress: number
+  released: boolean
+  heightPx: number | undefined
+}
+
+export function usePinnedSection(holdHeightPx: number, pinned: boolean): PinnedSection {
+  const ref = React.useRef<HTMLDivElement>(null)
+  const [progress, setProgress] = React.useState(0)
+
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    offset: ['start start', 'end end'],
+  })
+
+  useMotionValueEvent(scrollYProgress, 'change', (v) => {
+    // Guarded rather than conditionally subscribed: hooks cannot be called
+    // conditionally, and an unpinned section produces no meaningful progress
+    // anyway because nothing is sticky.
+    if (!pinned) return
+    setProgress(clamp01(v))
+  })
+
+  // Held at zero rather than merely ignored when unpinned. A stale progress
+  // left over from before a resize would keep driving the carousel after the
+  // pin was dropped.
+  const effectiveProgress = pinned ? progress : 0
+
+  return {
+    ref,
+    pinned,
+    progress: effectiveProgress,
+    released: pinned && effectiveProgress >= 1,
+    heightPx: pinned ? holdHeightPx : undefined,
+  }
+}
+```
+
+- [ ] **Step 12: Run them and watch them pass**
+
+```bash
+npx vitest run src/components/landing/__tests__/useViewportSize.test.ts
+npx vitest run src/components/landing/__tests__/usePinnedSection.test.ts
+```
+
+Expected: PASS, 4 and 7 tests.
+
+Then prove the unpinned path has teeth, the way M5's reviewers proved theirs:
+change `heightPx` to `holdHeightPx` unconditionally, run again, and watch
+"writes no height, so the section costs no extra scroll distance" go red.
+Restore, confirm green, confirm `git diff --stat` shows nothing. That branch is
+the whole of the mobile decision, and it is invisible from a desktop browser.
+
+- [ ] **Step 13: Write the failing `PinnedBlock` test**
 
 ```tsx
-// src/components/landing/__tests__/PinnedSequence.test.tsx
+// src/components/landing/__tests__/PinnedBlock.test.tsx
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, act } from '@testing-library/react'
-import { PinnedSequence } from '../PinnedSequence'
+import { renderHook } from '@testing-library/react'
+import { PinnedBlock } from '../PinnedBlock'
+import { usePinnedSection } from '../usePinnedSection'
+import { useViewportSize } from '../useViewportSize'
+import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
+import { shouldPin, heroPinHeightPx } from '@/lib/pinnedScroll'
 
 /**
  * A matchMedia that actually dispatches.
@@ -1938,125 +2246,93 @@ function installMatchMedia(initial = false) {
 
 afterEach(() => vi.clearAllMocks())
 
-describe('PinnedSequence on desktop with motion allowed', () => {
-  it('pins both sections and allocates scroll distance for their holds', () => {
+/** Mirrors exactly what Landing does, so the test exercises the real seam. */
+function useHeroPin(widthPx: number, heightPx: number) {
+  const reduced = usePrefersReducedMotion()
+  const size = useViewportSize({ widthPx, heightPx })
+  const pinned = shouldPin(reduced, size.widthPx)
+  return usePinnedSection(heroPinHeightPx(size.heightPx), pinned)
+}
+
+function Harness({ widthPx, heightPx }: { widthPx: number; heightPx: number }) {
+  const hero = useHeroPin(widthPx, heightPx)
+  return (
+    <PinnedBlock section={hero} name="hero">
+      <button>inside the pin</button>
+    </PinnedBlock>
+  )
+}
+
+describe('PinnedBlock on desktop with motion allowed', () => {
+  it('pins and allocates scroll distance for the hold', () => {
     const mm = installMatchMedia(false)
-    render(
-      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={1440}>
-        {() => <div>sections</div>}
-      </PinnedSequence>
-    )
+    render(<Harness widthPx={1440} heightPx={800} />)
     const hero = screen.getByTestId('pinned-hero')
-    const carousel = screen.getByTestId('pinned-carousel')
     expect(hero).toHaveAttribute('data-pinned', 'true')
-    expect(carousel).toHaveAttribute('data-pinned', 'true')
-    // 800 * 2, and 800 * (1 + 5 * 0.8)
-    expect(hero).toHaveStyle({ height: '1600px' })
-    expect(carousel).toHaveStyle({ height: '4000px' })
+    expect(hero).toHaveStyle({ height: '1600px' }) // 800 * (1 + 1)
+    mm.restore()
+  })
+
+  it('holds its child in a sticky viewport-height layer', () => {
+    const mm = installMatchMedia(false)
+    render(<Harness widthPx={1440} heightPx={800} />)
+    const sticky = screen.getByTestId('pinned-hero').firstElementChild
+    expect(sticky).not.toBeNull()
+    expect(sticky!.className).toContain('sticky')
+    // Positive companion: the child is really in there, not just a shell.
+    expect(screen.getByRole('button', { name: 'inside the pin' })).toBeInTheDocument()
     mm.restore()
   })
 })
 
-describe('PinnedSequence on mobile', () => {
+describe('PinnedBlock on mobile', () => {
   // Settled 2026-08-28: mobile does not pin. Asserted, not omitted -- "we
   // decided not to do X" is a behavioural claim, and an untested one rots
   // exactly the way this milestone's reduced-motion paths kept rotting.
   it('never pins below the md breakpoint, even with motion allowed', () => {
     const mm = installMatchMedia(false)
-    render(
-      <PinnedSequence slideCount={5} viewportHeightPx={812} viewportWidthPx={375}>
-        {() => <div>sections</div>}
-      </PinnedSequence>
-    )
+    render(<Harness widthPx={375} heightPx={812} />)
     const hero = screen.getByTestId('pinned-hero')
-    const carousel = screen.getByTestId('pinned-carousel')
     expect(hero).toHaveAttribute('data-pinned', 'false')
-    expect(carousel).toHaveAttribute('data-pinned', 'false')
-    // Positive companion: the sections still render, they are just in flow.
-    expect(screen.getByText('sections')).toBeInTheDocument()
+    // Positive companion: the section still renders, it is just in flow.
+    expect(screen.getByRole('button', { name: 'inside the pin' })).toBeInTheDocument()
     mm.restore()
   })
 
   it('allocates no extra scroll distance on mobile', () => {
-    // The whole cost of pinning on a 375x812 screen is the scroll distance.
-    // If the heights survive, the decision did not.
     const mm = installMatchMedia(false)
-    render(
-      <PinnedSequence slideCount={5} viewportHeightPx={812} viewportWidthPx={375}>
-        {() => <div>sections</div>}
-      </PinnedSequence>
-    )
+    render(<Harness widthPx={375} heightPx={812} />)
     expect(screen.getByTestId('pinned-hero').style.height).toBe('')
-    expect(screen.getByTestId('pinned-carousel').style.height).toBe('')
-    mm.restore()
-  })
-
-  it('leaves the carousel touchable, because scroll is not driving it', () => {
-    // The roadmap turned touch off to resolve a scroll-versus-gesture conflict
-    // on mobile. With mobile never pinned that conflict cannot arise, so the
-    // carousel is simply conventional -- and this is the assertion that stops
-    // someone "restoring" the touch lock later for consistency with desktop.
-    const mm = installMatchMedia(false)
-    const seen: boolean[] = []
-    render(
-      <PinnedSequence slideCount={5} viewportHeightPx={812} viewportWidthPx={375}>
-        {(state) => {
-          seen.push(state.pinned)
-          return <div>sections</div>
-        }}
-      </PinnedSequence>
-    )
-    expect(seen.length).toBeGreaterThan(0)
-    expect(seen.every((pinned) => pinned === false)).toBe(true)
     mm.restore()
   })
 
   it('starts pinning when a tablet crosses the breakpoint', () => {
-    // Positive companion to the three negatives above: proves the width gate
-    // is a gate and not a component that never pins at all.
     const mm = installMatchMedia(false)
-    const { rerender } = render(
-      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={767}>
-        {() => <div>sections</div>}
-      </PinnedSequence>
-    )
+    const { rerender } = render(<Harness widthPx={767} heightPx={800} />)
     expect(screen.getByTestId('pinned-hero')).toHaveAttribute('data-pinned', 'false')
 
-    rerender(
-      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={768}>
-        {() => <div>sections</div>}
-      </PinnedSequence>
-    )
+    rerender(<Harness widthPx={768} heightPx={800} />)
     expect(screen.getByTestId('pinned-hero')).toHaveAttribute('data-pinned', 'true')
     mm.restore()
   })
 })
 
-describe('PinnedSequence under reduced motion', () => {
-  it('drops the pin entirely and lets the sections sit in normal flow', () => {
+describe('PinnedBlock under reduced motion', () => {
+  it('drops the pin entirely and lets the section sit in normal flow', () => {
     // Scroll-jacking is a vestibular trigger. This is a hard requirement, and
     // unlike the width gate it cannot be reached around by resizing.
     const mm = installMatchMedia(true)
-    render(
-      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={1440}>
-        {() => <div>sections</div>}
-      </PinnedSequence>
-    )
+    render(<Harness widthPx={1440} heightPx={800} />)
     const hero = screen.getByTestId('pinned-hero')
     expect(hero).toHaveAttribute('data-pinned', 'false')
-    // Positive companion: the section still renders, it is just not pinned.
-    expect(screen.getByText('sections')).toBeInTheDocument()
     expect(hero.style.height).toBe('')
+    expect(screen.getByRole('button', { name: 'inside the pin' })).toBeInTheDocument()
     mm.restore()
   })
 
   it('unpins live when the OS preference changes with the page open', () => {
     const mm = installMatchMedia(false)
-    render(
-      <PinnedSequence slideCount={5} viewportHeightPx={800} viewportWidthPx={1440}>
-        {() => <div>sections</div>}
-      </PinnedSequence>
-    )
+    render(<Harness widthPx={1440} heightPx={800} />)
     expect(screen.getByTestId('pinned-hero')).toHaveAttribute('data-pinned', 'true')
 
     act(() => mm.set(true))
@@ -2068,7 +2344,7 @@ describe('PinnedSequence under reduced motion', () => {
   })
 })
 
-describe('PinnedSequence keyboard order', () => {
+describe('PinnedBlock keyboard order', () => {
   it('keeps pinned content in document order so Tab still reaches it', () => {
     // Content inside a pinned section must stay Tab-reachable in document
     // order, and focusing something below must not leave the page stuck in a
@@ -2076,15 +2352,14 @@ describe('PinnedSequence keyboard order', () => {
     // based fake pin would not, which is why this asserts on order rather
     // than on the CSS.
     const mm = installMatchMedia(false)
+    const { result } = renderHook(() => useHeroPin(1440, 800))
     render(
-      <PinnedSequence slideCount={2} viewportHeightPx={800} viewportWidthPx={1440}>
-        {() => (
-          <>
-            <button>inside the pin</button>
-            <button>below the pin</button>
-          </>
-        )}
-      </PinnedSequence>
+      <>
+        <PinnedBlock section={result.current} name="hero">
+          <button>inside the pin</button>
+        </PinnedBlock>
+        <button>below the pin</button>
+      </>
     )
     const buttons = screen.getAllByRole('button')
     expect(buttons.map((b) => b.textContent)).toEqual(['inside the pin', 'below the pin'])
@@ -2092,188 +2367,113 @@ describe('PinnedSequence keyboard order', () => {
     mm.restore()
   })
 })
+
+describe('two PinnedBlocks four sections apart', () => {
+  it('lets ordinary sections render between the hero and the carousel', () => {
+    // The whole reason PinnedSequence was split. Under the six-section order
+    // social proof and the problem statement sit BETWEEN the two pinned
+    // blocks; a component that emitted both wrappers as siblings could not
+    // express this page, and an earlier draft of this plan claimed it could.
+    const mm = installMatchMedia(false)
+    function Page() {
+      const size = useViewportSize({ widthPx: 1440, heightPx: 800 })
+      const reduced = usePrefersReducedMotion()
+      const pinned = shouldPin(reduced, size.widthPx)
+      const hero = usePinnedSection(heroPinHeightPx(size.heightPx), pinned)
+      const carousel = usePinnedSection(4000, pinned)
+      return (
+        <>
+          <PinnedBlock section={hero} name="hero"><div>hero</div></PinnedBlock>
+          <section>social proof</section>
+          <section>problem</section>
+          <PinnedBlock section={carousel} name="carousel"><div>carousel</div></PinnedBlock>
+        </>
+      )
+    }
+    const { container } = render(<Page />)
+    const order = Array.from(container.querySelectorAll('[data-testid], section')).map(
+      (el) => el.getAttribute('data-testid') ?? el.textContent
+    )
+    expect(order).toEqual(['pinned-hero', 'social proof', 'problem', 'pinned-carousel'])
+    // Both really are pinned -- otherwise this passes for a page that pins
+    // nothing, which is the same shape as the bug it is guarding.
+    expect(screen.getByTestId('pinned-hero')).toHaveAttribute('data-pinned', 'true')
+    expect(screen.getByTestId('pinned-carousel')).toHaveAttribute('data-pinned', 'true')
+    mm.restore()
+  })
+})
 ```
 
-- [ ] **Step 10: Run it and watch it fail**
+- [ ] **Step 14: Run it and watch it fail**
 
-Run: `npx vitest run src/components/landing/__tests__/PinnedSequence.test.tsx`
-Expected: FAIL — `Failed to resolve import "../PinnedSequence"`.
+Run: `npx vitest run src/components/landing/__tests__/PinnedBlock.test.tsx`
+Expected: FAIL — `Failed to resolve import "../PinnedBlock"`.
 
-- [ ] **Step 11: Write `PinnedSequence.tsx`**
+- [ ] **Step 15: Write `PinnedBlock.tsx`**
 
 ```tsx
-// src/components/landing/PinnedSequence.tsx
+// src/components/landing/PinnedBlock.tsx
 'use client'
 
 import * as React from 'react'
-import { useScroll, useMotionValueEvent } from 'framer-motion'
-import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
-import {
-  shouldPin,
-  heroPinHeightPx,
-  carouselPinHeightPx,
-  carouselProgressFrom,
-  navbarRevealed,
-} from '@/lib/pinnedScroll'
+import type { PinnedSection } from './usePinnedSection'
 
 /**
- * The PINNED scroll sequence: hero holds the viewport while it scrolls and
- * releases; the carousel holds and releases; the sticky navbar appears and
- * everything below scrolls normally to the footer.
+ * The wrapper that actually holds a section in the viewport.
  *
- * Pinning, not parallax. CSS position: sticky does the holding, not JavaScript.
- * Sticky is native, keeps the scrollbar honest, survives keyboard paging and
- * in-page anchors, and degrades to normal flow where it is unsupported.
- * framer-motion's useScroll is used ONLY to read a progress value inside an
- * already-pinned section; it never takes over scrolling.
+ * The outer div is the scroll distance; the inner sticky div is what the
+ * viewer sees held in place. Height comes from usePinnedSection, which gets it
+ * from lib/pinnedScroll -- NOT from the Figma frame. The frame height is the
+ * drawn height, not the scroll height: a pinned section needs scroll distance
+ * allocated for its hold, so the real page is materially taller than the
+ * 3102px desktop mockup.
  *
- * Two things disable pinning, and both are read live rather than captured at
- * mount. prefers-reduced-motion, through usePrefersReducedMotion, which
- * subscribes to the media query -- someone can change the OS setting with the
- * page open. And viewport width: mobile does not pin (settled 2026-08-28),
- * because a hold costs a full viewport on 375x812 and reads as jank under
- * touch. Both funnel through shouldPin() so there is one answer, not two
- * conditions that can disagree.
+ * Used TWICE and far apart -- once around the hero (section 1) and once around
+ * the screen carousel (inside section 4). It renders exactly one section so
+ * that ordinary sections can sit between the two.
  *
- * Because mobile never pins, scroll never drives the carousel there, so the
- * scroll-versus-gesture conflict the roadmap worried about on touch simply
- * does not arise -- the carousel is conventional and touchable, with no
- * arbitration logic anywhere in this file.
- *
- * The tall outer div is the scroll distance; the inner sticky div is what the
- * viewer sees held in place. Height comes from lib/pinnedScroll, not from the
- * Figma frame: the frame height is the drawn height, not the scroll height.
+ * In normal flow -- mobile, or prefers-reduced-motion -- the same children
+ * render in the same document position with no height and no sticky layer.
+ * Children are inside the element in BOTH branches; an earlier draft rendered
+ * empty marker divs and put the children elsewhere, which meant the unpinned
+ * path was a different tree from the pinned one and only one of them was ever
+ * really tested.
  */
-export interface PinnedSequenceProps {
-  slideCount: number
-  /** Injectable so tests do not depend on jsdom's window size. */
-  viewportHeightPx?: number
-  /** Injectable for the same reason. Below PIN_MIN_WIDTH_PX nothing pins. */
-  viewportWidthPx?: number
-  children: (state: {
-    pinned: boolean
-    carouselProgress: number
-    heroUnpinned: boolean
-    navbarRevealed: boolean
-  }) => React.ReactNode
+export interface PinnedBlockProps {
+  section: PinnedSection
+  /** 'hero' | 'carousel'. Becomes data-testid="pinned-<name>". */
+  name: string
+  children: React.ReactNode
 }
 
-export function PinnedSequence({
-  slideCount,
-  viewportHeightPx,
-  children,
-}: PinnedSequenceProps) {
-  const reduced = usePrefersReducedMotion()
-
-  // One resize subscription for both dimensions. Width decides whether we pin
-  // at all; height decides how much scroll a hold costs. Subscribed rather
-  // than read once, so rotating a tablet across 768px switches modes live.
-  const [measured, setMeasured] = React.useState({ w: 0, h: 0 })
-  React.useEffect(() => {
-    if (viewportWidthPx !== undefined && viewportHeightPx !== undefined) return
-    const read = () => setMeasured({ w: window.innerWidth, h: window.innerHeight })
-    read()
-    window.addEventListener('resize', read)
-    return () => window.removeEventListener('resize', read)
-  }, [viewportWidthPx, viewportHeightPx])
-
-  const vh = viewportHeightPx ?? measured.h
-  const vw = viewportWidthPx ?? measured.w
-  const pinned = shouldPin(reduced, vw)
-  const heroH = heroPinHeightPx(vh)
-  const carouselH = carouselPinHeightPx(slideCount, vh)
-
-  const heroRef = React.useRef<HTMLDivElement>(null)
-  const carouselRef = React.useRef<HTMLDivElement>(null)
-
-  const { scrollYProgress: carouselScroll } = useScroll({
-    target: carouselRef,
-    offset: ['start start', 'end end'],
-  })
-  const { scrollYProgress: heroScroll } = useScroll({
-    target: heroRef,
-    offset: ['start start', 'end end'],
-  })
-
-  const [carouselProgress, setCarouselProgress] = React.useState(0)
-  const [heroUnpinned, setHeroUnpinned] = React.useState(false)
-  const [revealed, setRevealed] = React.useState(false)
-
-  useMotionValueEvent(carouselScroll, 'change', (v) => {
-    // Guarded rather than conditionally subscribed: hooks cannot be called
-    // conditionally, and a mobile viewport produces no meaningful progress
-    // anyway because nothing is sticky.
-    if (!pinned) return
-    setCarouselProgress(carouselProgressFrom(v))
-    setRevealed(navbarRevealed(window.scrollY, heroH, carouselH))
-  })
-
-  useMotionValueEvent(heroScroll, 'change', (v) => {
-    if (!pinned) return
-    // Pause the hero's background video once the hero unpins: it is invisible
-    // by then, and decoding it costs battery for nothing.
-    setHeroUnpinned(v >= 1)
-  })
-
-  if (!pinned) {
+export function PinnedBlock({ section, name, children }: PinnedBlockProps) {
+  if (!section.pinned) {
     return (
-      <>
-        <div data-testid="pinned-hero" data-pinned="false" />
-        <div data-testid="pinned-carousel" data-pinned="false" />
-        {children({
-          pinned: false,
-          carouselProgress: 0,
-          heroUnpinned: false,
-          navbarRevealed: true,
-        })}
-      </>
+      <div ref={section.ref} data-testid={`pinned-${name}`} data-pinned="false">
+        {children}
+      </div>
     )
   }
 
   return (
-    <>
-      <div
-        ref={heroRef}
-        data-testid="pinned-hero"
-        data-pinned="true"
-        style={{ height: `${heroH}px` }}
-      >
-        <div className="sticky top-0 h-screen overflow-hidden">
-          {/* the hero half of `children` renders here; see Landing.tsx */}
-        </div>
-      </div>
-      <div
-        ref={carouselRef}
-        data-testid="pinned-carousel"
-        data-pinned="true"
-        style={{ height: `${carouselH}px` }}
-      >
-        <div className="sticky top-0 h-screen overflow-hidden">
-          {/* the carousel half renders here */}
-        </div>
-      </div>
-      {children({ pinned: true, carouselProgress, heroUnpinned, navbarRevealed: revealed })}
-    </>
+    <div
+      ref={section.ref}
+      data-testid={`pinned-${name}`}
+      data-pinned="true"
+      style={{ height: `${section.heightPx}px` }}
+    >
+      <div className="sticky top-0 h-screen overflow-hidden">{children}</div>
+    </div>
   )
 }
 ```
 
-**Implementation note for whoever writes this:** the two comment placeholders
-above mark where `Landing` must inject its hero and carousel slots. The render
-prop as written passes state down but does not receive the two sections; give
-`PinnedSequence` two additional props, `hero: React.ReactNode` and `carousel:
-React.ReactNode`, rendered inside the two sticky divs, and keep `children` for
-everything below the pin. Do this in the same step — the test above only
-asserts on the pin wrappers and on document order, so it stays honest either
-way, and `Landing`'s existing tests from Task 2 are what prove the sections
-still render.
+- [ ] **Step 16: Run it and watch it pass**
 
-- [ ] **Step 12: Run the pinned-sequence test and watch it pass**
+Run: `npx vitest run src/components/landing/__tests__/PinnedBlock.test.tsx`
+Expected: PASS, 9 tests.
 
-Run: `npx vitest run src/components/landing/__tests__/PinnedSequence.test.tsx`
-Expected: PASS, 8 tests.
-
-- [ ] **Step 13: Write the failing hero-video pause test**
+- [ ] **Step 17: Write the failing hero-video pause test**
 
 Timing here is real: the pause must not fire before the hero unpins, and it
 must fire once when it does. Each transition gets its own `act`, never one
@@ -2323,35 +2523,80 @@ describe('the hero video and the pin', () => {
 })
 ```
 
-- [ ] **Step 14: Run it, then wire `Landing` to `PinnedSequence`**
+- [ ] **Step 18: Run it, then wire `Landing` to its two pinned blocks**
 
 Run: `npx vitest run src/components/landing/__tests__/Landing.test.tsx`
 Expected: the new test PASSES against the `HeroMedia` written in Task 2 — its
 `paused` effect already implements this. If it fails, `HeroMedia`'s effect is
 wrong, not the test.
 
-Then modify `Landing.tsx` to wrap `Hero` and `ScreenCarousel` in
-`PinnedSequence`, threading `heroUnpinned` into `Hero`'s `unpinned` prop,
-`carouselProgress` into `ScreenCarousel`, and `navbarRevealed` into
-`StickyNavbar`'s `revealed`. `ScreenCarousel` captures the Swiper instance via
-`onSwiper` into local state and calls
-`useCarouselProgress(swiper, carouselProgress, scrollDriven)`.
+Then modify `Landing.tsx`. It computes the shared state once and places two
+`PinnedBlock`s four sections apart:
 
-**`scrollDriven` is `PinnedSequence`'s `pinned`, passed straight down — do not
-recompute it.** `ScreenCarousel` must not call `usePrefersReducedMotion()` or
-read a width itself. One component deciding it is pinned while another decides
-it is not is the same defect class as M5's sidebar and bottom nav each deriving
-their own active route and disagreeing, which needed a fix round; the ruling
-there was that the parent computes once and both consume. It applies here for
-the same reason.
+```tsx
+const reduced = usePrefersReducedMotion()
+const size = useViewportSize()
+const pinned = shouldPin(reduced, size.widthPx)
 
-`StickyNavbar` also needs `revealed` to be `true` on mobile from the start: with
-no pin there is no "after the hero" moment, so a navbar that waits for one
-never appears. `PinnedSequence`'s unpinned branch already returns
-`navbarRevealed: true`; confirm `Landing` passes that through rather than
-recomputing from `window.scrollY`.
+const hero = usePinnedSection(heroPinHeightPx(size.heightPx), pinned)
+const carousel = usePinnedSection(
+  carouselPinHeightPx(screens.length, size.heightPx),
+  pinned
+)
 
-- [ ] **Step 15: Run the whole suite, the typecheck and the build**
+const [swiper, setSwiper] = React.useState<DrivableSwiper | null>(null)
+useCarouselProgress(swiper, carousel.progress, carousel.pinned)
+
+return (
+  <>
+    <LandingNavbar overHero={overHero} />          {/* Task 2 owns overHero */}
+    <PinnedBlock section={hero} name="hero">
+      <Hero unpinned={hero.released} … />
+    </PinnedBlock>
+    <SocialProof … />
+    <ProblemStatement … />
+    <SolutionValue …>
+      <PinnedBlock section={carousel} name="carousel">
+        <ScreenCarousel
+          screens={screens}
+          scrollDriven={carousel.pinned}
+          onSwiper={setSwiper}
+        />
+      </PinnedBlock>
+    </SolutionValue>
+    <LandingFaq … />
+    <ClosingCta … />
+  </>
+)
+```
+
+Three rules, each one a defect this milestone has already paid for:
+
+**`scrollDriven` is `carousel.pinned`, passed straight down — do not recompute
+it.** `ScreenCarousel` must not call `usePrefersReducedMotion()` or read a
+width itself. One component deciding it is pinned while another decides it is
+not is the same defect class as M5's sidebar and bottom nav each deriving their
+own active route and disagreeing, which needed a fix round; the ruling there
+was that the parent computes once and both consume.
+
+**`shouldPin` is called once, and both blocks get the same boolean.** Not once
+per block. The two calls would almost always agree, which is what makes the
+disagreement expensive to find.
+
+**`useCarouselProgress` lives in `Landing`, not inside `ScreenCarousel`.** The
+Swiper instance arrives through `onSwiper` and the progress comes from a hook
+`Landing` already holds; putting the drive call in the child would mean the
+child needs the progress prop threaded in anyway, and then two components would
+each hold a reference to the same Swiper.
+
+Note what is NOT here: nothing wires the navbar. `LandingNavbar` takes
+`overHero` from Task 2's `navOverHero`, which reads the hero's measured bottom
+edge and knows nothing about pin heights. On mobile, where nothing pins, that
+still resolves correctly — the hero is a normal section with a real bottom
+edge — which is the bug the old `revealed`-on-mobile special case existed to
+paper over. There is no special case now.
+
+- [ ] **Step 19: Run the whole suite, the typecheck and the build**
 
 ```bash
 npx vitest run
@@ -2361,34 +2606,84 @@ rm -rf .next && npm run build
 
 Expected: green, exit 0, `/` non-zero in the route table.
 
-- [ ] **Step 16: Check it by hand in both modes**
+- [ ] **Step 20: Check it by hand in both modes**
 
 The tests cover the wiring; they cannot tell you whether it feels like
 scroll-jacking. In a browser:
 
-1. Scroll `/` from the top. The hero should hold, the carousel should hold and
-   advance one slide per hold-unit, the navbar should appear at the carousel's
-   end, and Features onward should scroll normally.
-2. Tab through the page from the top. Focus must reach the carousel arrows and
-   the slide content, and moving focus below the pin must not leave the page
+1. Scroll `/` from the top. The hero holds and releases; social proof and the
+   problem statement scroll past normally; the carousel then holds and advances
+   one slide per hold-unit; FAQ and the closing CTA scroll normally to the
+   footer. **Two separate holds with ordinary scrolling in between is the shape
+   to look for** — if they run back to back, the two blocks have been collapsed
+   into one again.
+2. Watch the navbar across the hero/social-proof boundary. It should be blended
+   and light over the hero and flip to the themed treatment as social proof
+   arrives, with no jump in position or height — colour only.
+3. Tab through the page from the top. Focus must reach the carousel arrows and
+   the slide content, and moving focus below a pin must not leave the page
    stuck in a pinned stage.
-3. Turn on Reduce Motion in the OS **with the page open**. The pin must drop,
+4. Turn on Reduce Motion in the OS **with the page open**. Both pins must drop,
    the sections must fall into normal flow, and touch and arrows must both
-   work. Turn it off again; pinning must come back.
-4. Repeat at 375px, where **nothing should pin**. The hero and carousel scroll
-   past like ordinary sections, the carousel swipes under the thumb, the arrows
-   still work, and the navbar is present from the top rather than waiting for a
-   reveal that never comes. If the page feels identical to the desktop pinned
+   work. The navbar must still swap colour — that is a state change, not
+   motion. Turn it off again; pinning must come back.
+5. Repeat at 375px, where **nothing should pin**. The hero and carousel scroll
+   past like ordinary sections, the carousel swipes under the thumb, and the
+   arrows still work. If the page feels identical to the desktop pinned
    version, the width gate is not wired.
-5. Drag the browser window across 768px with the page open. The mode should
-   switch both ways without a reload.
+6. Drag the browser window across 768px with the page open. The mode should
+   switch both ways without a reload, and **both** blocks should switch
+   together — one pinned and one not is the disagreement the single
+   `shouldPin` call exists to prevent.
 
-- [ ] **Step 17: Commit**
+- [ ] **Step 21: Commit**
 
 ```bash
 git add src/lib/pinnedScroll.ts src/lib/__tests__/pinnedScroll.test.ts src/components/landing
-git commit -m "feat: pin the hero and drive the carousel from scroll, with a reduced-motion path"
+git commit -m "feat: pin the hero and the carousel independently, with a reduced-motion path"
 ```
+
+---
+
+#### What this rewrite changed, 2026-09-02
+
+Recorded so a reader who knows the old shape can see what moved, and so the
+reasoning is not lost the next time someone wonders why there is a hook here
+instead of a component.
+
+1. **`PinnedSequence` is gone**, replaced by `useViewportSize` +
+   `usePinnedSection` + `PinnedBlock`. It emitted both pin wrappers as adjacent
+   siblings and rendered `children` beneath them, which cannot express a page
+   where social proof and the problem statement sit between the hero and the
+   carousel. This plan previously asserted the six-section reorder "does not
+   move them relative to each other, which is the only relationship Task 3
+   depends on" — that was wrong, and it was wrong in the specific way this plan
+   warns about elsewhere: a claim about structure made without opening the
+   component it described.
+2. **`navbarRevealed` is deleted from `lib/pinnedScroll.ts`.** The navbar is
+   Task 2's now: in the hero from first paint, swapping colour at the hero's
+   measured bottom edge via `navOverHero`. The old function keyed on
+   `heroPinHeight + carouselPinHeight`, a boundary that no longer means
+   anything now that four sections separate them.
+3. **The unpinned branch renders the same tree as the pinned one.** The old
+   component emitted empty marker divs when unpinned and rendered the children
+   somewhere else entirely, so the mobile and reduced-motion paths were a
+   different DOM from the desktop one and the tests that "covered" them were
+   asserting against a shell. Children now sit inside the block in both
+   branches.
+4. **`shouldPin` is called once by `Landing`** and handed to both blocks,
+   rather than each deriving it. Same ruling as M5's sidebar and bottom nav.
+5. **`framer-motion` → `motion/react`** throughout. Task 1's execution found
+   the Skiper registry had installed `framer-motion` beside the `motion`
+   package this repo already used — the same library under its old name — and
+   removed it.
+
+What did NOT change: `shouldPin`'s two vetoes and its zero-width default,
+`heroPinHeightPx` / `carouselPinHeightPx` and the constant-pace invariant,
+`carouselProgressFrom`, the whole of `useCarouselProgress` and its fake-Swiper
+tests, the dispatching `matchMedia` mock and the live-preference test, the
+keyboard-order test, and the hero-video pause test with its separate `act`
+blocks. Those were all sound; only the thing that owned them was wrong.
 
 ---
 
@@ -3253,26 +3548,26 @@ git commit -m "docs: rewrite the README against what the app actually is"
 |---|---|
 | *(not a spec item)* typecheck excludes test files | **Task 0**, prerequisite. Settled 2026-08-28; removes the workaround from all seven M6 tasks. |
 | 6.1 landing — hero, carousel, ATS section, footer | 2 |
-| 6.1 — skiper51 install, `swiper` + `framer-motion`, autoplay off | 1 |
+| 6.1 — skiper51 install, `swiper` (`framer-motion` was pulled in by the registry and removed — the repo uses `motion`), autoplay off | 1 |
 | 6.1 — Swiper CSS reconciled with M4 tokens, `shadow: true` killed | 1 (Steps 5–6) |
 | 6.1 — theme toggle in the sticky navbar **and** the footer | 2 (Steps 2, 5). In the navbar it inherits the `overHero` treatment like every other control — a sun/moon glyph at `text-text-secondary` over a dark hero is the same illegibility the whole decision exists to fix |
 | 6.1 — landing routes to auth; navbar `sign in` link + `sign up` button both breakpoints | 2 |
 | 6.1 — desktop navbar keeps `open the demo`, demoted to secondary; mobile drops it | 2 (Step 2) |
 | 6.1 — hero gains `create account` secondary beside primary `try the live demo` | 2 (Step 2) |
 | 6.1a — pinning not parallax; CSS sticky over JS hijacking | 3 |
-| 6.1a — reduced motion disables pinning entirely | 3 (Steps 9, 11) |
+| 6.1a — reduced motion disables pinning entirely | 3 (Steps 11, 13, 15 — the `pinned` parameter, and the PinnedBlock reduced-motion block) |
 | 6.1a — Figma frame height is not scroll height | 3 (`lib/pinnedScroll.ts` docblock, Step 1 test) |
 | 6.1a — scroll drives slides; `allowTouchMove: false`, `simulateTouch: false` | 1 (options), 3 (hook) |
 | 6.1a — `loop: false` in both modes | 1 (Step 7 test) |
 | 6.1a — `setProgress(0..1)`, never `slideNext()` | 3 (Steps 5, 7) |
-| 6.1a — arrows on in both modes, slide content Tab-reachable | 1 (options test), 2 (Step 2), 3 (Step 9 keyboard test) |
+| 6.1a — arrows on in both modes, slide content Tab-reachable | 1 (options test), 2 (Step 2), 3 (Step 13 keyboard test) |
 | 6.1a — reduced motion restores a conventional carousel | 3 (Steps 5, 7) |
-| 6.1a — preference read live via `matchMedia`, not captured at mount | 3 (Steps 5, 9 — the dispatching mock) |
+| 6.1a — preference read live via `matchMedia`, not captured at mount | 3 (Steps 5, 13 — the dispatching mock) |
 | 6.1a — both paths tested | 3 (every describe block is paired) |
 | 6.1a — pin length scales with slide count | 3 (Step 1, the constant-pace invariant) |
-| 6.1a — pause the hero video once the hero unpins | 2 (`HeroMedia`), 3 (Step 13) |
+| 6.1a — pause the hero video once the hero unpins | 2 (`HeroMedia`), 3 (Step 17) |
 | 6.1a — navbar reveals at the carousel's end | **Overturned by Gabe, 2026-09-02.** The navbar is in the hero from the top and swaps treatment at social proof. `navbarRevealed` is retired; `navOverHero` in Task 2's `lib/landingNav.ts` replaces it. Figma's `39:355` annotation is superseded — see the locked navbar decision in Task 2 |
-| 6.1a — decide whether mobile pins | **Settled: it does not.** Task 3 — `shouldPin(reduced, width)`, `PIN_MIN_WIDTH_PX = 768`, four tests asserting the mobile path is unpinned, and Step 16's manual check at 375px. |
+| 6.1a — decide whether mobile pins | **Settled: it does not.** Task 3 — `shouldPin(reduced, width)`, `PIN_MIN_WIDTH_PX = 768`, three PinnedBlock tests asserting the mobile path is unpinned plus a usePinnedSection pair, and Step 20's manual check at 375px. |
 | 6.2 — skiper106, `dialkit` | 4 (Steps 1–2) |
 | 6.2 — name collision, take only `SmoothInput` | 4 (Step 2) |
 | 6.2 — verify against the four Figma Input states, run `ui-ux-pro-max` | 4 (Step 5) |
@@ -3304,10 +3599,15 @@ contract instead of finished code, each with a reason and a verification step:
   the CLI runs, and writing invented source into a plan would be the exact
   failure mode this plan exists to avoid. Both tasks read the installed file
   first and state what to change; the source-shape tests are the gate.
-- Task 3 Step 11 carries an implementation note rather than final JSX for the
-  hero/carousel slot injection. The render-prop shape shown works and its tests
-  pass, but the two sections have to be injected somewhere and the note says
-  exactly how. Flagged in the step, not hidden.
+- ~~Task 3 Step 11 carries an implementation note rather than final JSX for the
+  hero/carousel slot injection.~~ **Resolved by the 2026-09-02 rewrite.** That
+  note existed because `PinnedSequence`'s render prop passed state down but had
+  nowhere to receive the two sections, so the plan described the fix in prose
+  instead of showing it. `PinnedBlock` takes `children` directly and is placed
+  twice by `Landing`, so there is no slot to inject into and no note to write.
+  The gap was a symptom of the wrong component, which is worth recording: a
+  placeholder that cannot be written out is usually telling you the shape is
+  wrong rather than that the detail is fiddly.
 - Task 6 Step 8 shows `/* …existing required props */` in a test, because
   `ApplicationsPage`'s prop list was revised twice during M5 and transcribing
   a stale copy here is precisely how M5's Task 8 named service methods that did
@@ -3324,7 +3624,7 @@ of JSX in a plan document that would go stale on the first task.
 - `SwiperCarouselOptions` is defined in Task 1 and consumed by Task 2's `ScreenCarousel` and Task 3's mode switch. `carouselOptionsFor(scrollDriven: boolean)` has one signature throughout, and `scrollDriven` is the same word in `useCarouselProgress`'s third parameter, in `ScreenCarousel`'s prop, and in `PinnedSequence`'s `pinned` state that feeds it — one concept, renamed at exactly one boundary, which Task 3 Step 14 names.
 - `DrivableSwiper` is defined in Task 3's Interfaces block and in `useCarouselProgress.ts`; the `onSwiper` prop Task 1 Step 5 adds to the vendor file is what supplies it. `setProgress`, `allowTouchMove` and `params.allowTouchMove` are the same three members everywhere they appear.
 - `AttributionEntry { id, name, href, credit }` is defined in Task 1 and consumed by Task 2's footer and Task 7's README tests. `credit` is the field asserted verbatim in three places.
-- `pinned` / `carouselProgress` / `heroUnpinned` are named identically in Task 2's `LandingProps`, Task 3's `PinnedSequence` render-prop state, and Task 3's Interfaces block. `heroUnpinned` becomes `HeroMedia`'s `paused` at exactly one boundary, which is stated in Task 3 Step 14.
+- `pinned` / `carouselProgress` / `heroUnpinned` are named identically in Task 2's `LandingProps` and Task 3's Interfaces block. After the 2026-09-02 rewrite they are fields on `PinnedSection` rather than a render-prop bag: `pinned` keeps its name, `carouselProgress` is `carousel.progress`, and `heroUnpinned` is `hero.released`. Each is renamed at exactly one boundary and each boundary is named in Task 3 Step 18 — `hero.released` → `Hero`'s `unpinned` → `HeroMedia`'s `paused`, and `carousel.pinned` → `ScreenCarousel`'s `scrollDriven`. Three names for one concept is two too many, but each rename crosses a real seam: the hook knows about pins, the section knows whether it is on screen, and the media element knows about playback.
 - `AuthMode = 'signin' | 'signup'` and `AuthScreenProps { mode, onSubmit }` are defined in Task 4 and used in both route files. `onSubmit(email, password): Promise<void>` matches `useAuth().signIn` / `.signUp`, both read from `src/contexts/AuthContext.tsx`.
 - `isDemoUser(userId, demoUserIds)` in Task 6 is the existing export, read from `src/services/demoMode.ts`, not a new one. `demoUserIds: string[]` is the same name on `RuntimeFlags` and in that call.
 - `usePrefersReducedMotion(): boolean` is the existing hook. There is exactly one `matchMedia` read in this milestone's production code, and it is inside `src/lib/motion.ts` where it already lives. `shouldPin(reduced, viewportWidthPx)` and `PIN_MIN_WIDTH_PX` are defined in Task 3's `lib/pinnedScroll.ts` and used only by `PinnedSequence` in the same task.
@@ -3337,8 +3637,8 @@ of JSX in a plan document that would go stale on the first task.
 - No `.rejects` on a function wrapper. The one rejection path (Task 4) uses `mockRejectedValue` and asserts on rendered output after an `await`.
 - Every `queryBy…toBeNull()` and every `not.toMatch` carries a positive companion in the same test: Task 1's source test asserts the file is the carousel before asserting what it lacks; Task 2's poster test is paired with a video test; Task 4's confirm-password negative sits beside two positives; Task 6's disabled-button test asserts the rows rendered first and is paired with an enabled-for-normal-accounts test; Task 6's SECURITY DEFINER scan asserts it found files before asserting what they contain.
 - No fixture supplies a value the production path cannot produce. `SCREENS` in tests are literal paths that the component only ever passes to `src`; `makeJob` is the consolidated fixture from `src/test/fixtures.ts`.
-- Timers: Task 3 Step 13 uses separate `act` blocks per transition and says why. Nothing in this plan advances a fake clock in one jump.
-- Three tests are proved to have teeth by reverting the code under them and watching them go red: Task 3 Step 8 (the reduced-motion guard), Task 6 Step 11 (the SECURITY DEFINER gate), and Task 1 Step 4 (the vendor source shape, which fails on arrival).
+- Timers: Task 3 Step 17 uses separate `act` blocks per transition and says why. Nothing in this plan advances a fake clock in one jump.
+- Three tests are proved to have teeth by reverting the code under them and watching them go red: Task 3 Step 8 (the reduced-motion guard) and Step 12 (the unpinned height branch), Task 6 Step 11 (the SECURITY DEFINER gate), and Task 1 Step 4 (the vendor source shape, which fails on arrival).
 
 ---
 
