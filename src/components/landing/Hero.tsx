@@ -32,6 +32,13 @@ import { HERO } from './content'
  * the CTA sits under the address bar on first paint. `svh` is the small
  * viewport height, which is the one actually on screen.
  *
+ * `h-full` ALONGSIDE the min-height, because this section renders in two
+ * containers. Unpinned its parent has auto height, `h-full` resolves to auto,
+ * and min-h-[88svh] governs -- the standalone behaviour. Inside 6.1a's pin the
+ * parent is exactly one viewport tall, and 88svh is SHORTER than that: without
+ * h-full the hero letterboxed itself, leaving a ~39px band of page background
+ * above and below the dark media on every pinned frame.
+ *
  * Content sits in the same 1200px container as every section below it, so the
  * headline starts on the same vertical line as every heading on the page.
  * Before that it used its own `px-16` and lined up with nothing.
@@ -47,7 +54,7 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
   return (
     <section
       data-landing-section="hero"
-      className="relative isolate flex min-h-[88svh] flex-col justify-center overflow-hidden px-5 pb-24 pt-32 md:px-8 md:pb-32 md:pt-40 lg:min-h-[92svh]"
+      className="relative isolate flex h-full min-h-[88svh] flex-col justify-center overflow-hidden px-5 pb-24 pt-32 md:px-8 md:pb-32 md:pt-40 lg:min-h-[92svh]"
     >
       <HeroMedia posterSrc={posterSrc} videoSrc={videoSrc} paused={unpinned} />
 

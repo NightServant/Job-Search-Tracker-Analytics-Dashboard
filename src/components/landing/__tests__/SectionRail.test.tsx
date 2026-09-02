@@ -65,8 +65,22 @@ describe('SectionRail', () => {
     render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} overHero />)
     expect(rail()).toHaveAttribute('data-over-hero', 'true')
     expect((rail().querySelector('[data-rail-fill]') as HTMLElement).className).toContain(
-      '#fafafa'
+      'bg-white'
     )
+  })
+
+  it('carries its own plate over the hero, where the scrim has run out', () => {
+    // The rail is pinned to the right edge, which is exactly where the hero's
+    // left-to-right scrim has decayed to 0.3 alpha and the footage is
+    // brightest. Without a plate the dots drift in and out of legibility as
+    // the clip plays, which reads as a flicker rather than as a control.
+    render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} overHero />)
+    expect(rail().className).toContain('backdrop-blur')
+  })
+
+  it('drops the plate past the hero, where the page provides its own ground', () => {
+    render(<SectionRail sections={SECTIONS} activeId="faq" progress={0.8} />)
+    expect(rail().className).not.toContain('backdrop-blur')
   })
 
   it('takes the themed treatment past the hero', () => {
@@ -75,6 +89,16 @@ describe('SectionRail', () => {
     expect((rail().querySelector('[data-rail-fill]') as HTMLElement).className).toContain(
       'bg-accent-default'
     )
+  })
+
+  it('draws its inactive dots in a foreground colour, not a border colour', () => {
+    // Shipped invisible once: border tokens are sized for 1px hairlines
+    // against a surface, and #d4d4d8 as a 7px dot on a white section cannot be
+    // seen. A dot is foreground and takes a foreground token.
+    render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
+    const inactive = document.querySelector('[data-rail-item="faq"] span') as HTMLElement
+    expect(inactive.className).toContain('bg-text-muted')
+    expect(inactive.className).not.toContain('bg-border-default')
   })
 
   it('is hidden below lg, where there is no margin to live in', () => {
