@@ -182,7 +182,7 @@ done while a bespoke equivalent of a catalogue component is still in its diff.
 
 | Task | Page | Components to build from |
 |---|---|---|
-| 2 | Landing — hero | `Button` + `ButtonGroup` for the CTA trio; `AspectRatio` around the hero media so the page does not reflow as it loads. The navbar lives here too — `BrandLockup` from `@/components/ui/brand-mark`, `Button` for `open the demo` and `sign up`, `ThemeToggle`. **No `NavigationMenu`**: six links and no submenus do not earn a menu primitive, and it would fight the two-treatment colour swap |
+| 2 | Landing — hero | `Button` for the single `read the source` CTA (no `ButtonGroup` — a group of one is a `div`; it returns if a second button does); `AspectRatio` around the hero media so the page does not reflow as it loads. The navbar lives here too — `BrandLockup` from `@/components/ui/brand-mark`, `Button` for `open the demo` and `sign up`, `ThemeToggle`. **No `NavigationMenu`**: six links and no submenus do not earn a menu primitive, and it would fight the two-treatment colour swap |
 | 2 | Landing — social proof | `Card` for each proof tile; `Separator` between them at narrow widths. **No `Avatar`, no testimonial card** — see the locked decision below |
 | 2 | Landing — problem | `Card` per pain point, or `Item` if the row form reads better; `Separator` closing the section |
 | 2 | Landing — solution | `Card` + `CardHeader`/`CardTitle`/`CardDescription` for the value grid. The product screens use **skiper51 (Swiper)**, not shadcn's `Carousel` — see exception 4 above. `Tabs` ONLY if the screens need naming rather than captioning |
@@ -1228,12 +1228,29 @@ pair — try the demo, create an account. `ButtonGroup` for the pair,
 This is the section Task 3 pins first, and per the locked decision above it is
 also the section the navbar is part of.
 
-Figma's hero (`39:369`) carries **three** CTAs, not two: `try the live demo`
-(filled accent), `create account` (hairline) and `read the source` (hairline),
-plus the line `no signup · the demo opens with sample data, read only`. The
-plan's "CTA pair" predates that frame being read. Build all three — the third
-is a link to the repository, it costs nothing, and it is the same claim the
-social-proof section is built on.
+**The hero carries ONE call to action: `read the source`.** Settled by Gabe,
+2026-09-02, during Task 2's implementation.
+
+Figma's hero (`39:369`) draws three — `try the live demo` (filled accent),
+`create account` (hairline) and `read the source` (hairline) — plus the line
+`no signup · the demo opens with sample data, read only`. The first two were
+removed. **Gabe wins over the frame**, as with the navbar.
+
+The reason to record: the hero now makes an argument instead of asking for a
+decision, and it no longer competes with the closing CTA, which is the section
+whose entire job is the decision. Neither route is lost — `sign in` and
+`sign up` sit in the navbar directly above the hero, and section 6 carries the
+demo and the signup together with the sentence that says what the demo is.
+
+The `no signup · …` line went with them. It annotated the demo button
+specifically, and copy explaining a control that is no longer on screen reads
+as a leftover; the same claim is made properly by `CLOSING_CTA.demoNote`,
+beside the button it describes.
+
+`ButtonGroup` is therefore not used in the hero — it binds a row of related
+buttons, and a group of one is a `div`. The *shadcn components per M6 page*
+table still names it because it is the right primitive if a second hero button
+ever returns.
 
 Type, read from the frame rather than guessed: eyebrow is Label/Caps —
 Helvetica Bold 11px, +6% tracking, uppercase, `accent-400`; the headline is
@@ -3624,8 +3641,8 @@ git commit -m "docs: rewrite the README against what the app actually is"
 | 6.1 — Swiper CSS reconciled with M4 tokens, `shadow: true` killed | 1 (Steps 5–6) |
 | 6.1 — theme toggle in the sticky navbar **and** the footer | 2 (Steps 2, 5). In the navbar it inherits the `overHero` treatment like every other control — a sun/moon glyph at `text-text-secondary` over a dark hero is the same illegibility the whole decision exists to fix |
 | 6.1 — landing routes to auth; navbar `sign in` link + `sign up` button both breakpoints | 2 |
-| 6.1 — desktop navbar keeps `open the demo`, demoted to secondary; mobile drops it | 2 (Step 2) |
-| 6.1 — hero gains `create account` secondary beside primary `try the live demo` | 2 (Step 2) |
+| 6.1 — desktop navbar keeps `open the demo`, demoted to secondary; mobile drops it | **Overturned by Gabe, 2026-09-02.** Removed from the bar entirely: the hero sat directly beneath it, so it was the same call to action twice in one viewport. The navbar is `how it works` / `faq` / `open source` / `sign in` / `sign up` |
+| 6.1 — hero gains `create account` secondary beside primary `try the live demo` | **Overturned by Gabe, 2026-09-02.** Both removed during Task 2; the hero carries only `read the source`. Neither route is lost — `sign in`/`sign up` are in the navbar above, and section 6 carries the demo and the signup. See the hero note in Task 2 |
 | 6.1a — pinning not parallax; CSS sticky over JS hijacking | 3 |
 | 6.1a — reduced motion disables pinning entirely | 3 (Steps 11, 13, 15 — the `pinned` parameter, and the PinnedBlock reduced-motion block) |
 | 6.1a — Figma frame height is not scroll height | 3 (`lib/pinnedScroll.ts` docblock, Step 1 test) |

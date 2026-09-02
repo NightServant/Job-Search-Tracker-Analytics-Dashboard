@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
-import { ButtonGroup } from '@/components/ui/button-group'
 import { HeroMedia } from './HeroMedia'
 import { HERO } from './content'
 
@@ -14,9 +13,19 @@ import { HERO } from './content'
  * accent-700 on near-black fails contrast, and the frame already made that
  * choice. Transcribed from Figma 39:369.
  *
- * Three calls to action, not two. The plan said "the CTA pair" before the
- * frame was read; the frame draws demo, create account AND read the source.
- * The third costs nothing and is the same claim social proof is built on.
+ * ONE call to action: "read the source". Gabe removed the demo and
+ * create-account buttons on 2026-09-02, and the frame's three-button group
+ * with them.
+ *
+ * The hero therefore makes an argument rather than asking for a decision. Both
+ * removed routes are still one click away -- `sign in` and `sign up` are in the
+ * navbar directly above, and the closing CTA carries the demo and the signup
+ * together with the sentence that says what the demo is. A hero that competes
+ * with its own closing CTA splits the reader's attention at the point they
+ * have the least reason to act.
+ *
+ * ButtonGroup went with them: it exists to bind a row of related buttons, and
+ * a group of one is a div.
  *
  * The padding leaves room for the fixed navbar overhead: the frame's own
  * pt-[120px] already accounts for a bar sitting over it.
@@ -42,26 +51,9 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
 
       <p className="max-w-[800px] text-body-l text-[rgba(250,250,250,0.82)]">{HERO.body}</p>
 
-      <ButtonGroup className="flex-wrap gap-3">
+      <div>
         <Link
-          href={HERO.primaryCta.href}
-          data-variant="primary"
-          className={buttonVariants({ variant: 'primary', size: 'm' })}
-        >
-          {HERO.primaryCta.label}
-        </Link>
-        <Link
-          href={HERO.secondaryCta.href}
-          data-variant="secondary"
-          className={cn(
-            buttonVariants({ variant: 'secondary', size: 'm' }),
-            'border-[rgba(250,250,250,0.5)] bg-transparent text-[#fafafa] hover:bg-[rgba(250,250,250,0.12)]'
-          )}
-        >
-          {HERO.secondaryCta.label}
-        </Link>
-        <Link
-          href={HERO.tertiaryCta.href}
+          href={HERO.sourceCta.href}
           target="_blank"
           rel="noreferrer noopener"
           data-variant="secondary"
@@ -70,11 +62,9 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
             'border-[rgba(250,250,250,0.5)] bg-transparent text-[#fafafa] hover:bg-[rgba(250,250,250,0.12)]'
           )}
         >
-          {HERO.tertiaryCta.label}
+          {HERO.sourceCta.label}
         </Link>
-      </ButtonGroup>
-
-      <p className="text-data-s text-[rgba(250,250,250,0.62)]">{HERO.note}</p>
+      </div>
     </section>
   )
 }

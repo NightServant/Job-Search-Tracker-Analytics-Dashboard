@@ -37,10 +37,26 @@ export const HERO = {
   body:
     'Track applications through five stages. See which CV you sent to which company, ' +
     'and which version. Get told when a company has gone quiet so you actually follow up.',
-  primaryCta: { label: 'try the live demo', href: '/demo/dashboard' },
-  secondaryCta: { label: 'create account', href: '/signup' },
-  tertiaryCta: { label: 'read the source', href: REPO_URL },
-  note: 'no signup · the demo opens with sample data, read only',
+  /**
+   * ONE call to action, and it leaves the site.
+   *
+   * Gabe, 2026-09-02: the hero's demo and create-account buttons were removed,
+   * leaving only "read the source". Named `sourceCta` rather than
+   * `tertiaryCta`, which was only ever a sensible name while a first and
+   * second existed.
+   *
+   * The demo and the signup are still reachable -- `sign in` / `sign up` sit in
+   * the navbar directly above, and the closing CTA carries both routes with
+   * the sentence explaining what the demo is. The hero no longer competes with
+   * either.
+   *
+   * The old `note` ("no signup · the demo opens with sample data, read only")
+   * went with them: it annotated the demo button specifically, and copy that
+   * explains a control which is no longer on screen reads as a leftover. The
+   * same claim is made properly by CLOSING_CTA.demoNote, beside the button it
+   * describes.
+   */
+  sourceCta: { label: 'read the source', href: REPO_URL },
 } as const
 
 export const NAV_LINKS = [

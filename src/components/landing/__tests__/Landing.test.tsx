@@ -52,22 +52,30 @@ describe('the landing page structure', () => {
 })
 
 describe('the hero', () => {
-  it('carries all three calls to action, pointing where they claim', () => {
-    // A CTA that goes nowhere is the one failure that makes the whole page
-    // pointless, so the hrefs are asserted rather than the labels alone.
+  it('carries exactly one call to action, and it goes to the source', () => {
+    // Gabe removed the demo and create-account buttons on 2026-09-02. Asserted
+    // as a COUNT, not just as the presence of the survivor: "we deliberately
+    // took two buttons out" is a claim that rots the moment someone helpfully
+    // adds a demo button back, and presence alone would not notice.
+    const { container } = renderLanding()
+    const hero = container.querySelector(
+      '[data-landing-section="hero"]'
+    ) as HTMLElement
+    const ctas = within(hero).getAllByRole('link')
+    expect(ctas).toHaveLength(1)
+    expect(ctas[0]).toHaveAttribute('href', HERO.sourceCta.href)
+    expect(ctas[0]).toHaveTextContent(HERO.sourceCta.label)
+  })
+
+  it('leaves the demo and the signup reachable elsewhere on the page', () => {
+    // The point of removing them from the hero was to stop it competing with
+    // the closing CTA -- not to make either route unreachable. If this ever
+    // fails, the removal went too far.
     renderLanding()
-    expect(screen.getByRole('link', { name: HERO.primaryCta.label })).toHaveAttribute(
-      'href',
-      '/demo/dashboard'
-    )
-    expect(screen.getByRole('link', { name: HERO.secondaryCta.label })).toHaveAttribute(
-      'href',
-      '/signup'
-    )
-    expect(screen.getByRole('link', { name: HERO.tertiaryCta.label })).toHaveAttribute(
-      'href',
-      HERO.tertiaryCta.href
-    )
+    expect(screen.getByRole('link', { name: 'sign up' })).toHaveAttribute('href', '/signup')
+    expect(
+      screen.getAllByRole('link', { name: /demo/i }).length
+    ).toBeGreaterThan(0)
   })
 
   it('is the one display-size heading on the page', () => {
