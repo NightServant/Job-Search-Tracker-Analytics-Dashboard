@@ -54,6 +54,7 @@ import { EyeIcon as EyeIconBase } from './eye'
 import { EyeOffIcon as EyeOffIconBase } from './eye-off'
 import { FileTextIcon } from './file-text'
 import { HistoryIcon } from './history'
+import { InfoIcon as InfoIconBase } from './info'
 import { LayoutDashboardIcon } from './layout-dashboard'
 import { LayoutListIcon } from './layout-list'
 import { LockIcon as LockIconBase } from './lock'
@@ -99,6 +100,7 @@ export const DownloadIcon = withDefaultSize(DownloadIconBase)
 export const CloseIcon = withDefaultSize(XIcon)
 export const ClockIcon = withDefaultSize(ClockIconBase)
 export const ExternalIcon = withDefaultSize(ExternalLinkIcon)
+export const InfoIcon = withDefaultSize(InfoIconBase)
 export const EyeIcon = withDefaultSize(EyeIconBase)
 export const EyeOffIcon = withDefaultSize(EyeOffIconBase)
 export const LockIcon = withDefaultSize(LockIconBase)
@@ -160,6 +162,7 @@ export const icons = {
   UserRound: asIconComponent(UserRoundIcon),
   Clock: asIconComponent(ClockIcon),
   External: asIconComponent(ExternalIcon),
+  Info: asIconComponent(InfoIcon),
   Eye: asIconComponent(EyeIcon),
   EyeOff: asIconComponent(EyeOffIcon),
   Lock: asIconComponent(LockIcon),

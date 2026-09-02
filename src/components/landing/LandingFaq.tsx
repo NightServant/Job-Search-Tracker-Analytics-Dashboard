@@ -1,5 +1,6 @@
 'use client'
 
+import { cn } from '@/lib/utils'
 import {
   Accordion,
   AccordionContent,
@@ -8,6 +9,7 @@ import {
 } from '@/components/ui/accordion'
 import { SearchIcon } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
+import { LANDING_TYPE } from './typography'
 import { FAQ } from './content'
 
 /**
@@ -45,10 +47,10 @@ export function LandingFaq() {
       >
         {FAQ.entries.map((entry, i) => (
           <AccordionItem key={entry.question} value={`faq-${i}`}>
-            <AccordionTrigger className="py-5 text-body-l text-text-primary">
+            <AccordionTrigger className={cn('py-5', LANDING_TYPE.itemTitle)}>
               {entry.question}
             </AccordionTrigger>
-            <AccordionContent className="max-w-3xl pb-5 text-body-m text-text-secondary">
+            <AccordionContent className={cn('max-w-3xl pb-5', LANDING_TYPE.itemBody)}>
               {entry.answer}
             </AccordionContent>
           </AccordionItem>

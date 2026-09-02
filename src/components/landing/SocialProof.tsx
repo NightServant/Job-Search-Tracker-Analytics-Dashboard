@@ -1,7 +1,9 @@
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { Reveal } from '@/components/motion/Reveal'
 import { CheckIcon, ExternalIcon, icons } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
+import { LANDING_TYPE } from './typography'
 import { SOCIAL_PROOF } from './content'
 
 /**
@@ -87,8 +89,8 @@ export function SocialProof() {
                 </span>
 
                 <div className="flex flex-col gap-2">
-                  <dt className="text-heading-m text-text-primary">{tile.title}</dt>
-                  <dd className="max-w-[62ch] text-body-l text-text-secondary">{tile.body}</dd>
+                  <dt className={LANDING_TYPE.itemTitle}>{tile.title}</dt>
+                  <dd className={cn('max-w-[62ch]', LANDING_TYPE.itemBody)}>{tile.body}</dd>
                 </div>
 
                 {/*
@@ -100,7 +102,10 @@ export function SocialProof() {
                 <Link
                   href={tile.href}
                   {...(tile.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
-                  className="inline-flex shrink-0 items-center gap-1.5 text-body-s text-accent-default md:justify-self-end"
+                  className={cn(
+                    'inline-flex shrink-0 items-center gap-1.5 md:justify-self-end',
+                    LANDING_TYPE.itemLink
+                  )}
                 >
                   <span className="underline underline-offset-4">{tile.linkLabel}</span>
                   <ExternalIcon size={14} aria-hidden />

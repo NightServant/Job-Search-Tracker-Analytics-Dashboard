@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Reveal } from '@/components/motion/Reveal'
+import { LANDING_TYPE } from './typography'
 
 /**
  * The landing page's layout grid, in one place.
@@ -67,8 +68,12 @@ export function Section({
  * would make a screen reader read the section name twice.
  *
  * These are the AnimateIcons components, which animate on hover. The whole
- * heading row is the hover target rather than the 20px glyph, because a
+ * heading row is the hover target rather than the glyph itself, because a
  * micro-interaction nobody can find is not an interaction.
+ *
+ * Every size here comes from LANDING_TYPE. Nothing in this file picks a type
+ * class directly -- see that file for why the roles are named rather than the
+ * sizes chosen per section.
  */
 export interface SectionHeadingProps {
   eyebrow?: string
@@ -81,17 +86,17 @@ export function SectionHeading({ eyebrow, title, lede, icon: Icon }: SectionHead
   return (
     <Reveal className="mb-12 flex flex-col gap-3">
       {eyebrow && (
-        <p className="text-label-caps uppercase text-accent-default">{eyebrow}</p>
+        <p className={LANDING_TYPE.eyebrow}>{eyebrow}</p>
       )}
       <div className="group flex items-center gap-3">
-        <h2 className="text-heading-l text-text-primary">{title}</h2>
+        <h2 className={LANDING_TYPE.sectionTitle}>{title}</h2>
         {Icon && (
           <span aria-hidden className="text-text-muted transition-colors group-hover:text-accent-default">
-            <Icon size={22} />
+            <Icon size={26} />
           </span>
         )}
       </div>
-      {lede && <p className="max-w-2xl text-body-l text-text-secondary">{lede}</p>}
+      {lede && <p className={cn('max-w-2xl', LANDING_TYPE.sectionLede)}>{lede}</p>}
     </Reveal>
   )
 }
