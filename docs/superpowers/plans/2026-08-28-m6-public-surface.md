@@ -996,11 +996,12 @@ rots because nobody sees it — exists before the pinned path is layered over it
   export function LandingNavbar(props: { overHero: boolean }): JSX.Element
 
   // src/lib/landingNav.ts
-  export const LANDING_NAV_HEIGHT_PX = 80
+  /** The bar is 60px at 375 (Figma 64:1020) and 80px on desktop (39:355). */
+  export const LANDING_NAV_HEIGHT_PX = { base: 60, md: 80 } as const
   export function navOverHero(
     scrollYPx: number,
     heroBottomPx: number,
-    navHeightPx?: number
+    navHeightPx: number   // required on purpose -- see the navbar decision
   ): boolean
   ```
 
@@ -1124,7 +1125,7 @@ flips mark and wordmark together, and the accent cell stays accent in both
 treatments. Do not fork the component or add a `variant` prop; pass a class.
 
 **The switch point is the hero's bottom edge, and it is a pure function.**
-`navOverHero(scrollYPx, heroBottomPx, navHeightPx = LANDING_NAV_HEIGHT_PX)`
+`navOverHero(scrollYPx, heroBottomPx, navHeightPx)`
 returns `scrollYPx + navHeightPx < heroBottomPx` — true while the hero still
 covers the band the navbar occupies. `heroBottomPx` is measured from the hero
 element, NOT computed from `heroPinHeightPx`: the hero is pinned on desktop and
@@ -1155,10 +1156,69 @@ change, no slide. A navbar that resizes or moves on scroll is the pattern this
 design system's restraint rules out, and a state change is not an animation, so
 `prefers-reduced-motion` gets the same swap instantly rather than losing it.
 
-**Open, for Gabe:** the Figma nav links are `features` / `ats` / `open source`,
-which are the OLD sections and two of them no longer exist. The six-section page
-suggests `how it works` (to solution/value), `faq`, and `open source` (external,
-to the repository). Named here rather than chosen silently.
+**The nav links are `how it works`, `faq`, `open source`.** Settled by Gabe,
+2026-09-02, replacing Figma's `features` / `ats` / `open source` — two of which
+named sections that no longer exist under the six-section order.
+
+| Link | Target | Kind |
+|---|---|---|
+| `how it works` | `#how-it-works` on the solution/value section | in-page anchor |
+| `faq` | `#faq` on the FAQ section | in-page anchor |
+| `open source` | the GitHub repository | external |
+
+Three things follow, and each is a real requirement rather than a detail:
+
+- **The two anchors need ids on the sections themselves**, set in `Landing`, not
+  on an inner heading. `#how-it-works` targets section 4, which *contains* the
+  pinned carousel — so the jump lands at the top of the block's tall outer div,
+  which is where the hold begins. That is the correct landing point and it is
+  worth stating, because it looks wrong in the DOM: the visitor arrives at a
+  `4000px` element and sees the first slide.
+- **`scroll-behavior: smooth` is gated on the motion preference.** A smooth
+  scroll across a pinned section is a long animated traversal of exactly the
+  motion someone with `prefers-reduced-motion` asked not to have. Use the CSS
+  `@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto } }`
+  guard rather than a second JS read — `src/lib/motion.ts` stays the only
+  `matchMedia` call in the milestone.
+- **`open source` leaves the site**, so it carries `rel="noreferrer"` and is the
+  one nav item that is not an anchor. It does not get an external-link glyph:
+  the bar already carries a lockup, three links, two buttons and a theme
+  toggle, and `ExternalIcon` on one of them is the kind of asymmetry this
+  design system's restraint rules out. The URL in the status bar is the
+  affordance.
+
+The links are `text-text-secondary` in the themed treatment and
+`rgba(250,250,250,0.82)` over the hero, per the treatment table above.
+
+**They do not appear below `md` (768px), the same breakpoint everything else on this page turns on.** Read from the mobile frame (`64:1020`), not
+assumed: at 375px the bar is **60px tall** and holds exactly three things —
+the lockup at x=20, `sign in`, and `sign up`. No links, no `open the demo`, and
+**no theme toggle**. So on mobile the theme control lives only in the footer,
+which still satisfies 6.1's "navbar **and** footer" because the desktop bar
+carries both. State that in `LandingNavbar`'s docblock; a later reader will
+otherwise "fix" the missing toggle.
+
+**The bar is two heights, and `navOverHero` must be told which.** Desktop
+`39:355` is 80px; mobile `64:1020` is 60px. The switch point is
+`scrollY + navHeight < heroBottom`, so a hard-coded 80 flips the treatment 20px
+early on every phone — a small enough error to survive review and a visible one
+in use, since it lands mid-transition. Therefore:
+
+```ts
+export const LANDING_NAV_HEIGHT_PX = { base: 60, md: 80 } as const
+export function navOverHero(
+  scrollYPx: number,
+  heroBottomPx: number,
+  navHeightPx: number   // no default -- see below
+): boolean
+```
+
+`navHeightPx` deliberately has **no default value**. A default is what would let
+a caller forget the responsive case and still compile, which is precisely the
+bug. `Landing` already holds a measured width from `useViewportSize`, so it
+picks: `size.widthPx >= PIN_MIN_WIDTH_PX ? LANDING_NAV_HEIGHT_PX.md :
+LANDING_NAV_HEIGHT_PX.base`. `landingNav.test.ts` gets a case for each height
+asserting the boundary moves with it.
 
 #### The six sections
 
@@ -1341,8 +1401,20 @@ reads the decision and then the JSX.
 
 `Landing` owns the state: a ref on the hero section, a `resize`-and-`scroll`
 subscription reading `heroRef.current.getBoundingClientRect().bottom + scrollY`
-into `heroBottomPx`, and `overHero = navOverHero(scrollY, heroBottomPx)` passed
-down. `LandingNavbar` itself takes the boolean and reads nothing — same rule
+into `heroBottomPx`, and
+
+```ts
+const navHeight =
+  size.widthPx >= PIN_MIN_WIDTH_PX ? LANDING_NAV_HEIGHT_PX.md : LANDING_NAV_HEIGHT_PX.base
+const overHero = navOverHero(scrollY, heroBottomPx, navHeight)
+```
+
+passed down. It reuses `size` from the `useViewportSize` Task 3 already put in
+`Landing`, and `PIN_MIN_WIDTH_PX` because `lg` and the pin breakpoint are the
+same 768 — a second responsive number for one bar is how two parts of one page
+disagree about what "mobile" means.
+
+`LandingNavbar` itself takes the boolean and reads nothing — same rule
 Task 3 Step 18 applies to `scrollDriven`, and for the same reason: one
 component deciding it is over the hero while another decides it is not is M5's
 sidebar-and-bottom-nav defect wearing a different hat.
