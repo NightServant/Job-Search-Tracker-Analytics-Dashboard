@@ -91,6 +91,44 @@ describe('the privacy page', () => {
     expect(document.body.textContent).toContain('delete_own_account')
   })
 
+  it('indexes every section, and indexes nothing that is not a section', () => {
+    // A hand-kept table of contents is a second copy of the structure, and the
+    // copy is what goes stale -- an index entry pointing at a section that was
+    // renamed is worse than no index. Both directions, so neither list can
+    // drift from the other.
+    render(<Privacy />)
+    // Scoped to the index, not to every <nav>: SiteFooter renders one too,
+    // and its links are absolute routes rather than in-page anchors.
+    const links = [...document.querySelectorAll('[data-privacy-toc] a')]
+    expect(links.length).toBeGreaterThan(0)
+
+    for (const link of links) {
+      const id = link.getAttribute('href')!.replace('#', '')
+      const target = document.getElementById(id)
+      expect(target, `the index links to #${id}, which is not on the page`).not.toBeNull()
+      // The link text is the heading it points at, not a paraphrase of it.
+      expect(target!.querySelector('h2')?.textContent).toBe(link.textContent)
+    }
+
+    const sections = [...document.querySelectorAll('article section[id]')]
+    expect(sections.length).toBe(links.length)
+  })
+
+  it('offers an obvious way back without a site footer', () => {
+    // Gabe's call. The footer carried the marketing page's own navigation --
+    // including a `privacy` link pointing back at this very page -- so the
+    // document ended by offering to take you to itself. The one control this
+    // page needs is now in the header, where someone who stepped out of a
+    // signup flow will look for it.
+    render(<Privacy />)
+    const home = screen.getByRole('link', { name: /Back to the home page/i })
+    expect(home).toHaveAttribute('href', '/')
+    expect(home).toHaveAttribute('data-variant', 'secondary')
+
+    // No second `privacy` link, which is what the footer used to add.
+    expect(screen.queryByRole('link', { name: /^privacy$/i })).toBeNull()
+  })
+
   it('does not invent a region, a retention period or a third party', () => {
     // The plan's instruction was explicit: name the region if it is known at
     // write time, do not guess it. It is not known here, so the page says

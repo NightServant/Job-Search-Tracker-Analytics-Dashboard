@@ -26,7 +26,9 @@ describe('the 404 page', () => {
       'href',
       '/applications'
     )
-    expect(screen.getByRole('link', { name: 'Go to the home page' })).toHaveAttribute(
+    // The way home is the header button now, matching /privacy: it is the one
+    // destination every visitor can use whether or not they have an account.
+    expect(screen.getByRole('link', { name: /Back to the home page/i })).toHaveAttribute(
       'href',
       '/'
     )
@@ -40,9 +42,19 @@ describe('the 404 page', () => {
     )
   })
 
+  it('carries no site footer, which would be a second navigation', () => {
+    // Gabe's call, applied here after /privacy. The footer is the marketing
+    // page's own navigation plus the attribution block -- a strange thing to
+    // read at the bottom of a broken link.
+    render(<NotFound />)
+    expect(screen.queryByRole('link', { name: /^source$/i })).toBeNull()
+    expect(screen.queryByRole('link', { name: /^privacy$/i })).toBeNull()
+  })
+
   it('offers exactly one primary route out', () => {
-    // Three equally-weighted primary buttons is three decisions. The overview
-    // is the one most people want; the others are secondary.
+    // Equally-weighted primary buttons would be several decisions at the
+    // moment the visitor is already lost. The overview is the one most people
+    // want; everything else is secondary.
     render(<NotFound />)
     const primaries = document.querySelectorAll('a[data-variant="primary"]')
     expect(primaries).toHaveLength(1)

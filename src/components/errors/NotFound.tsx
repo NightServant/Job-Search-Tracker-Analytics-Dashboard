@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { BrandLockup } from '@/components/ui/brand-mark'
-import { SiteFooter } from '@/components/landing/SiteFooter'
+import { ArrowRightIcon } from '@/components/icons'
 
 /**
  * The 404 page.
@@ -20,11 +20,16 @@ import { SiteFooter } from '@/components/landing/SiteFooter'
  * 404 body. This component reads no location at all, which is why the copy
  * cannot name what was asked for. A test asserts the absence.
  *
- * THREE RECOVERY LINKS, ONE PRIMARY. A 404 whose only control is "go home"
- * makes a signed-in visitor start over from the marketing page to get back to
- * the thing they were doing. The overview is primary because it is what most
- * people want; the other two are secondary because three equal buttons is
- * three decisions at the moment the visitor is already lost.
+ * RECOVERY LINKS, ONE PRIMARY. A 404 whose only control is "go home" makes a
+ * signed-in visitor start over from the marketing page to get back to the
+ * thing they were doing. The overview is primary because it is what most
+ * people want; applications is secondary, because two equal buttons is two
+ * decisions at the moment the visitor is already lost.
+ *
+ * The way home moved into the HEADER, matching /privacy -- it is the one
+ * destination every visitor to this page can use whether or not they have an
+ * account, and repeating it in the body made the group of three read as three
+ * peers when only two of them are about resuming work.
  *
  * OUTSIDE THE AUTH GUARD, deliberately: this renders from `app/not-found.tsx`
  * at the root, so it is not inside `(app)/layout.tsx`. A 404 that redirects a
@@ -34,9 +39,15 @@ import { SiteFooter } from '@/components/landing/SiteFooter'
  * signed-out visitor following one lands on the sign-in screen, which is
  * correct, because by then they have asked for a private page.
  *
- * It carries the landing chrome -- lockup and SiteFooter -- rather than the app
- * shell. The shell needs a session and a sidebar full of the visitor's own
- * data; a 404 is reachable by anyone, including crawlers.
+ * NO SITE FOOTER, matching /privacy. The footer is the marketing page's own
+ * navigation -- a second, denser set of destinations underneath a page whose
+ * entire job is to offer two or three good ones. It also carries the
+ * attribution block, which is a strange thing to read at the bottom of a
+ * broken link.
+ *
+ * It carries the landing chrome rather than the app shell. The shell needs a
+ * session and a sidebar full of the visitor's own data; a 404 is reachable by
+ * anyone, including crawlers.
  */
 export function NotFound() {
   return (
@@ -47,11 +58,23 @@ export function NotFound() {
         body is centred in a max-width container puts them a few pixels apart
         at every width -- the kind of misalignment that reads as sloppiness
         without anyone being able to say what is wrong.
+
+        The explicit way-back button matches /privacy. A clickable wordmark is
+        a convention people who build websites know and people who have just
+        hit a broken link do not.
       */}
-      <header className="w-full px-5 py-6 md:px-8">
-        <div className="mx-auto w-full max-w-[1200px]">
+      <header className="w-full border-b border-border-subtle px-5 py-5 md:px-8">
+        <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-6">
           <Link href="/" aria-label="Worktrack home">
             <BrandLockup />
+          </Link>
+          <Link
+            href="/"
+            data-variant="secondary"
+            className={`${buttonVariants({ variant: 'secondary', size: 's' })} group`}
+          >
+            Back to the home page
+            <ArrowRightIcon size={14} aria-hidden />
           </Link>
         </div>
       </header>
@@ -90,19 +113,11 @@ export function NotFound() {
               >
                 Go to your applications
               </Link>
-              <Link
-                href="/"
-                data-variant="secondary"
-                className={buttonVariants({ variant: 'secondary', size: 'm' })}
-              >
-                Go to the home page
-              </Link>
             </div>
           </div>
         </div>
       </main>
 
-      <SiteFooter />
     </div>
   )
 }
