@@ -49,11 +49,11 @@ import { NAV_LINKS } from './content'
  * bar, which is the trade being made deliberately -- a landing page that asks
  * for a decision in its top-right corner asks before it has argued anything.
  *
- * Below md the bar is the lockup and nothing else: the links hide, and the
- * theme toggle hides with them (Figma 64:1020 draws no toggle at 375). With
- * the footer's toggle also removed, that leaves NO theme control on this page
- * at phone widths -- see SiteFooter, which records the same consequence and
- * the one-line fix.
+ * Below md the links hide but the THEME TOGGLE DOES NOT. Figma 64:1020 draws
+ * no toggle in the 375px bar, and that omission was only survivable while the
+ * footer carried one; the footer's was removed on 2026-09-02, so following the
+ * frame would leave a phone visitor unable to change the theme anywhere on the
+ * page. The frame loses to the working product here.
  */
 export interface LandingNavbarProps {
   /** True while the hero still covers the band the bar occupies. */
@@ -150,7 +150,14 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
         ))}
       </nav>
 
-      <div data-nav-toggle className="hidden md:block">
+      {/*
+        Shown at EVERY width, including mobile. Figma 64:1020 draws no toggle
+        in the 375px bar, and this deliberately departs from it: the footer's
+        toggle was removed on 2026-09-02, and the frame's omission was only
+        survivable while the footer carried one. Following it now would leave a
+        phone visitor with no way to change the theme anywhere on the page.
+      */}
+      <div data-nav-toggle>
         <ThemeToggle size={32} className={cn(overHero && 'text-[#fafafa]')} />
       </div>
     </header>

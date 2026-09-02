@@ -18,11 +18,10 @@ import { FOOTER } from './content'
  *
  * NO THEME TOGGLE. Removed by Gabe on 2026-09-02.
  *
- * KNOWN CONSEQUENCE, recorded rather than quietly accepted: the navbar hides
- * its own toggle below md, so with this one gone there is NO theme control
- * anywhere on the landing page at phone widths. A visitor on a phone cannot
- * change the theme from `/`. The one-line fix, if that is not wanted, is to
- * drop `hidden md:block` from the navbar's toggle wrapper.
+ * The theme control now lives only in the navbar, which is why that bar shows
+ * its toggle at EVERY width rather than hiding it below md as Figma 64:1020
+ * draws. Removing both would have left a phone visitor no way to change the
+ * theme anywhere on the page; the two decisions only work as a pair.
  */
 export function SiteFooter() {
   return (

@@ -292,12 +292,20 @@
 
 /* Six unused utilities removed in M5.5 Item 11 (.animate-fade-in,
    .animate-slide-down, .animate-slide-up, .btn-danger, .btn-ghost,
-   .card-hover). What still holds the rest of this block alive, precisely:
-   .btn-primary/.btn-secondary/.card/.input/.label are used by
-   screens/LoginPage.tsx -- live, and deleted by M6 Task 4 -- and by
-   components/errors/ErrorFallback.tsx, which is dead code: its only importer
-   AppErrorBoundary is itself imported by nothing, and there is no
-   app/error.tsx. So this block dies with M6, not before. */
+   .card-hover).
+
+   UPDATE, M6 Task 4 (2026-09-02): screens/LoginPage.tsx has now been deleted,
+   which was half of what held this block alive. Re-checked by grep rather than
+   assumed: .card, .input and .label have ZERO users left anywhere in src, and
+   .btn-primary/.btn-secondary have exactly two, both in
+   components/errors/ErrorFallback.tsx -- which is itself dead code, since its
+   only importer AppErrorBoundary is imported by nothing and there is no
+   app/error.tsx.
+
+   So this whole block, ErrorFallback and AppErrorBoundary are now removable
+   together. Not done here because Task 4 is the auth split and deleting three
+   more files on the way is how a focused change stops being reviewable. It is
+   a clean, self-contained follow-up. */
 
 /* --- Legacy v3 tokens -------------------------------------------------------
    The screens still in the tree were built against these and are rewritten in

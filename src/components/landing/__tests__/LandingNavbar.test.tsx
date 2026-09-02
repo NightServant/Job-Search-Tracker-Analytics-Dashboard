@@ -154,14 +154,18 @@ describe('LandingNavbar at mobile widths', () => {
     }
   })
 
-  it('keeps the theme toggle to md and up, where the frame draws it', () => {
-    // Not an omission: on mobile the theme control lives in the footer only,
-    // which still satisfies 6.1's "navbar AND footer" because the desktop bar
-    // carries both. Asserted so a later reader does not "fix" it.
+  it('keeps the theme toggle at every width, including mobile', () => {
+    // Figma 64:1020 draws no toggle in the 375px bar. That omission was only
+    // survivable while the footer carried one, and the footer's was removed on
+    // 2026-09-02 -- so obeying the frame would leave a phone visitor unable to
+    // change the theme anywhere on the page. The two decisions only work as a
+    // pair, which is why this asserts the absence of the hiding classes rather
+    // than merely that a toggle exists somewhere.
     const bar = renderNav(false)
     const toggle = bar.querySelector('[data-theme-toggle]')
     expect(toggle).not.toBeNull()
-    expect(toggle!.closest('[data-nav-toggle]')?.className).toContain('hidden')
-    expect(toggle!.closest('[data-nav-toggle]')?.className).toContain('md:block')
+    const wrapper = toggle!.closest('[data-nav-toggle]') as HTMLElement
+    expect(wrapper.className).not.toContain('hidden')
+    expect(wrapper.className).not.toContain('md:block')
   })
 })

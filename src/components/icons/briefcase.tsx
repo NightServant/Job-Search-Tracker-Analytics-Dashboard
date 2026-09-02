@@ -1,5 +1,8 @@
 // The one glyph AnimateIcons has no equivalent for (searched briefcase, bag,
-// case, folder -- nothing). Its only call site is src/screens/LoginPage.tsx,
+// case, folder -- nothing). It had ONE call site, src/screens/LoginPage.tsx,
+// which M6 Task 4 deleted, so nothing renders it today; it stays in the
+// barrel because `icons` is a complete record keyed by IconName and removing
+// one entry narrows a type the app's nav is written against.
 // a legacy v3 screen M6 Task 4 deletes outright, decorating a wordmark that
 // reads "Job Search Tracker" -- not the product's current name. Gabe's ruling
 // on 2026-08-29: leave LoginPage.tsx untouched rather than substitute a
