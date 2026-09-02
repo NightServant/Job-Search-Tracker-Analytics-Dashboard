@@ -1,5 +1,8 @@
+'use client'
+
 import * as React from 'react'
 import Link from 'next/link'
+import { useAppHref } from '@/components/shell/routeBase'
 import { cn } from '@/lib/utils'
 import { AtsCheck } from '@/components/ui/ats-check'
 import { lintSections } from '@/services/atsLint'
@@ -95,6 +98,7 @@ export function DocumentRow({
   className,
   ...props
 }: DocumentRowProps) {
+  const appHref = useAppHref()
   const ats = lintSections(doc.sections)
 
   return (
@@ -113,7 +117,7 @@ export function DocumentRow({
     >
       <div className="min-w-0">
         <Link
-          href={`/cv?draft=${doc.id}`}
+          href={appHref(`/cv?draft=${doc.id}`)}
           className={cn(
             'block truncate rounded-md text-body-m text-text-primary hover:text-accent-default',
             'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'

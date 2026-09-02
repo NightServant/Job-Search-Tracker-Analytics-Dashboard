@@ -87,6 +87,26 @@ describe('the demo shell', () => {
     expect(DEMO_NAV).toHaveLength(5)
   })
 
+  it('keeps every link the SCREENS render inside the demo too', () => {
+    // The nav was only half the escape. The demo renders the REAL screens, and
+    // their rows link to absolute paths -- /applications/<id>, /calendar,
+    // /cv?draft=<id>. Unprefixed, a visitor clicking any application row
+    // leaves the demo, hits the (app) auth guard and lands on /login, which
+    // reads as the demo being broken rather than as a boundary working. This
+    // is the assertion that would have caught it.
+    const { container } = render(
+      <DemoLayout>
+        <DemoDashboard />
+      </DemoLayout>
+    )
+    const hrefs = [...container.querySelectorAll('a[href]')].map((a) => a.getAttribute('href')!)
+    const internal = hrefs.filter((h) => h.startsWith('/') && h !== '/signup')
+    expect(internal.length).toBeGreaterThan(0) // positive companion
+    for (const href of internal) {
+      expect(href, `${href} leaves the demo`).toMatch(/^\/demo(\/|$)/)
+    }
+  })
+
   it('renders the banner above the content on every demo route', () => {
     render(
       <DemoLayout>

@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useAppHref } from '@/components/shell/routeBase'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircleIcon } from '@/components/icons'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -51,6 +52,7 @@ export function UpcomingEvents({
   error = false,
   limit = 3,
 }: UpcomingEventsProps) {
+  const appHref = useAppHref()
   if (error) {
     return (
       <p className="flex items-center gap-2 py-4 text-body-s text-status-rejected-mark">
@@ -110,7 +112,7 @@ export function UpcomingEvents({
           })}
         </ul>
       )}
-      <Link href="/calendar" className="text-body-s text-accent-default hover:underline">
+      <Link href={appHref('/calendar')} className="text-body-s text-accent-default hover:underline">
         open calendar
       </Link>
     </div>

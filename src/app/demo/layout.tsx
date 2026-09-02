@@ -1,5 +1,6 @@
 import { AppShell } from '@/components/shell/AppShell'
 import { DemoBanner } from '@/components/shell/DemoBanner'
+import { RouteBaseProvider } from '@/components/shell/routeBase'
 import { DEMO_NAV } from './nav'
 
 /**
@@ -19,11 +20,18 @@ import { DEMO_NAV } from './nav'
  *
  * `settingsHref={null}` because there is no demo settings screen: settings act
  * on an account, and there is no account here.
+ *
+ * RouteBaseProvider is what keeps the screens' OWN links inside the demo. The
+ * nav is not the only way out: every application row, every "see all", the
+ * calendar link and the CV link are absolute paths in the shared components,
+ * and unprefixed they leave the demo and hit the (app) auth guard.
  */
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
   return (
-    <AppShell nav={DEMO_NAV} settingsHref={null} banner={<DemoBanner />}>
-      {children}
-    </AppShell>
+    <RouteBaseProvider base="/demo">
+      <AppShell nav={DEMO_NAV} settingsHref={null} banner={<DemoBanner />}>
+        {children}
+      </AppShell>
+    </RouteBaseProvider>
   )
 }
