@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import * as React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -317,5 +319,41 @@ describe('ThemeToggle', () => {
     render(<ThemeToggle />)
     fireEvent.click(screen.getByRole('button'))
     expect(setTheme).toHaveBeenCalledWith('dark')
+  })
+})
+
+describe('buttonVariants lives where a server component can call it', () => {
+  // A 500 on the 404 page is how this was found: `buttonVariants` was exported
+  // from button.tsx, which carries 'use client', so calling it from
+  // app/not-found.tsx threw at request time. Nothing caught it because every
+  // other caller happened to sit in a client tree, and jsdom does not model
+  // the server/client boundary at all.
+  const read = (p: string) => readFileSync(p, 'utf8')
+
+  it('is defined in a module with no use-client directive', () => {
+    const src = read('src/components/ui/button-variants.ts')
+    expect(src).toMatch(/export const buttonVariants = cva\(/)
+    expect(src.split('\n').slice(0, 3).join('\n')).not.toContain('use client')
+  })
+
+  it('is not re-exported from the client button module', () => {
+    // Re-exporting would be the smaller diff and would fix nothing: a
+    // re-export from a 'use client' module is itself client-marked, so the
+    // next server component to import from @/components/ui/button hits the
+    // same error. One canonical path is what makes it unrepeatable.
+    const src = read('src/components/ui/button.tsx')
+    expect(src).not.toMatch(/export\s*\{[^}]*\bbuttonVariants\b/)
+  })
+
+  it('has no caller importing it from the client module', () => {
+    const hits = execSync(
+      `grep -rln "buttonVariants" src --include=*.tsx --include=*.ts || true`,
+      { encoding: 'utf8' }
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .filter((f) => /buttonVariants[^}]*\}\s*from\s*'@\/components\/ui\/button'/.test(read(f)))
+    expect(hits).toEqual([])
   })
 })

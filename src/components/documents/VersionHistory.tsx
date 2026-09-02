@@ -2,7 +2,7 @@ import * as React from 'react'
 import Link from 'next/link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertCircleIcon } from '@/components/icons'
-import { buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { formatSnapshotTime } from '@/services/date'
 
 export interface VersionEntry {
