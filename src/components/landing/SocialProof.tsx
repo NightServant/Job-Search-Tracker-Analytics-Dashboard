@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Reveal } from '@/components/motion/Reveal'
-import { CheckIcon, ExternalIcon } from '@/components/icons'
+import { CheckIcon, ExternalIcon, icons } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
 import { SOCIAL_PROOF } from './content'
 
@@ -39,7 +39,17 @@ export function SocialProof() {
             */}
             <Card className="h-full rounded-none border-0 bg-bg-canvas transition-colors hover:bg-bg-surface">
               <CardHeader>
-                <CardTitle className="text-heading-s">{tile.title}</CardTitle>
+                <CardTitle className="flex items-center gap-2 text-heading-s">
+                  {/*
+                    aria-hidden: the heading beside it already names the tile,
+                    and announcing the glyph would say it twice.
+                  */}
+                  {(() => {
+                    const Glyph = icons[tile.icon]
+                    return <Glyph size={16} aria-hidden className="shrink-0 text-text-muted" />
+                  })()}
+                  {tile.title}
+                </CardTitle>
                 <CardDescription className="text-body-s">{tile.body}</CardDescription>
               </CardHeader>
               <CardContent>

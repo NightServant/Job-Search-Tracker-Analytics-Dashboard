@@ -1,7 +1,12 @@
 'use client'
 
 import * as React from 'react'
-import { activeSectionId, pageProgress, type SectionTop } from '@/lib/sectionProgress'
+import {
+  activeSectionId,
+  railFillFraction,
+  withinSectionFraction,
+  type SectionTop,
+} from '@/lib/sectionProgress'
 
 /**
  * Derives the rail's state from page scroll.
@@ -20,6 +25,12 @@ import { activeSectionId, pageProgress, type SectionTop } from '@/lib/sectionPro
  */
 export interface SectionProgress {
   activeId: string | null
+  /**
+   * How far the rail's fill should reach, 0..1 of the TRACK -- not of the
+   * page. The dots are evenly spaced and the sections are not evenly tall, so
+   * a pixel-linear value leaves the fill trailing the active dot for the whole
+   * page. See railFillFraction.
+   */
   progress: number
 }
 
@@ -43,13 +54,22 @@ export function useSectionProgress(ids: string[]): SectionProgress {
         if (!el) continue
         tops.push({ id, top: el.getBoundingClientRect().top + window.scrollY })
       }
+      const active = activeSectionId(window.scrollY, window.innerHeight, tops)
+      const index = tops.findIndex((t) => t.id === active)
+      // The last section is measured against the end of the document, since
+      // it has no successor to span to.
+      const nextTop =
+        index >= 0 && index < tops.length - 1
+          ? tops[index + 1].top
+          : document.documentElement.scrollHeight
+      const within =
+        index >= 0
+          ? withinSectionFraction(window.scrollY, window.innerHeight, tops[index].top, nextTop)
+          : 0
+
       setState({
-        activeId: activeSectionId(window.scrollY, window.innerHeight, tops),
-        progress: pageProgress(
-          window.scrollY,
-          document.documentElement.scrollHeight,
-          window.innerHeight
-        ),
+        activeId: active,
+        progress: railFillFraction(index, tops.length, within),
       })
     }
 

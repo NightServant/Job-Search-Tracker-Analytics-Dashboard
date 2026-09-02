@@ -28,6 +28,8 @@
  * Hero copy is transcribed from Figma node 39:369, read 2026-09-02.
  */
 
+import type { IconName } from '@/components/icons'
+
 export const REPO_URL = 'https://github.com/NightServant/Job-Search-Tracker-Analytics-Dashboard'
 export const COMMITS_URL = `${REPO_URL}/commits/main`
 
@@ -97,12 +99,19 @@ export const RAIL_SECTIONS = [
   { id: 'cta', label: 'get started' },
 ] as const
 
+/**
+ * Icons are named, not imported, so this file stays free of JSX and every
+ * string and glyph the page shows sits together. `IconName` is the same key
+ * the app's nav already looks up through the `icons` record, so a name that
+ * does not exist is a type error rather than a blank square.
+ */
 export interface ProofTile {
   title: string
   body: string
   href: string
   linkLabel: string
   external: boolean
+  icon: IconName
 }
 
 export const SOCIAL_PROOF: { heading: string; tiles: ProofTile[] } = {
@@ -110,6 +119,7 @@ export const SOCIAL_PROOF: { heading: string; tiles: ProofTile[] } = {
   tiles: [
     {
       title: 'open source',
+      icon: 'Documents',
       body: 'The whole application is readable, including the parts that are unfinished.',
       href: REPO_URL,
       linkLabel: 'read the repository',
@@ -117,6 +127,7 @@ export const SOCIAL_PROOF: { heading: string; tiles: ProofTile[] } = {
     },
     {
       title: 'built in the open',
+      icon: 'RotateCcw',
       body: 'Real commit history and real milestones, with the reasoning written down.',
       href: COMMITS_URL,
       linkLabel: 'read the commit log',
@@ -124,6 +135,7 @@ export const SOCIAL_PROOF: { heading: string; tiles: ProofTile[] } = {
     },
     {
       title: 'tested',
+      icon: 'Check',
       body: 'Every screen is covered by tests, and the suite runs on every commit.',
       href: `${REPO_URL}#testing`,
       linkLabel: 'how the suite is run',
@@ -131,6 +143,7 @@ export const SOCIAL_PROOF: { heading: string; tiles: ProofTile[] } = {
     },
     {
       title: 'a real stack',
+      icon: 'Lock',
       body: 'Next.js and TypeScript over Postgres, with row-level security on every table.',
       href: `${REPO_URL}#stack`,
       linkLabel: 'see the stack',
@@ -143,6 +156,7 @@ export interface Pain {
   title: string
   body: string
   answer: string
+  icon: IconName
 }
 
 export const PROBLEM: { heading: string; pains: Pain[] } = {
@@ -150,16 +164,19 @@ export const PROBLEM: { heading: string; pains: Pain[] } = {
   pains: [
     {
       title: 'the spreadsheet stops',
+      icon: 'Clock',
       body: 'It is current for two weeks. By week three nobody updates it, and it quietly stops being true.',
       answer: 'A pipeline with five stages, and a status history that records every move.',
     },
     {
       title: 'you cannot tell what is working',
+      icon: 'Analytics',
       body: 'Without knowing which channel produces interviews, effort goes wherever it feels productive.',
       answer: 'Analytics over your own applications: sources, conversion, and time in each stage.',
     },
     {
       title: 'the cv drifts',
+      icon: 'Documents',
       body: 'A version is rewritten per application, and a month later there is no record of which one was sent.',
       answer: 'A CV editor with version snapshots, linked to the application it was sent with.',
     },
@@ -169,6 +186,7 @@ export const PROBLEM: { heading: string; pains: Pain[] } = {
 export interface ValueClaim {
   title: string
   body: string
+  icon: IconName
 }
 
 export const SOLUTION: { heading: string; lede: string; claims: ValueClaim[] } = {
@@ -177,18 +195,21 @@ export const SOLUTION: { heading: string; lede: string; claims: ValueClaim[] } =
   claims: [
     {
       title: 'the pipeline',
+      icon: 'Applications',
       body:
         'Every application moves through wishlist, applied, interviewing, offer and rejected. ' +
         'The board and the table are the same data, and every transition is kept.',
     },
     {
       title: 'the analytics',
+      icon: 'Analytics',
       body:
         'Where applications come from, how many convert, and how long each stage takes. ' +
         'Computed from your own rows, so it is only ever as good as what you put in.',
     },
     {
       title: 'the cv editor',
+      icon: 'Documents',
       body:
         'Word-style and LaTeX editors with version snapshots, plus an ATS check that reads ' +
         'the document rather than guessing at it.',

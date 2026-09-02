@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Reveal } from '@/components/motion/Reveal'
-import { AnalyticsIcon } from '@/components/icons'
+import { AnalyticsIcon, icons } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
 import { SOLUTION } from './content'
 
@@ -35,7 +35,13 @@ export function SolutionValue({ children }: SolutionValueProps) {
         {SOLUTION.claims.map((claim, i) => (
           <Reveal key={claim.title} delay={i * 0.08} className="h-full">
             <div className="flex h-full flex-col gap-2 bg-bg-canvas p-6">
-              <h3 className="text-heading-s text-text-primary">{claim.title}</h3>
+              <h3 className="flex items-center gap-2 text-heading-s text-text-primary">
+                {(() => {
+                  const Glyph = icons[claim.icon]
+                  return <Glyph size={16} aria-hidden className="shrink-0 text-text-muted" />
+                })()}
+                {claim.title}
+              </h3>
               <p className="text-body-s text-text-secondary">{claim.body}</p>
             </div>
           </Reveal>

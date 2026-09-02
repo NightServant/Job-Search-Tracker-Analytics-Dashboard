@@ -1,6 +1,6 @@
 import { Reveal } from '@/components/motion/Reveal'
 import { Separator } from '@/components/ui/separator'
-import { AlertCircleIcon } from '@/components/icons'
+import { AlertCircleIcon, icons } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
 import { PROBLEM } from './content'
 
@@ -32,7 +32,13 @@ export function ProblemStatement() {
               <span className="text-data-s tabular text-text-muted">
                 {String(i + 1).padStart(2, '0')}
               </span>
-              <h3 className="text-heading-s text-text-primary">{pain.title}</h3>
+              <h3 className="flex items-center gap-2 text-heading-s text-text-primary">
+                {(() => {
+                  const Glyph = icons[pain.icon]
+                  return <Glyph size={16} aria-hidden className="shrink-0 text-text-muted" />
+                })()}
+                {pain.title}
+              </h3>
               <p className="text-body-s text-text-secondary">{pain.body}</p>
               <Separator className="my-1" />
               <p className="text-body-s text-text-primary">{pain.answer}</p>

@@ -10,6 +10,7 @@ import { usePinnedSection } from './usePinnedSection'
 import { useViewportSize } from './useViewportSize'
 import { useCarouselProgress, type DrivableSwiper } from './useCarouselProgress'
 import { SectionRail } from './SectionRail'
+import { SectionIndex } from './SectionIndex'
 import { useSectionProgress } from './useSectionProgress'
 import { RAIL_SECTIONS } from './content'
 import { Hero } from './Hero'
@@ -150,6 +151,15 @@ export function Landing({
         sections={[...RAIL_SECTIONS]}
         activeId={rail.activeId}
         progress={rail.progress}
+        overHero={railOverHero}
+      />
+      {/*
+        The left margin's counterweight. Same state as the rail, different job:
+        the rail is navigation, this states the position the rail only implies.
+      */}
+      <SectionIndex
+        sections={[...RAIL_SECTIONS]}
+        activeId={rail.activeId}
         overHero={railOverHero}
       />
 

@@ -52,6 +52,56 @@ export function pageProgress(
  * midpoint the reader is in the first one, and returning nothing there would
  * leave the rail with no active dot on first paint.
  */
+/**
+ * How far the rail's fill should reach, expressed as a fraction of the track.
+ *
+ * NOT page-scroll progress, and that distinction is the whole point. The dots
+ * are spaced EVENLY down the track -- one per section, regardless of how tall
+ * each section is -- while page progress is linear in pixels. The sections are
+ * nowhere near equal: the pinned carousel block alone is 4840px against a
+ * social-proof section of about 460px. So a fill driven by pixels sits at
+ * roughly a third of the track while the active dot is two thirds down it, and
+ * it never catches up until the very bottom of the page.
+ *
+ * Driving the fill from the same model as the dots makes them agree by
+ * construction: the fill reaches dot `i` exactly when dot `i` becomes active,
+ * and interpolates between dots by how far through the current section the
+ * reader is.
+ *
+ * The denominator is `count - 1` because the fill spans from the FIRST dot to
+ * the LAST one, not across a phantom slot after the last. A single section has
+ * nothing to span, and resolves to 0 rather than dividing by zero.
+ */
+export function railFillFraction(
+  activeIndex: number,
+  sectionCount: number,
+  withinSection: number
+): number {
+  if (sectionCount <= 1) return 0
+  const i = Math.min(Math.max(activeIndex, 0), sectionCount - 1)
+  return clamp01((i + clamp01(withinSection)) / (sectionCount - 1))
+}
+
+/**
+ * How far the reader is through one section, 0..1.
+ *
+ * Measured from the same viewport midpoint `activeSectionId` uses, so the two
+ * cannot disagree about which section is current and how far into it we are.
+ * A section with no successor (the last one) is measured against the document
+ * end instead.
+ */
+export function withinSectionFraction(
+  scrollYPx: number,
+  viewportHeightPx: number,
+  sectionTop: number,
+  nextTop: number
+): number {
+  const span = nextTop - sectionTop
+  if (span <= 0) return 0
+  const midpoint = scrollYPx + viewportHeightPx / 2
+  return clamp01((midpoint - sectionTop) / span)
+}
+
 export function activeSectionId(
   scrollYPx: number,
   viewportHeightPx: number,
