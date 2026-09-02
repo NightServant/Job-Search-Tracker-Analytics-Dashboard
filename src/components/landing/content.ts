@@ -78,6 +78,25 @@ export const NAV_ACTIONS = {
   signUp: { label: 'sign up', href: '/signup' },
 } as const
 
+/**
+ * The rail's sections, in page order.
+ *
+ * The ids are the same `data-landing-section` values the sections already
+ * carry and the same anchors the nav jumps to -- one vocabulary, so a rename
+ * cannot leave the rail pointing at a section that no longer exists.
+ *
+ * Labels are one word wherever one word will do. They are revealed on hover in
+ * a 200px margin, not read as a list.
+ */
+export const RAIL_SECTIONS = [
+  { id: 'hero', label: 'top' },
+  { id: 'social-proof', label: 'proof' },
+  { id: 'problem', label: 'the problem' },
+  { id: 'solution', label: 'how it works' },
+  { id: 'faq', label: 'faq' },
+  { id: 'cta', label: 'get started' },
+] as const
+
 export interface ProofTile {
   title: string
   body: string

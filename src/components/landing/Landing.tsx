@@ -4,6 +4,9 @@ import * as React from 'react'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { landingNavHeightPx, navOverHero } from '@/lib/landingNav'
 import { LandingNavbar } from './LandingNavbar'
+import { SectionRail } from './SectionRail'
+import { useSectionProgress } from './useSectionProgress'
+import { RAIL_SECTIONS } from './content'
 import { Hero } from './Hero'
 import { SocialProof } from './SocialProof'
 import { ProblemStatement } from './ProblemStatement'
@@ -82,9 +85,27 @@ export function Landing({
     }
   }, [])
 
+  // Computed once here and handed down, the same rule overHero follows. Two
+  // components deriving their own idea of the active section is how they end
+  // up disagreeing about it.
+  const rail = useSectionProgress(RAIL_SECTIONS.map((s) => s.id))
+
   return (
     <>
       <LandingNavbar overHero={overHero} />
+      {/*
+        6.1a: when the pinned sequence lands, `progress` should come from it
+        rather than from page scroll -- a thousand pixels of scroll inside a
+        pinned hero advances the reader through the CONTENT not at all, so
+        scrollY stops being a truthful measure. SectionRail takes props and
+        computes nothing, so that is a one-line change here.
+      */}
+      <SectionRail
+        sections={[...RAIL_SECTIONS]}
+        activeId={rail.activeId}
+        progress={rail.progress}
+        overHero={overHero}
+      />
 
       <main>
         <div ref={heroRef}>

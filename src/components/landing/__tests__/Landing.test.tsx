@@ -167,6 +167,25 @@ describe('the closing call to action', () => {
   })
 })
 
+describe('the section rail', () => {
+  it('offers a jump to every section on the page, in the same order', () => {
+    // The rail's ids ARE the sections' data-landing-section values and the
+    // nav's anchors -- one vocabulary. A rail pointing at an id nothing
+    // carries is a link that silently does nothing.
+    const { container } = renderLanding()
+    const rail = container.querySelector('[data-section-rail]') as HTMLElement
+    expect(rail).not.toBeNull()
+
+    const railIds = [...rail.querySelectorAll('[data-rail-item]')].map((el) =>
+      el.getAttribute('data-rail-item')
+    )
+    const sectionIds = [...container.querySelectorAll('[data-landing-section]')].map((el) =>
+      el.getAttribute('data-landing-section')
+    )
+    expect(railIds).toEqual(sectionIds)
+  })
+})
+
 describe('the landing page under prefers-reduced-motion', () => {
   it('still renders every section, in flow', () => {
     // The path that rots, because nobody with motion enabled ever sees it.

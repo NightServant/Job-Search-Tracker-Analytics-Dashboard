@@ -39,27 +39,40 @@ export function Reveal({ delay = 0, className, children, ...props }: RevealProps
   const [shown, setShown] = React.useState(false)
 
   /**
-   * Render the children plainly, with no motion wrapper at all.
+   * Whether the entrance cannot run, so the motion wrapper is skipped entirely.
    *
-   * Setting `shown` is NOT enough on its own, which is what an earlier version
-   * of this component got wrong. motion animates opacity on requestAnimationFrame,
-   * and a hidden document -- a background tab, a prerender, a headless capture --
-   * has rAF paused, so the element stays at its `initial` opacity of 0 no
-   * matter what `shown` says. The escape hatch flipped the flag and the
-   * content stayed invisible anyway.
+   * Setting `shown` alone is not enough: motion animates opacity on
+   * requestAnimationFrame, and a hidden document -- a background tab, a
+   * prerender, a headless capture -- has rAF paused, so an element started at
+   * opacity 0 never advances however the flag is set. That shipped once and
+   * rendered whole landing sections blank.
    *
-   * So in every case where the entrance cannot be watched or should not run,
-   * this skips the animation entirely rather than starting one that may never
-   * advance. A missing animation is a cosmetic loss; invisible content is a
-   * broken page, and this is a landing page.
+   * IT IS STATE SET FROM AN EFFECT, NOT A VALUE COMPUTED DURING RENDER, and
+   * that distinction is the whole fix for a hydration error. `document` does
+   * not exist on the server, so a render-time `document.visibilityState` check
+   * makes the server emit a motion.div while the client emits a plain div --
+   * two different trees for the same node, which is exactly the mismatch React
+   * reported at this component. Reading it in an effect keeps the first client
+   * render identical to the server's and moves the swap into a second,
+   * post-hydration render, which React is happy with.
+   *
+   * `reduced` is safe to read during render: usePrefersReducedMotion is
+   * useSyncExternalStore, which has a server snapshot and a hydration-safe
+   * contract of its own.
    */
-  const noAnimation =
-    reduced ||
-    typeof IntersectionObserver === 'undefined' ||
-    (typeof document !== 'undefined' && document.visibilityState === 'hidden')
+  const [cannotAnimate, setCannotAnimate] = React.useState(false)
+  const noAnimation = reduced || cannotAnimate
 
   React.useEffect(() => {
-    if (noAnimation) return setShown(true)
+    if (reduced) return setShown(true)
+
+    const blocked =
+      typeof IntersectionObserver === 'undefined' || document.visibilityState === 'hidden'
+    if (blocked) {
+      setCannotAnimate(true)
+      setShown(true)
+      return
+    }
 
     const el = ref.current
     if (!el) return
@@ -76,7 +89,7 @@ export function Reveal({ delay = 0, className, children, ...props }: RevealProps
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [noAnimation])
+  }, [reduced])
 
   if (noAnimation) {
     return (
