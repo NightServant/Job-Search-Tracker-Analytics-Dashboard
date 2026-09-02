@@ -200,6 +200,24 @@ Third-party components and assets vendored into this repository, credited when a
 - **Arimo** — SIL Open Font License 1.1, self-hosted via `next/font`. The metric-compatible fallback for Helvetica Neue, which is licensed and cannot be self-hosted.
 - **App backdrop photograph** — [Unsplash Licence](https://unsplash.com/license), photo by **Albert Salim** ([@albertsalim](https://unsplash.com/@albertsalim)), [photo-1751601454754](https://unsplash.com/photos/blurred-colors-blend-together-in-a-soft-abstract-pattern-XV7OUFLfB8Q). Vendored as `public/backdrop.jpg` and rendered by `AppBackground`. The licence does not require attribution; this repository credits third-party assets regardless.
 
+### Skiper UI
+
+UI components adapted from [Skiper UI](https://skiper-ui.com/components). Skiper
+UI's free tier requires attribution, and the registry copies source in-tree
+rather than installing a package, so the obligation attaches to the files below.
+These two sentences are asserted verbatim by `src/lib/__tests__/attribution.test.ts`
+and rendered by the landing footer, so the credit cannot drift from the code.
+
+- Carousel adapted from Skiper UI (Creative carousel 002), built on Swiper.js, with illustrations by AarzooAly.
+- Smooth caret input adapted from Skiper UI (Smooth caret input).
+
+The theme toggle is not a Skiper component. It was written from scratch against
+the technique in Skiper UI's theme toggle buttons — themselves adapted from
+[toggles.dev](https://toggles.dev) by Alfie Jones — and the View Transition
+theme wipe follows the approach in `rudrodip/theme-toggle-effect`. Neither
+component's source ships here, so neither carries an attribution obligation;
+both are named because the ideas are theirs.
+
 ---
 
 ## Credits
