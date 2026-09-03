@@ -168,6 +168,16 @@ const Carousel_005 = ({
           {images.map((image, index) => (
             <SwiperSlide key={index} className="">
               {/*
+                `object-contain`, not `object-cover`. Cover fills the slide and
+                crops whatever does not fit, which is invisible when the ratios
+                agree and silent when they drift -- and they did drift: a 2.05
+                screenshot in a 1.60 slide lost 28% of its height with nothing
+                on screen to say so. Contain shows the whole image always, so
+                the same mistake shows up as letterboxing, which somebody
+                notices. The slide ratio is matched to the captures in
+                index.css and asserted by a test, so there is nothing to
+                letterbox in practice.
+
                 BOTH CAPTURES SHIP, AND CSS PICKS ONE. The obvious alternative
                 is reading next-themes' resolvedTheme and setting one `src`,
                 which halves the bytes -- and it is wrong twice. next-themes
@@ -182,14 +192,14 @@ const Carousel_005 = ({
                 until it is near the viewport.
               */}
               <img
-                className="h-full w-full rounded-md border border-border-subtle object-cover dark:hidden"
+                className="h-full w-full rounded-md border border-border-subtle object-contain dark:hidden"
                 src={image.srcLight}
                 alt={image.alt}
                 loading="lazy"
                 decoding="async"
               />
               <img
-                className="hidden h-full w-full rounded-md border border-border-subtle object-cover dark:block"
+                className="hidden h-full w-full rounded-md border border-border-subtle object-contain dark:block"
                 src={image.srcDark}
                 alt=""
                 aria-hidden

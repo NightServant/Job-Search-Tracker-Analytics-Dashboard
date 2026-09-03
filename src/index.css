@@ -750,11 +750,20 @@ body,
    sit in; without it they overlap the last slide.
 
    HEIGHT IS DERIVED FROM THE SLIDE ASPECT, NOT FIXED. The vendor hardcodes
-   440px, which against a 1440x900 screenshot (16:10) crops roughly a third of
-   the image -- the app's sidebar and its lowest panels -- so the carousel
-   showed a detail of each screen rather than the screen. The slides are sized
-   16/10 to match what public/screens/*.png actually are, and the stage takes
-   its height from them. Re-capture at a different size and this follows.
+   440px, which crops roughly a third of a screenshot -- the app's sidebar and
+   its lowest panels -- so the carousel showed a detail of each screen rather
+   than the screen.
+
+   THE RATIO MUST MATCH THE FILES IN public/screens, AND ONCE IT DID NOT. This
+   said 16/10 for the 1440x900 captures it was written against; the screenshots
+   were later replaced with 1440x702 ones and this number was not, so a 2.05
+   image sat in a 1.60 box and object-cover quietly ate 28% of every slide. The
+   old comment here promised "re-capture at a different size and this follows",
+   which was a hope rather than a mechanism -- nothing made it follow.
+
+   landingCarousel.test.ts is the mechanism now: it reads this declaration and
+   the real dimensions of every file in public/screens and fails when they
+   disagree. Change the captures and the test tells you this line is stale.
 
    ONE SLIDE WIDE, so the presented screen is centred with nothing beside it.
    The vendor sizes slides narrower than the stage so its sample photos peek in
@@ -771,5 +780,7 @@ body,
 }
 .Carousal_005 .swiper-slide {
   width: 100%;
-  aspect-ratio: 16 / 10;
+  /* 1440x702 -- the real pixel size of every capture under public/screens.
+     Do not write a glob here: a `*` followed by a `/` closes this comment. */
+  aspect-ratio: 1440 / 702;
 }
