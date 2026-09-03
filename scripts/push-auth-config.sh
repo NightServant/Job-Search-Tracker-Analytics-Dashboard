@@ -31,6 +31,7 @@ cd "$(dirname "$0")/.."
 REQUIRED=(
   SUPABASE_AUTH_SITE_URL      # the production origin; no default, on purpose
   RESEND_API_KEY              # SMTP password. Empty here means broken email there.
+                              # Read from the keychain when absent -- see below.
   SUPABASE_AUTH_SMTP_SENDER   # the From address; Resend rejects unverified domains
 )
 
@@ -41,6 +42,27 @@ if [ -f .env ]; then
   set +a
 fi
 
+# RESEND_API_KEY comes from the macOS keychain if it is not already in .env.
+#
+# `resend login` stores the key under service "resend-cli" with storage set to
+# "secure_storage", so the key is in the keychain and NOT in
+# ~/.config/resend/credentials.json -- that file holds only the profile name,
+# the key type and its permission.
+#
+# Reading it here rather than copying it into .env is the point: the key is an
+# SMTP password that would otherwise sit in plaintext in the working tree, in a
+# file that is one `git add -f` away from being committed. This way it stays in
+# the keychain, is read into one process's environment for the length of one
+# push, and is never written down. It is also never echoed -- the assignment is
+# quiet and nothing below prints the value.
+#
+# If the entry is absent the assignment is empty and the check below catches
+# it, so a machine without the CLI simply falls back to .env.
+if [ -z "${RESEND_API_KEY:-}" ] && command -v security >/dev/null 2>&1; then
+  RESEND_API_KEY="$(security find-generic-password -s resend-cli -w 2>/dev/null || true)"
+  export RESEND_API_KEY
+fi
+
 missing=()
 for var in "${REQUIRED[@]}"; do
   if [ -z "${!var:-}" ]; then
@@ -49,7 +71,7 @@ for var in "${REQUIRED[@]}"; do
 done
 
 if [ ${#missing[@]} -gt 0 ]; then
-  echo "Refusing to push: these are unset or empty in .env" >&2
+  echo "Refusing to push: these are unset or empty" >&2
   for var in "${missing[@]}"; do
     echo "  - $var" >&2
   done
@@ -57,6 +79,9 @@ if [ ${#missing[@]} -gt 0 ]; then
   echo "supabase config push would only WARN about these and send empty values." >&2
   echo "With [auth.email.smtp] enabled = true, an empty password breaks every" >&2
   echo "auth email on the project. See docs/SECURITY.md." >&2
+  echo >&2
+  echo "RESEND_API_KEY is read from .env, or from the macOS keychain if you" >&2
+  echo "have run: resend login" >&2
   exit 1
 fi
 

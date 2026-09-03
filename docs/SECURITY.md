@@ -184,12 +184,40 @@ variable stops it locally, where the cost is reading one line.
 npm run push:auth-config
 ```
 
-Required in `.env`: `SUPABASE_AUTH_SITE_URL`, `RESEND_API_KEY`,
-`SUPABASE_AUTH_SMTP_SENDER`.
+Required: `SUPABASE_AUTH_SITE_URL` and `SUPABASE_AUTH_SMTP_SENDER` in `.env`.
 
-### The OTP email template cannot be pushed on this plan
+`RESEND_API_KEY` is **read from the macOS keychain**, not from `.env`. `resend
+login` stores it under service `resend-cli`, and the script pulls it into one
+process's environment for the length of one push. That is deliberate: the key
+is an SMTP password, and the alternative is leaving it in plaintext in the
+working tree, one `git add -f` from being committed. Set it in `.env` only
+where there is no keychain, such as CI.
 
-The first push was rejected outright:
+### Custom SMTP — done
+
+Resend, pushed 2026-09-03. `smtp.resend.com:465`, user `resend` (the literal
+string, the same for every Resend account), password from the keychain. This
+lifted the free-tier restriction below, so the OTP template is now live on the
+project and a signup sends a six-digit code rather than a link.
+
+`email_sent` was raised from the CLI default of 2/hour to 30. Two an hour is
+the built-in provider's cap and it throttles the PROJECT rather than each user,
+so the third person to register in an hour would have silently received nothing.
+
+**THE SENDING DOMAIN IS NOT VERIFIED, AND THAT IS A REAL LIMIT.** The From
+address is `onboarding@resend.dev`, which Resend delivers **only to the address
+that owns the Resend account**. Every other recipient is dropped silently — not
+bounced, not errored, just never delivered. It is enough to test the flow end
+to end and it is useless for real signups.
+
+Fixing it needs a domain verified in Resend (`resend domains` in the CLI, or
+the dashboard), then `SUPABASE_AUTH_SMTP_SENDER` pointed at an address on it.
+The only domain on the account today is `smart-hrms.onrender.com`, which is
+unverified and belongs to a different project.
+
+### The restriction this lifted
+
+Before custom SMTP was configured, the first push was rejected outright:
 
 ```
 unexpected status 400: Email template modification is not available for free
