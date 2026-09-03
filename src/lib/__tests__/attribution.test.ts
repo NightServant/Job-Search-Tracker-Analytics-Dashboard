@@ -1,4 +1,5 @@
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 import { SKIPER_ATTRIBUTION } from '../attribution'
 
@@ -96,13 +97,23 @@ describe('the README describes this repository', () => {
     // possible way for a README to be wrong.
     const text = readme()
     for (const shot of ['dashboard', 'applications', 'analytics']) {
-      expect(text, `README does not embed the ${shot} screenshot`).toContain(`${shot}.png`)
+      expect(text, `README does not embed the ${shot} screenshot`).toMatch(
+        new RegExp(`/screens/[a-z]+/${shot}\\.(?:jpg|png)`)
+      )
     }
-    const embedded = [...text.matchAll(/\/screens\/([a-z-]+\.png)/g)].map((m) => m[1])
+    // Paths are theme-scoped now -- public/screens/<theme>/<name>.jpg -- so the
+    // check walks the subdirectories rather than assuming a flat folder. This
+    // test caught the move itself: the README still pointed at the old flat
+    // PNGs, which would have shipped five broken images.
+    const embedded = [...text.matchAll(/\/screens\/([a-z]+\/[a-z-]+\.(?:jpg|png))/g)].map(
+      (m) => m[1]
+    )
     expect(embedded.length).toBeGreaterThan(0)
-    const onDisk = readdirSync('public/screens')
-    for (const file of new Set(embedded)) {
-      expect(onDisk, `README embeds ${file}, which is not in public/screens`).toContain(file)
+    for (const rel of new Set(embedded)) {
+      expect(
+        existsSync(join('public/screens', rel)),
+        `README embeds ${rel}, which is not in public/screens`
+      ).toBe(true)
     }
   })
 

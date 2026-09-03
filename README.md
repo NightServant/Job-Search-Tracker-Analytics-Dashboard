@@ -60,12 +60,12 @@ Captured from the running application, not mocked up.
 
 | | |
 |---|---|
-| ![The overview](public/screens/dashboard.png) | ![The applications list](public/screens/applications.png) |
+| ![The overview](public/screens/light/dashboard.jpg) | ![The applications list](public/screens/light/applications.jpg) |
 | **`/dashboard`** — what is moving, what has stalled, what is next | **`/applications`** — the pipeline as a board or a table |
-| ![Analytics](public/screens/analytics.png) | ![Documents](public/screens/documents.png) |
+| ![Analytics](public/screens/light/analytics.jpg) | ![Documents](public/screens/light/documents.jpg) |
 | **`/analytics`** — conversion, time-in-stage and source trends | **`/documents`** — CV versions and what was sent where |
 
-![The calendar](public/screens/calendar.png)
+![The calendar](public/screens/light/calendar.jpg)
 
 **`/calendar`** — interviews, deadlines and take-homes.
 

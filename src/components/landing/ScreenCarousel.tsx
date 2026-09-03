@@ -41,7 +41,11 @@ export function ScreenCarousel({
   return (
     <div data-testid="screen-carousel" data-scroll-driven={scrollDriven ? 'true' : 'false'}>
       <Carousel_005
-        images={screens.map((s) => ({ src: s.src, alt: s.alt }))}
+        images={screens.map((s) => ({
+          srcLight: s.srcLight,
+          srcDark: s.srcDark,
+          alt: s.alt,
+        }))}
         loop={options.loop}
         autoplay={options.autoplay}
         showNavigation={options.showNavigation}

@@ -32,37 +32,56 @@
  * write surface and the demo has no write path. Captioning a calendar as the
  * CV editor to fill the slot would be the kind of small lie this page's whole
  * social-proof section exists to avoid.
+ *
+ * EVERY SCREEN HAS TWO CAPTURES, one per theme. A landing page that follows
+ * the reader's theme and then shows five dark screenshots on a white page is
+ * worse than one that never adapted at all: the mismatch reads as stock
+ * imagery borrowed from somewhere else, which is the exact impression a
+ * screenshot of your own product exists to prevent.
+ *
+ * JPEG, not PNG. These are UI over a gradient backdrop, which is the case PNG
+ * is worst at -- the same captures were 4.6MB as PNG and are 1.2MB as JPEG at
+ * quality 88, with the table text still crisp at 1:1 (checked, not assumed).
+ * 1440px wide keeps them sharp in a slot that renders at roughly 1200.
  */
 
 export interface LandingScreen {
-  src: string
+  /** Shown while the page is in the light theme. */
+  srcLight: string
+  /** Shown while the page is in the dark theme. */
+  srcDark: string
   alt: string
   caption: string
 }
 
 export const SCREENS: LandingScreen[] = [
   {
-    src: '/screens/dashboard.png',
+    srcLight: '/screens/light/dashboard.jpg',
+    srcDark: '/screens/dark/dashboard.jpg',
     alt: 'The overview screen, showing application counts by stage and recent activity.',
     caption: 'the overview',
   },
   {
-    src: '/screens/applications.png',
+    srcLight: '/screens/light/applications.jpg',
+    srcDark: '/screens/dark/applications.jpg',
     alt: 'The applications screen, showing the five-stage pipeline as a board.',
     caption: 'the pipeline',
   },
   {
-    src: '/screens/analytics.png',
+    srcLight: '/screens/light/analytics.jpg',
+    srcDark: '/screens/dark/analytics.jpg',
     alt: 'The analytics screen, showing conversion and time-in-stage charts.',
     caption: 'the analytics',
   },
   {
-    src: '/screens/documents.png',
+    srcLight: '/screens/light/documents.jpg',
+    srcDark: '/screens/dark/documents.jpg',
     alt: 'The documents screen, showing the CV template gallery.',
     caption: 'the documents',
   },
   {
-    src: '/screens/calendar.png',
+    srcLight: '/screens/light/calendar.jpg',
+    srcDark: '/screens/dark/calendar.jpg',
     alt: 'The calendar screen, showing interviews and deadlines on a month grid.',
     caption: 'the calendar',
   },

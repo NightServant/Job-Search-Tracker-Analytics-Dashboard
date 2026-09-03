@@ -77,7 +77,11 @@ import { cn } from '@/lib/utils'
  */
 
 export interface Carousel005Props {
-  images: { src: string; alt: string }[]
+  /**
+   * One entry per slide, each carrying BOTH theme captures. See the render for
+   * why both ship rather than one being chosen in JavaScript.
+   */
+  images: { srcLight: string; srcDark: string; alt: string }[]
   className?: string
   showPagination?: boolean
   showNavigation?: boolean
@@ -163,10 +167,34 @@ const Carousel_005 = ({
         >
           {images.map((image, index) => (
             <SwiperSlide key={index} className="">
+              {/*
+                BOTH CAPTURES SHIP, AND CSS PICKS ONE. The obvious alternative
+                is reading next-themes' resolvedTheme and setting one `src`,
+                which halves the bytes -- and it is wrong twice. next-themes
+                only knows the resolved theme AFTER mount, so the server render
+                has to guess, and every dark-theme visitor gets a flash of the
+                light screenshot; and a first client render that disagrees with
+                the server is a hydration mismatch.
+                `dark:` here is the class variant this app already defines
+                (@custom-variant in index.css), so it follows the THEME TOGGLE
+                rather than the OS -- which `<picture media>` would not. Both
+                are lazy, and the carousel is section 4, so neither is fetched
+                until it is near the viewport.
+              */}
               <img
-                className="h-full w-full rounded-md border border-border-subtle object-cover"
-                src={image.src}
+                className="h-full w-full rounded-md border border-border-subtle object-cover dark:hidden"
+                src={image.srcLight}
                 alt={image.alt}
+                loading="lazy"
+                decoding="async"
+              />
+              <img
+                className="hidden h-full w-full rounded-md border border-border-subtle object-cover dark:block"
+                src={image.srcDark}
+                alt=""
+                aria-hidden
+                loading="lazy"
+                decoding="async"
               />
             </SwiperSlide>
           ))}

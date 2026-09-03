@@ -88,6 +88,45 @@ describe('the landing page structure', () => {
   })
 })
 
+describe('the screen carousel', () => {
+  it('ships both theme captures for every screen, and hides one with CSS', () => {
+    // A landing page that follows the reader's theme and then shows five dark
+    // screenshots on a white page is worse than one that never adapted: the
+    // mismatch reads as stock imagery borrowed from somewhere else.
+    //
+    // Asserted as BOTH images present with a `dark:` class, not as one `src`
+    // being correct, because the tempting alternative -- reading
+    // resolvedTheme and choosing a single src -- flashes the wrong capture at
+    // every dark-theme visitor before it mounts.
+    const { container } = renderLanding()
+    const carousel = container.querySelector('[data-landing-section="solution"]')!
+    const imgs = [...carousel.querySelectorAll('img')]
+
+    expect(imgs.length).toBe(SCREENS.length * 2)
+
+    const light = imgs.filter((i) => i.className.includes('dark:hidden'))
+    const dark = imgs.filter((i) => i.className.includes('dark:block'))
+    expect(light).toHaveLength(SCREENS.length)
+    expect(dark).toHaveLength(SCREENS.length)
+
+    for (const img of light) expect(img.getAttribute('src')).toContain('/screens/light/')
+    for (const img of dark) expect(img.getAttribute('src')).toContain('/screens/dark/')
+  })
+
+  it('names the screen once, so a reader does not hear it twice', () => {
+    // Both captures are the same picture. The light one carries the alt text
+    // and the dark one is aria-hidden -- otherwise every screen is announced
+    // twice, once for a copy that is not even displayed.
+    const { container } = renderLanding()
+    const carousel = container.querySelector('[data-landing-section="solution"]')!
+    const described = [...carousel.querySelectorAll('img')].filter(
+      (i) => (i.getAttribute('alt') ?? '') !== ''
+    )
+    expect(described).toHaveLength(SCREENS.length)
+    for (const img of described) expect(img.getAttribute('aria-hidden')).toBeNull()
+  })
+})
+
 describe('the hero', () => {
   it('carries exactly one call to action, and it goes to the source', () => {
     // Gabe removed the demo and create-account buttons on 2026-09-02. Asserted
