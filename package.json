@@ -14,7 +14,8 @@
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "seed:demo": "node --env-file=.env scripts/seed-demo.mjs",
     "start": "next start",
-    "push:auth-config": "bash scripts/push-auth-config.sh"
+    "push:auth-config": "bash scripts/push-auth-config.sh",
+    "verify:domain": "bash scripts/verify-sending-domain.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

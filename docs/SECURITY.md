@@ -233,26 +233,27 @@ cannot be added. It is dead weight on the account and can be removed.
 The Vercel project is still on a `vercel.app` subdomain, which has the same
 problem for the same reason.
 
-Once a domain exists, the rest is mechanical:
+Once a domain exists, the rest is scripted:
 
 ```bash
-resend domains create your-domain.com      # prints the DNS records to add
-# add the printed SPF/DKIM records at the registrar, then:
-resend domains verify <domain-id>
-resend domains list                        # status must read "verified"
+npm run verify:domain mail.your-domain.com            # prints the DNS records
+# add them at the DNS host, then:
+npm run verify:domain mail.your-domain.com -- --check # polls until verified
 ```
 
-Then point the sender at it and push:
+Then set `SUPABASE_AUTH_SMTP_SENDER=no-reply@mail.your-domain.com` in `.env`
+and run `npm run push:auth-config`. Nothing else changes — the template, the
+SMTP host and the auth config are already in place and already pushed.
 
-```bash
-# in .env
-SUPABASE_AUTH_SMTP_SENDER=no-reply@your-domain.com
+**Send from a subdomain**, `mail.your-domain.com` rather than the apex. It is
+Resend's own guidance and the reason is containment: a transactional sender
+that earns a bad reputation damages only that subdomain, leaving the apex —
+which is what people type, and what carries any real mail — untouched.
 
-npm run push:auth-config
-```
-
-Nothing else changes — the template, the SMTP host and the auth config are
-already in place and already pushed.
+The script exists because `resend domains verify` is **asynchronous**. It
+returns immediately whether or not DNS has propagated, so a fresh
+`not_started` reads as "your records are wrong" when it usually means "ask
+again in a minute". The script polls and tells the two apart.
 
 Availability checked 2026-09-03, for reference rather than as a
 recommendation: `worktrack.dev` $9.99/yr and `useworktrack.com` $11.25/yr were
@@ -273,6 +274,15 @@ Not viable, each for a specific reason worth writing down:
   and those TLDs are heavily spam-filtered even when they work.
 - **`js.org`, `vercel.app`, `onrender.com`** — subdomains without DNS
   delegation. No TXT record means no DKIM, which means no sending.
+- **`is-a.dev`** — free and GitHub-PR based, and its Terms of Service
+  explicitly forbid AI-created pull requests, naming Claude Code among others,
+  on pain of blocking the author from their repositories. Register it by hand
+  or not at all.
+
+**Every free route needs a human.** The Student Pack needs student
+verification, `eu.org` needs an account and manual approval, `is-a.dev` needs a
+hand-written PR. That is the one step in this chain that cannot be automated,
+and it is worth knowing before starting rather than halfway through.
 
 #### Cloudflare Email Routing does NOT solve this
 
