@@ -258,6 +258,35 @@ Availability checked 2026-09-03, for reference rather than as a
 recommendation: `worktrack.dev` $9.99/yr and `useworktrack.com` $11.25/yr were
 free; `worktrack.app`, `worktrack.io` and `getworktrack.com` were taken.
 
+#### Free routes to a domain
+
+- **GitHub Student Developer Pack** — Namecheap gives a free `.me` for a year,
+  Name.com a free domain across 25+ TLDs including `.app` and `.dev`, and
+  `.TECH` one free `.TECH`. A real registrar with full DNS control, which is
+  what SPF and DKIM need.
+- **eu.org** — free permanently and does not expire, and it delegates NS, so
+  DNS control is complete. Approval is manual and can take days.
+
+Not viable, each for a specific reason worth writing down:
+
+- **Freenom** (`.tk`, `.ml`, `.ga`, `.cf`, `.gq`) — stopped new registrations,
+  and those TLDs are heavily spam-filtered even when they work.
+- **`js.org`, `vercel.app`, `onrender.com`** — subdomains without DNS
+  delegation. No TXT record means no DKIM, which means no sending.
+
+#### Cloudflare Email Routing does NOT solve this
+
+It is worth stating because it looks like it should. **Email Routing is receive
+and forward only.** Cloudflare's own docs split the two products: Email Routing
+"for handling incoming emails", and a separate Email Sending beta that is
+"Available on Workers Paid plan". Routing cannot act as an SMTP relay, so it
+cannot deliver a Supabase verification code.
+
+Where it IS useful is the other direction, and it is free: once a domain is on
+Cloudflare, Email Routing can forward `hello@your-domain` to a personal inbox,
+so the address a signup email comes FROM can receive replies. That complements
+Resend rather than replacing it — and it still needs the domain first.
+
 ### The restriction this lifted
 
 Before custom SMTP was configured, the first push was rejected outright:
