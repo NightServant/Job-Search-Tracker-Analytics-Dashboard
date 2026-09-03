@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useAppHref } from '@/components/shell/routeBase'
 import {
   Table,
   TableBody,
@@ -46,6 +47,7 @@ export interface RecentApplicationsTableProps {
  * band of it is the over-bright header Gabe rejected on the calendar.
  */
 export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsTableProps) {
+  const appHref = useAppHref()
   const rows = jobs.slice(0, limit)
 
   if (rows.length === 0) {
@@ -72,7 +74,7 @@ export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsT
           // the banding reads as an aid rather than as a fill.
           <TableRow key={job.id} className={cn(i % 2 === 1 && 'bg-accent-surface/30')}>
             <TableCell className="max-w-0 truncate text-text-primary">
-              <Link href={`/applications/${job.id}`} className="hover:text-accent-default">
+              <Link href={appHref(`/applications/${job.id}`)} className="hover:text-accent-default">
                 {job.company}
               </Link>
             </TableCell>

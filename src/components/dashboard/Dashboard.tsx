@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useAppHref } from '@/components/shell/routeBase'
 import { PageHeader } from '@/components/ui/page-header'
 import {
   Card,
@@ -89,6 +90,7 @@ export function Dashboard({
   eventsLoading = false,
   eventsError = false,
 }: DashboardProps) {
+  const appHref = useAppHref()
   const stale = React.useMemo(
     () =>
       getStaleApplications(
@@ -204,7 +206,7 @@ export function Dashboard({
             </CardTitle>
             <CardDescription>the five most recent, newest first.</CardDescription>
             <CardAction>
-              <Link href="/applications" className="text-body-s text-accent-default hover:underline">
+              <Link href={appHref('/applications')} className="text-body-s text-accent-default hover:underline">
                 view all
               </Link>
             </CardAction>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { Dashboard } from '../Dashboard'
 import { makeJob } from '@/test/fixtures'
 import type { Job } from '@/types'
@@ -126,12 +127,20 @@ describe('Dashboard', () => {
     expect(screen.queryByText(/2026-08-20T/)).toBeNull()
   })
 
-  it('sends the follow-up nudge to the stale application\'s own detail route', () => {
-    // stale-1 also shows up in Recent applications, so this scopes the query
-    // to the nudge itself rather than risking a match on the other row.
+  it('sends the follow-up nudge to the stale application\'s own detail route', async () => {
+    // The nudge is a CTA now, not an inline list -- fifteen rows made it the
+    // longest thing on the dashboard and pushed both charts below the fold.
+    // The destination it guards is unchanged; it just lives one click away.
     const { container } = render(<Dashboard jobs={STALE_FIXTURE} />)
     const nudge = container.querySelector('[data-follow-up]') as HTMLElement
-    const link = within(nudge).getByRole('link', { name: /Acme/i })
+    expect(nudge).not.toBeNull()
+
+    // Nothing is listed on the dashboard itself.
+    expect(within(nudge).queryByRole('link', { name: /Acme/i })).toBeNull()
+
+    await userEvent.click(within(nudge).getByRole('button', { name: /follow/i }))
+    const dialog = await screen.findByRole('dialog')
+    const link = within(dialog).getByRole('link', { name: /Acme/i })
     expect(link.getAttribute('href')).toBe('/applications/stale-1')
   })
 })

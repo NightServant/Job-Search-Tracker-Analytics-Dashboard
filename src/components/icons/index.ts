@@ -42,6 +42,7 @@ import { ArrowRightIcon as ArrowRightIconBase } from './arrow-right'
 import { CalendarIcon as CalendarIconBase } from './calendar'
 import { ChartLineIcon } from './chart-line'
 import { CheckIcon as CheckIconBase } from './check'
+import { CircleCheckIcon as CircleCheckIconBase } from './circle-check'
 import { ChevronDownIcon as ChevronDownIconBase } from './chevron-down'
 import { ChevronLeftIcon as ChevronLeftIconBase } from './chevron-left'
 import { ChevronRightIcon as ChevronRightIconBase } from './chevron-right'
@@ -49,8 +50,11 @@ import { ClockIcon as ClockIconBase } from './clock'
 import { DownloadIcon as DownloadIconBase } from './download'
 import { EllipsisVerticalIcon } from './ellipsis-vertical'
 import { ExternalLinkIcon } from './external-link'
+import { EyeIcon as EyeIconBase } from './eye'
+import { EyeOffIcon as EyeOffIconBase } from './eye-off'
 import { FileTextIcon } from './file-text'
 import { HistoryIcon } from './history'
+import { InfoIcon as InfoIconBase } from './info'
 import { LayoutDashboardIcon } from './layout-dashboard'
 import { LayoutListIcon } from './layout-list'
 import { LockIcon as LockIconBase } from './lock'
@@ -59,10 +63,12 @@ import { MoonIcon as MoonIconBase } from './moon'
 import { PlusIcon as PlusIconBase } from './plus'
 import { SearchIcon as SearchIconBase } from './search'
 import { SettingsIcon as SettingsIconBase } from './settings'
+import { ShieldCheckIcon as ShieldCheckIconBase } from './shield-check'
 import { SunIcon as SunIconBase } from './sun'
 import { TrashIcon as TrashIconBase } from './trash'
 import { TriangleAlertIcon } from './triangle-alert'
 import { UploadIcon as UploadIconBase } from './upload'
+import { UserRoundIcon as UserRoundIconBase } from './user-round'
 import { XIcon } from './x'
 
 import { BriefcaseIcon } from './briefcase'
@@ -94,6 +100,9 @@ export const DownloadIcon = withDefaultSize(DownloadIconBase)
 export const CloseIcon = withDefaultSize(XIcon)
 export const ClockIcon = withDefaultSize(ClockIconBase)
 export const ExternalIcon = withDefaultSize(ExternalLinkIcon)
+export const InfoIcon = withDefaultSize(InfoIconBase)
+export const EyeIcon = withDefaultSize(EyeIconBase)
+export const EyeOffIcon = withDefaultSize(EyeOffIconBase)
 export const LockIcon = withDefaultSize(LockIconBase)
 export const MailIcon = withDefaultSize(MailIconBase)
 export const SunIcon = withDefaultSize(SunIconBase)
@@ -104,6 +113,9 @@ export const ChevronLeftIcon = withDefaultSize(ChevronLeftIconBase)
 export const ChevronRightIcon = withDefaultSize(ChevronRightIconBase)
 export const TrashIcon = withDefaultSize(TrashIconBase)
 export const CheckIcon = withDefaultSize(CheckIconBase)
+export const CircleCheckIcon = withDefaultSize(CircleCheckIconBase)
+export const ShieldCheckIcon = withDefaultSize(ShieldCheckIconBase)
+export const UserRoundIcon = withDefaultSize(UserRoundIconBase)
 export const GripVerticalIcon = withDefaultSize(EllipsisVerticalIcon)
 export const RotateCcwIcon = withDefaultSize(HistoryIcon)
 
@@ -145,8 +157,14 @@ export const icons = {
   Download: asIconComponent(DownloadIcon),
   Close: asIconComponent(CloseIcon),
   Check: asIconComponent(CheckIcon),
+  CircleCheck: asIconComponent(CircleCheckIcon),
+  ShieldCheck: asIconComponent(ShieldCheckIcon),
+  UserRound: asIconComponent(UserRoundIcon),
   Clock: asIconComponent(ClockIcon),
   External: asIconComponent(ExternalIcon),
+  Info: asIconComponent(InfoIcon),
+  Eye: asIconComponent(EyeIcon),
+  EyeOff: asIconComponent(EyeOffIcon),
   Lock: asIconComponent(LockIcon),
   Mail: asIconComponent(MailIcon),
   Sun: asIconComponent(SunIcon),

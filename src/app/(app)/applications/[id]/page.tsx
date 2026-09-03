@@ -9,7 +9,7 @@ import { useCvText } from '@/hooks/useCvText'
 import { matchKeywords } from '@/services/atsMatch'
 import { DetailPage } from '@/components/applications/detail/DetailPage'
 import { RouteLoading, RouteError } from '@/components/ui/route-states'
-import { buttonVariants } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button-variants'
 import Link from 'next/link'
 
 /**

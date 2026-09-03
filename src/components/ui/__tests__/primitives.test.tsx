@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
+import * as React from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { Button } from '../button'
@@ -120,6 +123,131 @@ describe('Input', () => {
   })
 })
 
+describe('Button pending state', () => {
+  // A submit that was `disabled` and nothing else is indistinguishable from a
+  // broken control, which on a sign-in form is the exact moment people click
+  // again. Three things have to happen together, so they are one prop.
+  it('shows a spinner, disables itself and says so, all from one prop', () => {
+    const { container } = render(<Button loading>Sign in</Button>)
+    const button = container.querySelector('button')!
+
+    expect(button.querySelector('[role="status"]')).not.toBeNull()
+    expect(button.disabled).toBe(true)
+    expect(button.getAttribute('aria-busy')).toBe('true')
+  })
+
+  it('keeps the label rather than collapsing to a glyph', () => {
+    // Swapping the label for a bare spinner loses the only text saying what is
+    // being waited on, and a button that changes width mid-click moves the
+    // pointer off whatever is beside it.
+    const { container } = render(<Button loading>Sign in</Button>)
+    expect(container.querySelector('button')!.textContent).toContain('Sign in')
+  })
+
+  it('is an ordinary button when it is not loading', () => {
+    // Positive companion: without it every assertion above would hold for a
+    // button that was permanently busy.
+    const { container } = render(<Button>Sign in</Button>)
+    const button = container.querySelector('button')!
+    expect(button.querySelector('[role="status"]')).toBeNull()
+    expect(button.disabled).toBe(false)
+    expect(button.getAttribute('aria-busy')).toBeNull()
+  })
+
+  it('stays disabled when the caller disables it for its own reasons', () => {
+    // OtpStep passes both: `disabled` means "the code is not six digits yet",
+    // `loading` means "it has gone to the server". Folding one into the other
+    // would show a spinner for an incomplete field.
+    const { container } = render(
+      <Button disabled loading={false}>
+        Verify
+      </Button>
+    )
+    const button = container.querySelector('button')!
+    expect(button.disabled).toBe(true)
+    expect(button.querySelector('[role="status"]')).toBeNull()
+  })
+})
+
+describe('Input with the smooth caret merged in', () => {
+  // The merge Gabe asked for on 2026-09-02. Before it, the auth screens
+  // imported skiper106's SmoothInput directly and re-typed Input's border and
+  // background into a `wrapperClassName` -- a copy that had already fallen
+  // behind on the focus ring, the error border and the disabled state. These
+  // assert the two branches are ONE component with one class string, which is
+  // the only thing that stops it drifting apart again.
+  const classesOf = (el: Element) => el.className.split(/\s+/).filter(Boolean)
+
+  it('gives the caret branch every class the plain one has', () => {
+    // Containment, not string equality: SmoothInput adds four STRUCTURAL
+    // classes of its own -- the grid cell it shares with the caret, and the
+    // outline reset -- and those are not chrome. What must not differ is a
+    // single one of the design system's own classes.
+    const plain = render(<Input id="a" />)
+    const plainClasses = classesOf(plain.container.querySelector('input')!)
+    plain.unmount()
+
+    const smooth = render(<Input id="b" smoothCaret />)
+    const smoothClasses = classesOf(smooth.container.querySelector('input')!)
+
+    expect(plainClasses.length).toBeGreaterThan(10)
+    expect(smoothClasses).toEqual(expect.arrayContaining(plainClasses))
+
+    const extra = smoothClasses.filter((c) => !plainClasses.includes(c))
+    expect(extra.sort()).toEqual([
+      'col-end-2',
+      'col-start-1',
+      'outline-none',
+      'row-end-2',
+      'row-start-1',
+    ])
+  })
+
+  it('drops the vendor background rather than layering it over ours', () => {
+    // SmoothInput ships `bg-transparent text-inherit`, which on a page with a
+    // tinted section would render a see-through field. tailwind-merge resolves
+    // that in our favour because Input passes its classes LAST -- this is the
+    // assertion that notices if that order is ever reversed.
+    const { container } = render(<Input id="bg" smoothCaret />)
+    const cls = classesOf(container.querySelector('input')!)
+    expect(cls).not.toContain('bg-transparent')
+    expect(cls).not.toContain('text-inherit')
+    expect(cls).toContain('bg-bg-canvas')
+  })
+
+  it('carries the error state through the caret branch too', () => {
+    // The hand-copied wrapperClassName never had this at all: a failed
+    // validation on the sign-in email field drew no error border.
+    const { container } = render(<Input id="c" smoothCaret error="Nope" />)
+    const field = container.querySelector('input')!
+    expect(field.className).toContain('border-status-rejected-mark')
+    expect(field.getAttribute('aria-invalid')).toBe('true')
+    expect(field.getAttribute('aria-describedby')).toBe('c-error')
+    expect(screen.getByText('Nope')).toBeTruthy()
+  })
+
+  it('draws a caret only when asked', () => {
+    // Positive/negative pair on the FEATURE, so "chrome is identical" cannot
+    // be satisfied by the caret branch quietly rendering a plain input.
+    const off = render(<Input id="d" />)
+    expect(off.container.querySelector('[style*="caret-color"]')).toBeNull()
+    off.unmount()
+
+    const on = render(<Input id="e" smoothCaret />)
+    expect(on.container.querySelector('[style*="caret-color"]')).not.toBeNull()
+  })
+
+  it('hands a ref the real input, not the wrapper', () => {
+    // SmoothInput was a plain function component and swallowed refs entirely.
+    // Input is a forwardRef, so delegating to it without fixing that would
+    // have been a silent regression at every call site that focuses a field.
+    const ref = React.createRef<HTMLInputElement>()
+    render(<Input id="f" smoothCaret ref={ref} />)
+    expect(ref.current).toBeInstanceOf(HTMLInputElement)
+    expect(ref.current!.id).toBe('f')
+  })
+})
+
 describe('PasswordInput', () => {
   it('anchors the reveal control to the field right edge, not a fixed offset', () => {
     const { container } = render(<PasswordInput id="pw" />)
@@ -134,6 +262,35 @@ describe('PasswordInput', () => {
     expect(field.type).toBe('password')
     fireEvent.click(screen.getByLabelText('Show password'))
     expect(field.type).toBe('text')
+  })
+
+  it('draws an eye rather than the magnifier it used to', () => {
+    // This shipped with SearchIcon for "show" and LockIcon for "hide", which
+    // put a search affordance inside the signup form's password field. The
+    // assertion is on GEOMETRY, not on the imported name: the eye's pupil is
+    // a circle at 12,12 r=3, the magnifier's lens is 11,11 r=8 and its handle
+    // is the only path in the set containing 4.34. Swapping the import back
+    // fails both halves.
+    const { container } = render(<PasswordInput id="pw" />)
+    const svg = container.querySelector('button svg')!
+
+    expect(svg.querySelector('circle[cx="12"][cy="12"][r="3"]')).toBeTruthy()
+    expect(svg.querySelector('circle[r="8"]')).toBeNull()
+    expect(svg.innerHTML).not.toContain('4.34')
+  })
+
+  it('swaps the eye for a struck-through eye once revealed', () => {
+    // Positive companion to the above: without this, an eye hard-coded in
+    // both states would pass. eye-off is the same pupil plus a slash, so the
+    // discriminator is the extra line, not the circle.
+    const { container } = render(<PasswordInput id="pw" />)
+    const before = container.querySelectorAll('button svg *').length
+
+    fireEvent.click(screen.getByLabelText('Show password'))
+
+    const after = container.querySelectorAll('button svg *').length
+    expect(after).toBeGreaterThan(before)
+    expect(screen.getByLabelText('Hide password')).toBeTruthy()
   })
 })
 
@@ -162,5 +319,41 @@ describe('ThemeToggle', () => {
     render(<ThemeToggle />)
     fireEvent.click(screen.getByRole('button'))
     expect(setTheme).toHaveBeenCalledWith('dark')
+  })
+})
+
+describe('buttonVariants lives where a server component can call it', () => {
+  // A 500 on the 404 page is how this was found: `buttonVariants` was exported
+  // from button.tsx, which carries 'use client', so calling it from
+  // app/not-found.tsx threw at request time. Nothing caught it because every
+  // other caller happened to sit in a client tree, and jsdom does not model
+  // the server/client boundary at all.
+  const read = (p: string) => readFileSync(p, 'utf8')
+
+  it('is defined in a module with no use-client directive', () => {
+    const src = read('src/components/ui/button-variants.ts')
+    expect(src).toMatch(/export const buttonVariants = cva\(/)
+    expect(src.split('\n').slice(0, 3).join('\n')).not.toContain('use client')
+  })
+
+  it('is not re-exported from the client button module', () => {
+    // Re-exporting would be the smaller diff and would fix nothing: a
+    // re-export from a 'use client' module is itself client-marked, so the
+    // next server component to import from @/components/ui/button hits the
+    // same error. One canonical path is what makes it unrepeatable.
+    const src = read('src/components/ui/button.tsx')
+    expect(src).not.toMatch(/export\s*\{[^}]*\bbuttonVariants\b/)
+  })
+
+  it('has no caller importing it from the client module', () => {
+    const hits = execSync(
+      `grep -rln "buttonVariants" src --include=*.tsx --include=*.ts || true`,
+      { encoding: 'utf8' }
+    )
+      .trim()
+      .split('\n')
+      .filter(Boolean)
+      .filter((f) => /buttonVariants[^}]*\}\s*from\s*'@\/components\/ui\/button'/.test(read(f)))
+    expect(hits).toEqual([])
   })
 })

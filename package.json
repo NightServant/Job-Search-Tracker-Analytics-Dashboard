@@ -13,7 +13,9 @@
     "load:autofill": "npx artillery run load-tests/job-autofill.yml",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "seed:demo": "node --env-file=.env scripts/seed-demo.mjs",
-    "start": "next start"
+    "start": "next start",
+    "push:auth-config": "bash scripts/push-auth-config.sh",
+    "verify:domain": "bash scripts/verify-sending-domain.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -44,6 +46,7 @@
     "react-resizable-panels": "^4.12.3",
     "recharts": "^3.8.0",
     "sonner": "^2.0.8",
+    "swiper": "^14.2.0",
     "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {

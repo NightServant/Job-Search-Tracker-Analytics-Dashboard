@@ -49,8 +49,24 @@ export const NAV: { href: string; label: string; icon: IconName }[] = [
  * (19:11), which has none either.
  */
 
+/** One destination in the primary nav. */
+export type NavEntry = { href: string; label: string; icon: IconName }
+
 export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
   pathname?: string
+  /**
+   * The destinations to render. Defaults to the app's own NAV.
+   *
+   * Overridden by /demo/*, whose links must point inside /demo -- a demo
+   * visitor clicking "applications" and landing on the real /applications is
+   * bounced to /login, which reads as the demo being broken.
+   */
+  nav?: NavEntry[]
+  /**
+   * Where the settings row points, or null to omit it entirely. The demo has
+   * no settings screen, and a row that navigates nowhere is worse than none.
+   */
+  settingsHref?: string | null
   /**
    * Which NAV destination is active, precomputed by activeNavHref.
    *
@@ -141,12 +157,19 @@ function ThemeSection({ collapsed }: { collapsed: boolean }) {
  * collapse, which stranded every destination and left a blank column --
  * exactly the state a "collapse" control must not produce.
  */
-function SidebarNav({ pathname = '/dashboard', activeHref, className, ...props }: SidebarProps) {
+function SidebarNav({
+  pathname = '/dashboard',
+  activeHref,
+  nav = NAV,
+  settingsHref = '/settings',
+  className,
+  ...props
+}: SidebarProps) {
   const { open } = useSidebar()
   const collapsed = !open
   const active =
-    activeHref !== undefined ? activeHref : activeNavHref(pathname, NAV.map((n) => n.href))
-  const settingsActive = isUnder(pathname, '/settings')
+    activeHref !== undefined ? activeHref : activeNavHref(pathname, nav.map((n) => n.href))
+  const settingsActive = settingsHref ? isUnder(pathname, settingsHref) : false
 
   return (
     <nav
@@ -191,7 +214,7 @@ function SidebarNav({ pathname = '/dashboard', activeHref, className, ...props }
       </div>
 
       <div className={cn('flex flex-col gap-1', collapsed && 'items-center')}>
-        {NAV.map((item) => (
+        {nav.map((item) => (
           <NavItem
             key={item.href}
             {...item}
@@ -203,13 +226,15 @@ function SidebarNav({ pathname = '/dashboard', activeHref, className, ...props }
 
       <hr data-sidebar-divider className="w-full border-border-subtle" />
 
-      <NavItem
-        href="/settings"
-        label="settings"
-        icon="Settings"
-        active={settingsActive}
-        collapsed={collapsed}
-      />
+      {settingsHref && (
+        <NavItem
+          href={settingsHref}
+          label="settings"
+          icon="Settings"
+          active={settingsActive}
+          collapsed={collapsed}
+        />
+      )}
 
       {/* Figma 19:11: the flexible Spacer (416, h122 in the 720-tall frame)
           sits between Settings and the Theme Toggle -- not after it. It

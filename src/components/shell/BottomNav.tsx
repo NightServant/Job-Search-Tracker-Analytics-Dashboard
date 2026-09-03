@@ -1,6 +1,6 @@
 'use client'
 
-import { NAV } from '@/components/ui/sidebar'
+import { NAV, type NavEntry } from '@/components/ui/sidebar'
 import { NavItem } from '@/components/ui/nav-item'
 
 /**
@@ -11,14 +11,21 @@ import { NavItem } from '@/components/ui/nav-item'
  * Settings has no entry here: it moved to the Top Bar when it left the nav,
  * so nothing in this bar is ever active on /settings.
  */
-export function BottomNav({ activeHref }: { activeHref: string | null }) {
+export function BottomNav({
+  activeHref,
+  nav = NAV,
+}: {
+  activeHref: string | null
+  /** Overridden by /demo/*, whose links must stay inside /demo. */
+  nav?: NavEntry[]
+}) {
   return (
     <nav
       aria-label="Primary"
       data-bottom-nav
       className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border-subtle bg-bg-canvas md:hidden"
     >
-      {NAV.map((item) => (
+      {nav.map((item) => (
         <NavItem
           key={item.href}
           {...item}

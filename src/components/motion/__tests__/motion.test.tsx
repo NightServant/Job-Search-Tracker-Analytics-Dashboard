@@ -76,6 +76,32 @@ describe('Reveal with motion allowed', () => {
   })
 })
 
+describe('Reveal when the entrance cannot run', () => {
+  it('renders children plainly in a hidden document', () => {
+    // rAF is paused in a hidden document -- a background tab, a prerender, a
+    // headless capture -- so a motion element started at opacity 0 never
+    // advances. Flipping the internal `shown` flag is not enough on its own;
+    // the animation has to be skipped, or the content is simply invisible.
+    // This shipped that way: a whole landing section rendered blank.
+    setReducedMotion(false)
+    const spy = vi
+      .spyOn(document, 'visibilityState', 'get')
+      .mockReturnValue('hidden' as DocumentVisibilityState)
+
+    const { container } = render(<Reveal>visible anyway</Reveal>)
+    expect(screen.getByText('visible anyway')).toBeInTheDocument()
+    // A plain div, not a motion element holding an animation that cannot run.
+    const el = container.querySelector('[data-reveal]') as HTMLElement
+    expect(el.style.opacity).toBe('')
+    // Not marked as reduced -- the OS preference is off, this is a
+    // capability fallback, and conflating the two would make the
+    // reduced-motion assertions elsewhere pass for the wrong reason.
+    expect(el.hasAttribute('data-reduced')).toBe(false)
+
+    spy.mockRestore()
+  })
+})
+
 describe('theme wipe', () => {
   it('skips the view transition entirely under reduced motion', () => {
     setReducedMotion(true)

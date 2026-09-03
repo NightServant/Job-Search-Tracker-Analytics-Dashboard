@@ -292,12 +292,20 @@
 
 /* Six unused utilities removed in M5.5 Item 11 (.animate-fade-in,
    .animate-slide-down, .animate-slide-up, .btn-danger, .btn-ghost,
-   .card-hover). What still holds the rest of this block alive, precisely:
-   .btn-primary/.btn-secondary/.card/.input/.label are used by
-   screens/LoginPage.tsx -- live, and deleted by M6 Task 4 -- and by
-   components/errors/ErrorFallback.tsx, which is dead code: its only importer
-   AppErrorBoundary is itself imported by nothing, and there is no
-   app/error.tsx. So this block dies with M6, not before. */
+   .card-hover).
+
+   UPDATE, M6 Task 4 (2026-09-02): screens/LoginPage.tsx has now been deleted,
+   which was half of what held this block alive. Re-checked by grep rather than
+   assumed: .card, .input and .label have ZERO users left anywhere in src, and
+   .btn-primary/.btn-secondary have exactly two, both in
+   components/errors/ErrorFallback.tsx -- which is itself dead code, since its
+   only importer AppErrorBoundary is imported by nothing and there is no
+   app/error.tsx.
+
+   So this whole block, ErrorFallback and AppErrorBoundary are now removable
+   together. Not done here because Task 4 is the auth split and deleting three
+   more files on the way is how a focused change stops being reviewable. It is
+   a clean, self-contained follow-up. */
 
 /* --- Legacy v3 tokens -------------------------------------------------------
    The screens still in the tree were built against these and are rewritten in
@@ -697,3 +705,71 @@ body,
   filter: var(--app-backdrop-filter);
 }
 
+
+/* --- Swiper (skiper51, M6 6.1) --------------------------------------------
+   Swiper ships its own stylesheet and its own DOM (.swiper-slide,
+   .swiper-pagination, .swiper-button-next), and the vendor's guidance for
+   changing any of it is !important overrides. They are kept in this one block
+   rather than inline on the component so a later reader can see the whole
+   vendor reconciliation at once -- the copied source at
+   src/components/v1/skiper51.tsx had an inline <style> element doing half of
+   this, and it was removed in favour of these rules.
+
+   Radius caps at 4px here as everywhere; the vendor drew 25px slide corners.
+
+   The `content: none` matters. Swiper draws its arrows as an ::after glyph
+   from its own icon font, which is a second icon vocabulary and the Global
+   Constraint forbids it. Killing the pseudo-element is what lets the
+   @/components/icons chevrons show. */
+.swiper-slide {
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background-position: center;
+  background-size: cover;
+}
+.swiper-pagination-bullet {
+  background: var(--color-text-muted);
+  opacity: 1;
+  border-radius: var(--radius-sm);
+}
+.swiper-pagination-bullet-active {
+  background: var(--color-accent-default);
+}
+.swiper-button-next,
+.swiper-button-prev {
+  color: var(--color-text-secondary);
+}
+.swiper-button-next::after,
+.swiper-button-prev::after {
+  content: none;
+}
+
+/* The carousel's own stage. `Carousal_005` is the vendor's spelling of the
+   class it puts on the Swiper root -- kept as-is so the selector still matches
+   the copied source. The bottom padding is the gutter the pagination bullets
+   sit in; without it they overlap the last slide.
+
+   HEIGHT IS DERIVED FROM THE SLIDE ASPECT, NOT FIXED. The vendor hardcodes
+   440px, which against a 1440x900 screenshot (16:10) crops roughly a third of
+   the image -- the app's sidebar and its lowest panels -- so the carousel
+   showed a detail of each screen rather than the screen. The slides are sized
+   16/10 to match what public/screens/*.png actually are, and the stage takes
+   its height from them. Re-capture at a different size and this follows.
+
+   ONE SLIDE WIDE, so the presented screen is centred with nothing beside it.
+   The vendor sizes slides narrower than the stage so its sample photos peek in
+   from the sides -- fine for photography, wrong here: a half-visible second
+   copy of the app chrome at the right edge reads as a rendering fault rather
+   than as a carousel, and it pulls the eye off the screen being presented.
+   The creative effect still has its neighbours, they are simply translated
+   fully off-stage (next sits at 100%), which is what makes the transition a
+   clean push instead of a shuffle. */
+.Carousal_005 {
+  width: 100%;
+  height: auto;
+  padding-bottom: 44px;
+}
+.Carousal_005 .swiper-slide {
+  width: 100%;
+  aspect-ratio: 16 / 10;
+}

@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useAppHref } from '@/components/shell/routeBase'
 import { cn } from '@/lib/utils'
 import { ApplicationRow } from '@/components/ui/application-row'
 import { IconButton } from '@/components/ui/icon-button'
@@ -50,6 +51,7 @@ export function ApplicationsList({
   role,
   'aria-labelledby': ariaLabelledBy,
 }: ApplicationsListProps) {
+  const appHref = useAppHref()
   return (
     <div
       data-list
@@ -68,7 +70,7 @@ export function ApplicationsList({
             className="flex items-stretch gap-2 border-b border-border-subtle"
           >
             <Link
-              href={`/applications/${job.id}`}
+              href={appHref(`/applications/${job.id}`)}
               className={cn(
                 'min-w-0 flex-1 rounded-md',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'

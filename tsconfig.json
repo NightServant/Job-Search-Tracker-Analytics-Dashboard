@@ -36,7 +36,8 @@
   "include": [
     "src",
     ".next/types/**/*.ts",
-    "supabase/functions/deno.d.ts"
+    "supabase/functions/deno.d.ts",
+    "supabase/__tests__"
   ],
   "exclude": [],
   "references": [

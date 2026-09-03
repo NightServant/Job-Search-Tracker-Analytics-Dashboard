@@ -1,3 +1,5 @@
+import { createClient } from 'npm:@supabase/supabase-js@2'
+
 import {
   buildCompletionEvent,
   buildErrorEvent,
@@ -194,6 +196,62 @@ Deno.serve(async (req: Request) => {
       429,
       { 'Retry-After': String(rateLimit.retryAfterSeconds) },
     )
+  }
+
+  // AUTHENTICATION. This endpoint fetches an arbitrary external URL on the
+  // server's behalf, so an unauthenticated caller gets a fetch proxy running
+  // inside our infrastructure, on our egress IP, with our rate budget.
+  //
+  // Supabase's own `verify_jwt` is NOT sufficient on its own here, which is
+  // the trap: the ANON key is itself a valid JWT and it is public by design
+  // (it ships in the client bundle -- see the README's note on why that is
+  // fine for RLS). So a gateway that only checks "is this a valid JWT" admits
+  // the entire internet. Calling getUser() is what distinguishes a signed-in
+  // person from anyone holding a public key, and it is what the other three
+  // functions in this directory already do.
+  //
+  // The client is built with the ANON key plus the CALLER'S Authorization
+  // header, never the service role: this function must act as the user, so
+  // anything it touches stays behind RLS.
+  //
+  // Placed after the throttle deliberately -- an anonymous flood should be
+  // rejected by the cheap in-memory check before it costs a network round trip
+  // to the auth server.
+  const authHeader = req.headers.get('Authorization')
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+  if (!authHeader || !supabaseUrl || !supabaseAnonKey) {
+    const latencyMs = Date.now() - startTime
+    emitMonitoringEvent(buildErrorEvent({
+      functionName: 'job-url-autofill',
+      requestId,
+      status: 401,
+      latencyMs,
+      callerKey,
+      message: 'Missing Authorization header',
+    }))
+    return jsonResponse({ error: 'Unauthorized', requestId }, 401)
+  }
+
+  {
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    })
+    const { data: userData, error: authError } = await supabase.auth.getUser()
+    if (authError || !userData?.user) {
+      const latencyMs = Date.now() - startTime
+      emitMonitoringEvent(buildErrorEvent({
+        functionName: 'job-url-autofill',
+        requestId,
+        status: 401,
+        latencyMs,
+        callerKey,
+        message: 'Unauthorized',
+        extra: { authError: authError?.message },
+      }))
+      return jsonResponse({ error: 'Unauthorized', requestId }, 401)
+    }
   }
 
   let body: AutofillRequest

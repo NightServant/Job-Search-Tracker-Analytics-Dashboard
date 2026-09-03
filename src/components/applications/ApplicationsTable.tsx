@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { useAppHref } from '@/components/shell/routeBase'
 import {
   Table,
   TableBody,
@@ -64,6 +65,7 @@ export function ApplicationsTable({
   role,
   'aria-labelledby': ariaLabelledBy,
 }: ApplicationsTableProps) {
+  const appHref = useAppHref()
   if (jobs.length === 0) {
     return (
       <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy}>
@@ -112,7 +114,7 @@ export function ApplicationsTable({
             >
               <TableCell className="max-w-0 truncate text-text-primary">
                 <Link
-                  href={`/applications/${job.id}`}
+                  href={appHref(`/applications/${job.id}`)}
                   className="rounded-md hover:text-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
                 >
                   {job.company}
