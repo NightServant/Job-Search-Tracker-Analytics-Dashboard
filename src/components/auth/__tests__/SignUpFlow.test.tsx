@@ -1,6 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import userEventDefault from '@testing-library/user-event'
+
+/**
+ * `delay: null` removes user-event's artificial pause between keystrokes.
+ *
+ * The rate-limit test types six full registrations -- three fields a round,
+ * six rounds -- and the default inter-keystroke delay made that take longer
+ * than the 5s timeout once the suite grew, so it failed roughly two runs in
+ * three under full-suite load while passing on its own. A flaky test is worse
+ * than a slow one: it teaches you to re-run rather than to read.
+ *
+ * The delay exists to simulate human typing speed. Nothing here asserts on
+ * timing -- the rate limiter is driven by attempt COUNT, not by how fast the
+ * attempts arrive -- so removing it changes how long the test takes and not
+ * what it proves.
+ */
+const userEvent = userEventDefault.setup({ delay: null })
 import { SignUpFlow } from '../SignUpFlow'
 
 const STRONG = 'Str0ng!Passw0rd'

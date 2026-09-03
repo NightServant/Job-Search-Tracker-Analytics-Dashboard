@@ -10,6 +10,7 @@ import { usePinnedSection } from './usePinnedSection'
 import { useViewportSize } from './useViewportSize'
 import { useCarouselProgress, type DrivableSwiper } from './useCarouselProgress'
 import { SectionRail } from './SectionRail'
+import { StickyMobileCta } from './StickyMobileCta'
 import { SectionIndex } from './SectionIndex'
 import { useSectionProgress } from './useSectionProgress'
 import { RAIL_SECTIONS } from './content'
@@ -209,6 +210,9 @@ export function Landing({
       </main>
 
       <SiteFooter />
+
+      {/* Mobile only, and only between the hero and the closing CTA. */}
+      <StickyMobileCta />
     </>
   )
 }

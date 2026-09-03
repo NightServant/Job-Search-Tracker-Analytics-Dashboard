@@ -352,6 +352,33 @@ Then uncomment the three `[auth.email.template.confirmation]` lines and push
 again. The template is already written and reviewed at
 `supabase/templates/confirmation.html`.
 
+## Analytics
+
+**Vercel Web Analytics**, added 2026-09-03. Cookieless: it sets no cookie,
+assigns no identifier and does not follow a visitor between sites or between
+visits. That is why there is no consent banner — there is nothing to consent
+to — and it is the reason it was chosen over Google Analytics, which is neither.
+
+It is loaded as `/_vercel/insights/script.js` rather than through
+`@vercel/analytics`. **The package cannot be installed here.** All of its peers
+are `optional: true`, including `@sveltejs/kit`, and npm resolves them anyway —
+colliding the `vite@5` that vitest brings with the `vite@8` SvelteKit's plugin
+wants. Verified on npm 11.10.1, so it is current behaviour rather than an old
+resolver, and Vercel runs `npm install` on every build: adding the package
+would have broken the deploy, not just the laptop. The package's only job is to
+inject that script and re-report on route changes, and the script hooks the
+History API itself.
+
+The tag is production-only, and the feature must also be switched on in the
+project's Analytics tab — the tag alone collects nothing.
+
+**The privacy policy changed in the same commit.** It previously said this
+application had "no analytics vendor, no advertising network and no third-party
+tracking", which shipping this would have made false. A policy describing the
+previous version of the product is worse than a vague one, because it is
+confidently wrong. `page.test.tsx` now fails if the vendor goes unnamed or the
+old blanket denial returns.
+
 ## OAuth providers
 
 Google and Microsoft. **Microsoft is `azure`** in the SDK — Supabase names the

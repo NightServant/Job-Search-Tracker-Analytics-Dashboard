@@ -1,5 +1,12 @@
+import type { Metadata } from 'next'
 import { Analytics } from '@/components/analytics/Analytics'
 import { DEMO } from '@/lib/demoFixture'
+
+export const metadata: Metadata = {
+  title: 'Demo · Analytics',
+  description: 'Conversion, time-in-stage and salary insights, over invented data.',
+}
+
 
 /**
  * Analytics takes a MetricState per panel, mirroring what a react-query result

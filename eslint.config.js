@@ -59,6 +59,38 @@ export default [
     },
   },
 
+  // App Router route files. Next REQUIRES `metadata` to be exported from the
+  // same file as the page or layout -- there is no other place to put it -- so
+  // react-refresh's "only export components" rule is describing a convention
+  // this framework does not have.
+  //
+  // `allowExportNames` rather than turning the rule off: the rule still catches
+  // a stray helper exported from a route file, which is the thing it is
+  // actually good at. Only the names the framework itself defines are exempt.
+  {
+    files: ['src/app/**/*.tsx', 'src/app/**/*.ts'],
+    rules: {
+      'react-refresh/only-export-components': [
+        'warn',
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            'metadata',
+            'generateMetadata',
+            'viewport',
+            'generateViewport',
+            'dynamic',
+            'revalidate',
+            'fetchCache',
+            'runtime',
+            'preferredRegion',
+            'generateStaticParams',
+          ],
+        },
+      ],
+    },
+  },
+
   // Vendored third-party source, copied in by the shadcn CLI and deliberately
   // left as shipped so a re-vendor is a clean diff. AnimateIcons casts its two
   // mouse handlers through `any`; shadcn components export variant objects

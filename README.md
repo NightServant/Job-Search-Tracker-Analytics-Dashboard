@@ -285,7 +285,6 @@ Deno, in `supabase/functions/`:
 - **The signup OTP needs a dashboard change to work.** `supabase/config.toml` carries it, but nothing takes effect until `supabase config push` is run against the project. Until then the code is never sent.
 - **Client-side rate limiting is an affordance, not a boundary.** `src/lib/authRateLimit.ts` throttles repeated attempts from one browser and anyone with a console walks past it. The real boundary is server-side, and `docs/SECURITY.md` tables the dashboard controls that have to be switched on.
 - **`/` redirects a signed-in visitor after hydration, not before.** The session lives in `localStorage`, so there is no auth cookie for middleware to read, and the landing page paints for a frame before the redirect. Removing that frame needs cookie-backed sessions via `@supabase/ssr`, which is a migration rather than a fix.
-- **The hero video is longer than it should be.** The frame calls for an 8–15s seamless loop; the vendored clip is 40s and does not loop cleanly.
 - **`resumes.sections` is never written**, so the ATS column reads "not checked" for CVs created through the editors.
 - **No accessibility audit has been done.** Keyboard navigation and `aria-current` are handled on the primary surfaces, `prefers-reduced-motion` is honoured throughout, and colour is never the only carrier of state — but a full screen-reader pass has not happened.
 - **The pinned landing sequence is desktop-only.** Below `lg` nothing pins; the page scrolls normally, which is deliberate rather than unfinished.

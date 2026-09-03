@@ -88,6 +88,18 @@ describe('the landing page structure', () => {
   })
 })
 
+describe('the footer', () => {
+  it('states a copyright year, and computes it rather than storing one', () => {
+    // A typed year is wrong from the first of January and stays wrong until
+    // somebody notices -- the most common way a portfolio page announces that
+    // nobody has looked at it lately. Asserted against the CURRENT year, so a
+    // literal that happens to be right today fails next January.
+    renderLanding()
+    const year = new Date().getFullYear()
+    expect(screen.getByText(new RegExp(`©\\s*${year}\\s+Worktrack`))).toBeTruthy()
+  })
+})
+
 describe('the screen carousel', () => {
   it('ships both theme captures for every screen, and hides one with CSS', () => {
     // A landing page that follows the reader's theme and then shows five dark

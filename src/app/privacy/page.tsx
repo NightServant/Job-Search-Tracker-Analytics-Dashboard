@@ -5,7 +5,9 @@ import { BrandLockup } from '@/components/ui/brand-mark'
 import { ArrowRightIcon } from '@/components/icons'
 
 export const metadata: Metadata = {
-  title: 'Privacy — Worktrack',
+  // Just 'Privacy'. The root layout's title.template appends the product name,
+  // so spelling it out here produced "Privacy — Worktrack · Worktrack".
+  title: 'Privacy',
   description: 'What Worktrack stores, where it lives, who can read it, and how to delete it.',
 }
 
@@ -21,11 +23,21 @@ export const metadata: Metadata = {
  * which is the only mechanism that keeps a document like this honest a year
  * from now.
  *
- * NO REGION, NO RETENTION PERIOD, NO THIRD PARTY. The plan was explicit: name
- * the region if it is known at write time, do not guess it. It is not known
- * here. The same rule kills the two other sentences every template supplies --
- * a retention period nothing enforces, and an analytics vendor this app does
- * not use. Saying less and meaning all of it is the whole point.
+ * NO REGION AND NO RETENTION PERIOD. The plan was explicit: name the region if
+ * it is known at write time, do not guess it. It is not known here, and a
+ * retention period nothing enforces is the other sentence every template
+ * supplies. Saying less and meaning all of it is the whole point.
+ *
+ * THE ANALYTICS SECTION IS NOT BOILERPLATE, it is a correction. This page used
+ * to say there was "no analytics vendor, no advertising network and no
+ * third-party tracking" -- true when written, and made false the moment Vercel
+ * Web Analytics was added. A privacy policy that describes the previous
+ * version of the product is worse than a vague one, because it is confidently
+ * wrong. It ships in the same commit as the analytics for that reason.
+ *
+ * It also states that no AI is used. That is currently true and worth saying
+ * out loud, because "does this thing feed my CV to a model" is the first
+ * question a reasonable person asks of a CV tool in 2026.
  *
  * TWO COLUMNS ON DESKTOP, ONE ON MOBILE. The first version was a single
  * centred `max-w-[68ch]` column, which is right for the TEXT and wrong for the
@@ -83,6 +95,7 @@ const STORED: { table: string; what: string }[] = [
 const SECTIONS = [
   { id: 'stored', title: 'What is stored' },
   { id: 'where', title: 'Where it is stored' },
+  { id: 'analytics', title: 'Analytics and third parties' },
   { id: 'who', title: 'Who can read it' },
   { id: 'deleting', title: 'Deleting your account' },
 ] as const
@@ -199,13 +212,51 @@ export default function Page() {
               <h2 className="text-heading-l font-bold text-text-primary">Where it is stored</h2>
               <p className="text-body-m font-normal text-text-secondary">
                 In a Postgres database hosted by Supabase, together with the
-                authentication service that holds your login. Nothing is copied to
-                any other service: there is no analytics vendor, no advertising
-                network and no third-party tracking on this application.
+                authentication service that holds your login. None of it is
+                copied to any other service.
               </p>
               <p className="text-body-m font-normal text-text-secondary">
                 This page does not state a hosting region, because stating one that
                 later turns out to be wrong would be worse than saying nothing.
+              </p>
+            </section>
+
+            <section id="analytics" className="flex scroll-mt-16 flex-col gap-4">
+              <h2 className="text-heading-l font-bold text-text-primary">
+                Analytics and third parties
+              </h2>
+              <p className="text-body-m font-normal text-text-secondary">
+                This site counts page views using{' '}
+                <Link
+                  href="https://vercel.com/docs/analytics/privacy-policy"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent-default underline underline-offset-4"
+                >
+                  Vercel Web Analytics
+                </Link>
+                . It records which pages are visited, and where visits came from
+                in the broadest sense — it sets{' '}
+                <strong className="font-bold text-text-primary">no cookies</strong>,
+                assigns no identifier, and does not follow you between sites or
+                between visits. That is why there is no cookie banner: there is
+                nothing to consent to.
+              </p>
+              <p className="text-body-m font-normal text-text-secondary">
+                It is not linked to your account. Nothing you type, and no row
+                belonging to you, is sent to it.
+              </p>
+              <p className="text-body-m font-normal text-text-secondary">
+                There is no advertising network, no session recorder, no
+                cross-site tracking pixel, and no data broker. Vercel and
+                Supabase — the two companies that host this application — are
+                the only third parties involved at all, and neither receives
+                anything beyond what running it requires.
+              </p>
+              <p className="text-body-m font-normal text-text-secondary">
+                No AI is used anywhere in this application. Nothing you write is
+                sent to a language model, and no feature here is generated by
+                one. If that changes, this page changes with it.
               </p>
             </section>
 

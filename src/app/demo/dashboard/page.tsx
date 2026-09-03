@@ -1,5 +1,12 @@
+import type { Metadata } from 'next'
 import { Dashboard } from '@/components/dashboard/Dashboard'
 import { DEMO } from '@/lib/demoFixture'
+
+export const metadata: Metadata = {
+  title: 'Demo · Overview',
+  description: 'The overview screen, over invented data. No account needed.',
+}
+
 
 /**
  * The demo overview. No hooks, no queries, no auth -- the fixture is imported

@@ -1,10 +1,12 @@
 'use client'
 
+import * as React from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { scrollToSection } from '@/lib/scrollToSection'
 import { BrandLockup } from '@/components/ui/brand-mark'
+import { CloseIcon, MenuIcon } from '@/components/icons'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { NAV_LINKS } from './content'
 
@@ -64,6 +66,44 @@ export interface LandingNavbarProps {
 
 export function LandingNavbar({ overHero }: LandingNavbarProps) {
   const prefersReducedMotion = usePrefersReducedMotion()
+  const [menuOpen, setMenuOpen] = React.useState(false)
+
+  // Close on Escape. A panel that covers the page and can only be dismissed by
+  // finding its button again is a trap on a phone, where the button is small
+  // and the panel is everything.
+  React.useEffect(() => {
+    if (!menuOpen) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('keydown', onKey)
+    // The panel covers the page, so the page behind it must not scroll under
+    // it -- otherwise dismissing the menu returns you somewhere else.
+    const previous = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previous
+    }
+  }, [menuOpen])
+
+  /** Shared by both the desktop row and the mobile panel. */
+  const linkHandler = (href: string) => (event: React.MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return
+    }
+    const id = href.replace(/^#/, '')
+    if (scrollToSection(id, { reducedMotion: prefersReducedMotion })) {
+      event.preventDefault()
+      setMenuOpen(false)
+    }
+  }
 
   return (
     <header
@@ -142,29 +182,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
             key={link.label}
             href={link.href}
             {...(link.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
-            {...(link.external
-              ? {}
-              : {
-                  // The same handler the rail uses, for the same two reasons:
-                  // the jump should glide rather than teleport, and it should
-                  // clear the bar this link is sitting in. `href` stays a real
-                  // anchor, so this is enhancement rather than replacement.
-                  onClick: (event: React.MouseEvent<HTMLAnchorElement>) => {
-                    if (
-                      event.defaultPrevented ||
-                      event.metaKey ||
-                      event.ctrlKey ||
-                      event.shiftKey ||
-                      event.altKey
-                    ) {
-                      return
-                    }
-                    const id = link.href.replace(/^#/, '')
-                    if (scrollToSection(id, { reducedMotion: prefersReducedMotion })) {
-                      event.preventDefault()
-                    }
-                  },
-                })}
+            {...(link.external ? {} : { onClick: linkHandler(link.href) })}
             className={cn(
               'text-body-s transition-colors',
               overHero
@@ -187,6 +205,66 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
       <div data-nav-toggle>
         <ThemeToggle size={32} className={cn(overHero && 'text-[#fafafa]')} />
       </div>
+
+      {/*
+        THE MOBILE MENU. Below md the three links were simply hidden, which
+        left a phone visitor with no route to the FAQ or the repository from
+        the top of the page -- the nav did not degrade, it disappeared.
+
+        A disclosure rather than a Sheet or a Drawer: this is three links and
+        the shadcn overlays bring a focus trap, a portal and an animation
+        library for a panel that needs none of them. The trade is that the
+        focus trap has to be replaced by something, which is why Escape closes
+        it, the page beneath it stops scrolling, and the button owns
+        aria-expanded and aria-controls.
+      */}
+      <button
+        type="button"
+        data-nav-menu-toggle
+        aria-expanded={menuOpen}
+        aria-controls="landing-mobile-nav"
+        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+        onClick={() => setMenuOpen((v) => !v)}
+        className={cn(
+          'grid h-10 w-10 place-items-center rounded-md md:hidden',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+          overHero ? 'text-[#fafafa]' : 'text-text-primary'
+        )}
+      >
+        {menuOpen ? <CloseIcon size={20} /> : <MenuIcon size={20} />}
+      </button>
+
+      {menuOpen && (
+        <div
+          id="landing-mobile-nav"
+          data-nav-mobile-panel
+          className={cn(
+            'fixed inset-x-0 top-[60px] z-40 flex flex-col gap-1 border-b border-border-subtle',
+            'bg-bg-canvas px-5 pb-6 pt-2 md:hidden'
+          )}
+        >
+          {/*
+            Opaque `bg-bg-canvas` even when the bar above it is transparent
+            over the hero. A translucent panel over video is the case where
+            these links stop being readable, and this panel exists because
+            they were unreachable -- swapping unreachable for illegible is not
+            a fix.
+          */}
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.label}
+              href={link.href}
+              {...(link.external
+                ? { target: '_blank', rel: 'noreferrer noopener' }
+                : { onClick: linkHandler(link.href) })}
+              onClickCapture={() => link.external && setMenuOpen(false)}
+              className="rounded-md px-2 py-3 text-body-l text-text-primary hover:bg-bg-inset"
+            >
+              {link.label}
+            </Link>
+          ))}
+        </div>
+      )}
     </header>
   )
 }

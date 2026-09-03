@@ -129,6 +129,30 @@ describe('the privacy page', () => {
     expect(screen.queryByRole('link', { name: /^privacy$/i })).toBeNull()
   })
 
+  it('names every third party that receives anything', () => {
+    // This page said "no analytics vendor, no advertising network and no
+    // third-party tracking" -- true when written, and made false the moment
+    // Vercel Web Analytics shipped. A policy that describes the previous
+    // version of the product is worse than a vague one, because it is
+    // confidently wrong. This asserts the two halves that matter: the vendor
+    // is named, and the old blanket denial cannot come back.
+    render(<Privacy />)
+    const text = document.body.textContent ?? ''
+    expect(text).toMatch(/Vercel Web Analytics/i)
+    expect(text).toMatch(/no cookies/i)
+    expect(text, 'the policy still denies having any analytics').not.toMatch(
+      /no analytics vendor/i
+    )
+  })
+
+  it('states whether AI is involved', () => {
+    // "Does this thing feed my CV to a model" is the first question a
+    // reasonable person asks of a CV tool. Currently the answer is no, and an
+    // unanswered question reads as a yes.
+    render(<Privacy />)
+    expect(document.body.textContent).toMatch(/No AI is used/i)
+  })
+
   it('does not invent a region, a retention period or a third party', () => {
     // The plan's instruction was explicit: name the region if it is known at
     // write time, do not guess it. It is not known here, so the page says

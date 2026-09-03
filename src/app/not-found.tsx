@@ -1,4 +1,19 @@
+import type { Metadata } from 'next'
 import { NotFound } from '@/components/errors/NotFound'
+
+/**
+ * A 404 needs a title like any other page -- without one the tab reads as the
+ * homepage, which is exactly the wrong signal when the page is telling someone
+ * their link is broken.
+ *
+ * `noindex` because a soft-404 that gets indexed competes with the real pages
+ * for the same queries. Next already serves the correct 404 status here, so
+ * this is belt and braces rather than the only defence.
+ */
+export const metadata: Metadata = {
+  title: 'Page not found',
+  robots: { index: false, follow: false },
+}
 
 /**
  * Next's root not-found boundary.

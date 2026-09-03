@@ -57,6 +57,21 @@ export function SiteFooter() {
           </p>
         ))}
         <p className="text-caption text-text-muted">{FOOTER.lineage}</p>
+
+        {/*
+          COMPUTED, NEVER TYPED. A hard-coded year is wrong from the first of
+          January and stays wrong until somebody notices, which on a portfolio
+          site is the single most common way a page announces that nobody has
+          looked at it in a while.
+
+          `new Date()` in a server component is evaluated at BUILD time for a
+          static route, not per request -- so this says the year the site was
+          last deployed. That is the honest reading of a copyright line anyway,
+          and a redeploy is what a live project has regularly.
+        */}
+        <p className="text-caption text-text-muted">
+          © {new Date().getFullYear()} Worktrack
+        </p>
       </div>
     </footer>
   )

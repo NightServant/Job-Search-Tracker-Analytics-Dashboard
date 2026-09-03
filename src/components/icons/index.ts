@@ -59,6 +59,7 @@ import { LayoutDashboardIcon } from './layout-dashboard'
 import { LayoutListIcon } from './layout-list'
 import { LockIcon as LockIconBase } from './lock'
 import { MailIcon as MailIconBase } from './mail'
+import { MenuIcon as MenuIconBase } from './menu'
 import { MoonIcon as MoonIconBase } from './moon'
 import { PlusIcon as PlusIconBase } from './plus'
 import { SearchIcon as SearchIconBase } from './search'
@@ -105,6 +106,7 @@ export const EyeIcon = withDefaultSize(EyeIconBase)
 export const EyeOffIcon = withDefaultSize(EyeOffIconBase)
 export const LockIcon = withDefaultSize(LockIconBase)
 export const MailIcon = withDefaultSize(MailIconBase)
+export const MenuIcon = withDefaultSize(MenuIconBase)
 export const SunIcon = withDefaultSize(SunIconBase)
 export const MoonIcon = withDefaultSize(MoonIconBase)
 export const AlertCircleIcon = withDefaultSize(TriangleAlertIcon)
@@ -167,6 +169,7 @@ export const icons = {
   EyeOff: asIconComponent(EyeOffIcon),
   Lock: asIconComponent(LockIcon),
   Mail: asIconComponent(MailIcon),
+  Menu: asIconComponent(MenuIcon),
   Sun: asIconComponent(SunIcon),
   Moon: asIconComponent(MoonIcon),
   AlertCircle: asIconComponent(AlertCircleIcon),

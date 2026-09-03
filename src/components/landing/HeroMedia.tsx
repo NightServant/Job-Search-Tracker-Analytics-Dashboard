@@ -13,7 +13,7 @@ import { useViewportSize } from './useViewportSize'
  * under prefers-reduced-motion".
  *
  * THE POSTER-ONLY RULE BELOW 768px IS A WEIGHT DECISION, NOT A LAYOUT ONE. The
- * clip is 6.8 MB; the poster is 65 KB. Rendering the <video> element at all on
+ * clip is 2.5 MB; the poster is 65 KB. Rendering the <video> element at all on
  * a phone starts that download over whatever connection the phone is on, for a
  * background behind a scrim. So the element is not rendered below the
  * breakpoint -- `poster` alone would still fetch the source.
@@ -28,10 +28,19 @@ import { useViewportSize } from './useViewportSize'
  * scrolls back up -- a video that stays dead for the rest of the session is
  * the bug the resume path prevents.
  *
- * KNOWN DEVIATION: the frame asks for an 8-15s seamless loop. The clip is 40s
- * and its loop point is a visible cut, because trimming needs ffmpeg and there
- * is none on this machine. One cut every 40 seconds is the least-bad version
- * of that; re-cut the file if it ever bothers anyone.
+ * THE CLIP IS 15s, WHICH IS THE FRAME'S SPEC. It was 40s, recorded here as a
+ * known deviation from Figma 39:369's "8-15s seamless loop" because trimming
+ * was thought to need ffmpeg. macOS ships `avconvert`, which trims without
+ * re-encoding the picture: same 1280x720, same encode, 6.8 MB down to 2.5 MB.
+ *
+ * The window was chosen by MEASUREMENT rather than taste. Nine candidate
+ * windows were scored on the mean luminance difference between their first and
+ * last frame -- the size of the jump a viewer sees when the loop restarts --
+ * after the same grayscale the page applies. They all landed within about one
+ * point of each other, so the footage drifts continuously and no cut is truly
+ * seamless. What settled it is that the ORIGINAL 40s loop scored 11.97 and
+ * 0-15s scores 10.08: the shorter clip's seam is not a compromise for the
+ * smaller file, it is slightly less visible than the one being replaced.
  */
 export interface HeroMediaProps {
   posterSrc: string

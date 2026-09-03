@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Arimo } from 'next/font/google'
 import '../index.css'
+import { VercelAnalytics } from '@/components/analytics/VercelAnalytics'
+import { siteUrl } from '@/lib/siteUrl'
 import { Providers } from './providers'
 
 /**
@@ -37,15 +39,38 @@ const arimo = Arimo({
  * `openGraph.description` reuses the sidebar footer's retired M5 line rather
  * than inventing a tagline; `CV` keeps its case as an acronym.
  */
-const siteUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+// One definition, shared with robots.ts and sitemap.ts. See lib/siteUrl.
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
-  title: 'Worktrack',
-  description: 'job search tracker and analytics dashboard',
+  // `template` is what lets every other route state only its own name. Without
+  // it each page has to repeat the product name, and one of them eventually
+  // will not -- which is how a site ends up with a tab reading "analytics" and
+  // no clue whose analytics they are.
+  //
+  // `default` is used where a route sets no title of its own, and it carries
+  // the product name plus what the product IS. A bare "Worktrack" as the
+  // homepage title tells a search result nothing.
+  title: {
+    default: 'Worktrack — job search tracker with analytics and a CV builder',
+    template: '%s · Worktrack',
+  },
+  description:
+    'Track every application, see what is actually working, and keep every version of your CV in one place. Open source, with row-level security on every table.',
   openGraph: {
-    title: 'Worktrack',
-    description: 'every application, every version of your CV.',
+    type: 'website',
+    siteName: 'Worktrack',
+    title: 'Worktrack — job search tracker with analytics and a CV builder',
+    description: 'every application, every version of your CV, in one place.',
+    // The file-convention opengraph-image.png in this directory is picked up
+    // by Next on its own; naming it here would be a second source of truth.
+    // What DOES need saying is the type, so a card renders as a summary with
+    // a large image rather than a thumbnail beside a line of text.
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Worktrack — job search tracker with analytics and a CV builder',
+    description: 'every application, every version of your CV, in one place.',
   },
 }
 
@@ -56,6 +81,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={arimo.variable} suppressHydrationWarning>
       <body>
         <Providers>{children}</Providers>
+        <VercelAnalytics />
       </body>
     </html>
   )

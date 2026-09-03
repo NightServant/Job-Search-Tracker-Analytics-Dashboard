@@ -18,14 +18,21 @@ import type { ResumeContent } from '@/services/resumeService'
 export const DEFAULT_WORD_CONTENT: JSONContent = {
   type: 'doc',
   content: [
-    { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'CV Title' }] },
-    { type: 'paragraph', content: [{ type: 'text', text: 'email@example.com | (000) 000-0000 | portfolio.example' }] },
+    { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Your name' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: '[email] · [phone] · [city] · [portfolio or GitHub]' }] },
     { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Summary' }] },
-    { type: 'paragraph', content: [{ type: 'text', text: 'Lorem ipsum dolor sit amet, consectetur adipiscing elit.' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: '[Two sentences: what you do, and the thing you are best at. Write it last.]' }] },
     { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Experience' }] },
-    { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Achieved measurable impact using clear, quantifiable results.' }] }] }] },
+    { type: 'paragraph', content: [{ type: 'text', text: '[Role] · [Company] · [Month Year – Month Year]' }] },
+    { type: 'bulletList', content: [
+      { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '[What you changed, and the number that shows it. Start with a verb.]' }] }] },
+      { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '[A problem you were handed, and what you did about it.]' }] }] },
+    ] },
     { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Projects' }] },
-    { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Built a product with modern frontend and database tooling.' }] }] }] },
+    { type: 'paragraph', content: [{ type: 'text', text: '[Project] · [link]' }] },
+    { type: 'bulletList', content: [{ type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: '[What it does, what you built it with, and who uses it.]' }] }] }] },
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Skills' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: '[The tools you would be happy to be asked about in an interview.]' }] },
   ],
 }
 
@@ -57,23 +64,25 @@ export const DEFAULT_LATEX_SOURCE = String.raw`\documentclass[10pt,a4paper]{arti
 \titleformat{\section}{\needspace{4\baselineskip}\bfseries\large}{}{0pt}{}[\vspace{1pt}\titlerule]
 \begin{document}
 \begin{center}
-{\LARGE \textbf{Resume Title}}\\
-email@example.com \textbar{} (000) 000-0000 \textbar{} portfolio.example
+{\LARGE \textbf{Your name}}\\
+[email] \textbar{} [phone] \textbar{} [city] \textbar{} [portfolio or GitHub]
 \end{center}
 \section{Summary}
-Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+[Two sentences: what you do, and the thing you are best at. Write it last.]
 \section{Experience}
-\textbf{Role Title} \hfill 2025 -- Present\\
-Organization Name
+\textbf{[Role]} \hfill [Month Year -- Month Year]\\
+[Company]
 \begin{itemize}
-  \item Lorem ipsum dolor sit amet.
-  \item Sed do eiusmod tempor incididunt.
+  \item [What you changed, and the number that shows it. Start with a verb.]
+  \item [A problem you were handed, and what you did about it.]
 \end{itemize}
 \section{Projects}
-\textbf{Project Title}
+\textbf{[Project]} \hfill [link]
 \begin{itemize}
-  \item Built a product with modern frontend and database tooling.
+  \item [What it does, what you built it with, and who uses it.]
 \end{itemize}
+\section{Skills}
+[The tools you would be happy to be asked about in an interview.]
 \end{document}`
 
 export function isLatexContent(content: ResumeContent | null | undefined): content is { type: 'latex'; source: string } {
