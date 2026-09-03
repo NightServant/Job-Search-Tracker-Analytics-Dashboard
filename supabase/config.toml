@@ -262,12 +262,33 @@ otp_expiry = 3600
 # admin_email = "admin@email.com"
 # sender_name = "Admin"
 
-# THE TEMPLATE THAT CARRIES THE CODE. Without this block the project uses
-# Supabase's stock confirmation email, which contains {{ .ConfirmationURL }}
-# and no token at all -- so no code is ever sent and verifyOtp can only fail.
-[auth.email.template.confirmation]
-subject = "Your Worktrack verification code"
-content_path = "./supabase/templates/confirmation.html"
+# THE TEMPLATE THAT CARRIES THE CODE, and it CANNOT BE PUSHED ON THIS PLAN.
+#
+# Without it the project uses Supabase's stock confirmation email, which
+# contains {{ .ConfirmationURL }} and no token at all -- so no code is ever
+# sent and verifyOtp can only fail. The registration flow's step 2 is
+# therefore broken in production and will stay broken until this block can be
+# applied.
+#
+# `supabase config push` on 2026-09-03 rejected it with:
+#
+#   unexpected status 400: Email template modification is not available for
+#   free tier projects using the default email provider. Please upgrade your
+#   plan or configure a custom SMTP provider.
+#
+# That is a platform limit, not a mistake in this file. The whole push is
+# atomic, so leaving the block uncommented meant NOTHING was applied -- not
+# the site_url fix, not the password rules, not the OTP length. Commented out,
+# the rest of the file lands and this stays as the exact change to make the
+# moment either condition is met.
+#
+# TO ENABLE IT: configure a custom SMTP provider under [auth.email.smtp] below
+# (Resend, SendGrid, Postmark -- all have free tiers), or upgrade the project.
+# Then uncomment these three lines and push again. The template itself is
+# already written and reviewed at the path below.
+# [auth.email.template.confirmation]
+# subject = "Your Worktrack verification code"
+# content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
@@ -325,9 +346,15 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 max_enrolled_factors = 10
 
 # Control MFA via App Authenticator (TOTP)
+# TRUE, MATCHING THE LIVE PROJECT, and this line is the whole argument for
+# diffing before pushing. The CLI generates these as `false`, the project has
+# them ON, and `config push` sends the whole file -- so accepting the generated
+# default would have silently turned off app-authenticator MFA for every user
+# who had enrolled one, as a side effect of a change about email templates.
+# Caught in the push diff on 2026-09-03.
 [auth.mfa.totp]
-enroll_enabled = false
-verify_enabled = false
+enroll_enabled = true
+verify_enabled = true
 
 # Configure MFA via Phone Messaging
 [auth.mfa.phone]

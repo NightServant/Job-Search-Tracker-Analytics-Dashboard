@@ -101,8 +101,9 @@ These are the actual boundary and none of them live in this repository:
 | Control | Where | Why |
 |---|---|---|
 | Auth rate limits | Dashboard → Authentication → Rate Limits | The only thing that throttles a script hitting the API directly. |
+| Custom SMTP | Dashboard → Project Settings → Auth, or `[auth.email.smtp]` | **Blocking the OTP step.** Without it the free tier refuses email-template changes, so no verification code is ever sent. See below. |
 | CAPTCHA (hCaptcha or Turnstile) | Dashboard → Authentication → Bot and Abuse Protection | The control that actually stops automated sign-up floods. |
-| ~~Email confirmations ON~~ | now `supabase/config.toml` | Moved into the repo on 2026-09-03; see below. Still needs `config push` to take effect. |
+| ~~Email confirmations ON~~ | now `supabase/config.toml` | Moved into the repo and **pushed** on 2026-09-03. |
 | Redirect allow-list | Dashboard → Authentication → URL Configuration | Constrains where an OAuth flow may return a token. |
 | Leaked-password protection | Dashboard → Authentication → Password | Rejects passwords in known breach corpora, which no client-side rule can. |
 
@@ -130,23 +131,61 @@ The last two close the "client validation is duplicated by nothing on the
 server" gap for passwords specifically: a rule the browser enforces and the
 server does not is a rule anyone can skip with curl.
 
-### Applying it — read before you push
+### Applying it
 
 ```bash
 SUPABASE_AUTH_SITE_URL=https://your-deployed-origin npx supabase config push
 ```
 
-**`config push` sends the WHOLE file, and this file was generated from CLI
-defaults.** Anything left at a default overwrites whatever the dashboard has
-now. `site_url` is the one that bites: the generated default is
-`http://127.0.0.1:3000`, and pushing that points every auth email and OAuth
-return at a developer's laptop. It is therefore `env(SUPABASE_AUTH_SITE_URL)`
-with **no fallback**, so an unset variable fails the push loudly instead of
-shipping localhost to production.
+**PUSHED on 2026-09-03.** The remote auth config now carries the production
+`site_url`, the redirect allow-list, the 10-character password minimum,
+`lower_upper_letters_digits_symbols`, and a 6-digit OTP.
 
-Diff the file against the dashboard's current Auth settings before the first
-push. This has not been pushed from here — it changes a live project, which is
-not a call this repo should make on its own.
+**`config push` sends the WHOLE file, and this file was generated from CLI
+defaults.** Anything left at a default overwrites whatever the dashboard has.
+Read the diff it prints before answering the prompt — the first attempt here
+proved why:
+
+| Setting | Remote before | Local file | Outcome |
+|---|---|---|---|
+| `site_url` | `http://localhost:3000` | production origin | **Fixed.** Every auth email and OAuth return had been pointing at a laptop. |
+| `additional_redirect_urls` | `[]` | production + localhost | Fixed. |
+| `minimum_password_length` | `6` | `10` | Fixed. |
+| `password_requirements` | `""` | upper/lower/digit/symbol | Fixed. |
+| `otp_length` | `8` | `6` | Fixed — `OtpStep` asks for six. |
+| **`mfa.totp.enroll_enabled`** | **`true`** | **`false`** | **Caught and reverted.** The CLI generates these `false`; the project has them **on**. Pushing the generated default would have silently disabled app-authenticator MFA for everyone enrolled, as a side effect of a change about email templates. The file now says `true`. |
+
+`site_url` is `env(SUPABASE_AUTH_SITE_URL)` with **no fallback**, so an unset
+variable fails the push loudly instead of shipping localhost to production.
+
+### The OTP email template cannot be pushed on this plan
+
+The first push was rejected outright:
+
+```
+unexpected status 400: Email template modification is not available for free
+tier projects using the default email provider. Please upgrade your plan or
+configure a custom SMTP provider.
+```
+
+The push is **atomic**, so that one rejection meant *nothing* was applied — not
+the `site_url` fix, not the password rules. The template block is therefore
+commented out in `config.toml` and the rest of the file now lands.
+
+**This means the registration OTP step does not work in production yet.**
+`enable_confirmations` is on, so a signup sends Supabase's stock email — a
+confirmation *link* with no `{{ .Token }}` in it — and the verification screen
+waits for a code that was never sent.
+
+Two ways out, either of which is enough:
+
+1. **Configure custom SMTP** under `[auth.email.smtp]`. Resend, SendGrid and
+   Postmark all have free tiers, and a custom provider lifts the restriction.
+2. **Upgrade the project** off the free tier.
+
+Then uncomment the three `[auth.email.template.confirmation]` lines and push
+again. The template is already written and reviewed at
+`supabase/templates/confirmation.html`.
 
 ## OAuth providers
 
