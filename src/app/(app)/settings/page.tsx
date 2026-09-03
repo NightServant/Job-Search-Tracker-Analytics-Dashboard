@@ -1,6 +1,5 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -33,7 +32,6 @@ import type { SupportedCurrency } from '@/services/userPreferences'
  */
 export default function Page() {
   const { user, signOut } = useAuth()
-  const router = useRouter()
   const { data: prefs = null } = useUserPreferences()
   const setDefaultCurrency = useSetDefaultCurrency()
   const { success, error: showError } = useToast()
@@ -53,19 +51,27 @@ export default function Page() {
   const handleSignOut = async () => {
     try {
       await signOut()
-      // TO THE HOMEPAGE, EXPLICITLY. Gabe's ruling on 2026-09-03. Without
-      // this the person went to /login, and only by accident: nothing here
-      // navigated at all, so they sat on /settings until AppLayout's guard
-      // noticed the session was gone and bounced them. Two problems with
-      // that. The destination was wrong -- somebody who just chose to leave
-      // is being handed a sign-in form, which reads as the app refusing to
-      // let go -- and the timing was a race, so the last frame before the
-      // redirect was the settings page with its data already gone.
+      // A HARD NAVIGATION, NOT router.replace, and the reason is not style.
       //
-      // `replace`, not `push`: the settings page they just signed out of must
-      // not be one Back press away, because going back to it would land a
-      // signed-out visitor on the guard and bounce them again.
-      router.replace('/')
+      // Gabe reported from the deployed app on 2026-09-03 that this landed on
+      // /login. Both redirects were firing: this one, and AppLayout's guard a
+      // beat later when onAuthStateChange set the user to null while the
+      // layout was still mounted. Whichever ran second won, and it was not
+      // reliably this one.
+      //
+      // `signingOut` on the context now stops the guard from firing at all,
+      // which removes the flash. This closes the other half. AuthProvider
+      // lives in the ROOT layout, so a client-side navigation to `/` leaves it
+      // mounted and leaves that flag raised -- and a raised flag on a later
+      // visit to a private route would make the guard stand aside from a
+      // rejection it should make, rendering a blank page instead of the
+      // sign-in form. A document load tears the provider down, so the flag
+      // cannot outlive the sign-out that set it.
+      //
+      // It also drops every in-memory cache. React Query is still holding the
+      // rows of the person who just left; on a shared machine, a client-side
+      // navigation keeps them one render away.
+      window.location.assign('/')
     } catch (err) {
       showError('Sign out failed', err instanceof Error ? err.message : 'Unknown error')
     }
@@ -83,9 +89,10 @@ export default function Page() {
       const { error } = await supabase.rpc('delete_own_account')
       if (error) throw toError(error)
       await signOut()
-      // Same destination as an ordinary sign-out, and more obviously right
-      // here: there is no account left to sign back into.
-      router.replace('/')
+      // Same destination and the same mechanism as an ordinary sign-out, and
+      // more obviously right here: there is no account left to sign back into,
+      // and no cached row that should survive the deletion.
+      window.location.assign('/')
     } catch (err) {
       showError('Could not delete account', err instanceof Error ? err.message : 'Unknown error')
     }

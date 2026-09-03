@@ -29,6 +29,17 @@ interface AuthContextType {
   user: User | null
   session: Session | null
   loading: boolean
+  /**
+   * True from the moment a sign-out starts until the page navigates away.
+   *
+   * It exists so the (app) route guard can tell two different events apart.
+   * Both end with `user === null`, and they want opposite destinations:
+   * a guard rejection means "you asked for a private page without a session"
+   * and belongs at /login; a sign-out means "you chose to leave" and belongs
+   * at the home page. Nothing in the session state distinguishes them --
+   * only intent does, and this is where intent lives.
+   */
+  signingOut: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
@@ -54,6 +65,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
     // Get initial session
@@ -145,8 +157,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!hasValidSupabaseConfig) {
       throw new Error(supabaseConfigError || 'Supabase is not configured')
     }
+    // Raised BEFORE the call, not after. onAuthStateChange can fire while
+    // signOut() is still in flight, and the guard reads this flag on the very
+    // next render -- setting it afterwards would leave exactly the window this
+    // is meant to close.
+    setSigningOut(true)
     const { error } = await supabase.auth.signOut()
-    if (error) throw authError(error)
+    if (error) {
+      // Lowered again only on failure. On success the caller navigates away
+      // and this provider unmounts, so leaving it raised is correct: clearing
+      // it would re-arm the guard during the navigation it is standing aside
+      // for, which is the bug.
+      setSigningOut(false)
+      throw authError(error)
+    }
   }
 
   return (
@@ -155,6 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         session,
         loading,
+        signingOut,
         signIn,
         signUp,
         verifySignUpOtp,

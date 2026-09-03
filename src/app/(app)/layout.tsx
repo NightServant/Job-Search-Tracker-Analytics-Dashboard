@@ -14,12 +14,26 @@ import { AppShell } from '@/components/shell/AppShell'
  * nothing regardless of what the UI renders.
  */
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user, loading, signingOut } = useAuth()
   const router = useRouter()
 
   useEffect(() => {
-    if (!loading && !user) router.replace('/login')
-  }, [loading, user, router])
+    // `signingOut` is what stops this guard from overriding a deliberate
+    // sign-out. Reported from the deployed app on 2026-09-03: signing out from
+    // /settings landed on /login rather than the home page.
+    //
+    // Both redirects really did fire. The settings page calls replace('/') as
+    // soon as signOut() resolves; a beat later onAuthStateChange sets user to
+    // null, this layout re-renders while still mounted, and this effect calls
+    // replace('/login'). Second one wins.
+    //
+    // The fix is not ordering -- it is that these are two different events
+    // that happen to share a state. A guard rejection is "you asked for a
+    // private page without a session", and /login is right for it. A sign-out
+    // is "you chose to leave", and answering that with a sign-in form reads as
+    // the app refusing to let go.
+    if (!loading && !user && !signingOut) router.replace('/login')
+  }, [loading, user, signingOut, router])
 
   // Render nothing while auth resolves. Showing the shell and then redirecting
   // flashes protected chrome at someone who is not signed in.

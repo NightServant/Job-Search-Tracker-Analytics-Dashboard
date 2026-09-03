@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
+import { describe, it, expect, vi, afterEach, beforeAll } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 
@@ -14,6 +14,7 @@ const rpcMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
 const replaceMock = vi.hoisted(() => vi.fn())
+const assignMock = vi.hoisted(() => vi.fn())
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: useAuthMock }))
 // The route navigates on sign-out, so it needs a router. jsdom has no app
@@ -38,8 +39,19 @@ vi.mock('@/lib/supabase', () => ({
 
 import Page from '../page'
 
+// jsdom refuses a real navigation, so the one call that matters is stubbed.
+// It is stubbed rather than spied because `location.assign` is non-writable in
+// newer jsdom, and a spy on it silently does nothing.
+beforeAll(() => {
+  Object.defineProperty(window, 'location', {
+    configurable: true,
+    value: { ...window.location, assign: assignMock },
+  })
+})
+
 afterEach(() => {
   replaceMock.mockClear()
+  assignMock.mockClear()
   cleanup()
   showErrorMock.mockClear()
   showSuccessMock.mockClear()
@@ -103,16 +115,21 @@ describe('Settings route wrapper', () => {
   })
 
   it('sends the person to the homepage after signing out, not to the sign-in form', async () => {
-    // Gabe's 2026-09-03 ruling. Before it nothing here navigated at all: the
-    // person sat on /settings until AppLayout's guard noticed the session was
-    // gone and pushed them to /login -- the wrong destination, arrived at by
-    // a race. `replace` rather than `push`, so Back cannot return them to a
-    // page the guard will immediately bounce them off again.
+    // Reported from the deployed app: this landed on /login. Two redirects
+    // were firing -- this one, and AppLayout's guard a beat later when the
+    // auth state went null while the layout was still mounted.
+    //
+    // A DOCUMENT LOAD, not router.replace. AuthProvider lives in the root
+    // layout, so a client-side navigation leaves it mounted and leaves the
+    // `signingOut` flag raised, which would make the guard stand aside from a
+    // later rejection it should make. It also drops every in-memory cache,
+    // including the rows of the person who just left.
     const { signOut } = setup()
     render(<Page />)
     fireEvent.click(screen.getByRole('button', { name: /^sign out$/i }))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/'))
+    await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/'))
+    expect(replaceMock).not.toHaveBeenCalled()
   })
 
   it('calls the delete_own_account RPC and signs out once account deletion is confirmed', async () => {
@@ -122,9 +139,10 @@ describe('Settings route wrapper', () => {
     await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('delete_own_account'))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
-    // Same destination, and more obviously right here -- there is no account
-    // left to sign back into.
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/'))
+    // Same destination and mechanism, and more obviously right here -- there
+    // is no account left to sign back into, and no cached row that should
+    // survive the deletion.
+    await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/'))
   })
 
   // CRITICAL from the review round: supabase.rpc() resolves { error } as a
