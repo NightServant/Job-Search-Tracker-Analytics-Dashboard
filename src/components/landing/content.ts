@@ -47,10 +47,12 @@ export const HERO = {
    * `tertiaryCta`, which was only ever a sensible name while a first and
    * second existed.
    *
-   * The demo and the signup are still reachable -- `sign in` / `sign up` sit in
-   * the navbar directly above, and the closing CTA carries both routes with
-   * the sentence explaining what the demo is. The hero no longer competes with
-   * either.
+   * The demo and the signup are still reachable -- the closing CTA carries the
+   * demo, the signup and (since 2026-09-03) sign-in, with the sentence
+   * explaining what the demo is. The hero no longer competes with any of them.
+   * It does NOT say "the navbar directly above" any more: the bar's auth
+   * controls were removed the same day the hero's were, so that sentence had
+   * been pointing at buttons which no longer existed.
    *
    * The old `note` ("no signup · the demo opens with sample data, read only")
    * went with them: it annotated the demo button specifically, and copy that
@@ -262,6 +264,22 @@ export const CLOSING_CTA = {
   body: 'The demo needs nothing from you. An account takes an email and a password.',
   primary: { label: 'open the demo', href: '/demo/dashboard' },
   secondary: { label: 'create an account', href: '/signup' },
+  /**
+   * THE RETURNING VISITOR'S ROUTE, moved here from the footer on 2026-09-03.
+   *
+   * It is `sign in` and not `log in` because that is the word the product uses
+   * everywhere else -- AuthScreen's title, the /login route's page title, and
+   * the settings copy that calls it "the address you sign in with". Two names
+   * for one door is how a small product starts to feel like two.
+   *
+   * Third in the list, and on the second row. The other two are addressed to
+   * somebody who has never been here; this one is for somebody who already
+   * has, and who is far likelier to arrive already knowing where to go than to
+   * need convincing at the bottom of a marketing page. That distinction is
+   * made by POSITION rather than by button weight -- see ClosingCta.tsx for
+   * why the quieter variant was tried and dropped.
+   */
+  tertiary: { label: 'sign in', href: '/login' },
   demoNote:
     'The demo is invented data on public pages. It is read-only, nothing you type there is kept, ' +
     'and it is the same application the account version runs.',
@@ -269,9 +287,18 @@ export const CLOSING_CTA = {
 
 export const FOOTER = {
   tagline: 'A job search tracker with analytics and a CV builder.',
+  /**
+   * NO `sign in`. Removed by Gabe on 2026-09-03; it now sits in the closing
+   * CTA as a button, directly under the two it belongs beside.
+   *
+   * It was the only link down here that asked for an action rather than
+   * offering a reference -- privacy and source are both places you go to read
+   * something. An auth route in that company reads as an afterthought, and it
+   * was also the page's single most-buried control: below the last section,
+   * below a separator, in caption-adjacent type.
+   */
   links: [
     { label: 'privacy', href: '/privacy', external: false },
-    { label: 'sign in', href: '/login', external: false },
     { label: 'source', href: REPO_URL, external: true },
   ],
   lineage:

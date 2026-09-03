@@ -8,12 +8,19 @@ import { LANDING_TYPE } from './typography'
 import { CLOSING_CTA } from './content'
 
 /**
- * Section 6. Both routes out of the page, and one honest line about what the
+ * Section 6. Every route out of the page, and one honest line about what the
  * demo is.
  *
- * Both are plain links. The demo is a URL space rather than a sign-in --
- * settled 2026-09-02 -- so nothing here touches auth, and a signed-in visitor
- * following it keeps their session. Task 6 owns the routes; this owns the door.
+ * THREE ROUTES SINCE 2026-09-03, not two: the demo, the signup, and sign-in,
+ * which moved up from the footer. This is now the only place on the landing
+ * page where any of the three can be reached -- the hero and the navbar each
+ * gave theirs up on 2026-09-02 -- so it is also the section whose links are
+ * worth a guard rather than an eyeball.
+ *
+ * All three are plain links, and this component runs no auth logic. The demo
+ * is a URL space rather than a sign-in -- settled 2026-09-02 -- so a signed-in
+ * visitor following it keeps their session, and the sign-in link is a
+ * destination like any other. Task 6 owns the routes; this owns the doors.
  *
  * Card-less. It is the last thing on the page and the only section asking for
  * a decision, so it gets no competing chrome -- a bordered box here would make
@@ -56,21 +63,66 @@ export function ClosingCta() {
           <h2 className={LANDING_TYPE.sectionTitle}>{CLOSING_CTA.heading}</h2>
           <p className={cn('max-w-2xl', LANDING_TYPE.sectionLede)}>{CLOSING_CTA.body}</p>
 
-          <div className="flex flex-wrap gap-3 pt-2">
+          {/*
+            TWO ROWS, NOT ONE WRAPPING ROW -- Gabe, 2026-09-03. The two ways in
+            for somebody new sit together on top; the way back for somebody
+            who already has an account sits under them.
+
+            `items-start` is what keeps this from becoming three full-width
+            bars. The buttons are in a flex COLUMN, and a column stretches its
+            children by default -- inside a grid track that runs to ~46rem on
+            desktop, that would have given a quiet tertiary link the widest
+            hit area on the page.
+
+            The top row still wraps, so at 375px this degrades to three stacked
+            buttons rather than two squeezed ones. The row/column split is the
+            grouping; wrapping is what happens when the group will not fit.
+          */}
+          <div className="flex flex-col items-start gap-3 pt-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <Link
+                href={CLOSING_CTA.primary.href}
+                data-variant="primary"
+                className={`${buttonVariants({ variant: 'primary', size: 'm' })} group`}
+              >
+                {CLOSING_CTA.primary.label}
+                <ArrowRightIcon size={16} aria-hidden />
+              </Link>
+              <Link
+                href={CLOSING_CTA.secondary.href}
+                data-variant="secondary"
+                className={buttonVariants({ variant: 'secondary', size: 'm' })}
+              >
+                {CLOSING_CTA.secondary.label}
+              </Link>
+            </div>
+
+            {/*
+              SECONDARY, NOT GHOST -- and this was built ghost first, then
+              changed after looking at it.
+
+              Ghost is the textbook variant for a tertiary action, and on the
+              hierarchy argument it was right: filled, outlined, bare, falling
+              off as the audience narrows. But `ghost` here is `text-secondary`
+              on the canvas with no fill and no border, and alone on its own
+              row with nothing to sit beside, it rendered as a stray text link
+              rather than a control. Gabe asked for a BUTTON.
+
+              The row split is already carrying the hierarchy -- new visitors
+              above, returning visitors below -- and one hierarchy device
+              stated clearly beats two stated weakly. The filled primary still
+              takes the eye; this just has to be unmistakably clickable.
+
+              It carries no icon. The arrow on the primary marks the one action
+              that opens something immediately; repeating it here would spend
+              the distinction.
+            */}
             <Link
-              href={CLOSING_CTA.primary.href}
-              data-variant="primary"
-              className={`${buttonVariants({ variant: 'primary', size: 'm' })} group`}
-            >
-              {CLOSING_CTA.primary.label}
-              <ArrowRightIcon size={16} aria-hidden />
-            </Link>
-            <Link
-              href={CLOSING_CTA.secondary.href}
+              href={CLOSING_CTA.tertiary.href}
               data-variant="secondary"
               className={buttonVariants({ variant: 'secondary', size: 'm' })}
             >
-              {CLOSING_CTA.secondary.label}
+              {CLOSING_CTA.tertiary.label}
             </Link>
           </div>
         </div>

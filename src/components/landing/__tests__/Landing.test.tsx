@@ -164,11 +164,18 @@ describe('the hero', () => {
     // -- was to stop them competing with the closing CTA, not to make either
     // route unreachable. With the bar now carrying no auth at all, this is the
     // test that would catch the removals having gone one step too far.
+    //
+    // `sign in` used to be satisfied by the footer. It is satisfied by the
+    // closing CTA since 2026-09-03, and `getByRole` (singular) is doing real
+    // work in that move: it throws on TWO matches as well as on none, so it
+    // also asserts the link was MOVED rather than duplicated.
     renderLanding()
     expect(
       screen.getByRole('link', { name: CLOSING_CTA.secondary.label })
     ).toHaveAttribute('href', '/signup')
-    expect(screen.getByRole('link', { name: 'sign in' })).toHaveAttribute('href', '/login')
+    expect(
+      screen.getByRole('link', { name: CLOSING_CTA.tertiary.label })
+    ).toHaveAttribute('href', '/login')
     expect(screen.getAllByRole('link', { name: /demo/i }).length).toBeGreaterThan(0)
   })
 
@@ -296,6 +303,69 @@ describe('the closing call to action', () => {
       within(section).getByRole('link', { name: CLOSING_CTA.secondary.label })
     ).toHaveAttribute('href', '/signup')
     expect(within(section).getByText(CLOSING_CTA.demoNote)).toBeInTheDocument()
+  })
+
+  it('carries sign-in as its third route, since the footer no longer does', () => {
+    // Gabe, 2026-09-03. Scoped to the section for the same reason as above,
+    // and asserted by href rather than by label alone -- "sign in" is a phrase
+    // that could plausibly appear as prose.
+    const { container } = renderLanding()
+    const section = container.querySelector(
+      '[data-landing-section="cta"]'
+    ) as HTMLElement
+    expect(
+      within(section).getByRole('link', { name: CLOSING_CTA.tertiary.label })
+    ).toHaveAttribute('href', '/login')
+  })
+
+  it('groups two buttons on top and one beneath them', () => {
+    // THE LAYOUT GABE ASKED FOR, asserted structurally rather than by
+    // classname. The grouping lives in the DOM: the two buttons for a new
+    // visitor share a parent, and the third is that parent's next sibling.
+    //
+    // Reading the classes instead would assert my spelling of the layout and
+    // not the layout -- `flex-wrap` on one row and `flex-col` on the other are
+    // the same string whether or not the buttons are nested correctly. This
+    // fails if somebody flattens all three into a single wrapping row, which
+    // is the exact arrangement this replaced.
+    const { container } = renderLanding()
+    const section = container.querySelector(
+      '[data-landing-section="cta"]'
+    ) as HTMLElement
+
+    const primary = within(section).getByRole('link', { name: CLOSING_CTA.primary.label })
+    const secondary = within(section).getByRole('link', { name: CLOSING_CTA.secondary.label })
+    const tertiary = within(section).getByRole('link', { name: CLOSING_CTA.tertiary.label })
+
+    const topRow = primary.parentElement as HTMLElement
+    expect(secondary.parentElement).toBe(topRow)
+    expect(topRow.childElementCount).toBe(2)
+
+    // Beneath, not beside: a sibling of the row rather than a member of it,
+    // and after it in document order -- which is what "at the bottom" means to
+    // a screen reader as much as to a browser.
+    expect(tertiary.parentElement).not.toBe(topRow)
+    expect(tertiary.parentElement).toBe(topRow.parentElement)
+    expect(topRow.compareDocumentPosition(tertiary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('keeps exactly one filled button among the three', () => {
+    // The section asks for ONE thing first. Two filled buttons is the same as
+    // none, and "open the demo" is the one that should win -- it is the only
+    // route that costs the visitor nothing.
+    //
+    // The other two are both `secondary`. Ghost was tried for the third and
+    // rejected: with no fill and no border, alone on its row, it rendered as a
+    // text link rather than a button. See the note in ClosingCta.tsx.
+    const { container } = renderLanding()
+    const section = container.querySelector(
+      '[data-landing-section="cta"]'
+    ) as HTMLElement
+    const variants = Array.from(section.querySelectorAll('a[data-variant]')).map((el) =>
+      el.getAttribute('data-variant')
+    )
+    expect(variants).toEqual(['primary', 'secondary', 'secondary'])
+    expect(variants.filter((v) => v === 'primary')).toHaveLength(1)
   })
 })
 

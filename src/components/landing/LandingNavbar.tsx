@@ -48,10 +48,11 @@ import { NAV_LINKS } from './content'
  * identity (the lockup), orientation (three links) and one preference (the
  * theme toggle) -- the bar orients, it does not ask.
  *
- * Auth is still reachable: the closing CTA carries `create an account` and the
- * footer carries `sign in`. Both are further down the page than a persistent
- * bar, which is the trade being made deliberately -- a landing page that asks
- * for a decision in its top-right corner asks before it has argued anything.
+ * Auth is still reachable: the closing CTA carries `create an account` AND
+ * `sign in`, the latter having moved out of the footer on 2026-09-03. Both are
+ * further down the page than a persistent bar, which is the trade being made
+ * deliberately -- a landing page that asks for a decision in its top-right
+ * corner asks before it has argued anything.
  *
  * Below md the links hide but the THEME TOGGLE DOES NOT. Figma 64:1020 draws
  * no toggle in the 375px bar, and that omission was only survivable while the

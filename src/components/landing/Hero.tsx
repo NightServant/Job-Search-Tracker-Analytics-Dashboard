@@ -20,9 +20,11 @@ import { HERO } from './content'
  * to finish. With nothing to be secondary to, the only honest weight is
  * primary -- and the accent fill is the one element that carries colour on an
  * otherwise desaturated hero, so it is also where the eye lands. The hero therefore makes an argument rather than asking for a
- * decision. Both removed routes are still one click away -- `sign in` and
- * `sign up` are in the navbar directly above, and the closing CTA carries the
- * demo and the signup together with the sentence that says what the demo is.
+ * decision. Both removed routes are still one click away, though NOT in the
+ * navbar -- that bar's auth controls were removed the same day these were, so
+ * the sentence that used to point there was describing buttons that no longer
+ * existed. They are in the closing CTA, which carries the demo, the signup and
+ * sign-in together with the sentence that says what the demo is.
  *
  * HEIGHT IS VIEWPORT-RELATIVE, AND THE CONTENT IS CENTRED IN IT. `min-h` with
  * `justify-center` means a taller hero grows the MEDIA, not the gap under the
