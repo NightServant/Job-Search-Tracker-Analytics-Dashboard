@@ -158,6 +158,35 @@ proved why:
 `site_url` is `env(SUPABASE_AUTH_SITE_URL)` with **no fallback**, so an unset
 variable fails the push loudly instead of shipping localhost to production.
 
+### Never run `supabase config push` directly — use `npm run push:auth-config`
+
+`config push` treats a missing `env(...)` as a **warning, not an error**:
+
+```
+WARN: environment variable is unset: RESEND_API_KEY
+```
+
+and then sends `pass = ""`. Combined with `enabled = true` in the SMTP block,
+that is a config the API accepts and which breaks **every auth email on the
+project** — signup codes, password resets, email changes. The failure is
+silent, remote, and only surfaces when somebody cannot receive a code.
+
+It nearly happened on 2026-09-03. The push reached the confirmation prompt
+with an empty password and was stopped only because a *second* variable was
+also unset and happened to fail regex validation on the way out. Relying on one
+mistake to catch another is not a safety property.
+
+`scripts/push-auth-config.sh` asserts every required variable is non-empty
+before it will run, reads them from `.env`, and never prints them. A missing
+variable stops it locally, where the cost is reading one line.
+
+```bash
+npm run push:auth-config
+```
+
+Required in `.env`: `SUPABASE_AUTH_SITE_URL`, `RESEND_API_KEY`,
+`SUPABASE_AUTH_SMTP_SENDER`.
+
 ### The OTP email template cannot be pushed on this plan
 
 The first push was rejected outright:

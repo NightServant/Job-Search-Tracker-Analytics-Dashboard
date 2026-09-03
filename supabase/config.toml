@@ -208,7 +208,12 @@ password_requirements = "lower_upper_letters_digits_symbols"
 
 [auth.rate_limit]
 # Number of emails that can be sent per hour. Requires auth.email.smtp to be enabled.
-email_sent = 2
+# 30, not the CLI's 2. Two an hour is the built-in provider's cap and it is a
+# throttle on the PROJECT, not per user -- with a real signup flow behind it,
+# the third person to register in an hour silently gets no code. 30 is still a
+# real ceiling against a flood while leaving ordinary use alone; Resend's free
+# tier allows far more.
+email_sent = 30
 # Number of SMS messages that can be sent per hour. Requires auth.sms to be enabled.
 sms_sent = 30
 # Number of anonymous sign-ins that can be made per hour per IP address. Requires enable_anonymous_sign_ins = true.
@@ -252,43 +257,58 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
-# [auth.email.smtp]
-# enabled = true
-# host = "smtp.sendgrid.net"
-# port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# CUSTOM SMTP, VIA RESEND. Two things depend on this block, and only one of
+# them is about deliverability.
+#
+# The obvious one: Supabase's built-in email provider is rate limited to a
+# couple of messages an hour and is explicitly not for production.
+#
+# The one that actually blocks this app: the free tier REFUSES EMAIL TEMPLATE
+# CHANGES while the default provider is in use. That is what rejected the
+# first `config push` on 2026-09-03, and the template it rejected is the only
+# thing that puts `{{ .Token }}` in the signup email. Without it the
+# registration flow's step 2 waits forever for a code that was never sent. So
+# custom SMTP is not a hardening step here, it is what makes the feature work.
+#
+# `pass` is `env(...)`, never a literal. The key is a bearer credential for an
+# account that can send mail as this domain; committing one is the mistake this
+# repository's own audit went looking for.
+#
+# Resend's SMTP username is the literal string "resend" for every account --
+# it is not an account id, and it is not the key. Port 465 is implicit TLS,
+# which is what Supabase's sender expects.
+#
+# ADMIN_EMAIL IS THE FROM ADDRESS AND RESEND WILL REJECT IT unless the domain
+# is verified in the Resend dashboard. Until a domain is verified the only
+# usable value is `onboarding@resend.dev`, which Resend will deliver ONLY to
+# the address that owns the Resend account -- fine for testing the flow, and
+# useless for real signups, since every other recipient is silently dropped.
+# It is env-driven so switching from the test sender to a real one is a
+# variable change rather than a commit.
+[auth.email.smtp]
+enabled = true
+host = "smtp.resend.com"
+port = 465
+user = "resend"
+pass = "env(RESEND_API_KEY)"
+admin_email = "env(SUPABASE_AUTH_SMTP_SENDER)"
+sender_name = "Worktrack"
 
-# THE TEMPLATE THAT CARRIES THE CODE, and it CANNOT BE PUSHED ON THIS PLAN.
+# THE TEMPLATE THAT CARRIES THE CODE.
 #
-# Without it the project uses Supabase's stock confirmation email, which
-# contains {{ .ConfirmationURL }} and no token at all -- so no code is ever
-# sent and verifyOtp can only fail. The registration flow's step 2 is
-# therefore broken in production and will stay broken until this block can be
-# applied.
+# Supabase's stock confirmation email contains {{ .ConfirmationURL }} and no
+# token at all, so on the default template no code is ever sent and
+# verifyOtp({ type: 'signup' }) fails forever against a code that never
+# existed. This block is what replaces it.
 #
-# `supabase config push` on 2026-09-03 rejected it with:
-#
-#   unexpected status 400: Email template modification is not available for
-#   free tier projects using the default email provider. Please upgrade your
-#   plan or configure a custom SMTP provider.
-#
-# That is a platform limit, not a mistake in this file. The whole push is
-# atomic, so leaving the block uncommented meant NOTHING was applied -- not
-# the site_url fix, not the password rules, not the OTP length. Commented out,
-# the rest of the file lands and this stays as the exact change to make the
-# moment either condition is met.
-#
-# TO ENABLE IT: configure a custom SMTP provider under [auth.email.smtp] below
-# (Resend, SendGrid, Postmark -- all have free tiers), or upgrade the project.
-# Then uncomment these three lines and push again. The template itself is
-# already written and reviewed at the path below.
-# [auth.email.template.confirmation]
-# subject = "Your Worktrack verification code"
-# content_path = "./supabase/templates/confirmation.html"
+# It was commented out between the two pushes on 2026-09-03, because the free
+# tier rejects template changes while the built-in email provider is in use --
+# and the push is ATOMIC, so leaving it in meant nothing at all was applied,
+# not even the site_url fix. The [auth.email.smtp] block above lifts that
+# restriction, so it is live again.
+[auth.email.template.confirmation]
+subject = "Your Worktrack verification code"
+content_path = "./supabase/templates/confirmation.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]

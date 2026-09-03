@@ -13,7 +13,8 @@
     "load:autofill": "npx artillery run load-tests/job-autofill.yml",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "seed:demo": "node --env-file=.env scripts/seed-demo.mjs",
-    "start": "next start"
+    "start": "next start",
+    "push:auth-config": "bash scripts/push-auth-config.sh"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
