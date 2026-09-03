@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 23 23" role="img" aria-label="Worktrack">
+  <!-- For LIGHT backgrounds. neutral-900 cells with accent-700, the exact pair the app resolves to in its light theme.
+       Geometry is copied from src/app/icon.svg and src/components/ui/brand-mark.tsx,
+       not redrawn: four 10x10 cells on a 23-unit grid with a 3-unit gutter and a
+       1-unit radius. The bottom-left cell is the accent, a literal reference to
+       one stage of the status pipeline being active.
+
+       This file exists ONLY for the README. The app's own mark needs no light and
+       dark variants -- its three static cells use currentColor and its accent cell
+       binds to var(--color-accent-default), so it follows the theme by itself. A
+       README on GitHub gets neither: an <img> has no CSS context and no inherited
+       colour, so the two themes need two files and a <picture> element to pick
+       between them. -->
+  <rect x="0"  y="0"  width="10" height="10" rx="1" fill="#18181b"/>
+  <rect x="13" y="0"  width="10" height="10" rx="1" fill="#18181b"/>
+  <rect x="0"  y="13" width="10" height="10" rx="1" fill="#c2410c"/>
+  <rect x="13" y="13" width="10" height="10" rx="1" fill="#18181b"/>
+</svg>

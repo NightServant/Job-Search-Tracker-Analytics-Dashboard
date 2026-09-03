@@ -447,6 +447,30 @@ What a reviewer sees first.
 
 **Exit:** a stranger can open the demo and understand the product without an account.
 
+**Status — built on `feat/m6-public-surface`, not yet merged.** Tasks 0-7 are
+done: the typecheck covers test files, skiper51 and skiper106 are vendored and
+credited behind a gate, the six-section landing page and its pinned sequence
+are built, `/login` and `/signup` are separate routes with a three-step
+registration, `/demo/*` is a public route space over a fixture, `/privacy` and
+a custom 404 exist, and this README is asserted against the repository rather
+than maintained by hand.
+
+Two gates could not be run in the session that finished the work, and neither
+is a code result:
+
+- `npm run test:integration` — the sandbox redacts secret-shaped environment
+  values, so `VITE_SUPABASE_URL` reaches the test process as the literal string
+  `[SENSITIVE]` and `createClient` rejects it. Run it locally before merging.
+- The exit criterion itself is a manual walkthrough — a private window, no
+  session, `/` to the demo to the dashboard to applications to analytics and
+  back out, repeated at 375px and with Reduce Motion on. Nothing automated
+  substitutes for it.
+
+Everything else is green: unit suite, `tsc --noEmit` (with `exclude` still
+empty), lint on changed files, a clean production build with `/`, `/login`,
+`/signup`, `/privacy` and `/_not-found` all present, no `lucide-react` imports,
+and `supabase migration list --linked` showing local and remote in step.
+
 ### M7 — Intelligence *(optional)*
 - 7.1 AI CV tailoring against the stored job description
 - 7.2 Grammar check via LanguageTool in the editor

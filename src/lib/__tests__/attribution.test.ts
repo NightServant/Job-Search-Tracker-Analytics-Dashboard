@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { describe, it, expect } from 'vitest'
 import { SKIPER_ATTRIBUTION } from '../attribution'
 
@@ -40,5 +40,84 @@ describe('third-party attribution', () => {
     expect(readme).toContain('AarzooAly')
     expect(readme).toContain('toggles.dev')
     expect(readme).toContain('rudrodip/theme-toggle-effect')
+  })
+})
+
+/**
+ * The README, as a tested artefact.
+ *
+ * It shipped claiming "304 unit tests across 28 files" -- wrong within a day
+ * and still wrong a milestone later, by which point the real figure was over a
+ * thousand. A README that lies is worse than a short one, and the only kind of
+ * claim that stays true without maintenance is one nothing has to maintain.
+ * These assertions either read the repository for the answer or ban the class
+ * of statement that decays.
+ */
+describe('the README describes this repository', () => {
+  const readme = () => readFileSync('README.md', 'utf8')
+
+  it('names the React major the repo actually depends on', () => {
+    const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
+    const major = pkg.dependencies.react.replace(/^[^\d]*/, '').split('.')[0]
+    expect(readme()).toContain(`React ${major}`)
+    expect(readme()).not.toContain(`React ${Number(major) - 1}`)
+  })
+
+  it('does not quote a test count, which decays on every commit', () => {
+    // The banned sentence, and the two ways it tends to be written.
+    const text = readme()
+    expect(text).not.toMatch(/\b\d{2,5}\s+unit tests\b/)
+    expect(text).not.toMatch(/\b\d{2,5}\s+tests\s+across\b/)
+  })
+
+  it('quotes no other figure that goes stale on its own', () => {
+    // Same rule as the landing page's proof section: a number nothing
+    // recomputes is a claim that rots. Route counts and file counts are the
+    // two that were in here.
+    const text = readme()
+    expect(text).not.toMatch(/\b\d+\s+(?:authenticated\s+)?routes\b/)
+    expect(text).not.toMatch(/\b\d+\s+files\b/)
+  })
+
+  it('links the demo and the auth routes', () => {
+    const text = readme()
+    expect(text).toContain('](/login')
+    expect(text).toContain('](/signup')
+    expect(text).toContain('/demo/dashboard')
+    // Tolerant of the section NUMBER, not of the section being absent. The
+    // README follows the numbered-heading structure used across these repos,
+    // so a literal '## Demo' would fail on '## 4. Demo' and force the
+    // numbering to be dropped to satisfy a test about content.
+    expect(text).toMatch(/^##\s+(?:\d+\.\s+)?Demo\s*$/m)
+  })
+
+  it('shows the screens it claims to have, and only screens that exist', () => {
+    // Both directions. An embedded image that 404s is the most visible
+    // possible way for a README to be wrong.
+    const text = readme()
+    for (const shot of ['dashboard', 'applications', 'analytics']) {
+      expect(text, `README does not embed the ${shot} screenshot`).toContain(`${shot}.png`)
+    }
+    const embedded = [...text.matchAll(/\/screens\/([a-z-]+\.png)/g)].map((m) => m[1])
+    expect(embedded.length).toBeGreaterThan(0)
+    const onDisk = readdirSync('public/screens')
+    for (const file of new Set(embedded)) {
+      expect(onDisk, `README embeds ${file}, which is not in public/screens`).toContain(file)
+    }
+  })
+
+  it('names every route the app really serves under Features', () => {
+    // The old README described screens M5 had already replaced. Read from the
+    // filesystem so a deleted route fails the claim rather than outliving it.
+    const text = readme()
+    const routes = readdirSync('src/app/(app)', { withFileTypes: true })
+      .filter((d) => d.isDirectory() && !d.name.startsWith('_') && d.name !== '__tests__')
+      .map((d) => d.name)
+    expect(routes.length).toBeGreaterThan(4)
+    for (const route of routes) {
+      expect(text, `the app serves /${route} and the README never mentions it`).toContain(
+        `/${route}`
+      )
+    }
   })
 })
