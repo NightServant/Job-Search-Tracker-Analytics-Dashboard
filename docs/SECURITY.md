@@ -265,8 +265,34 @@ free; `worktrack.app`, `worktrack.io` and `getworktrack.com` were taken.
   Name.com a free domain across 25+ TLDs including `.app` and `.dev`, and
   `.TECH` one free `.TECH`. A real registrar with full DNS control, which is
   what SPF and DKIM need.
-- **eu.org** — free permanently and does not expire, and it delegates NS, so
-  DNS control is complete. Approval is manual and can take days.
+- **eu.org** — free permanently, does not expire, and it delegates NS, so DNS
+  control is complete. Two things to know before starting, because both bite
+  in the middle:
+
+  1. **Nameservers must exist before you apply.** The form wants two working
+     nameservers, so the Cloudflare zone has to be created *first* — add
+     `yourname.eu.org` to Cloudflare, take the two nameservers it assigns, and
+     put those in the eu.org application. The zone sits "pending" until eu.org
+     delegates to it, which is expected, not an error.
+  2. **Approval is manual, by volunteers, and takes days to weeks.** There is
+     no queue position and no support channel.
+
+  Availability is checkable with `dig` rather than a signup — a name with no
+  NS, SOA or A record is free:
+
+  ```bash
+  dig +short NS worktrack.eu.org
+  ```
+
+  Checked 2026-09-03: `worktrack.eu.org`, `worktrackapp.eu.org` and
+  `worktrack-app.eu.org` all resolved nothing.
+
+  **Deliverability is the real cost.** `.eu.org` is a legitimate registry
+  running since 1996, but it is a free subdomain service, and spam filters
+  weigh that. Combined with a brand-new sending reputation, verification codes
+  are more likely to land in spam than they would from a registered domain.
+  Free, permanent, and the weakest of the three on the one axis that matters
+  for auth email.
 
 Not viable, each for a specific reason worth writing down:
 
