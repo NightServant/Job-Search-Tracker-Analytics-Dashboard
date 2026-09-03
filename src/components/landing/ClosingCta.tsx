@@ -95,35 +95,34 @@ export function ClosingCta() {
               >
                 {CLOSING_CTA.secondary.label}
               </Link>
+              {/*
+                SECONDARY, NOT GHOST -- and this was built ghost first, then
+                changed after looking at it.
+
+                Ghost is the textbook variant for a tertiary action, and on the
+                hierarchy argument it was right: filled, outlined, bare, falling
+                off as the audience narrows. But `ghost` here is `text-secondary`
+                on the canvas with no fill and no border, and alone on its own
+                row with nothing to sit beside, it rendered as a stray text link
+                rather than a control. Gabe asked for a BUTTON.
+
+                The row split is already carrying the hierarchy -- new visitors
+                above, returning visitors below -- and one hierarchy device
+                stated clearly beats two stated weakly. The filled primary still
+                takes the eye; this just has to be unmistakably clickable.
+
+                It carries no icon. The arrow on the primary marks the one action
+                that opens something immediately; repeating it here would spend
+                the distinction.
+              */}
+              <Link
+                href={CLOSING_CTA.tertiary.href}
+                data-variant="secondary"
+                className={buttonVariants({ variant: 'secondary', size: 'm' })}
+              >
+                {CLOSING_CTA.tertiary.label}
+              </Link>
             </div>
-
-            {/*
-              SECONDARY, NOT GHOST -- and this was built ghost first, then
-              changed after looking at it.
-
-              Ghost is the textbook variant for a tertiary action, and on the
-              hierarchy argument it was right: filled, outlined, bare, falling
-              off as the audience narrows. But `ghost` here is `text-secondary`
-              on the canvas with no fill and no border, and alone on its own
-              row with nothing to sit beside, it rendered as a stray text link
-              rather than a control. Gabe asked for a BUTTON.
-
-              The row split is already carrying the hierarchy -- new visitors
-              above, returning visitors below -- and one hierarchy device
-              stated clearly beats two stated weakly. The filled primary still
-              takes the eye; this just has to be unmistakably clickable.
-
-              It carries no icon. The arrow on the primary marks the one action
-              that opens something immediately; repeating it here would spend
-              the distinction.
-            */}
-            <Link
-              href={CLOSING_CTA.tertiary.href}
-              data-variant="secondary"
-              className={buttonVariants({ variant: 'secondary', size: 'm' })}
-            >
-              {CLOSING_CTA.tertiary.label}
-            </Link>
           </div>
         </div>
 
