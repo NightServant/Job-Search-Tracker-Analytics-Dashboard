@@ -210,10 +210,53 @@ that owns the Resend account**. Every other recipient is dropped silently — no
 bounced, not errored, just never delivered. It is enough to test the flow end
 to end and it is useless for real signups.
 
-Fixing it needs a domain verified in Resend (`resend domains` in the CLI, or
-the dashboard), then `SUPABASE_AUTH_SMTP_SENDER` pointed at an address on it.
-The only domain on the account today is `smart-hrms.onrender.com`, which is
-unverified and belongs to a different project.
+**Verified by test on 2026-09-03.** An email rendered from the real template
+was sent through Resend SMTP and reached `last_event: delivered` — but only to
+`egabecervantes@gmail.com`, the address that owns the Resend account. Sending
+to any other recipient returns:
+
+```
+403 validation_error: You can only send testing emails to your own email
+address. To send emails to other recipients, please verify a domain at
+resend.com/domains, and change the `from` address to an email using this
+domain.
+```
+
+### To reach real users
+
+A verified sending domain is the only way, and it needs a domain whose DNS you
+control. The one domain on the Resend account, `smart-hrms.onrender.com`, can
+**never** be verified: Render owns the `onrender.com` zone and issues
+subdomains without DNS delegation, so the SPF and DKIM records Resend requires
+cannot be added. It is dead weight on the account and can be removed.
+
+The Vercel project is still on a `vercel.app` subdomain, which has the same
+problem for the same reason.
+
+Once a domain exists, the rest is mechanical:
+
+```bash
+resend domains create your-domain.com      # prints the DNS records to add
+# add the printed SPF/DKIM records at the registrar, then:
+resend domains verify <domain-id>
+resend domains list                        # status must read "verified"
+```
+
+Then point the sender at it and push:
+
+```bash
+# in .env
+SUPABASE_AUTH_SMTP_SENDER=no-reply@your-domain.com
+
+npm run push:auth-config
+```
+
+Nothing else changes — the template, the SMTP host and the auth config are
+already in place and already pushed.
+
+Availability checked 2026-09-03, for reference rather than as a
+recommendation: `worktrack.dev` $9.99/yr and `useworktrack.com` $11.25/yr were
+free; `worktrack.app`, `worktrack.io` and `getworktrack.com` were taken.
 
 ### The restriction this lifted
 
