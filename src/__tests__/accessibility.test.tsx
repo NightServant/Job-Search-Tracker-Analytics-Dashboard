@@ -23,10 +23,20 @@ describe('accessibility checks', () => {
       </AppDialog>
     )
 
-    // Ensure all form controls with ids have associated labels
-    const controls = document.querySelectorAll('input[id], select[id], textarea[id]')
+    // Ensure all form controls with ids have associated labels.
+    //
+    // `aria-hidden` controls are excluded, and that is a correction rather
+    // than a loophole. Base UI's Select renders a 1px, `tabindex="-1"`,
+    // `aria-hidden="true"` input purely so a native form submission carries
+    // the value -- it is not in the accessibility tree and cannot be reached
+    // by keyboard. Labelling it would put a control into the tree that should
+    // not be there, which is the opposite of what this test is protecting.
+    // Anything a user can actually reach is still covered.
+    const controls = Array.from(
+      document.querySelectorAll('input[id], select[id], textarea[id]')
+    ).filter((el) => el.getAttribute('aria-hidden') !== 'true')
     expect(controls.length).toBeGreaterThan(0)
-    for (const el of Array.from(controls)) {
+    for (const el of controls) {
       const id = el.getAttribute('id')
       if (!id) continue
       const labelled = document.querySelector(`label[for="${id}"]`) || el.closest('label')

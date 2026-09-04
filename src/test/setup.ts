@@ -16,6 +16,32 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+// jsdom never implemented PointerEvent. Base UI activates a button on Enter by
+// dispatching a synthetic pointer click (dispatchClickWithModifiers), so
+// without this every keyboard interaction with a Select, Dialog or Checkbox
+// throws "ownerWindow(...).PointerEvent is not a constructor" -- and, because
+// the throw happens inside a React event handler, it surfaces as the assertion
+// simply not being met rather than as an error anyone would recognise.
+//
+// MouseEvent carries everything the library reads (button, modifiers,
+// coordinates); the pointer-specific fields are unused, so subclassing it is
+// enough and avoids shipping a full polyfill for one constructor.
+if (typeof window.PointerEvent === 'undefined') {
+  class PointerEventPolyfill extends MouseEvent {
+    readonly pointerId: number
+    readonly pointerType: string
+    readonly isPrimary: boolean
+    constructor(type: string, params: PointerEventInit = {}) {
+      super(type, params)
+      this.pointerId = params.pointerId ?? 0
+      this.pointerType = params.pointerType ?? 'mouse'
+      this.isPrimary = params.isPrimary ?? true
+    }
+  }
+  window.PointerEvent = PointerEventPolyfill as unknown as typeof PointerEvent
+  globalThis.PointerEvent = window.PointerEvent
+}
+
 // jsdom has no layout engine, so it never implemented scrollIntoView. Any
 // component that scrolls a panel into view on open needs this or the call
 // throws in every test that renders it.

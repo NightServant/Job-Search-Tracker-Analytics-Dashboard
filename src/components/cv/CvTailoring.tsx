@@ -140,14 +140,18 @@ export function TailoringTargetRail({ state, jobs }: { state: CvTailoringState; 
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-label-caps uppercase text-text-secondary">application</span>
-            <Select value={state.jobId} onChange={(e) => state.setJobId(e.target.value)}>
-              <option value="">none selected</option>
-              {jobs.map((job) => (
-                <option key={job.id} value={job.id}>
-                  {job.role} — {job.company}
-                </option>
-              ))}
-            </Select>
+            <Select
+              aria-label="application"
+              value={state.jobId}
+              onValueChange={state.setJobId}
+              items={[
+                { value: '', label: 'none selected' },
+                ...jobs.map((job) => ({
+                  value: job.id,
+                  label: `${job.role} — ${job.company}`,
+                })),
+              ]}
+            />
           </label>
 
           <label className="flex flex-col gap-1.5">

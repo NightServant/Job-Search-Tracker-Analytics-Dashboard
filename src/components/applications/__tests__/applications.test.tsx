@@ -7,6 +7,7 @@ import { ApplicationForm } from '../ApplicationForm'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from '../StatusTabs'
 import { ApplicationsTable } from '../ApplicationsTable'
 import { makeJob } from '@/test/fixtures'
+import { chooseOption, selectedLabel } from '@/test/select'
 import type { Job } from '@/types'
 
 // The desktop/mobile fork. jsdom reports a 1024px window, so `useIsMobile` is
@@ -527,7 +528,8 @@ describe('ApplicationForm', () => {
     // A PHP user typing a peso figure into a form defaulted to USD produces a
     // number that is wrong by a factor of 55 and looks plausible.
     render(<ApplicationForm defaultCurrency="PHP" />)
-    expect((screen.getByLabelText('currency') as HTMLSelectElement).value).toBe('PHP')
+    // A button, not a <select>: what it SHOWS is the assertion.
+    expect(selectedLabel(screen.getByLabelText('currency'))).toBe('PHP')
   })
 
   it('disables submit and shows a spinner while saving', () => {
@@ -542,7 +544,7 @@ describe('ApplicationForm', () => {
     // a stored figure without changing it.
     const job = makeJob({ id: '9', status: 'applied', salary_currency: 'USD' })
     render(<ApplicationForm defaultCurrency="PHP" job={job} />)
-    expect((screen.getByLabelText('currency') as HTMLSelectElement).value).toBe('USD')
+    expect(selectedLabel(screen.getByLabelText('currency'))).toBe('USD')
   })
 
   it('refuses to submit a job with no company and says why', () => {
@@ -555,11 +557,12 @@ describe('ApplicationForm', () => {
   })
 
   it('submits the typed currency alongside the figures', async () => {
+    const user = userEvent.setup({ delay: null })
     const onSubmit = vi.fn().mockResolvedValue(undefined)
     render(<ApplicationForm defaultCurrency="PHP" onSubmit={onSubmit} />)
     fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
     fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
-    fireEvent.change(screen.getByLabelText('currency'), { target: { value: 'USD' } })
+    await chooseOption(user, screen.getByLabelText('currency'), 'USD')
     fireEvent.click(screen.getByRole('button', { name: /add application/i }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
     expect(onSubmit.mock.calls[0][0]).toMatchObject({

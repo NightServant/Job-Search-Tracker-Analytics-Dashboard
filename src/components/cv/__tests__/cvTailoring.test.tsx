@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import * as React from 'react'
 import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from '../CvTailoring'
 import { makeJob } from '@/test/fixtures'
+import { chooseOption } from '@/test/select'
 
 afterEach(() => cleanup())
 
@@ -39,7 +40,7 @@ describe('the tailoring rails', () => {
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="React and TypeScript developer." />)
 
-    await user.selectOptions(screen.getByLabelText(/application/i), 'j1')
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
     // A real percentage from the deterministic scorer, not a model's opinion.
     expect(await screen.findByText(/%$/)).toBeTruthy()
     expect(screen.getByText(/missing keywords/i)).toBeTruthy()
@@ -53,7 +54,7 @@ describe('the tailoring rails', () => {
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="Go and Kubernetes engineer." />)
 
-    await user.selectOptions(screen.getByLabelText(/application/i), 'j1')
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
     await user.type(screen.getByLabelText(/paste a posting/i), 'We need Go and Kubernetes.')
 
     expect(await screen.findByText(/using the pasted posting/i)).toBeTruthy()
@@ -64,7 +65,7 @@ describe('the tailoring rails', () => {
     // is that there is nothing on that application to score against.
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="anything" />)
-    await user.selectOptions(screen.getByLabelText(/application/i), 'j2')
+    await chooseOption(user, screen.getByLabelText(/application/i), /Backend Engineer/)
     expect(await screen.findByText(/no job description saved/i)).toBeTruthy()
   })
 
@@ -83,7 +84,7 @@ describe('the tailoring rails', () => {
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="React developer" fetchImpl={fetchImpl} />)
 
-    await user.selectOptions(screen.getByLabelText(/application/i), 'j1')
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled())
@@ -97,7 +98,7 @@ describe('the tailoring rails', () => {
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="React developer" fetchImpl={fetchImpl} />)
 
-    await user.selectOptions(screen.getByLabelText(/application/i), 'j1')
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
     await waitFor(() => expect(fetchImpl).toHaveBeenCalled())
@@ -136,7 +137,7 @@ describe('the tailoring rails', () => {
 
     const user = userEvent.setup({ delay: null })
     render(<Applying />)
-    await user.selectOptions(screen.getByLabelText(/application/i), 'j1')
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
     expect(await screen.findByText('new line')).toBeTruthy()
@@ -161,7 +162,7 @@ describe('the tailoring rails', () => {
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="React developer" fetchImpl={fetchImpl} />)
 
-    await user.selectOptions(screen.getByLabelText(/application/i), 'j1')
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
     const notice = await screen.findByRole('alert')

@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { openOptions, chooseOption } from '@/test/select'
 import type { Job } from '@/types'
 import { Analytics, type MetricState } from '../Analytics'
 import { FunnelChart, normalizeFunnel, STAGE_FILL } from '../FunnelChart'
@@ -200,14 +202,17 @@ describe('Analytics', () => {
     expect(stageHeading.closest('[data-analytics-panel]')!.textContent).toMatch(/all time/i)
   })
 
-  it('narrows cohorts to the picked range, and leaves the other panels unchanged', () => {
+  it('narrows cohorts to the picked range, and leaves the other panels unchanged', async () => {
+    const user = userEvent.setup({ delay: null })
     render(<Analytics {...fullProps()} />)
     // Cohort analysis is the one remaining panel the picker filters: source
     // trends, which was the other, is gone. Its "top converting source"
     // callout went with it, which is why this no longer needs getAllByText to
     // step around the source name appearing in two places.
     expect(screen.getByText('Feb 2025')).toBeTruthy()
-    fireEvent.change(screen.getByLabelText('Date range'), { target: { value: '3m' } })
+    // Picked the way a user picks it -- `fireEvent.change` was a native
+    // <select>'s mechanism and means nothing to a listbox.
+    await chooseOption(user, screen.getByLabelText('Date range'), 'Last 3 months')
     // 2025-02's cohort falls outside the last 3 months of "now"; the
     // component's own default clock is real Date.now(), so this only pins
     // the row disappearing, not which exact months remain.
@@ -571,9 +576,13 @@ describe('SalaryInsights scope', () => {
 })
 
 describe('RangePicker', () => {
-  it('offers the four windows the range maths supports, in that order', () => {
+  it('offers the four windows the range maths supports, in that order', async () => {
+    // The options exist only while the list is open now -- the control stopped
+    // being a native <select> on 2026-09-05, so there is no permanently
+    // mounted <option> to query.
+    const user = userEvent.setup({ delay: null })
     render(<RangePicker value="all" onChange={() => {}} />)
-    const options = screen.getAllByRole('option').map((o) => o.textContent)
+    const options = await openOptions(user, screen.getByLabelText(/date range/i))
     expect(options).toEqual(['Last 3 months', 'Last 6 months', 'Last 12 months', 'all time'])
   })
 })

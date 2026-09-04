@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeJob } from '@/test/fixtures'
+import { selectedLabel } from '@/test/select'
 
 // Every read and write on this route goes through the useJobs hooks so they
 // all land on the same ['jobs', user?.id] cache entry the dashboard reads.
@@ -209,7 +210,9 @@ describe('Applications route wrapper', () => {
     render(<Page />)
 
     fireEvent.click(screen.getByRole('button', { name: 'add' }))
-    expect(screen.getByLabelText(/^currency/)).toHaveValue('PHP')
+    // The control is a button now, not a <select>, so it has no `value` --
+    // what it SHOWS is the assertion, which is what a user checks anyway.
+    expect(selectedLabel(screen.getByLabelText(/^currency/))).toBe('PHP')
   })
 
   it('defaults a new application to the stored preference instead of PHP', () => {
@@ -222,7 +225,7 @@ describe('Applications route wrapper', () => {
     render(<Page />)
 
     fireEvent.click(screen.getByRole('button', { name: 'add' }))
-    expect(screen.getByLabelText(/^currency/)).toHaveValue('USD')
+    expect(selectedLabel(screen.getByLabelText(/^currency/))).toBe('USD')
   })
 
   // Item 2's second half: window.confirm is the same defect class as the

@@ -16,10 +16,14 @@ import { RANGE_OPTIONS, type RangeOption } from '@/lib/analyticsRange'
  * pretending the control reaches them -- see the pre-flight ruling in
  * `.superpowers/sdd/2026-08-25-m5-application-screens/progress.md`.
  *
- * A native `<select>` (via `ui/select`) rather than a segmented control:
- * four options is on the edge either way, but `Select` already exists and a
- * second selection pattern for one screen would be the "no new component
- * styling" constraint's exact failure mode.
+ * `ui/select` rather than a segmented control: four options is on the edge
+ * either way, but `Select` already exists and a second selection pattern for
+ * one screen would be the "no new component styling" constraint's exact
+ * failure mode.
+ *
+ * It stopped being a native `<select>` on 2026-09-05 -- the OS drew that
+ * element's option list, so it was the one control in the app the design
+ * system did not reach. Nothing here changed but the call signature.
  */
 export interface RangePickerProps {
   value: RangeOption
@@ -32,14 +36,9 @@ export function RangePicker({ value, onChange }: RangePickerProps) {
       <Select
         aria-label="Date range"
         value={value}
-        onChange={(event) => onChange(event.target.value as RangeOption)}
-      >
-        {RANGE_OPTIONS.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </Select>
+        onValueChange={(next) => onChange(next as RangeOption)}
+        items={RANGE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
+      />
     </div>
   )
 }

@@ -336,29 +336,19 @@ export function ApplicationForm({
             <Select
               id="salary_currency"
               value={currency}
-              onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
+              onValueChange={(next) => setCurrency(next as SupportedCurrency)}
               error={errorFor('salary_currency')}
-            >
-              {SUPPORTED_CURRENCIES.map((code) => (
-                <option key={code} value={code}>
-                  {code}
-                </option>
-              ))}
-            </Select>
+              items={SUPPORTED_CURRENCIES.map((code) => ({ value: code, label: code }))}
+            />
           </Field>
 
           <Field id="status" label="status">
             <Select
               id="status"
               value={status}
-              onChange={(e) => setStatus(e.target.value as JobStatus)}
-            >
-              {STATUSES.map((value) => (
-                <option key={value} value={value}>
-                  {STATUS_LABELS[value]}
-                </option>
-              ))}
-            </Select>
+              onValueChange={(next) => setStatus(next as JobStatus)}
+              items={STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
+            />
           </Field>
 
           <Field id="location" label="location">
@@ -377,15 +367,12 @@ export function ApplicationForm({
             <Select
               id="work_mode"
               value={workMode}
-              onChange={(e) => setWorkMode(e.target.value as WorkMode | '')}
-            >
-              <option value="">not set</option>
-              {WORK_MODES.map((mode) => (
-                <option key={mode.value} value={mode.value}>
-                  {mode.label}
-                </option>
-              ))}
-            </Select>
+              onValueChange={(next) => setWorkMode(next as WorkMode | '')}
+              items={[
+                { value: '', label: 'not set' },
+                ...WORK_MODES.map((mode) => ({ value: mode.value, label: mode.label })),
+              ]}
+            />
           </Field>
 
           <Field id="source" label="source">
