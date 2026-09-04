@@ -94,12 +94,63 @@ export interface IntegrationCapabilities {
   expandSkills: boolean
 }
 
+/**
+ * Misconfigurations that are worth naming rather than discovering at the
+ * request.
+ *
+ * THIS EXISTS BECAUSE IT HAPPENED. `TAILORING_BASE_URL` and `TAILORING_MODEL`
+ * were set to each other's values -- an easy transposition, since they are
+ * adjacent lines that both come from the same provider's dashboard. Every
+ * capability check passed (all three vars were non-empty), and the failure
+ * surfaced as a POST to `openai/gpt-oss-120b/chat/completions`, which is not a
+ * URL, several layers away from the line that caused it.
+ *
+ * A non-empty check cannot catch that. A shape check can, and it is three
+ * lines: a base URL is a URL, and a model id is not.
+ */
+export function configProblems(config: IntegrationConfig): string[] {
+  const problems: string[] = []
+  const { baseUrl, model, apiKey } = config.tailoring
+
+  if (baseUrl && !/^https?:\/\//i.test(baseUrl)) {
+    problems.push(
+      `TAILORING_BASE_URL should be a URL but is "${baseUrl}". ` +
+        'Check it has not been swapped with TAILORING_MODEL.'
+    )
+  }
+  if (model && /^https?:\/\//i.test(model)) {
+    problems.push(
+      'TAILORING_MODEL looks like a URL. Check it has not been swapped with TAILORING_BASE_URL.'
+    )
+  }
+  // Two of three is a half-configured integration, which fails at the request
+  // rather than at startup unless someone says so here.
+  const present = [baseUrl, model, apiKey].filter(Boolean).length
+  if (present > 0 && present < 3) {
+    problems.push(
+      'AI tailoring needs all three of TAILORING_BASE_URL, TAILORING_MODEL and ' +
+        'TAILORING_API_KEY; some are set and some are not.'
+    )
+  }
+
+  if (config.formatex.baseUrl && !/^https?:\/\//i.test(config.formatex.baseUrl)) {
+    problems.push(`FORMATEX_BASE_URL should be a URL but is "${config.formatex.baseUrl}".`)
+  }
+  return problems
+}
+
 export function capabilitiesOf(config: IntegrationConfig): IntegrationCapabilities {
   return {
     compileLatex: !!config.formatex.apiKey,
     // Both, and neither alone: a base URL with no key cannot authenticate and
     // a key with no base URL has nowhere to go.
-    tailorCv: !!config.tailoring.apiKey && !!config.tailoring.baseUrl && !!config.tailoring.model,
+    // Shape-checked, not just presence-checked: three non-empty strings in the
+    // wrong order passed the old test and failed at the request.
+    tailorCv:
+      !!config.tailoring.apiKey &&
+      /^https?:\/\//i.test(config.tailoring.baseUrl ?? '') &&
+      !!config.tailoring.model &&
+      !/^https?:\/\//i.test(config.tailoring.model),
     expandSkills: config.esco.enabled,
   }
 }

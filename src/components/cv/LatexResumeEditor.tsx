@@ -9,6 +9,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
 import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
+import { useLatexCompile } from './useLatexCompile'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import {
@@ -286,6 +288,14 @@ export function LatexResumeEditor({
   // keyword either way.
   const tailoring = useCvTailoring({ cvText: latexSource, jobs })
 
+  // Real compilation through FormaTeX, replacing the JS "readable preview"
+  // that had been standing in for a renderer. The fallback stays: it is what
+  // an unconfigured deployment, a failed build and a not-yet-compiled document
+  // all show, and it is better than an empty pane in all three cases.
+  const { state: compileState, compile } = useLatexCompile({ source: latexSource })
+
+  const compileNow = () => void compile(latexSource)
+
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'latex') {
       setSource((content as { source: string }).source)
@@ -315,6 +325,15 @@ export function LatexResumeEditor({
           </Button>
           <Button variant="ghost" size="s" onClick={copyLatex}>
             copy LaTeX
+          </Button>
+          <Button
+            variant="secondary"
+            size="s"
+            onClick={compileNow}
+            disabled={compileState.status === 'compiling' || !latexSource.trim()}
+          >
+            {compileState.status === 'compiling' && <CssSpinner size={14} />}
+            {compileState.status === 'compiling' ? 'compiling' : 'compile'}
           </Button>
           {/* Save is primary here for the same reason it is in the Word
               editor: in an editor the verb is Save, and it was previously the
@@ -346,7 +365,17 @@ export function LatexResumeEditor({
         lines it has to show, so every one of them wraps. Stacked, each gets
         the whole column, and the order reads as the job does: edit, then look.
       */}
-      <div className="flex flex-col gap-6">
+      {/*
+        SIDE BY SIDE FROM `lg`, on Gabe's instruction (2026-09-05). It is a
+        comparison view: the point is reading the source against what it
+        produced, and stacking them puts a scroll between the line you are
+        editing and the paragraph it renders.
+
+        Below `lg` they stack -- two 400px columns are worse than one 800px
+        one for both a code pane and a page proof. `items-start` so the two
+        panes keep their own heights instead of the shorter one stretching.
+      */}
+      <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-heading-s text-text-primary">LaTeX source</p>
@@ -357,7 +386,7 @@ export function LatexResumeEditor({
             onChange={(e) => {
               setSource(e.target.value)
             }}
-            className="h-[420px] w-full resize-y rounded-md border border-border-default bg-bg-canvas px-3 py-2 font-mono text-body-s text-text-primary focus-visible:border-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30"
+            className="h-[620px] w-full resize-y rounded-md border border-border-default bg-bg-canvas px-3 py-2 font-mono text-body-s text-text-primary focus-visible:border-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30"
             spellCheck={false}
             aria-label="LaTeX source"
           />
@@ -366,18 +395,58 @@ export function LatexResumeEditor({
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-heading-s text-text-primary">preview</p>
+            {/*
+              THREE DISTINCT STATES, named. A compiled PDF is what the CV will
+              actually look like; the readable preview is an approximation; a
+              failed build is neither. Collapsing them into one label is how
+              somebody sends out a CV they never really saw.
+            */}
             <span className="text-body-s text-text-muted">
-              {cdnAvailable ? 'Live rendering' : 'Readable preview'}
+              {compileState.status === 'ok'
+                ? 'compiled PDF'
+                : compileState.status === 'compiling'
+                  ? 'compiling'
+                  : cdnAvailable
+                    ? 'readable preview — not compiled'
+                    : 'readable preview'}
             </span>
           </div>
-          {/* The preview is a rendered page, not app chrome, so it keeps its own
-              white sheet in both themes -- that is what the CV will look like. */}
-          <iframe
-            title="LaTeX preview"
-            srcDoc={previewHtml}
-            className="h-[520px] w-full rounded-md border border-border-default bg-white"
-            sandbox="allow-scripts allow-same-origin"
-          />
+
+          {/* A rendered page, not app chrome, so it keeps its own white sheet
+              in both themes -- that is what the CV will look like. */}
+          {compileState.status === 'ok' ? (
+            // `#toolbar=0&navpanes=0&scrollbar=0` strips the browser's own PDF
+            // chrome -- the download, print, rotate and page controls Gabe
+            // asked to remove. They are the WRONG controls here: this is a
+            // proof of the document being edited, and the app already owns
+            // export. A second download button that saves an intermediate
+            // build is a way to send out the wrong file.
+            <iframe
+              title="Compiled CV"
+              src={`${compileState.url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
+              className="h-[620px] w-full rounded-md border border-border-default bg-white"
+            />
+          ) : (
+            <iframe
+              title="LaTeX preview"
+              srcDoc={previewHtml}
+              className="h-[620px] w-full rounded-md border border-border-default bg-white"
+              sandbox="allow-scripts allow-same-origin"
+            />
+          )}
+
+          {compileState.status === 'error' && (
+            <p
+              role="alert"
+              className={
+                compileState.unconfigured
+                  ? 'text-body-s text-text-muted'
+                  : 'whitespace-pre-wrap font-mono text-body-s text-status-rejected-mark'
+              }
+            >
+              {compileState.message}
+            </p>
+          )}
         </div>
       </div>
     </DocumentWorkspace>

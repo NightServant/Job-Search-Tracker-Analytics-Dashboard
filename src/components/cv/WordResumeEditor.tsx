@@ -311,6 +311,44 @@ export function WordResumeEditor({
     }
   }
 
+  /**
+   * Word export, alongside the PDF one.
+   *
+   * BOTH, not one: ATS parsers still handle .docx more reliably than PDF and
+   * many application forms accept Word only, while a human reviewer opening
+   * the file wants the PDF's fixed layout. Which one matters depends on who is
+   * on the other end, and the author is the only one who knows that.
+   */
+  const [isExportingDocx, setIsExportingDocx] = useState(false)
+  const exportDocx = async () => {
+    if (!editor) return
+    setIsExportingDocx(true)
+    try {
+      const response = await fetch('/api/cv/docx', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.trim() || 'CV', content: editor.getJSON() }),
+      })
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || `Export failed (${response.status})`)
+      }
+      const url = URL.createObjectURL(await response.blob())
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${(title.trim() || 'cv').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'cv'}.docx`
+      anchor.click()
+      // Revoked immediately: the click has already handed the blob to the
+      // download, and holding it keeps the whole file in memory for the tab.
+      URL.revokeObjectURL(url)
+      success('Word file ready', 'Your CV has been downloaded as .docx.')
+    } catch (err) {
+      showError('Export failed', err instanceof Error ? err.message : 'Could not export Word file')
+    } finally {
+      setIsExportingDocx(false)
+    }
+  }
+
   const resetTemplate = () => {
     editor?.commands.setContent(DEFAULT_WORD_CONTENT)
     markDirty()
@@ -359,6 +397,10 @@ export function WordResumeEditor({
           <Button variant="ghost" size="s" onClick={resetTemplate} disabled={!editor}>
             <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
             reset
+          </Button>
+          <Button variant="ghost" size="s" onClick={exportDocx} disabled={!editor || isExportingDocx}>
+            <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
+            {isExportingDocx ? 'exporting' : 'export .docx'}
           </Button>
           <Button variant="secondary" size="s" onClick={exportPdf} disabled={!editor || isExporting}>
             <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />

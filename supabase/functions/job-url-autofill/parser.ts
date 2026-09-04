@@ -15,6 +15,80 @@ export interface AutofillResponse {
   warnings: string[]
 }
 
+/**
+ * Sites that answer a server-side fetch with a bot challenge rather than a
+ * page, and the name to show for each.
+ *
+ * JOBSTREET IS HERE BECAUSE IT CANNOT BE SCRAPED, measured on 2026-09-05:
+ * every HTML path -- `/job/<id>`, `/jobs`, and the homepage -- returns 403
+ * with Cloudflare's "Just a moment..." interstitial, from a browser User-Agent
+ * and full Accept headers. Only `robots.txt` answers 200, because it is served
+ * outside the challenge. This is not a parsing problem that better selectors
+ * would fix: no HTML ever reaches the function.
+ *
+ * So the honest behaviour is to say so, fill in what the URL alone can prove,
+ * and point at the path that does work. The tailoring rail and the job
+ * description field both take pasted text, and a browser that is already past
+ * the challenge is the only thing on the user's side that can read the page.
+ */
+const CHALLENGED_HOSTS: { match: RegExp; name: string }[] = [
+  { match: /(^|\.)jobstreet\.com(\.[a-z]{2})?$/i, name: 'JobStreet' },
+  { match: /(^|\.)jobsdb\.com$/i, name: 'JobsDB' },
+  { match: /(^|\.)seek\.com(\.[a-z]{2})?$/i, name: 'SEEK' },
+]
+
+/** The display name for a host known to challenge, or null. */
+export function challengedSiteName(hostname: string): string | null {
+  const host = hostname.trim().toLowerCase().replace(/^www\./, '')
+  return CHALLENGED_HOSTS.find((entry) => entry.match.test(host))?.name ?? null
+}
+
+/**
+ * Whether a response body is a bot interstitial rather than the page asked
+ * for.
+ *
+ * Checked on the BODY as well as the status, because a challenge can arrive as
+ * a 200 with a JS redirect -- treating only 403 as blocked would hand the
+ * parser an interstitial and let it "successfully" extract "Just a moment..."
+ * as the role.
+ */
+export function looksLikeBotChallenge(status: number, html: string): boolean {
+  if (status === 403 || status === 503) return true
+  const head = html.slice(0, 4000)
+  return (
+    /Just a moment\.\.\./i.test(head) ||
+    /cf-browser-verification|cf_chl_opt|__cf_chl/i.test(head) ||
+    /Checking your browser before accessing/i.test(head)
+  )
+}
+
+/**
+ * What a URL alone can establish, for a page that could not be read.
+ *
+ * Worth returning rather than nothing: it saves the user a field, and -- more
+ * usefully -- it confirms the app understood the link, which a bare "could not
+ * fetch" does not. Confidence is deliberately below every parsed value's, and
+ * nothing here is guessed from the path: only the site's own name.
+ */
+export function autofillFromUrlAlone(url: URL): AutofillResponse {
+  const name = challengedSiteName(url.hostname)
+  const values: AutofillValues = { url: url.toString() }
+  const confidence: Record<string, number> = {}
+  if (name) {
+    values.source = name
+    confidence.source = 1
+  }
+  return {
+    values,
+    confidence,
+    warnings: [
+      name
+        ? `${name} blocks automated reads, so the posting could not be fetched. Paste the description in by hand.`
+        : 'That page could not be read automatically. Paste the description in by hand.',
+    ],
+  }
+}
+
 function decodeHtmlEntities(value: string): string {
   return value
     .replace(/&amp;/gi, '&')
@@ -47,7 +121,7 @@ function decodePossiblyEncoded(value: string): string {
 function normalizeCompany(raw: string): string {
   if (!raw) return ''
   let v = cleanText(decodePossiblyEncoded(raw))
-  v = v.replace(/\s+by\s+[^,|\-]+$/i, '')
+  v = v.replace(/\s+by\s+[^,|-]+$/i, '')
   v = v.replace(/\s*[|\-:].*$/i, '')
   return v.trim()
 }

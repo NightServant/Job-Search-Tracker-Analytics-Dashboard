@@ -13,6 +13,23 @@ const nextConfig: NextConfig = {
   },
   // The Vite app still lives in src/ and must not be swept into the Next build.
   pageExtensions: ['tsx', 'ts'],
+  /**
+   * `docx` is required at runtime, never bundled.
+   *
+   * Bundling it BROKE THE BUILD, and not in a way that named itself: with
+   * /api/cv/docx present, `next build` failed at "Collecting page data" with
+   * `Cannot find module for page: /_not-found` and `/gallery` -- two pages
+   * that have nothing to do with Word export -- and a MODULE_NOT_FOUND deep
+   * inside `.next/server/webpack-runtime.js`. Removing that one route made it
+   * pass, which is how it was traced. `docx` pulls jszip and a pile of Node
+   * built-ins; webpack tripped over them and corrupted the shared runtime
+   * chunk the other pages resolve through.
+   *
+   * Listing it here tells Next to `require()` it from node_modules at request
+   * time instead, which is correct for a server-only library anyway -- it is
+   * ~2MB of zip machinery no client should ever receive.
+   */
+  serverExternalPackages: ['docx'],
   eslint: {
     // The repo already lints via `npm run lint` with its own config. Next bundles
     // a stricter one that fails the build on pre-existing `any` usages across

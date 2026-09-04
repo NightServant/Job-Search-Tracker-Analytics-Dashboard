@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { extractAutofill } from '../../../supabase/functions/job-url-autofill/parser'
+import {
+  extractAutofill,
+  challengedSiteName,
+  looksLikeBotChallenge,
+  autofillFromUrlAlone,
+} from '../../../supabase/functions/job-url-autofill/parser'
 
 describe('job url autofill parser', () => {
   it('extracts from LinkedIn metadata heuristics', () => {
@@ -308,5 +313,58 @@ describe('job url autofill parser', () => {
     const result = extractAutofill(url, html)
     expect(result.values.role).toContain('Senior Engineer')
     expect(result.values.company).toBe('ACME Corp')
+  })
+})
+
+describe('sites that answer a fetch with a bot challenge', () => {
+  // MEASURED, not assumed (2026-09-05): every JobStreet HTML path -- /job/<id>,
+  // /jobs, and the homepage -- returns 403 with Cloudflare's "Just a moment..."
+  // interstitial, from a browser User-Agent with full Accept headers. Only
+  // robots.txt answers 200. No selector work fixes that; no HTML arrives.
+
+  it('recognises the APAC sites that block server-side reads', () => {
+    expect(challengedSiteName('ph.jobstreet.com')).toBe('JobStreet')
+    expect(challengedSiteName('www.jobstreet.com.ph')).toBe('JobStreet')
+    expect(challengedSiteName('hk.jobsdb.com')).toBe('JobsDB')
+    expect(challengedSiteName('www.seek.com.au')).toBe('SEEK')
+    // A site that does NOT block must not be labelled as one, or the app would
+    // stop trying to read pages it can read perfectly well.
+    expect(challengedSiteName('boards.greenhouse.io')).toBeNull()
+    expect(challengedSiteName('jobs.lever.co')).toBeNull()
+    // Not a substring match: this must not fire on an unrelated host.
+    expect(challengedSiteName('notjobstreet.com.evil.test')).toBeNull()
+  })
+
+  it('detects a challenge by status AND by body', () => {
+    // A challenge can arrive as a 200 whose only job is to run JS and redirect.
+    // Status alone would let that through to the parser, which would then
+    // "succeed" and extract "Just a moment..." as the role -- a confidently
+    // wrong autofill, which is worse than an error because nothing looks broken.
+    expect(looksLikeBotChallenge(403, '')).toBe(true)
+    expect(looksLikeBotChallenge(503, '')).toBe(true)
+    expect(looksLikeBotChallenge(200, '<html><title>Just a moment...</title>')).toBe(true)
+    expect(looksLikeBotChallenge(200, '<div class="cf-browser-verification">')).toBe(true)
+    // A real page is not a challenge.
+    expect(looksLikeBotChallenge(200, '<html><title>Frontend Engineer at Acme</title>')).toBe(false)
+  })
+
+  it('returns what the URL alone proves, rather than nothing', () => {
+    // A bot challenge is not a broken link. Answering "could not fetch this
+    // URL" sends the user to check a URL that is perfectly correct.
+    const result = autofillFromUrlAlone(new URL('https://ph.jobstreet.com/job/86776684'))
+    expect(result.values.source).toBe('JobStreet')
+    expect(result.values.url).toBe('https://ph.jobstreet.com/job/86776684')
+    // Nothing is invented from the path -- no role, no company.
+    expect(result.values.role).toBeUndefined()
+    expect(result.values.company).toBeUndefined()
+    // And it says why, naming the site and the way that does work.
+    expect(result.warnings.join(' ')).toMatch(/JobStreet blocks automated reads/)
+    expect(result.warnings.join(' ')).toMatch(/paste/i)
+  })
+
+  it('still explains itself for an unknown blocking host', () => {
+    const result = autofillFromUrlAlone(new URL('https://unknown.example/job/1'))
+    expect(result.values.source).toBeUndefined()
+    expect(result.warnings.join(' ')).toMatch(/could not be read/i)
   })
 })

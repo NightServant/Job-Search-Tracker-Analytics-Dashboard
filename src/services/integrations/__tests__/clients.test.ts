@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { readIntegrationConfig, capabilitiesOf, type IntegrationConfig } from '../config'
+import {
+  readIntegrationConfig,
+  capabilitiesOf,
+  configProblems,
+  type IntegrationConfig,
+} from '../config'
 import { compileLatex } from '../formatex'
 import { parseTailoringReply, tailorCv } from '../tailoring'
 
@@ -35,6 +40,47 @@ describe('what this deployment can do', () => {
       tailoring: { apiKey: 'k', model: 'm', baseUrl: 'https://api.test/v1' },
     })
     expect(capabilitiesOf(whole).tailorCv).toBe(true)
+  })
+
+  it('catches a base URL and a model swapped for each other', () => {
+    // THIS IS A REAL BUG THAT SHIPPED INTO .env.local, not a hypothetical:
+    // both vars come off the same provider dashboard on adjacent lines and are
+    // easy to transpose. All three values were non-empty, so every presence
+    // check passed, and the failure surfaced as a POST to
+    // "openai/gpt-oss-120b/chat/completions" -- not a URL -- several layers
+    // from the line that caused it.
+    const swapped = configWith({
+      tailoring: {
+        apiKey: 'k',
+        baseUrl: 'openai/gpt-oss-120b',
+        model: 'https://api.groq.com/openai/v1',
+      },
+    })
+    expect(capabilitiesOf(swapped).tailorCv).toBe(false)
+    const problems = configProblems(swapped).join(' ')
+    expect(problems).toMatch(/TAILORING_BASE_URL should be a URL/)
+    expect(problems).toMatch(/TAILORING_MODEL looks like a URL/)
+  })
+
+  it('passes a correctly ordered config', () => {
+    // The companion. Without it, "rejects the swap" would also pass if the
+    // check rejected everything.
+    const right = configWith({
+      tailoring: {
+        apiKey: 'k',
+        baseUrl: 'https://api.groq.com/openai/v1',
+        model: 'openai/gpt-oss-120b',
+      },
+    })
+    expect(capabilitiesOf(right).tailorCv).toBe(true)
+    expect(configProblems(right)).toEqual([])
+  })
+
+  it('names a half-configured integration instead of failing at the request', () => {
+    const half = configWith({ tailoring: { apiKey: 'k', model: 'm' } })
+    expect(configProblems(half).join(' ')).toMatch(/needs all three/)
+    // Nothing set at all is not a problem -- it is the normal unconfigured state.
+    expect(configProblems(configWith())).toEqual([])
   })
 
   it('defaults FormaTeX to the base URL that was actually probed', () => {

@@ -11,7 +11,7 @@ import {
   takeThrottleSlot,
 } from '../_shared/edgeMonitoring.ts'
 import { mergeSecurityHeaders } from '../_shared/edgeHeaders.ts'
-import { extractAutofill } from './parser.ts'
+import { extractAutofill, looksLikeBotChallenge, autofillFromUrlAlone } from './parser.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -396,6 +396,27 @@ Deno.serve(async (req: Request) => {
   if (!response.ok) {
     console.warn(`[${requestId}] HTTP ${response.status}: ${targetUrl.hostname}`)
     const latencyMs = Date.now() - startTime
+
+    // A BOT CHALLENGE IS NOT A BROKEN LINK, and saying "could not fetch this
+    // URL" for one sends the user to check a URL that is perfectly correct.
+    // JobStreet, JobsDB and SEEK all answer a server-side fetch with
+    // Cloudflare's interstitial (measured 2026-09-05: 403 on every HTML path,
+    // browser User-Agent and all). Nothing this function can do will get the
+    // page -- so it returns 200 with what the URL alone proves, names the
+    // reason, and points at pasting, which does work.
+    if (looksLikeBotChallenge(response.status, '')) {
+      emitMonitoringEvent(buildErrorEvent({
+        functionName: 'job-url-autofill',
+        requestId,
+        status: 200,
+        latencyMs,
+        callerKey,
+        message: 'Upstream served a bot challenge',
+        extra: { status: response.status, host: targetUrl.hostname },
+      }))
+      return jsonResponse({ ...autofillFromUrlAlone(targetUrl), requestId }, 200)
+    }
+
     emitMonitoringEvent(buildErrorEvent({
       functionName: 'job-url-autofill',
       requestId,
@@ -461,6 +482,15 @@ Deno.serve(async (req: Request) => {
       extra: { bytes: html.length },
     }))
     return jsonResponse({ error: 'Page content is too large or empty', requestId }, 422)
+  }
+
+  // A CHALLENGE CAN ARRIVE AS A 200, as a page whose only job is to run JS and
+  // redirect. Parsing that "succeeds": it extracts "Just a moment..." as the
+  // role and hands the user a confidently wrong autofill, which is worse than
+  // an error because nothing looks broken.
+  if (looksLikeBotChallenge(200, html)) {
+    console.warn(`[${requestId}] Bot challenge served as 200: ${finalUrl.hostname}`)
+    return jsonResponse({ ...autofillFromUrlAlone(finalUrl), requestId }, 200)
   }
 
   const result = extractAutofill(finalUrl, html)
