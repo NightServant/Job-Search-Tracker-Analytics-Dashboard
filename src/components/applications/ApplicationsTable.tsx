@@ -3,6 +3,7 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useAppHref } from '@/components/shell/routeBase'
+import { useIsMobile } from '@/hooks/use-mobile'
 import {
   Table,
   TableBody,
@@ -22,7 +23,14 @@ import type { Job } from '@/types'
 
 export interface ApplicationsTableProps {
   jobs: Job[]
-  onEdit?: (job: Job) => void
+  /**
+   * Opens the record on THIS screen, in the given mode.
+   *
+   * When it is absent the company cell stays an ordinary link to
+   * `/applications/<id>` and the whole row falls back to navigation, which is
+   * what the mobile surface wants and what a no-JS render does anyway.
+   */
+  onOpen?: (job: Job, mode: 'view' | 'edit') => void
   onDelete?: (job: Job) => void
   emptyMessage?: string
   id?: string
@@ -58,7 +66,7 @@ export interface ApplicationsTableProps {
  */
 export function ApplicationsTable({
   jobs,
-  onEdit,
+  onOpen,
   onDelete,
   emptyMessage = 'nothing matches these filters.',
   id,
@@ -66,6 +74,11 @@ export function ApplicationsTable({
   'aria-labelledby': ariaLabelledBy,
 }: ApplicationsTableProps) {
   const appHref = useAppHref()
+  // Read at CLICK time, not at render time. `useIsMobile` reports false until
+  // its effect has run, and a click cannot happen before hydration -- so the
+  // first-render value never reaches a decision, and there is no need to gate
+  // the whole table on a width the server cannot know.
+  const isMobile = useIsMobile()
   if (jobs.length === 0) {
     return (
       <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy}>
@@ -94,7 +107,7 @@ export function ApplicationsTable({
             <TableHead>status</TableHead>
             <TableHead>salary</TableHead>
             <TableHead className="text-right">applied on</TableHead>
-            {(onEdit || onDelete) && <TableHead className="w-20 text-right">actions</TableHead>}
+            {(onOpen || onDelete) && <TableHead className="w-20 text-right">actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -113,8 +126,23 @@ export function ApplicationsTable({
               className={cn(i % 2 === 1 && 'bg-accent-surface/30')}
             >
               <TableCell className="max-w-0 truncate text-text-primary">
+                {/*
+                  STILL A REAL LINK, even on desktop where clicking it opens
+                  the dialog instead of navigating. Rendering a <button> here
+                  would take away cmd-click, middle-click and "open in new
+                  tab" on a row whose href is a genuine, shareable address --
+                  so the anchor stays and the plain left-click is what gets
+                  intercepted. Every modified click falls through to the
+                  browser untouched.
+                */}
                 <Link
                   href={appHref(`/applications/${job.id}`)}
+                  onClick={(e) => {
+                    if (isMobile || !onOpen) return
+                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
+                    e.preventDefault()
+                    onOpen(job, 'view')
+                  }}
                   className="rounded-md hover:text-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
                 >
                   {job.company}
@@ -131,13 +159,13 @@ export function ApplicationsTable({
               <TableCell className="tabular whitespace-nowrap text-right text-text-muted">
                 {job.date_applied ? formatAppliedDate(job.date_applied) : 'not applied'}
               </TableCell>
-              {(onEdit || onDelete) && (
+              {(onOpen || onDelete) && (
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    {onEdit && (
+                    {onOpen && (
                       <IconButton
                         aria-label={`Edit ${job.role} at ${job.company}`}
-                        onClick={() => onEdit(job)}
+                        onClick={() => onOpen(job, 'edit')}
                         className="text-label-caps uppercase"
                       >
                         edit

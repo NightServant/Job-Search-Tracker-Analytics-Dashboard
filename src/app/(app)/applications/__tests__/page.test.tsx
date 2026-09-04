@@ -37,6 +37,24 @@ vi.mock('@/contexts/ToastContext', () => ({
   useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
 }))
 
+// The record dialog's four secondary reads, which this route now owns for
+// whichever row is open. They are stubbed rather than exercised here -- the
+// record's own behaviour is covered in detail.test.tsx -- but they have to be
+// stubbed, or importing them drags in the real Supabase client.
+vi.mock('@/hooks/useActivity', () => ({ useActivity: () => ({ data: [], isLoading: false }) }))
+vi.mock('@/hooks/useDocumentLinks', () => ({
+  useDocumentLinks: () => ({ data: [], isLoading: false }),
+}))
+vi.mock('@/hooks/useJobEvents', () => ({ useJobEvents: () => ({ data: [], isLoading: false }) }))
+vi.mock('@/hooks/useCvText', () => ({ useCvText: () => ({ data: undefined }) }))
+
+// `?application=<id>` is how a desktop deep link off /applications/<id>
+// arrives. Returning no param is the ordinary case; one test overrides it.
+const searchParamMock = vi.hoisted(() => vi.fn(() => null as string | null))
+vi.mock('next/navigation', () => ({
+  useSearchParams: () => ({ get: searchParamMock }),
+}))
+
 import Page from '../page'
 
 beforeEach(() => {
@@ -45,6 +63,7 @@ beforeEach(() => {
   useCreateJobsBulkMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   useUserPreferencesMock.mockReturnValue({ data: null, isLoading: false, error: null })
   deleteJobMutate.mockReset().mockResolvedValue(undefined)
+  searchParamMock.mockReturnValue(null)
 })
 
 afterEach(() => cleanup())
@@ -113,7 +132,50 @@ describe('Applications route wrapper', () => {
     fireEvent.click(screen.getByRole('button', { name: /save application/i }))
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
-    expect(screen.getByRole('heading', { name: /edit .* at initech/i })).toBeTruthy()
+    // Still on the FORM, not bounced back to the record. The dialog's heading
+    // is now the role alone -- company and status moved into the header's own
+    // slots beside it -- so the check that it stayed open is the presence of a
+    // field carrying the typed value, which is the thing a rejected save must
+    // not throw away.
+    expect(screen.getByLabelText(/^company/)).toHaveValue('Initech')
+    expect(screen.getByRole('button', { name: /save application/i })).toBeTruthy()
+  })
+
+  it('returns to the record, not to the list, once an edit saves', async () => {
+    // The dialog is the whole record now. Closing it after a save would throw
+    // away the context the edit was made in, and the saved values are exactly
+    // what the person who just typed them wants to check.
+    const mutateAsync = vi.fn().mockResolvedValue(undefined)
+    useUpdateJobMock.mockReturnValue({ mutateAsync, isPending: false })
+    const job = makeJob({ id: '1', status: 'applied', company: 'Initech', role: 'QA Lead' })
+    useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
+    render(<Page />)
+
+    fireEvent.click(screen.getAllByRole('button', { name: /^edit/i })[0])
+    fireEvent.click(screen.getByRole('button', { name: /save application/i }))
+
+    await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: /save application/i })).toBeNull()
+    )
+    // The dialog is still open, showing the record it just saved.
+    expect(screen.getByRole('dialog')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'QA Lead' })).toBeTruthy()
+  })
+
+  it('opens the named record on mount when a desktop deep link redirected here', async () => {
+    // /applications/<id> is the mobile surface. A wide viewport landing there
+    // is replaced with /applications?application=<id>, and this is the half
+    // that makes the intent survive the redirect.
+    searchParamMock.mockReturnValue('1')
+    const job = makeJob({ id: '1', status: 'applied', company: 'Initech', role: 'QA Lead' })
+    useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
+    render(<Page />)
+
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+    expect(screen.getByRole('heading', { name: 'QA Lead' })).toBeTruthy()
+    // Viewing, not editing -- a deep link is a request to read the record.
+    expect(screen.queryByRole('button', { name: /save application/i })).toBeNull()
   })
 
   it('resolves handleImport to false and keeps the parsed CSV summary when the bulk mutation rejects', async () => {

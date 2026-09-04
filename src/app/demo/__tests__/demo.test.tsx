@@ -34,6 +34,10 @@ const pathname = vi.hoisted(() => ({ value: '/demo/dashboard' }))
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname.value,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
+  // The demo list reads `?application=<id>`, which is how a wide viewport
+  // landing on /demo/applications/<id> arrives with its intent intact.
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({ id: '' }),
   redirect: vi.fn(),
 }))
 

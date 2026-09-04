@@ -2,12 +2,16 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { PanelSection } from '@/components/ui/panel-section'
 import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { STATUSES } from '@/components/ui/status-marker'
+import { cn } from '@/lib/utils'
 import { assertJobFormDataValid, jobValidation } from '@/services/jobValidation'
 import {
   SUPPORTED_CURRENCIES,
@@ -94,6 +98,13 @@ export interface ApplicationFormProps {
    * field back to its original value clears the flag again.
    */
   onDirtyChange?: (dirty: boolean) => void
+  /**
+   * Which surface is rendering it. `dialog` pairs the short fields into two
+   * columns; `page` keeps one column at every width and grows the controls to
+   * a 44px touch target, because the mobile record page is reached with a
+   * thumb and 40px is the height a pointer needs, not a finger.
+   */
+  layout?: 'dialog' | 'page'
 }
 
 export function ApplicationForm({
@@ -105,6 +116,7 @@ export function ApplicationForm({
   onAutofill,
   autofilling = false,
   onDirtyChange,
+  layout = 'dialog',
 }: ApplicationFormProps) {
   const [company, setCompany] = React.useState(job?.company ?? '')
   const [role, setRole] = React.useState(job?.role ?? '')
@@ -234,146 +246,173 @@ export function ApplicationForm({
 
   const submitLabel = job ? 'Save application' : 'Add application'
 
+  // Two columns on the dialog, one on the page. `cols` is applied per group
+  // rather than to one grid wrapping everything, which is what lets a group
+  // like tags-and-tech-stack pair its two fields while the group above it
+  // runs eight.
+  const cols = layout === 'dialog' ? 'sm:grid-cols-2' : undefined
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field id="company" label="company" required>
-          <Input
-            id="company"
-            value={company}
-            onChange={(e) => setCompany(e.target.value)}
-            onBlur={blur('company')}
-            error={errorFor('company')}
-            placeholder="acme"
-          />
-        </Field>
+    <form
+      onSubmit={handleSubmit}
+      className={cn(
+        'flex flex-col gap-8',
+        // A 44px touch target on the page surface, applied at the wrapper
+        // rather than threaded through nineteen className props. The same
+        // arbitrary-variant technique `ApplicationsTable` uses on its header
+        // cells; the alternative is a `size` prop on Input, Select and
+        // Textarea for the sake of one caller.
+        layout === 'page' && '[&_input:not([type=checkbox])]:h-11 [&_select]:h-11'
+      )}
+    >
+      {/*
+        Section 2. Company and role lead it because they are the only two
+        required fields on the record, and a form whose required fields are
+        buried is a form people fail at the last step.
 
-        <Field id="role" label="role" required>
-          <Input
-            id="role"
-            value={role}
-            onChange={(e) => setRole(e.target.value)}
-            onBlur={blur('role')}
-            error={errorFor('role')}
-            placeholder="frontend engineer"
-          />
-        </Field>
+        The group headings are `PanelSection`, the same component the
+        read-only record uses for its panels -- so switching a record from
+        viewing to editing changes the controls and not the typography. Two
+        different heading treatments for the same eleven sections is how the
+        two modes start to look like two screens.
+      */}
+      <PanelSection title="job information" className="border-t-0 pt-0">
+        <div className={cn('grid gap-5', cols)}>
+          <Field id="company" label="company" required>
+            <Input
+              id="company"
+              value={company}
+              onChange={(e) => setCompany(e.target.value)}
+              onBlur={blur('company')}
+              error={errorFor('company')}
+              autoComplete="organization"
+              placeholder="acme"
+            />
+          </Field>
 
-        <Field id="salary_min" label="min salary">
-          <Input
-            id="salary_min"
-            type="number"
-            inputMode="numeric"
-            value={salaryMin}
-            onChange={(e) => setSalaryMin(e.target.value)}
-            onBlur={blur('salary_min')}
-            error={errorFor('salary_min')}
-            placeholder="60000"
-          />
-        </Field>
+          <Field id="role" label="role" required>
+            <Input
+              id="role"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              onBlur={blur('role')}
+              error={errorFor('role')}
+              autoComplete="organization-title"
+              placeholder="frontend engineer"
+            />
+          </Field>
 
-        <Field id="salary_max" label="max salary">
-          <Input
-            id="salary_max"
-            type="number"
-            inputMode="numeric"
-            value={salaryMax}
-            onChange={(e) => setSalaryMax(e.target.value)}
-            onBlur={blur('salary_max')}
-            error={errorFor('salary_max')}
-            placeholder="90000"
-          />
-        </Field>
+          <Field id="salary_min" label="min salary">
+            <Input
+              id="salary_min"
+              type="number"
+              inputMode="numeric"
+              value={salaryMin}
+              onChange={(e) => setSalaryMin(e.target.value)}
+              onBlur={blur('salary_min')}
+              error={errorFor('salary_min')}
+              placeholder="60000"
+            />
+          </Field>
 
-        <Field
-          id="salary_currency"
-          label="currency"
-          hint="figures are stored in this currency and never converted."
-        >
-          <Select
+          <Field id="salary_max" label="max salary">
+            <Input
+              id="salary_max"
+              type="number"
+              inputMode="numeric"
+              value={salaryMax}
+              onChange={(e) => setSalaryMax(e.target.value)}
+              onBlur={blur('salary_max')}
+              error={errorFor('salary_max')}
+              placeholder="90000"
+            />
+          </Field>
+
+          <Field
             id="salary_currency"
-            value={currency}
-            onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
-            error={errorFor('salary_currency')}
+            label="currency"
+            hint="figures are stored in this currency and never converted."
           >
-            {SUPPORTED_CURRENCIES.map((code) => (
-              <option key={code} value={code}>
-                {code}
-              </option>
-            ))}
-          </Select>
-        </Field>
+            <Select
+              id="salary_currency"
+              value={currency}
+              onChange={(e) => setCurrency(e.target.value as SupportedCurrency)}
+              error={errorFor('salary_currency')}
+            >
+              {SUPPORTED_CURRENCIES.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
-        <Field id="status" label="status">
-          <Select
-            id="status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value as JobStatus)}
-          >
-            {STATUSES.map((value) => (
-              <option key={value} value={value}>
-                {STATUS_LABELS[value]}
-              </option>
-            ))}
-          </Select>
-        </Field>
+          <Field id="status" label="status">
+            <Select
+              id="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value as JobStatus)}
+            >
+              {STATUSES.map((value) => (
+                <option key={value} value={value}>
+                  {STATUS_LABELS[value]}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
-        <Field id="date_applied" label="date applied">
-          <Input
-            id="date_applied"
-            type="date"
-            value={dateApplied}
-            onChange={(e) => setDateApplied(e.target.value)}
-            onBlur={blur('date_applied')}
-            error={errorFor('date_applied')}
-          />
-        </Field>
+          <Field id="location" label="location">
+            <Input
+              id="location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              onBlur={blur('location')}
+              error={errorFor('location')}
+              autoComplete="address-level2"
+              placeholder="manila / remote"
+            />
+          </Field>
 
-        <Field id="location" label="location">
-          <Input
-            id="location"
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-            onBlur={blur('location')}
-            error={errorFor('location')}
-            placeholder="manila / remote"
-          />
-        </Field>
+          <Field id="work_mode" label="work mode">
+            <Select
+              id="work_mode"
+              value={workMode}
+              onChange={(e) => setWorkMode(e.target.value as WorkMode | '')}
+            >
+              <option value="">not set</option>
+              {WORK_MODES.map((mode) => (
+                <option key={mode.value} value={mode.value}>
+                  {mode.label}
+                </option>
+              ))}
+            </Select>
+          </Field>
 
-        <Field id="work_mode" label="work mode">
-          <Select
-            id="work_mode"
-            value={workMode}
-            onChange={(e) => setWorkMode(e.target.value as WorkMode | '')}
-          >
-            <option value="">not set</option>
-            {WORK_MODES.map((mode) => (
-              <option key={mode.value} value={mode.value}>
-                {mode.label}
-              </option>
-            ))}
-          </Select>
-        </Field>
+          <Field id="source" label="source">
+            <Input
+              id="source"
+              value={source}
+              onChange={(e) => setSource(e.target.value)}
+              onBlur={blur('source')}
+              error={errorFor('source')}
+              placeholder="LinkedIn"
+            />
+          </Field>
+        </div>
+      </PanelSection>
 
-        <Field id="source" label="source">
-          <Input
-            id="source"
-            value={source}
-            onChange={(e) => setSource(e.target.value)}
-            onBlur={blur('source')}
-            error={errorFor('source')}
-            placeholder="LinkedIn"
-          />
-        </Field>
-
-        <Field id="url" label="posting URL" span>
+      {/* Section 3. Its own group because Auto-fill acts on this one field. */}
+      <PanelSection title="posting url">
+        <Field id="url" label="posting URL">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
             <Input
               id="url"
+              type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
               onBlur={blur('url')}
               error={errorFor('url')}
+              autoComplete="url"
               placeholder="careers.acme.com/123"
             />
             {onAutofill && (
@@ -390,46 +429,79 @@ export function ApplicationForm({
           </div>
           {autofillNote && <p className="text-body-s text-text-muted">{autofillNote}</p>}
         </Field>
+      </PanelSection>
 
-        <Field id="tags" label="tags">
-          <Input
-            id="tags"
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            onBlur={blur('tags')}
-            error={errorFor('tags')}
-            placeholder="new-grad, fintech"
-          />
-        </Field>
+      {/* Section 4. One comma-separated input each, never a chip editor: the
+          value is a list the user types in one go, and splitting it into an
+          add-a-tag control would be three interactions for what is one. */}
+      <PanelSection title="tags and tech stack">
+        <div className={cn('grid gap-5', cols)}>
+          <Field id="tags" label="tags" hint="separated by commas.">
+            <Input
+              id="tags"
+              value={tagsInput}
+              onChange={(e) => setTagsInput(e.target.value)}
+              onBlur={blur('tags')}
+              error={errorFor('tags')}
+              placeholder="new-grad, fintech"
+            />
+          </Field>
 
-        <Field id="tech_stack" label="tech stack">
-          <Input
-            id="tech_stack"
-            value={techInput}
-            onChange={(e) => setTechInput(e.target.value)}
-            onBlur={blur('tech_stack')}
-            error={errorFor('tech_stack')}
-            placeholder="react, postgres"
-          />
-        </Field>
-
-        <div className="flex items-center gap-2 sm:col-span-2">
-          <input
-            id="is_referral"
-            type="checkbox"
-            checked={isReferral}
-            onChange={(e) => setIsReferral(e.target.checked)}
-            className="h-4 w-4 rounded-none border-border-default accent-accent-default"
-          />
-          <label htmlFor="is_referral" className="text-body-m text-text-primary">
-            came through a referral
-          </label>
+          <Field id="tech_stack" label="tech stack" hint="separated by commas.">
+            <Input
+              id="tech_stack"
+              value={techInput}
+              onChange={(e) => setTechInput(e.target.value)}
+              onBlur={blur('tech_stack')}
+              error={errorFor('tech_stack')}
+              placeholder="react, postgres"
+            />
+          </Field>
         </div>
+      </PanelSection>
 
+      {/* Section 5. shadcn's Checkbox rather than the bare `<input>` this
+          used to be -- it inherits the accent through `--color-primary` and
+          the system border through `--color-input`, and it carries the focus
+          ring the raw input never had. */}
+      <PanelSection title="referral">
+        <div className="flex items-center gap-3">
+          <Checkbox
+            id="is_referral"
+            checked={isReferral}
+            onCheckedChange={(checked) => setIsReferral(checked === true)}
+          />
+          <Label htmlFor="is_referral" className="text-body-m font-normal text-text-primary">
+            came through a referral
+          </Label>
+        </div>
+      </PanelSection>
+
+      {/* Section 6. */}
+      <PanelSection title="date applied">
+        <div className={cn('grid gap-5', cols)}>
+          <Field id="date_applied" label="date applied">
+            <Input
+              id="date_applied"
+              type="date"
+              value={dateApplied}
+              onChange={(e) => setDateApplied(e.target.value)}
+              onBlur={blur('date_applied')}
+              error={errorFor('date_applied')}
+            />
+          </Field>
+        </div>
+      </PanelSection>
+
+      {/* Sections 7 and 11. Both are long text, and both got taller: a
+          pasted job description is hundreds of words and editing it through a
+          six-line window means scrolling a box inside a scrolling dialog.
+          Both keep `resize-y` from Textarea, so the height here is a floor
+          and not a cap. */}
+      <PanelSection title="job description">
         <Field
           id="description"
           label="job description"
-          span
           hint="pasted in full, this is what the ATS keyword match reads."
         >
           <Textarea
@@ -438,24 +510,26 @@ export function ApplicationForm({
             onChange={(e) => setDescription(e.target.value)}
             onBlur={blur('description')}
             error={errorFor('description')}
-            className="min-h-32"
+            className="min-h-48"
           />
         </Field>
+      </PanelSection>
 
-        <Field id="notes" label="notes" span>
+      <PanelSection title="notes">
+        <Field id="notes" label="notes">
           <Textarea
             id="notes"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
             onBlur={blur('notes')}
             error={errorFor('notes')}
+            className="min-h-32"
           />
         </Field>
-      </div>
+      </PanelSection>
 
-      <div className="flex flex-col gap-5 border-t border-border-subtle pt-6">
-        <h3 className="text-label-caps uppercase text-text-secondary">contact</h3>
-        <div className="grid gap-5 sm:grid-cols-2">
+      <PanelSection title="contact">
+        <div className={cn('grid gap-5', cols)}>
           <Field id="contact_name" label="name">
             <Input
               id="contact_name"
@@ -463,6 +537,7 @@ export function ApplicationForm({
               onChange={(e) => setContactName(e.target.value)}
               onBlur={blur('contact_name')}
               error={errorFor('contact_name')}
+              autoComplete="name"
               placeholder="recruiter or hiring manager"
             />
           </Field>
@@ -475,11 +550,12 @@ export function ApplicationForm({
               onChange={(e) => setContactEmail(e.target.value)}
               onBlur={blur('contact_email')}
               error={errorFor('contact_email')}
+              autoComplete="email"
               placeholder="name@acme.com"
             />
           </Field>
 
-          <Field id="contact_linkedin" label="LinkedIn" span>
+          <Field id="contact_linkedin" label="LinkedIn" span={layout === 'dialog'}>
             <Input
               id="contact_linkedin"
               value={contactLinkedin}
@@ -490,7 +566,7 @@ export function ApplicationForm({
             />
           </Field>
 
-          <Field id="contact_notes" label="contact notes" span>
+          <Field id="contact_notes" label="contact notes" span={layout === 'dialog'}>
             <Textarea
               id="contact_notes"
               value={contactNotes}
@@ -500,7 +576,7 @@ export function ApplicationForm({
             />
           </Field>
         </div>
-      </div>
+      </PanelSection>
 
       {formError && (
         <p role="alert" className="text-body-s text-status-rejected-mark">
@@ -508,7 +584,20 @@ export function ApplicationForm({
         </p>
       )}
 
-      <div className="flex items-center gap-3 border-t border-border-subtle pt-6">
+      {/*
+        The actions stay at the foot of the form on both surfaces. On the
+        page they are sticky to the bottom of the viewport instead, so a
+        nineteen-field form on a phone does not require scrolling to the end
+        to find Save -- the one place the two layouts differ in more than
+        column count.
+      */}
+      <div
+        className={cn(
+          'flex items-center gap-3 border-t border-border-subtle pt-6',
+          layout === 'page' &&
+            'sticky bottom-0 -mx-5 bg-bg-canvas px-5 pb-5 [&_button]:h-11 [&_button]:flex-1'
+        )}
+      >
         <Button type="submit" disabled={saving}>
           {saving && <CssSpinner size={14} />}
           {saving ? 'Saving' : submitLabel}

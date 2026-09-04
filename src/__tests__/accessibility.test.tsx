@@ -40,7 +40,26 @@ describe('accessibility checks', () => {
       expect(name.trim().length, 'Buttons should have accessible names').toBeGreaterThan(0)
     }
 
-    // Sanity: the form names itself
-    expect(screen.getByRole('heading', { level: 2 })).toBeTruthy()
+    // Sanity: the form names itself, and every group inside it names itself
+    // too. It went from one heading to nine when the flat fourteen-field grid
+    // was split into the record's own sections -- so this asserts the group
+    // names rather than a count, which would be a number nobody could read a
+    // reason into.
+    const headings = screen
+      .getAllByRole('heading', { level: 2 })
+      .map((h) => h.textContent?.trim())
+    expect(headings).toContain('New application')
+    for (const group of [
+      'job information',
+      'posting url',
+      'tags and tech stack',
+      'referral',
+      'date applied',
+      'job description',
+      'notes',
+      'contact',
+    ]) {
+      expect(headings).toContain(group)
+    }
   })
 })

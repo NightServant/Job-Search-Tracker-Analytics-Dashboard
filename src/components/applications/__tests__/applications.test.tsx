@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApplicationsPage } from '../ApplicationsPage'
 import { ApplicationForm } from '../ApplicationForm'
@@ -8,6 +8,12 @@ import { StatusTabs, STATUS_TABS, type StatusTabValue } from '../StatusTabs'
 import { ApplicationsTable } from '../ApplicationsTable'
 import { makeJob } from '@/test/fixtures'
 import type { Job } from '@/types'
+
+// The desktop/mobile fork. jsdom reports a 1024px window, so `useIsMobile` is
+// false unless a test says otherwise -- desktop is the default here, and the
+// mobile branch is opted into explicitly.
+const useIsMobileMock = vi.hoisted(() => vi.fn(() => false))
+vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: useIsMobileMock }))
 
 const JOBS: Job[] = [
   makeJob({ id: '1', status: 'wishlist', company: 'Initech' }),
@@ -19,6 +25,120 @@ const JOBS: Job[] = [
 ]
 
 afterEach(() => cleanup())
+
+describe('opening one application', () => {
+  // THE POINT OF THE WHOLE REFACTOR, and the part nothing else asserts: on
+  // desktop a row opens the record here, in a dialog, instead of navigating
+  // to a second screen. On a phone it still navigates, to the full-screen
+  // page that replaced that screen.
+
+  it('opens the record in a dialog instead of navigating, on desktop', async () => {
+    useIsMobileMock.mockReturnValue(false)
+    render(<ApplicationsPage jobs={JOBS} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+
+    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByRole('heading', { name: JOBS[0].role })).toBeTruthy()
+    // VIEWING, not editing. A click on a row is a request to read it.
+    expect(within(dialog).queryByRole('button', { name: /save application/i })).toBeNull()
+    expect(within(dialog).getByRole('button', { name: 'edit' })).toBeTruthy()
+  })
+
+  it('leaves the row a real link, so cmd-click still opens a new tab', () => {
+    // The interception is on the plain left-click only. Rendering a <button>
+    // here would take away cmd-click, middle-click and "open in new tab" on a
+    // row whose href is a genuine, shareable address.
+    useIsMobileMock.mockReturnValue(false)
+    render(<ApplicationsPage jobs={JOBS} />)
+    const link = screen.getByRole('link', { name: 'Initech' })
+    expect(link).toHaveAttribute('href', '/applications/1')
+
+    fireEvent.click(link, { metaKey: true })
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('navigates rather than opening a dialog, on a phone', () => {
+    // The mobile surface is a route, so back is back and the hardware gesture
+    // keeps working. A dialog at 375px takes that away.
+    useIsMobileMock.mockReturnValue(true)
+    render(<ApplicationsPage jobs={JOBS} />)
+
+    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+
+  it('switches the same dialog from reading to editing, without a second screen', async () => {
+    // The old detail screen's `edit` was a link back to /applications, so
+    // fixing a typo took three navigations. It is a mode switch now.
+    useIsMobileMock.mockReturnValue(false)
+    render(<ApplicationsPage jobs={JOBS} />)
+    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+
+    const dialog = await screen.findByRole('dialog')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'edit' }))
+
+    expect(within(dialog).getByLabelText(/^company/)).toHaveValue('Initech')
+    expect(within(dialog).getByRole('button', { name: /save application/i })).toBeTruthy()
+  })
+
+  it('tells the caller which row is open, so the route can read its history', async () => {
+    // This screen does not fetch. It reports the selection and the route runs
+    // the record's four reads against it -- which is the seam that keeps this
+    // component renderable with no QueryClient.
+    useIsMobileMock.mockReturnValue(false)
+    const onOpenJobChange = vi.fn()
+    render(<ApplicationsPage jobs={JOBS} onOpenJobChange={onOpenJobChange} />)
+
+    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    expect(onOpenJobChange).toHaveBeenLastCalledWith(JOBS[0])
+
+    await screen.findByRole('dialog')
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    await waitFor(() => expect(onOpenJobChange).toHaveBeenLastCalledWith(null))
+  })
+
+  it('closes the record when the row it is showing is deleted out from under it', async () => {
+    // Delete is reachable from inside the dialog, and the confirm stacks on
+    // top of it -- so once the row is gone, what is left underneath is a
+    // record of something that no longer exists, carrying an edit button that
+    // would save it back.
+    useIsMobileMock.mockReturnValue(false)
+    const { rerender } = render(<ApplicationsPage jobs={JOBS} />)
+    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    await screen.findByRole('dialog')
+
+    rerender(<ApplicationsPage jobs={JOBS.filter((job) => job.id !== '1')} />)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('leaves an open record alone when some OTHER row is deleted', async () => {
+    // The companion. Without it, closing on every change to `jobs` would pass
+    // the test above and make the dialog unusable the moment anything else
+    // refetched.
+    useIsMobileMock.mockReturnValue(false)
+    const { rerender } = render(<ApplicationsPage jobs={JOBS} />)
+    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    await screen.findByRole('dialog')
+
+    rerender(<ApplicationsPage jobs={JOBS.filter((job) => job.id !== '5')} />)
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
+  })
+
+  it('closes a record opened for reading on the first Escape, with no discard prompt', async () => {
+    // Viewing is never dirty. A stale `formDirty` from an earlier edit would
+    // otherwise make a read-only record refuse to close.
+    useIsMobileMock.mockReturnValue(false)
+    render(<ApplicationsPage jobs={JOBS} />)
+    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    await screen.findByRole('dialog')
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+    expect(screen.queryByText(/discard unsaved changes/i)).toBeNull()
+  })
+})
 
 describe('ApplicationsPage', () => {
   it('renders the same flat list at every width, not a mobile-only fallback', () => {

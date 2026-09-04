@@ -318,16 +318,18 @@ describe('the closing call to action', () => {
     ).toHaveAttribute('href', '/login')
   })
 
-  it('groups two buttons on top and one beneath them', () => {
-    // THE LAYOUT GABE ASKED FOR, asserted structurally rather than by
-    // classname. The grouping lives in the DOM: the two buttons for a new
-    // visitor share a parent, and the third is that parent's next sibling.
+  it('keeps all three routes together in one row', () => {
+    // ASSERTED STRUCTURALLY rather than by classname, so it describes the
+    // grouping and not my spelling of it.
     //
-    // Reading the classes instead would assert my spelling of the layout and
-    // not the layout -- `flex-wrap` on one row and `flex-col` on the other are
-    // the same string whether or not the buttons are nested correctly. This
-    // fails if somebody flattens all three into a single wrapping row, which
-    // is the exact arrangement this replaced.
+    // This was two rows when it was written -- the two ways in for a new
+    // visitor above, the way back for a returning one below -- and Gabe
+    // flattened it to one on 2026-09-04 (`0038a8b`), which turned the test
+    // red. Updated to what he shipped rather than reverted: the layout is his
+    // call, and a guard that argues with the code is worse than no guard.
+    //
+    // What it still catches is a route going missing or drifting out of the
+    // group, which is the part nobody chose.
     const { container } = renderLanding()
     const section = container.querySelector(
       '[data-landing-section="cta"]'
@@ -337,16 +339,10 @@ describe('the closing call to action', () => {
     const secondary = within(section).getByRole('link', { name: CLOSING_CTA.secondary.label })
     const tertiary = within(section).getByRole('link', { name: CLOSING_CTA.tertiary.label })
 
-    const topRow = primary.parentElement as HTMLElement
-    expect(secondary.parentElement).toBe(topRow)
-    expect(topRow.childElementCount).toBe(2)
-
-    // Beneath, not beside: a sibling of the row rather than a member of it,
-    // and after it in document order -- which is what "at the bottom" means to
-    // a screen reader as much as to a browser.
-    expect(tertiary.parentElement).not.toBe(topRow)
-    expect(tertiary.parentElement).toBe(topRow.parentElement)
-    expect(topRow.compareDocumentPosition(tertiary) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const row = primary.parentElement as HTMLElement
+    expect(secondary.parentElement).toBe(row)
+    expect(tertiary.parentElement).toBe(row)
+    expect(row.childElementCount).toBe(3)
   })
 
   it('keeps exactly one filled button among the three', () => {

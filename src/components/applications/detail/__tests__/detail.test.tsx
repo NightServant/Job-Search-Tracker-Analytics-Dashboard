@@ -6,7 +6,8 @@ import { NextEvent } from '../NextEvent'
 import { JobDescription } from '../JobDescription'
 import { ActivityTimeline } from '../ActivityTimeline'
 import { LinkedCv } from '../LinkedCv'
-import { DetailPage } from '../DetailPage'
+import { ApplicationRecord } from '../../record/ApplicationRecord'
+import { EMPTY_RECORD_DATA } from '../../record/recordData'
 
 afterEach(() => cleanup())
 
@@ -178,28 +179,33 @@ describe('LinkedCv', () => {
   })
 })
 
-describe('DetailPage', () => {
-  it('shows the breadcrumb with the current page as text, not a link', () => {
-    render(<DetailPage job={JOB} />)
-    expect(screen.queryByRole('link', { name: JOB.role })).toBeNull()
-    expect(screen.getByText(JOB.role, { selector: '[aria-current="page"]' })).toBeTruthy()
-  })
+describe.each(['dialog', 'page'] as const)('ApplicationRecord (%s layout)', (layout) => {
+  // BOTH LAYOUTS, from one table. The whole reason the record is one
+  // component with a layout prop is that the desktop dialog and the mobile
+  // page must not drift; a suite that only ever rendered one of them would
+  // let exactly that happen while staying green.
 
-  it('renders Back and Edit as the header action, not the Top Bar', () => {
-    render(<DetailPage job={JOB} />)
-    expect(screen.getByRole('link', { name: 'back' })).toBeTruthy()
-    expect(screen.getByRole('link', { name: 'edit' })).toBeTruthy()
-  })
-
-  it('renders every panel with sensible defaults when only job is given', () => {
-    render(<DetailPage job={JOB} />)
+  it('renders every panel with sensible defaults when there is nothing to show', () => {
+    render(<ApplicationRecord job={JOB} data={EMPTY_RECORD_DATA} layout={layout} />)
     expect(screen.getByText(/no activity logged for this application yet/i)).toBeTruthy()
     expect(screen.getByText(/no cv linked/i)).toBeTruthy()
     expect(screen.getByText(/nothing scheduled/i)).toBeTruthy()
   })
 
   it('passes each panel its own error flag without blanking the other panels', () => {
-    render(<DetailPage job={JOB} activityError linksError nextEventError atsError />)
+    render(
+      <ApplicationRecord
+        job={JOB}
+        data={{
+          ...EMPTY_RECORD_DATA,
+          activityError: true,
+          linksError: true,
+          nextEventError: true,
+          atsError: true,
+        }}
+        layout={layout}
+      />
+    )
     expect(screen.getByText(/could not load activity/i)).toBeTruthy()
     expect(screen.getByText(/could not load the linked cv/i)).toBeTruthy()
     expect(screen.getByText(/could not load the next event/i)).toBeTruthy()
@@ -209,8 +215,41 @@ describe('DetailPage', () => {
     expect(screen.queryByText(/no cv linked/i)).toBeNull()
     expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
     expect(screen.queryByText(/see how closely they match/i)).toBeNull()
-    // The page itself still renders -- a secondary-read failure never blanks
-    // the whole screen.
-    expect(screen.getByRole('heading', { name: JOB.role })).toBeTruthy()
+    // The fields off the jobs row still render -- a secondary-read failure
+    // never blanks the whole record.
+    expect(screen.getByText('posting url')).toBeTruthy()
+  })
+
+  it('shows every section the record is specified to carry', () => {
+    render(<ApplicationRecord job={JOB} data={EMPTY_RECORD_DATA} layout={layout} />)
+    for (const heading of [
+      'job description',
+      'activity',
+      'next event',
+      'linked CV',
+      'ATS match',
+      'notes',
+    ]) {
+      expect(screen.getByRole('heading', { name: heading })).toBeTruthy()
+    }
+  })
+
+  it('says which fields are unset rather than leaving them blank', () => {
+    // A blank value in a grid reads as something that failed to load. Asserted
+    // on work mode specifically because JOB leaves it null.
+    render(<ApplicationRecord job={JOB} data={EMPTY_RECORD_DATA} layout={layout} />)
+    const workMode = screen.getByText('work mode').closest('div')
+    expect(workMode?.textContent).toMatch(/not set/i)
+  })
+
+  it('holds back only the four secondary panels while their reads are in flight', () => {
+    // The fields off the jobs row came with the list and are shown at once;
+    // blanking them too would make opening a record feel like a page load.
+    render(
+      <ApplicationRecord job={JOB} data={{ ...EMPTY_RECORD_DATA, loading: true }} layout={layout} />
+    )
+    expect(screen.getByText('posting url')).toBeTruthy()
+    expect(screen.queryByText(/no activity logged/i)).toBeNull()
+    expect(screen.getByText(/loading this application/i)).toBeTruthy()
   })
 })

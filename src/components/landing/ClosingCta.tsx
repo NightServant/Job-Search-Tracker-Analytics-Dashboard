@@ -64,19 +64,16 @@ export function ClosingCta() {
           <p className={cn('max-w-2xl', LANDING_TYPE.sectionLede)}>{CLOSING_CTA.body}</p>
 
           {/*
-            TWO ROWS, NOT ONE WRAPPING ROW -- Gabe, 2026-09-03. The two ways in
-            for somebody new sit together on top; the way back for somebody
-            who already has an account sits under them.
+            ONE WRAPPING ROW. This was built as two rows -- new visitors above,
+            returning ones below -- and Gabe flattened it back to one on
+            2026-09-04 (`0038a8b`). His call; the note is here so the next
+            reader does not "restore" a split that was deliberately removed.
 
-            `items-start` is what keeps this from becoming three full-width
-            bars. The buttons are in a flex COLUMN, and a column stretches its
-            children by default -- inside a grid track that runs to ~46rem on
-            desktop, that would have given a quiet tertiary link the widest
-            hit area on the page.
+            `items-start` on the outer column still earns its place: it stops
+            the row stretching its children, which inside a grid track running
+            to ~46rem on desktop would give every button the full width.
 
-            The top row still wraps, so at 375px this degrades to three stacked
-            buttons rather than two squeezed ones. The row/column split is the
-            grouping; wrapping is what happens when the group will not fit.
+            The row wraps, so at 375px the three stack rather than squeeze.
           */}
           <div className="flex flex-col items-start gap-3 pt-2">
             <div className="flex flex-wrap items-center gap-3">
@@ -96,24 +93,18 @@ export function ClosingCta() {
                 {CLOSING_CTA.secondary.label}
               </Link>
               {/*
-                SECONDARY, NOT GHOST -- and this was built ghost first, then
-                changed after looking at it.
+                SECONDARY, NOT GHOST -- built ghost first, then changed after
+                looking at it. With no fill and no border it rendered as a
+                stray text link rather than a control, and Gabe asked for a
+                BUTTON.
 
-                Ghost is the textbook variant for a tertiary action, and on the
-                hierarchy argument it was right: filled, outlined, bare, falling
-                off as the audience narrows. But `ghost` here is `text-secondary`
-                on the canvas with no fill and no border, and alone on its own
-                row with nothing to sit beside, it rendered as a stray text link
-                rather than a control. Gabe asked for a BUTTON.
+                With all three now on one row, the filled primary is the only
+                thing carrying hierarchy, which is why it stays the only
+                filled one.
 
-                The row split is already carrying the hierarchy -- new visitors
-                above, returning visitors below -- and one hierarchy device
-                stated clearly beats two stated weakly. The filled primary still
-                takes the eye; this just has to be unmistakably clickable.
-
-                It carries no icon. The arrow on the primary marks the one action
-                that opens something immediately; repeating it here would spend
-                the distinction.
+                It carries no icon. The arrow on the primary marks the one
+                action that opens something immediately; repeating it here
+                would spend the distinction.
               */}
               <Link
                 href={CLOSING_CTA.tertiary.href}

@@ -1,6 +1,8 @@
 'use client'
 
 import * as React from 'react'
+import { Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import {
   useJobs,
   useCreateJob,
@@ -11,6 +13,7 @@ import {
 } from '@/hooks/useJobs'
 import { useToast } from '@/contexts/ToastContext'
 import { ApplicationsPage } from '@/components/applications/ApplicationsPage'
+import { useApplicationRecord } from '@/hooks/useApplicationRecord'
 import { RouteLoading, RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
@@ -42,7 +45,7 @@ function message(err: unknown, fallback: string): string {
  * user without this route needing to gate the whole board on a preferences
  * fetch the way it already gates on the jobs fetch below.
  */
-export default function Page() {
+function ApplicationsRoute() {
   const { data: jobs = [], isLoading, error } = useJobs()
   const { data: prefs = null } = useUserPreferences()
   const createJob = useCreateJob()
@@ -52,6 +55,23 @@ export default function Page() {
   const autofill = useAutofillJobFromUrl()
   const { success, error: showError } = useToast()
   const [pendingDelete, setPendingDelete] = React.useState<Job | null>(null)
+
+  // WHICH RECORD IS OPEN, and its four secondary reads.
+  //
+  // The screen owns the selection and reports it here; this route owns the
+  // reads, the same division every other screen in the app uses. Every query
+  // behind `useApplicationRecord` is `enabled: !!jobId`, so nothing is
+  // fetched at all while the dialog is shut.
+  //
+  // It is kept as the whole `Job` rather than an id because the ATS match
+  // needs the row's `description`, and holding the row avoids a second lookup
+  // through `jobs` on every render.
+  const [openJob, setOpenJob] = React.useState<Job | null>(null)
+  const record = useApplicationRecord(openJob?.id, openJob?.description)
+
+  // A desktop visitor landing on `/applications/<id>` is redirected here with
+  // the id in the query, because that route is the mobile surface now.
+  const openParam = useSearchParams().get('application')
 
   if (isLoading) {
     return <RouteLoading />
@@ -130,6 +150,9 @@ export default function Page() {
         saving={createJob.isPending || updateJob.isPending}
         importing={createJobsBulk.isPending}
         autofilling={autofill.isPending}
+        record={record}
+        onOpenJobChange={setOpenJob}
+        initialOpenId={openParam}
       />
       <ConfirmDialog
         open={pendingDelete !== null}
@@ -143,5 +166,18 @@ export default function Page() {
         onConfirm={confirmDelete}
       />
     </>
+  )
+}
+
+/**
+ * `useSearchParams` opts a client page out of static prerendering, which Next
+ * 15 fails the build over unless the read sits behind a Suspense boundary --
+ * the same wrapper `/cv` needs for the same reason.
+ */
+export default function Page() {
+  return (
+    <Suspense fallback={<RouteLoading />}>
+      <ApplicationsRoute />
+    </Suspense>
   )
 }

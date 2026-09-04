@@ -3,7 +3,6 @@
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { AppDialog } from '@/components/ui/app-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PlusIcon } from '@/components/icons'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
@@ -18,7 +17,8 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from './StatusTabs'
-import { ApplicationForm } from './ApplicationForm'
+import { ApplicationRecordDialog } from './record/ApplicationRecordDialog'
+import type { ApplicationRecordData } from './record/recordData'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
 import type { Job, JobAutofillResult, JobFormData } from '@/types'
@@ -31,7 +31,11 @@ interface CsvImport {
   invalid: number
 }
 
-type FormState = { job: Job | null } | null
+/**
+ * What the record dialog is showing. `job: null` is a new application, which
+ * exists only in `edit` -- there is nothing to view until it is saved.
+ */
+type RecordState = { job: Job | null; mode: 'view' | 'edit' } | null
 
 /**
  * M5 Task 4's removed pagination was 20 a page. Ten instead: at twenty, an
@@ -97,6 +101,24 @@ export interface ApplicationsPageProps {
   saving?: boolean
   importing?: boolean
   autofilling?: boolean
+  /**
+   * The four secondary reads for whichever row is currently open.
+   *
+   * This screen does not fetch them. It reports which row opened through
+   * `onOpenJobChange`, the route runs `useApplicationRecord` against that id,
+   * and the result comes back down here -- which keeps this component a pure
+   * function of its props, renderable in a test with no QueryClient, the same
+   * split the file has always had.
+   */
+  record?: ApplicationRecordData
+  onOpenJobChange?: (job: Job | null) => void
+  /**
+   * Opens this application on mount. Set from `?application=<id>` when a
+   * desktop visitor lands on a `/applications/<id>` link -- that route is the
+   * mobile surface now, so on a wide screen it redirects here and this is how
+   * the intent survives the redirect.
+   */
+  initialOpenId?: string | null
 }
 
 export function ApplicationsPage({
@@ -111,34 +133,86 @@ export function ApplicationsPage({
   saving = false,
   importing = false,
   autofilling = false,
+  record,
+  onOpenJobChange,
+  initialOpenId = null,
 }: ApplicationsPageProps) {
   const [search, setSearch] = React.useState('')
   const [tab, setTab] = React.useState<StatusTabValue>('all')
   const [page, setPage] = React.useState(1)
-  const [form, setForm] = React.useState<FormState>(null)
+  const [open, setOpen] = React.useState<RecordState>(null)
   const [formDirty, setFormDirty] = React.useState(false)
   const [discardOpen, setDiscardOpen] = React.useState(false)
   const [csv, setCsv] = React.useState<CsvImport | null>(null)
   const [skipDuplicates, setSkipDuplicates] = React.useState(true)
   const [parsingCsv, setParsingCsv] = React.useState(false)
 
-  // A dialog adds three ways to dismiss the old inline section never had --
-  // Escape, an overlay click, the header's own close button -- and all three
-  // report through this one handler (Base UI routes every one of them
-  // through onOpenChange). A clean form closes immediately; a dirty one asks
-  // first, so none of the three can silently drop nineteen typed fields the
-  // way an unconditional setForm(null) after a rejected save used to.
+  const openRecord = (job: Job | null, mode: 'view' | 'edit') => {
+    setOpen({ job, mode })
+    // Told, not derived. The route runs the record's four reads against this
+    // id, and it can only do that if it is informed the moment the selection
+    // changes rather than by watching a prop it does not own.
+    onOpenJobChange?.(job)
+  }
+
+  const dismiss = () => {
+    setOpen(null)
+    setFormDirty(false)
+    onOpenJobChange?.(null)
+  }
+
+  // A dialog adds three ways to dismiss that the old inline section never had
+  // -- Escape, an overlay click, the header's own close button -- and all
+  // three report through this one handler (Base UI routes every one of them
+  // through onOpenChange). A clean dialog closes immediately; one with unsaved
+  // edits asks first, so none of the three can silently drop nineteen typed
+  // fields the way an unconditional close after a rejected save used to.
   //
-  // The form's own Cancel button is deliberately NOT routed through this --
-  // it is an explicit "abandon this" action that predates the dialog and
-  // behaved the same way (immediate, no confirmation) in the inline section.
-  const closeForm = () => {
+  // VIEWING IS NEVER DIRTY, so a record opened for reading always closes on
+  // the first Escape. `formDirty` is only ever raised by the form, and the
+  // form is only mounted in edit mode -- but it is also cleared on every
+  // dismiss, because a stale true from a previous edit would otherwise make a
+  // read-only record refuse to close.
+  const closeRecord = () => {
     if (formDirty) {
       setDiscardOpen(true)
       return
     }
-    setForm(null)
+    dismiss()
   }
+
+  // THE OPEN RECORD STOPPED EXISTING. Delete is reachable from inside the
+  // dialog now, and the confirm sits on top of it -- so once the row is gone
+  // from `jobs`, what is underneath is a record of something that no longer
+  // exists, with an edit button that would save it back.
+  //
+  // Keyed on the LIST rather than wired into the delete callback, so it also
+  // covers a row deleted in another tab and arriving through a refetch. When
+  // it fires, `dismiss` sets `open` to null and the next run returns at the
+  // first line, so there is no loop.
+  React.useEffect(() => {
+    const openId = open?.job?.id
+    if (!openId) return
+    if (!jobs.some((candidate) => candidate.id === openId)) dismiss()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [jobs, open?.job?.id])
+
+  // `?application=<id>` from the desktop redirect off `/applications/<id>`.
+  // Runs once per id: re-running it on every render of `jobs` would reopen
+  // the dialog every time the list refetched, including right after the user
+  // closed it.
+  const openedInitial = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!initialOpenId || openedInitial.current === initialOpenId) return
+    const job = jobs.find((candidate) => candidate.id === initialOpenId)
+    if (!job) return
+    openedInitial.current = initialOpenId
+    setOpen({ job, mode: 'view' })
+    onOpenJobChange?.(job)
+    // `jobs` is the only other value read, and it is here so a deep link that
+    // arrives before the list has loaded still opens once it has.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialOpenId, jobs])
 
   // Sorted most-recently-created first. This predates Task 5 and Task 5 does
   // not change it, but it is worth naming now that a single status renders as
@@ -262,8 +336,26 @@ export function ApplicationsPage({
     // onCreate/onUpdate resolve to false on a caught failure rather than
     // throwing, so a rejected save leaves the panel open with every typed
     // field intact instead of discarding them behind a toast.
-    const ok = form?.job ? await onUpdate?.(form.job.id, data) : await onCreate?.(data)
-    if (ok !== false) setForm(null)
+    const editingJob = open?.job ?? null
+    const ok = editingJob ? await onUpdate?.(editingJob.id, data) : await onCreate?.(data)
+    if (ok === false) return
+
+    setFormDirty(false)
+    if (editingJob) {
+      // An EDIT returns to the record it just changed rather than closing.
+      // The dialog is the whole record now, so shutting it after a save would
+      // throw away the context the edit was made in -- and the saved values
+      // are exactly what the reader wants to check.
+      //
+      // It re-reads `job` from the incoming `jobs` prop rather than keeping
+      // the stale row it opened with: the mutation has already invalidated
+      // that cache, so the fresh row is on its way down through props.
+      const fresh = jobs.find((candidate) => candidate.id === editingJob.id) ?? editingJob
+      setOpen({ job: fresh, mode: 'view' })
+      return
+    }
+    // A NEW application has no record to fall back to, so it closes.
+    dismiss()
   }
 
   return (
@@ -272,39 +364,39 @@ export function ApplicationsPage({
         title="applications"
         description="every role you are tracking, from wishlist through to an offer."
         action={
-          <Button size="s" onClick={() => setForm({ job: null })}>
+          <Button size="s" onClick={() => openRecord(null, 'edit')}>
             <PlusIcon size={16} aria-hidden />
             add
           </Button>
         }
       />
 
-      <AppDialog
-        open={form !== null}
-        onOpenChange={(open) => {
-          if (!open) closeForm()
+      <ApplicationRecordDialog
+        open={open !== null}
+        onOpenChange={(next) => {
+          if (!next) closeRecord()
         }}
-        size="l"
-        title={
-          form?.job ? `Edit ${form.job.role} at ${form.job.company}` : 'New application'
-        }
-      >
-        <div data-application-form>
-          {form && (
-            <ApplicationForm
-              key={form.job?.id ?? 'new'}
-              defaultCurrency={defaultCurrency}
-              job={form.job}
-              saving={saving}
-              onSubmit={submit}
-              onCancel={() => setForm(null)}
-              onAutofill={onAutofill}
-              autofilling={autofilling}
-              onDirtyChange={setFormDirty}
-            />
-          )}
-        </div>
-      </AppDialog>
+        job={open?.job ?? null}
+        mode={open?.mode ?? 'view'}
+        onModeChange={(mode) => setOpen((prev) => (prev ? { ...prev, mode } : prev))}
+        data={record}
+        defaultCurrency={defaultCurrency}
+        saving={saving}
+        onSubmit={submit}
+        // Cancel on an EXISTING record goes back to viewing it; on a new one
+        // there is nothing behind the form, so it closes. Either way it is
+        // the explicit "abandon this" action and never raises the discard
+        // prompt, exactly as it behaved before the dialog existed.
+        onCancelEdit={() => {
+          setFormDirty(false)
+          if (open?.job) setOpen({ job: open.job, mode: 'view' })
+          else dismiss()
+        }}
+        onDelete={onDelete}
+        onAutofill={onAutofill}
+        autofilling={autofilling}
+        onDirtyChange={setFormDirty}
+      />
 
       <ConfirmDialog
         open={discardOpen}
@@ -315,8 +407,7 @@ export function ApplicationsPage({
         destructive
         onConfirm={() => {
           setDiscardOpen(false)
-          setFormDirty(false)
-          setForm(null)
+          dismiss()
         }}
       />
 
@@ -367,7 +458,7 @@ export function ApplicationsPage({
             Add the first one by hand, or import the spreadsheet you have been keeping
             instead. Company and role are the only columns an import needs.
           </p>
-          <Button onClick={() => setForm({ job: null })}>
+          <Button onClick={() => openRecord(null, 'edit')}>
             <PlusIcon size={16} aria-hidden />
             add your first application
           </Button>
@@ -389,7 +480,7 @@ export function ApplicationsPage({
                 aria-labelledby={`status-tab-${tab}`}
                 jobs={paged}
                 emptyMessage={emptyListMessage}
-                onEdit={(job) => setForm({ job })}
+                onOpen={openRecord}
                 onDelete={onDelete}
               />
             </CardContent>
