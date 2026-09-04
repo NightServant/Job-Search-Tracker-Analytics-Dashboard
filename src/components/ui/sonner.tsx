@@ -17,8 +17,11 @@ const Toaster = ({ ...props }: ToasterProps) => {
       className="toaster group"
       icons={{
         success: (
+          // One quiet pop as it arrives. sonner renders a fresh node per
+          // toast, so the one-shot keyframe runs once for each -- there is no
+          // ref and no effect to keep in step with the toast's own lifetime.
           <CircleCheckIcon
-            className="size-4 [&_svg]:size-4"
+            className="size-4 [&_svg]:size-4 icon-settle"
           />
         ),
         info: (
@@ -27,8 +30,10 @@ const Toaster = ({ ...props }: ToasterProps) => {
           />
         ),
         warning: (
+          // Two shakes, once. The error tone has no glyph at all (see below),
+          // so this is the only icon in the set that says "no".
           <TriangleAlertIcon
-            className="size-4 [&_svg]:size-4"
+            className="size-4 [&_svg]:size-4 icon-refuse"
           />
         ),
         // No `error` icon. base-nova ships lucide's OctagonX here and

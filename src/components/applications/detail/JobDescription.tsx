@@ -1,5 +1,6 @@
 import * as React from 'react'
 import { ExternalIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { PanelSection } from '@/components/ui/panel-section'
 
 /**
@@ -29,10 +30,10 @@ export function JobDescription({ description, url, className, ...props }: JobDes
             href={url}
             target="_blank"
             rel="noreferrer"
-            className="flex items-center gap-1 text-body-s text-text-secondary hover:text-text-primary hover:underline"
+            className={`${ICON_MOTION_GROUP} flex items-center gap-1 text-body-s text-text-secondary hover:text-text-primary hover:underline`}
           >
             view posting
-            <ExternalIcon size={14} />
+            <ExternalIcon size={14} className={iconMotion('forward', { press: false })} />
           </a>
         ) : undefined
       }

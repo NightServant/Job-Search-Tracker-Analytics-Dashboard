@@ -2,6 +2,7 @@ import * as React from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Button } from '@/components/ui/button'
 import { AlertCircleIcon } from '@/components/icons'
+import { ICON_STATE_MOTION } from '@/components/icons/motion'
 
 /**
  * The route-level loading and error blocks every top-level `page.tsx` under
@@ -76,7 +77,10 @@ export interface RouteErrorProps {
 export function RouteError({ title, message, action }: RouteErrorProps) {
   return (
     <div className="flex flex-col items-center gap-3 py-24 text-center">
-      <AlertCircleIcon size={32} className="text-status-rejected-mark" />
+      <AlertCircleIcon
+        size={32}
+        className={`text-status-rejected-mark ${ICON_STATE_MOTION.refuse}`}
+      />
       <p className="text-body-m text-text-primary">{title}</p>
       <p className="text-body-s text-text-muted">{message}</p>
       {action ?? (

@@ -54,7 +54,7 @@ export const Input = React.forwardRef<HTMLInputElement, InputProps>(
 
     const fieldClassName = cn(
       'h-10 w-full rounded-md border bg-bg-canvas px-3 text-body-m text-text-primary',
-      'placeholder:text-text-muted transition-colors duration-[--duration-fast]',
+      'placeholder:text-text-muted transition-colors duration-(--duration-fast)',
       'focus-visible:outline-none focus-visible:border-accent-default',
       'focus-visible:ring-2 focus-visible:ring-accent-default/30',
       'disabled:cursor-not-allowed disabled:bg-bg-inset disabled:text-text-muted',

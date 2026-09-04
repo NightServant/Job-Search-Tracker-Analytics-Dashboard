@@ -187,7 +187,7 @@ function SidebarNav({
         // the row's height entirely, on every page regardless of length.
         // shrink-0 keeps a wide main from squeezing it; overflow-y-auto is
         // the fallback for a viewport shorter than the nav's own content.
-        'sticky top-0 flex h-screen shrink-0 flex-col gap-8 overflow-y-auto border-r border-border-subtle bg-bg-canvas py-8 transition-[width,padding] duration-[--duration-base] supports-[height:100dvh]:h-dvh',
+        'sticky top-0 flex h-screen shrink-0 flex-col gap-8 overflow-y-auto border-r border-border-subtle bg-bg-canvas py-8 transition-[width,padding] duration-(--duration-base) supports-[height:100dvh]:h-dvh',
         // The expanded state's pl-6 must not carry into the collapsed rail:
         // that 24px offset is what let the mark sit flush left while
         // centred rows (via items-center below) landed elsewhere. Collapsed

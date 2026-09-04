@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { ExternalIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { formatSalaryRange } from '@/services/salary'
 import { formatAppliedDate } from '@/services/date'
 import { cn } from '@/lib/utils'
@@ -165,10 +166,13 @@ export function RecordSummary({ job, layout }: RecordSummaryProps) {
                 href={job.url}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex max-w-full items-center gap-1 break-all text-accent-default underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+                className={cn(
+                  ICON_MOTION_GROUP,
+                  'inline-flex max-w-full items-center gap-1 break-all text-accent-default underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
+                )}
               >
                 <span className="truncate">{job.url}</span>
-                <ExternalIcon size={14} className="shrink-0" aria-hidden />
+                <ExternalIcon size={14} className={cn('shrink-0', iconMotion('forward', { press: false }))} aria-hidden />
               </a>
             ) : (
               <Unset>none saved</Unset>

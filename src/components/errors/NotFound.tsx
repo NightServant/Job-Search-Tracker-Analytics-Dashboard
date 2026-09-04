@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { BrandLockup } from '@/components/ui/brand-mark'
 import { ArrowRightIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 
 /**
  * The 404 page. Figma `Desktop / 404 — Not Found` (1:14, and 117:2395 dark).
@@ -106,20 +107,20 @@ export function NotFound() {
                 href="/dashboard"
                 data-variant="primary"
                 data-cta="dashboard"
-                className={`${buttonVariants({ variant: 'primary', size: 'm' })} group`}
+                className={`${ICON_MOTION_GROUP} ${buttonVariants({ variant: 'primary', size: 'm' })} group`}
               >
                 Return to dashboard
-                <ArrowRightIcon size={16} aria-hidden />
+                <ArrowRightIcon size={16} aria-hidden className={iconMotion('forward')} />
               </Link>
             ) : (
               <Link
                 href="/"
                 data-variant="primary"
                 data-cta="home"
-                className={`${buttonVariants({ variant: 'primary', size: 'm' })} group`}
+                className={`${ICON_MOTION_GROUP} ${buttonVariants({ variant: 'primary', size: 'm' })} group`}
               >
                 Back to the home page
-                <ArrowRightIcon size={16} aria-hidden />
+                <ArrowRightIcon size={16} aria-hidden className={iconMotion('forward')} />
               </Link>
             ))}
         </div>

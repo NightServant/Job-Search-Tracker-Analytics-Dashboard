@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Input } from '@/components/ui/input'
 import { DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
@@ -21,7 +22,7 @@ import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeSe
 import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 
 const TOOLBAR =
-  'h-8 rounded-md border px-3 text-body-s transition-colors duration-[--duration-fast] ' +
+  'h-8 rounded-md border px-3 text-body-s transition-colors duration-(--duration-fast) ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
 
 function ToolbarButton({
@@ -339,7 +340,7 @@ export function WordResumeEditor({
           <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
         )}
         <Button variant="secondary" size="s" onClick={resetTemplate} disabled={!editor}>
-          <RotateCcwIcon size={14} aria-hidden />
+          <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
           reset
         </Button>
         <Button
@@ -351,7 +352,7 @@ export function WordResumeEditor({
           {isSaving ? 'Saving...' : 'Save'}
         </Button>
         <Button size="s" onClick={exportPdf} disabled={!editor || isExporting}>
-          <DownloadIcon size={14} aria-hidden />
+          <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
           {isExporting ? 'Exporting...' : 'Export PDF'}
         </Button>
         <Button
@@ -360,7 +361,7 @@ export function WordResumeEditor({
           aria-label={`Delete ${draft.title}`}
           onClick={() => onDelete(draft.id)}
         >
-          <TrashIcon size={14} aria-hidden />
+          <TrashIcon size={14} aria-hidden className={iconMotion('lid')} />
           delete
         </Button>
       </div>

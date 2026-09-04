@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { BrandLockup } from '@/components/ui/brand-mark'
 import { SettingsIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 
 /**
  * Mobile only. Logo, spacer, Theme Toggle, Settings.
@@ -41,7 +42,7 @@ export function TopBar({
           settingsActive ? 'text-accent-default' : 'text-text-secondary hover:text-text-primary'
         )}
       >
-        <SettingsIcon size={18} />
+        <SettingsIcon size={18} className={iconMotion('turn')} />
       </Link>
       )}
     </header>

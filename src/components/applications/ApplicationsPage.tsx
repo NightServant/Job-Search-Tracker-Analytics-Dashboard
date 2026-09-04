@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { PlusIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
 import { ApplicationsTable } from './ApplicationsTable'
 import { Card, CardContent } from '@/components/ui/card'
@@ -365,7 +366,7 @@ export function ApplicationsPage({
         description="every role you are tracking, from wishlist through to an offer."
         action={
           <Button size="s" onClick={() => openRecord(null, 'edit')}>
-            <PlusIcon size={16} aria-hidden />
+            <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
             add
           </Button>
         }
@@ -459,7 +460,7 @@ export function ApplicationsPage({
             instead. Company and role are the only columns an import needs.
           </p>
           <Button onClick={() => openRecord(null, 'edit')}>
-            <PlusIcon size={16} aria-hidden />
+            <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
             add your first application
           </Button>
         </div>

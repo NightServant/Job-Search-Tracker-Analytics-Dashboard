@@ -19,6 +19,7 @@ import { TrashIcon } from '@/components/icons'
 import { formatAppliedDate } from '@/services/date'
 import { formatSalaryRange } from '@/services/salary'
 import { cn } from '@/lib/utils'
+import { iconMotion } from '@/components/icons/motion'
 import type { Job } from '@/types'
 
 export interface ApplicationsTableProps {
@@ -176,7 +177,7 @@ export function ApplicationsTable({
                         aria-label={`Delete ${job.role} at ${job.company}`}
                         onClick={() => onDelete(job)}
                       >
-                        <TrashIcon size={16} aria-hidden className="[&_svg]:size-4" />
+                        <TrashIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('lid')}`} />
                       </IconButton>
                     )}
                   </div>

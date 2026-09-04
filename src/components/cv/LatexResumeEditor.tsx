@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Input } from '@/components/ui/input'
 import { RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
@@ -295,7 +296,7 @@ export function LatexResumeEditor({
           <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
         )}
         <Button variant="secondary" size="s" onClick={resetTemplate}>
-          <RotateCcwIcon size={14} aria-hidden />
+          <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
           reset
         </Button>
         <Button variant="secondary" size="s" onClick={() => void handleSave()} disabled={isSaving}>
@@ -310,7 +311,7 @@ export function LatexResumeEditor({
           aria-label={`Delete ${draft.title}`}
           onClick={() => onDelete(draft.id)}
         >
-          <TrashIcon size={14} aria-hidden />
+          <TrashIcon size={14} aria-hidden className={iconMotion('lid')} />
           delete
         </Button>
       </div>

@@ -100,7 +100,7 @@ export function ThemeToggle({ size = 32, className, onClick, ...props }: ThemeTo
       aria-label={mounted ? (isDark ? 'Switch to light theme' : 'Switch to dark theme') : 'Switch theme'}
       className={cn(
         'relative grid place-items-center rounded-md text-text-secondary',
-        'transition-colors duration-[--duration-fast] hover:bg-bg-inset hover:text-text-primary',
+        'transition-colors duration-(--duration-fast) hover:bg-bg-inset hover:text-text-primary',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
         'active:scale-95',
         size === 44 ? 'h-11 w-11' : 'h-8 w-8',

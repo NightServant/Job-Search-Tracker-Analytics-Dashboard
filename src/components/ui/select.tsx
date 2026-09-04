@@ -36,7 +36,7 @@ export const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             data-error={error ? '' : undefined}
             className={cn(
               'h-10 w-full appearance-none rounded-md border bg-bg-canvas pl-3 pr-9',
-              'text-body-m text-text-primary transition-colors duration-[--duration-fast]',
+              'text-body-m text-text-primary transition-colors duration-(--duration-fast)',
               'focus-visible:outline-none focus-visible:border-accent-default',
               'focus-visible:ring-2 focus-visible:ring-accent-default/30',
               'disabled:cursor-not-allowed disabled:bg-bg-inset disabled:text-text-muted',

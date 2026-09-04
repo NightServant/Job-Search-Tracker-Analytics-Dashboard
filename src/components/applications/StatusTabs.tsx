@@ -87,7 +87,7 @@ export function StatusTabs({ value, onChange, counts, panelId, className }: Stat
             aria-controls={panelId}
             className={cn(
               'relative h-8 shrink-0 items-center justify-start gap-1.5 whitespace-nowrap rounded-none border-0 px-3 py-0',
-              'text-label-caps uppercase transition-colors duration-[--duration-fast]',
+              'text-label-caps uppercase transition-colors duration-(--duration-fast)',
               'text-text-muted hover:text-text-primary',
               'data-active:bg-transparent data-active:text-text-primary data-active:shadow-none',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',

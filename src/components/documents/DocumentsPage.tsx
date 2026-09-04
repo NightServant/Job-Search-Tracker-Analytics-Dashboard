@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { IconButton } from '@/components/ui/icon-button'
 import { PlusIcon, TrashIcon, UploadIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ModeChooser } from '@/components/cv/ModeChooser'
 import { DocumentRow, DOCUMENT_GRID } from './DocumentRow'
@@ -87,7 +88,7 @@ export function DocumentsPage({
 
   const importButton = (
     <Button variant="secondary" size="s" onClick={() => fileInput.current?.click()}>
-      <UploadIcon size={16} aria-hidden />
+      <UploadIcon size={16} aria-hidden className={iconMotion('raise')} />
       import
     </Button>
   )
@@ -123,7 +124,7 @@ export function DocumentsPage({
             <div className="flex items-center gap-2">
               {importButton}
               <Button size="s" onClick={() => setNewCvOpen(true)}>
-                <PlusIcon size={16} aria-hidden />
+                <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
                 new CV
               </Button>
             </div>
@@ -162,7 +163,7 @@ export function DocumentsPage({
                 onOpenVersions={() => onToggleVersions?.(doc)}
                 actions={
                   <IconButton aria-label={`Delete ${doc.title}`} onClick={() => onDelete?.(doc)}>
-                    <TrashIcon size={16} aria-hidden className="[&_svg]:size-4" />
+                    <TrashIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('lid')}`} />
                   </IconButton>
                 }
               />
@@ -178,7 +179,7 @@ export function DocumentsPage({
               // at all. `import` sits beside it as the other way in.
               <div className="flex flex-wrap items-center justify-center gap-2">
                 <Button size="s" onClick={() => setNewCvOpen(true)}>
-                  <PlusIcon size={16} aria-hidden />
+                  <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
                   new CV
                 </Button>
                 {importButton}

@@ -25,7 +25,7 @@ export interface ModeChooserProps {
 
 const CHOICE =
   'flex flex-col gap-1 border-b border-border-subtle py-4 text-left ' +
-  'transition-colors duration-[--duration-fast] hover:bg-bg-inset ' +
+  'transition-colors duration-(--duration-fast) hover:bg-bg-inset ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default ' +
   'disabled:pointer-events-none disabled:opacity-50'
 

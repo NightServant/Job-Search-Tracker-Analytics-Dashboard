@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { ChevronLeftIcon, TrashIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { ApplicationForm } from '../ApplicationForm'
 import { ApplicationRecord } from './ApplicationRecord'
 import { EMPTY_RECORD_DATA, type ApplicationRecordData } from './recordData'
@@ -76,7 +77,7 @@ export function ApplicationRecordScreen({
         className={cnBack}
         aria-label="Back to applications"
       >
-        <ChevronLeftIcon size={18} aria-hidden />
+        <ChevronLeftIcon size={18} aria-hidden className={iconMotion('back')} />
         applications
       </Link>
 
@@ -121,7 +122,7 @@ export function ApplicationRecordScreen({
                 onClick={() => onDelete(job)}
                 aria-label={`Delete ${job.role} at ${job.company}`}
               >
-                <TrashIcon size={16} aria-hidden />
+                <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
                 delete
               </Button>
             )}
@@ -139,4 +140,4 @@ export function ApplicationRecordScreen({
  * at module scope because it is a pure function over strings and the classes
  * never change with props.
  */
-const cnBack = `${buttonVariants({ variant: 'ghost', size: 's' })} h-11 w-fit -ml-3 gap-2`
+const cnBack = `${ICON_MOTION_GROUP} ${buttonVariants({ variant: 'ghost', size: 's' })} h-11 w-fit -ml-3 gap-2`

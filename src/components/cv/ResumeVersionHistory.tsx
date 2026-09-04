@@ -13,6 +13,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { ChevronDownIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { useToast } from '@/contexts/ToastContext'
 import {
   getSnapshots,
@@ -190,7 +191,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
                       // it is a no-op dressed up as an action.
                       disabled={isRestoring || index === 0}
                     >
-                      <RotateCcwIcon size={14} aria-hidden />
+                      <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
                       {isRestoring ? 'restoring...' : 'restore'}
                     </Button>
                     <Button
@@ -199,7 +200,7 @@ export function ResumeVersionHistory({ resumeId, userId, onRestore }: ResumeVers
                       aria-label={`Remove ${versionLabel(snapshot)}`}
                       onClick={() => handleDelete(snapshot.id)}
                     >
-                      <TrashIcon size={14} aria-hidden />
+                      <TrashIcon size={14} aria-hidden className={iconMotion('lid')} />
                       remove
                     </Button>
                   </div>

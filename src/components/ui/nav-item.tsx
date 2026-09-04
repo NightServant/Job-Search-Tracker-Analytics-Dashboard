@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import type { IconName } from '@/components/icons'
 import { icons } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion, type IconMotion } from '@/components/icons/motion'
 import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 
 /**
@@ -45,6 +46,29 @@ import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip
  * colour instead of drawing a box, which keeps keyboard focus visible
  * without inventing a second visual language.
  */
+/**
+ * WHAT EACH DESTINATION'S ICON DOES ON HOVER, FOCUS AND PRESS.
+ *
+ * FIVE OF THE SIX ARE THE SAME GESTURE, and that is the design decision, not
+ * an unfinished map. Overview, applications, calendar, documents and analytics
+ * are one kind of thing -- a place you go -- and in this system one kind of
+ * thing looks like one kind of thing. Giving each of them its own little dance
+ * would imply a difference between them that does not exist, and five
+ * different animations firing down one sidebar is the "decorative" the brief
+ * rules out. `lift` is a single pixel: felt rather than seen, which is the
+ * only thing "subtle" can mean for something that fires on every row.
+ *
+ * SETTINGS IS THE EXCEPTION because the gear is the one nav glyph whose own
+ * form describes a motion. Turning it 45 degrees -- one detent, not a spin --
+ * is the least arbitrary thing that icon can do, and it is also the only nav
+ * entry that is chrome rather than a section of the product.
+ *
+ * Anything not named here gets `lift`. A new destination is a destination.
+ */
+const NAV_ICON_MOTION: Partial<Record<IconName, IconMotion>> = {
+  Settings: 'turn',
+}
+
 export interface NavItemProps {
   href: string
   label: string
@@ -72,6 +96,7 @@ export function NavItem({
   className,
 }: NavItemProps) {
   const Icon = icons[icon]
+  const motionClass = iconMotion(NAV_ICON_MOTION[icon] ?? 'lift')
   const bottom = variant === 'bottom'
   const rail = !bottom && collapsed
 
@@ -82,7 +107,13 @@ export function NavItem({
       data-nav-item
       data-active={active ? '' : undefined}
       className={cn(
-        'group relative flex items-center gap-3 outline-none transition-colors duration-[--duration-fast]',
+        // Two groups, both named deliberately. The bare `group` is the one the
+        // active rule and the focus treatment already used; `group/icon` is
+        // the icon vocabulary's, kept separate because Tailwind's unnamed
+        // `group-hover:` matches ANY `.group` ancestor and these two must not
+        // be able to trigger each other.
+        ICON_MOTION_GROUP,
+        'group relative flex items-center gap-3 outline-none transition-colors duration-(--duration-fast)',
         active
           ? 'text-accent-default'
           : 'text-text-secondary group-focus-visible:text-accent-default hover:text-text-primary focus-visible:text-accent-default',
@@ -132,10 +163,10 @@ export function NavItem({
 
       {rail ? (
         <span className="flex h-full w-full items-center justify-center">
-          <Icon size={20} />
+          <Icon size={20} className={motionClass} />
         </span>
       ) : (
-        <Icon size={20} />
+        <Icon size={20} className={motionClass} />
       )}
 
       <span

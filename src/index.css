@@ -648,6 +648,176 @@ body,
   }
 }
 
+/* --- Icon motion (2026-09-04) --------------------------------------------
+   The hover / focus / press vocabulary. `src/components/icons/motion.ts` names
+   the variants and says which control uses which; this says what each one does.
+
+   WRITTEN AS ORDINARY CSS, NOT AS TAILWIND VARIANTS. The first version used
+   `motion-safe:group-hover/icon:*` utilities and was replaced for two reasons,
+   both found by reading the built stylesheet in a browser rather than the
+   source: `cn()`'s tailwind-merge collapsed the base and press `duration-*`
+   utilities into one and silently dropped the base's timing from every icon in
+   the app, and Tailwind's scanner turned a class name quoted inside a TEST file
+   into a real, ungated, unused rule in production CSS. Neither is possible when
+   the declaration is the transform.
+
+   A NOTE FOR WHOEVER MEASURES THIS NEXT. These transitions appear frozen if the
+   browser pane is hidden: a hidden pane does not tick the compositor, so a
+   transition never leaves its start value and every computed transform reads as
+   identity. That artifact briefly looked like the utilities not working at all.
+   To observe a hover state, disable the transition first, then read
+   getBoundingClientRect() -- which is how the -1px below was confirmed.
+
+   THE TRIGGER IS THE CONTROL, NOT THE GLYPH. This is the whole point of the
+   work. Every icon in this app is an AnimateIcons component whose own hover
+   handler sits on its 20px <div>, so hovering a 200px nav row did nothing
+   unless the pointer happened to cross the icon, and focus and press were
+   never handled at all. `.icon-trigger` goes on the button, link, row or field
+   wrapper; the icon inside it only has to say which gesture it wants.
+
+   TRANSFORMS ONLY. Every declaration below is `transform`, which the
+   compositor can run without a layout pass -- on a six-row sidebar the
+   alternative is six layout passes per pointer move. */
+.icon-motion {
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.icon-trigger:hover .icon-motion-lift,
+.icon-trigger:focus-visible .icon-motion-lift {
+  transform: translateY(-1px);
+}
+
+.icon-trigger:hover .icon-motion-turn,
+.icon-trigger:focus-visible .icon-motion-turn {
+  transform: rotate(45deg);
+}
+
+/* Search alone also answers :focus-within -- its trigger is a FIELD, so the
+   thing that takes focus is the input inside the wrapper, not the wrapper. */
+.icon-trigger:hover .icon-motion-zoom,
+.icon-trigger:focus-visible .icon-motion-zoom,
+.icon-trigger:focus-within .icon-motion-zoom {
+  transform: scale(1.1);
+}
+
+.icon-trigger:hover .icon-motion-open,
+.icon-trigger:focus-visible .icon-motion-open {
+  transform: rotate(90deg);
+}
+
+.icon-trigger:hover .icon-motion-forward,
+.icon-trigger:focus-visible .icon-motion-forward {
+  transform: translateX(2px);
+}
+
+.icon-trigger:hover .icon-motion-back,
+.icon-trigger:focus-visible .icon-motion-back {
+  transform: translateX(-2px);
+}
+
+.icon-trigger:hover .icon-motion-raise,
+.icon-trigger:focus-visible .icon-motion-raise {
+  transform: translateY(-2px);
+}
+
+.icon-trigger:hover .icon-motion-drop,
+.icon-trigger:focus-visible .icon-motion-drop {
+  transform: translateY(2px);
+}
+
+.icon-trigger:hover .icon-motion-lid,
+.icon-trigger:focus-visible .icon-motion-lid {
+  transform: translateY(-1px) rotate(-12deg);
+}
+
+.icon-trigger:hover .icon-motion-edit,
+.icon-trigger:focus-visible .icon-motion-edit {
+  transform: translate(1px, -1px);
+}
+
+/* Last, so it wins over whichever hover gesture is also matching -- :active
+   implies :hover for a pointer, and the press is the more recent fact. */
+.icon-trigger:active .icon-motion-press {
+  transform: scale(0.9);
+  transition-duration: var(--duration-instant);
+}
+
+/* The gate. Returning every transform to `none` rather than shortening it:
+   somebody who asked not to be animated wants the icon to hold still, not to
+   move quickly. Colour transitions are untouched -- a colour change is not
+   motion, and removing it would cost legibility for nothing. */
+@media (prefers-reduced-motion: reduce) {
+  .icon-motion {
+    transition: none;
+  }
+  .icon-trigger:hover .icon-motion,
+  .icon-trigger:focus-visible .icon-motion,
+  .icon-trigger:focus-within .icon-motion,
+  .icon-trigger:active .icon-motion {
+    transform: none;
+  }
+}
+
+/* --- Icon state motion (2026-09-04) --------------------------------------
+   The two icon animations that are NOT hover, and therefore cannot be a
+   Tailwind `:hover` variant: something arrived, or something was refused.
+   The hover/focus/press vocabulary lives in src/components/icons/motion.ts
+   as `motion-safe:` transform utilities; only these two need keyframes.
+
+   THEY ANIMATE THE ICON'S WRAPPER, never anything inside the <svg>. Every
+   glyph in this app is an AnimateIcons component, and motion writes inline
+   transform styles onto the inner <svg> and its groups to hold them at their
+   `initial="normal"` variant. An inline style beats a stylesheet, so a
+   keyframe aimed at a path would silently do nothing. The wrapping <div> is
+   the one element motion does not drive, which is why it is the one this
+   system uses -- and it is also why a stroke-drawing variant is absent here
+   rather than merely unwritten: the stroke lives on a path this cannot reach.
+
+   Fired by the element appearing, so `motion-safe:` cannot gate them --
+   that prefix gates the utility that starts an animation, not an animation
+   started by a mount. A real media query is the only way, and collapsing to
+   `none` is right here (unlike the toast above, which must still arrive and
+   leave): the icon is already in place and the animation only comments on it. */
+.icon-settle {
+  animation: icon-settle var(--duration-base) var(--ease-standard) 1;
+}
+.icon-refuse {
+  animation: icon-refuse var(--duration-base) var(--ease-standard) 1;
+}
+
+@keyframes icon-settle {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Two shakes, three pixels, once. Any longer and it is scolding. */
+@keyframes icon-refuse {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .icon-settle,
+  .icon-refuse {
+    animation: none;
+  }
+}
+
 /* --- App backdrop (M5.5) --------------------------------------------------
    A real photograph: Unsplash photo-1751601454754 by Albert Salim
    (@albertsalim), soft blurred colour blended into an abstract field, under

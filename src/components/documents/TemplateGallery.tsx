@@ -144,7 +144,7 @@ function Thumbnail({ id, mode }: { id: string; mode: ResumeMode }) {
       className={cn(
         'flex aspect-[3/4] w-32 flex-col gap-1.5 overflow-hidden rounded-sm border p-3',
         'border-border-subtle bg-bg-canvas',
-        'transition-colors duration-[--duration-fast]',
+        'transition-colors duration-(--duration-fast)',
         'group-hover/template:border-accent-default'
       )}
     >

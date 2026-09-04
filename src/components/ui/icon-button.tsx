@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { ICON_MOTION_GROUP } from '@/components/icons/motion'
 
 /**
  * The small square control that hangs beside a row or a card: delete, edit,
@@ -34,8 +35,11 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
       type={type}
       data-icon-button
       className={cn(
+        // The named group its glyph's motion variant listens to. Inert on its
+        // own: nothing happens unless a child asks for `group-hover/icon:`.
+        ICON_MOTION_GROUP,
         'grid h-7 w-9 place-items-center rounded-md text-text-muted',
-        'transition-colors duration-[--duration-fast] hover:bg-bg-inset hover:text-text-primary',
+        'transition-colors duration-(--duration-fast) hover:bg-bg-inset hover:text-text-primary',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
         className
       )}

@@ -75,10 +75,39 @@ import { XIcon } from './x'
 import { BriefcaseIcon } from './briefcase'
 export { BriefcaseIcon }
 
-/** Forces this design system's authored 20px default over AnimateIcons' 24px one. */
-function withDefaultSize<P extends { size?: number }>(Component: ComponentType<P>) {
+/**
+ * Forces this design system's authored 20px default over AnimateIcons' 24px
+ * one, and TURNS THE REGISTRY'S OWN HOVER ANIMATION OFF.
+ *
+ * `isAnimated: false` is the second half of the icon motion work
+ * (2026-09-04). Every glyph here ships a hover animation of its own, and two
+ * things were wrong with leaving them on:
+ *
+ *   1. They fire on the icon's own 20px <div>, not on the control around it,
+ *      so hovering a 200px nav row did nothing unless the pointer crossed the
+ *      glyph. Focus and press were never handled, so the keyboard got no
+ *      feedback at all.
+ *   2. They are 0.6-1.2s springy overshoots -- the plus does
+ *      `scale: [1, 1.2, 0.85, 1], rotate: [0, 10, -10, 0]`, the chevron emits
+ *      a ghost trail. That is a playful consumer aesthetic, and this system is
+ *      Swiss: minimal, fast, and explicitly not decorative.
+ *
+ * ./motion.ts replaces them with one CSS vocabulary driven by the control's
+ * own hover, focus and press. The imperative `startAnimation()` handle each
+ * glyph exposes is untouched and still works, so nothing is lost -- a caller
+ * that genuinely wants the registry's one-shot can still ask for it, and a
+ * caller can pass `isAnimated` back to override this default.
+ *
+ * SCOPED TO THE BARREL. Vendored shadcn primitives -- accordion, combobox,
+ * calendar, pagination -- import their glyphs directly from the source files
+ * and keep the registry's behaviour. Rewriting 39 registry files is a
+ * different change than the one this is.
+ */
+function withDefaultSize<P extends { size?: number; isAnimated?: boolean }>(
+  Component: ComponentType<P>
+) {
   function Sized(props: P) {
-    return createElement(Component, { size: 20, ...props })
+    return createElement(Component, { size: 20, isAnimated: false, ...props })
   }
   const name = (Component as { displayName?: string; name?: string }).displayName
     ?? (Component as { displayName?: string; name?: string }).name

@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { ICON_MOTION_GROUP } from '@/components/icons/motion'
 import { buttonVariants, type ButtonVariantProps } from './button-variants'
 import { CssSpinner } from './css-spinner'
 
@@ -58,7 +59,10 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       // a double submit unrepresentable instead of merely discouraged.
       disabled={disabled || loading}
       aria-busy={loading || undefined}
-      className={cn(buttonVariants({ variant, size }), className)}
+      // ICON_MOTION_GROUP is the named group an icon child's motion variant
+      // listens to. It is inert unless a child asks for `group-hover/icon:`,
+      // so every existing button is unchanged by it.
+      className={cn(ICON_MOTION_GROUP, buttonVariants({ variant, size }), className)}
       {...props}
     >
       {loading && <CssSpinner size={14} />}

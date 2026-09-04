@@ -1,6 +1,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { AlertCircleIcon } from '@/components/icons'
+import { ICON_STATE_MOTION } from '@/components/icons/motion'
 
 /**
  * The hairline-separated section every screen in this system groups content
@@ -59,7 +60,13 @@ export function PanelSection({
       </div>
       {error ? (
         <div className="flex items-start gap-2 text-body-s text-status-rejected-mark">
-          <AlertCircleIcon size={16} className="mt-0.5 shrink-0" />
+          {/* The error branch mounts a fresh node when a read fails, so the
+              one-shot shake runs exactly when the failure appears -- and
+              never again while it sits there being read. */}
+          <AlertCircleIcon
+            size={16}
+            className={cn('mt-0.5 shrink-0', ICON_STATE_MOTION.refuse)}
+          />
           {error}
         </div>
       ) : (

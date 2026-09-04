@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { DownloadIcon, SearchIcon, UploadIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 
 /**
  * Search plus the two CSV controls.
@@ -43,11 +44,17 @@ export function ApplicationsToolbar({
 
   return (
     <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center', className)}>
-      <div className="relative w-full sm:max-w-sm">
+      {/* The group is the FIELD'S WRAPPER, not a button: the lens should
+          react to the box being focused or typed into, which is what
+          `zoom`'s focus-within trigger is for. */}
+      <div className={cn(ICON_MOTION_GROUP, 'relative w-full sm:max-w-sm')}>
         <SearchIcon
           size={16}
           aria-hidden
-          className="pointer-events-none absolute left-3 top-3 text-text-muted"
+          className={cn(
+            'pointer-events-none absolute left-3 top-3 text-text-muted',
+            iconMotion('zoom', { press: false })
+          )}
         />
         <Input
           id="applications-search"
@@ -80,11 +87,11 @@ export function ApplicationsToolbar({
           onClick={() => fileRef.current?.click()}
           disabled={importBusy}
         >
-          {importBusy ? <CssSpinner size={14} /> : <UploadIcon size={16} aria-hidden />}
+          {importBusy ? <CssSpinner size={14} /> : <UploadIcon size={16} aria-hidden className={iconMotion('raise')} />}
           Import CSV
         </Button>
         <Button variant="secondary" size="s" onClick={onExport} disabled={exportDisabled}>
-          <DownloadIcon size={16} aria-hidden />
+          <DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />
           export CSV
         </Button>
       </div>

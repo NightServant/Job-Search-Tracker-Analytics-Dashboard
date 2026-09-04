@@ -129,7 +129,7 @@ export function SegmentedControl<T extends string>({
               if (!disabled) onChange(option.value)
             }}
             className={cn(
-              'h-9 px-3 text-body-s transition-colors duration-[--duration-fast]',
+              'h-9 px-3 text-body-s transition-colors duration-(--duration-fast)',
               'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
               'disabled:cursor-not-allowed disabled:opacity-50',
               index > 0 && 'border-l border-border-default',

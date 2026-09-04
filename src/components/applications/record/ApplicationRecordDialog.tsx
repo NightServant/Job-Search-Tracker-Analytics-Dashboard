@@ -5,6 +5,7 @@ import { AppDialog } from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { TrashIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { ApplicationForm } from '../ApplicationForm'
 import { ApplicationRecord } from './ApplicationRecord'
 import { EMPTY_RECORD_DATA, type ApplicationRecordData } from './recordData'
@@ -93,7 +94,7 @@ export function ApplicationRecordDialog({
                 onClick={() => onDelete(job)}
                 aria-label={`Delete ${job.role} at ${job.company}`}
               >
-                <TrashIcon size={16} aria-hidden />
+                <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
                 delete
               </Button>
             )}

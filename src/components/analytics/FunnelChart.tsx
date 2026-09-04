@@ -184,7 +184,7 @@ export function FunnelChart({ data }: FunnelChartProps) {
               >
                 <div
                   data-fill={STAGE_FILL[d.stage]}
-                  className="h-full rounded-sm transition-[width] duration-[--duration-base]"
+                  className="h-full rounded-sm transition-[width] duration-(--duration-base)"
                   style={{
                     // A floor so a zero stage is still a visible tick rather
                     // than nothing -- "0 got here" is information.

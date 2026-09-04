@@ -38,7 +38,7 @@ export function JobCard({
     <article
       className={cn(
         'flex flex-col gap-2 rounded-md border border-border-subtle bg-bg-canvas p-3',
-        'transition-colors duration-[--duration-fast] hover:border-border-default',
+        'transition-colors duration-(--duration-fast) hover:border-border-default',
         className
       )}
       {...props}
