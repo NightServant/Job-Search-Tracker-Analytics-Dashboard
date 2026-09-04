@@ -1,16 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
-import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { buttonVariants } from '@/components/ui/button-variants'
-import { Input } from '@/components/ui/input'
 import { RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
+import type { Job } from '@/types'
+import { DocumentWorkspace } from './DocumentWorkspace'
+import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import {
   DEFAULT_LATEX_SOURCE,
@@ -32,6 +31,13 @@ import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeSe
  * `Code2`) resolve to a text button, `RotateCcwIcon` and another text button.
  */
 export interface LatexResumeEditorProps {
+  /**
+   * The user's applications, for the tailoring rail's picker. A PROP, not a
+   * `useJobs()` call: the route owns every read in this app, which is what
+   * keeps the editors renderable in a test with no QueryClient.
+   */
+  jobs?: Job[]
+
   draft: ResumeDraft
   backHref: string
   onDelete: (draftId: string) => void
@@ -48,6 +54,7 @@ export function LatexResumeEditor({
   backHref,
   onDelete,
   onPersistDraft,
+  jobs = [],
 }: LatexResumeEditorProps) {
   const { user } = useAuth()
   const { success, error: showError, info } = useToast()
@@ -273,6 +280,12 @@ export function LatexResumeEditor({
   // applyTemplate and its dropdown are gone -- templates are chosen on
   // /documents now, before the document exists. See WordResumeEditor for why.
 
+  // The tailoring rails read the LaTeX SOURCE as their CV text. That is the
+  // honest input: it is what the author is editing and what compiles, and the
+  // scorer counts words rather than parsing TeX -- a control sequence is not a
+  // keyword either way.
+  const tailoring = useCvTailoring({ cvText: latexSource, jobs })
+
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'latex') {
       setSource((content as { source: string }).source)
@@ -281,30 +294,37 @@ export function LatexResumeEditor({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="LaTeX CV"
-        action={
-          <Link href={backHref} className={buttonVariants({ variant: 'ghost', size: 's' })}>
-            back
-          </Link>
-        }
-      />
-
-      <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
-        {user && (
-          <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
-        )}
-        <Button variant="secondary" size="s" onClick={resetTemplate}>
-          <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
-          reset
-        </Button>
-        <Button variant="secondary" size="s" onClick={() => void handleSave()} disabled={isSaving}>
-          {isSaving ? 'Saving...' : 'Save'}
-        </Button>
-        <Button variant="secondary" size="s" onClick={copyLatex}>
-          copy LaTeX
-        </Button>
+    <DocumentWorkspace
+      kindLabel="latex"
+      documentsHref={backHref}
+      title={title}
+      onTitleChange={(next) => {
+        setTitle(next)
+        markDirty()
+      }}
+      savedLabel={formatSaveTime(lastSavedAt)}
+      dirty={isDirty}
+      actions={
+        <>
+          {user && (
+            <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
+          )}
+          <Button variant="ghost" size="s" onClick={resetTemplate}>
+            <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
+            reset
+          </Button>
+          <Button variant="ghost" size="s" onClick={copyLatex}>
+            copy LaTeX
+          </Button>
+          {/* Save is primary here for the same reason it is in the Word
+              editor: in an editor the verb is Save, and it was previously the
+              only plain-text control in a row of outlined ones. */}
+          <Button size="s" onClick={() => void handleSave()} disabled={isSaving}>
+            {isSaving ? 'saving' : 'save'}
+          </Button>
+        </>
+      }
+      destructiveActions={
         <Button
           variant="ghost"
           size="s"
@@ -314,29 +334,20 @@ export function LatexResumeEditor({
           <TrashIcon size={14} aria-hidden className={iconMotion('lid')} />
           delete
         </Button>
-      </div>
-
-      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_auto]">
-        <label className="block">
-          <span className="text-label-caps uppercase text-text-secondary">CV title</span>
-          <Input
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              markDirty()
-            }}
-            placeholder="untitled CV"
-            className="mt-1"
-          />
-        </label>
-        <p className="text-body-s text-text-muted md:text-right">
-          {formatSaveTime(lastSavedAt)}
-          {isDirty ? <span className="ml-2 text-amber-600">unsaved changes</span> : null}
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-        <div className="flex flex-col gap-2 border-t border-border-subtle pt-4">
+      }
+      leftRail={<TailoringTargetRail state={tailoring} jobs={jobs} />}
+      rightRail={<TailoringAnalysisRail state={tailoring} />}
+    >
+      {/*
+        SOURCE ABOVE PREVIEW, not beside it. Side by side was right when this
+        editor owned the full width; with a tailoring rail either side the
+        middle column is ~980px, and splitting that again gives a monospace
+        LaTeX pane about 470px wide -- narrower than most of the preamble
+        lines it has to show, so every one of them wraps. Stacked, each gets
+        the whole column, and the order reads as the job does: edit, then look.
+      */}
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-heading-s text-text-primary">LaTeX source</p>
             <span className="tabular text-body-s text-text-muted">{latexSource.length} chars</span>
@@ -346,12 +357,13 @@ export function LatexResumeEditor({
             onChange={(e) => {
               setSource(e.target.value)
             }}
-            className="h-[540px] w-full resize-y rounded-md border border-border-default bg-bg-canvas px-3 py-2 font-mono text-body-s text-text-primary focus-visible:border-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30"
+            className="h-[420px] w-full resize-y rounded-md border border-border-default bg-bg-canvas px-3 py-2 font-mono text-body-s text-text-primary focus-visible:border-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30"
             spellCheck={false}
             aria-label="LaTeX source"
           />
         </div>
-        <div className="flex flex-col gap-2 border-t border-border-subtle pt-4">
+
+        <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between">
             <p className="text-heading-s text-text-primary">preview</p>
             <span className="text-body-s text-text-muted">
@@ -363,11 +375,11 @@ export function LatexResumeEditor({
           <iframe
             title="LaTeX preview"
             srcDoc={previewHtml}
-            className="h-[540px] w-full rounded-md border border-border-default bg-white"
+            className="h-[520px] w-full rounded-md border border-border-default bg-white"
             sandbox="allow-scripts allow-same-origin"
           />
         </div>
       </div>
-    </div>
+    </DocumentWorkspace>
   )
 }

@@ -21,16 +21,26 @@ export interface BreadcrumbProps extends React.HTMLAttributes<HTMLElement> {
 
 export function Breadcrumb({ items, className, ...props }: BreadcrumbProps) {
   return (
-    <nav aria-label="Breadcrumb" className={cn('flex items-center', className)} {...props}>
-      <ol className="flex items-center gap-2 text-body-s">
+    <nav aria-label="Breadcrumb" className={cn('flex min-w-0 items-center', className)} {...props}>
+      <ol className="flex min-w-0 items-center gap-2 text-body-s">
         {items.map((item, i) => {
           const last = i === items.length - 1
+          // THE LAST CRUMB TRUNCATES, the others do not. A trail reads
+          // "documents / word / <this document>": the first two are short
+          // fixed words, the last is a user-supplied filename that can run to
+          // eighty characters. Truncating the whole row would eat the path;
+          // truncating the leaf keeps every ancestor legible and clickable,
+          // which is the part a breadcrumb is actually for. `title` carries
+          // the full text, so what the ellipsis hides stays reachable.
           return (
-            <li key={`${item.label}-${i}`} className="flex items-center gap-2">
+            <li key={`${item.label}-${i}`} className={cn('flex items-center gap-2', last && 'min-w-0')}>
               {last || !item.href ? (
                 <span
                   aria-current={last ? 'page' : undefined}
-                  className={last ? 'text-text-primary' : 'text-text-muted'}
+                  title={last ? item.label : undefined}
+                  className={cn(
+                    last ? 'block min-w-0 truncate text-text-primary' : 'text-text-muted'
+                  )}
                 >
                   {item.label}
                 </span>
@@ -42,7 +52,7 @@ export function Breadcrumb({ items, className, ...props }: BreadcrumbProps) {
                   {item.label}
                 </Link>
               )}
-              {!last && <ArrowRightIcon size={14} className="text-text-muted" />}
+              {!last && <ArrowRightIcon size={14} className="shrink-0 text-text-muted" />}
             </li>
           )
         })}

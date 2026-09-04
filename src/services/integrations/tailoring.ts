@@ -1,0 +1,228 @@
+import type { IntegrationConfig } from './config'
+
+/**
+ * CV tailoring over any OpenAI-compatible chat endpoint.
+ *
+ * WHY IT IS NOT CALLED "NOVORESUME". The brief asked for Novoresume's career
+ * AI tools "via API". They have no API -- no developer docs, no endpoints, no
+ * developer programme; the tools are consumer web pages (checked 2026-09-04).
+ * Gabe's instruction was to use free public APIs instead, so this is written
+ * against the SHAPE those services share rather than against any one of them:
+ * Groq, OpenRouter, Cloudflare Workers AI, Together and a local Ollama all
+ * speak `POST /chat/completions`, and every one of their free tiers has moved
+ * its limits at least once. The provider is therefore two environment
+ * variables and never an import.
+ *
+ * SCORING IS NOT DONE HERE, and that is the important boundary. `atsMatch`
+ * and `atsLint` already compute the score deterministically, in-repo, with
+ * tests -- and a number a user is going to act on should not come back
+ * different every time it is asked for. The model is used only for the part
+ * that genuinely needs language: rewriting a summary, rewriting bullets, and
+ * naming which missing keyword belongs in which section.
+ *
+ * NEVER THROWS. This sits behind a button with a spinner; a rejected promise
+ * there is an unhandled rejection and a control stuck on "tailoring".
+ */
+
+export interface TailoringInput {
+  /** The CV as plain text -- whatever the editor currently holds. */
+  cvText: string
+  jobDescription: string
+  /** From `atsMatch`, so the model is told what is missing rather than guessing. */
+  missingKeywords?: string[]
+  role?: string
+  company?: string
+}
+
+export interface TailoringSuggestion {
+  /** Which part of the CV this applies to, in the user's own words. */
+  section: string
+  /** What is there now, quoted so the user can find it. */
+  before: string
+  /** The proposed replacement. */
+  after: string
+  /** Why -- one sentence, so a suggestion can be judged rather than trusted. */
+  rationale: string
+}
+
+export type TailoringResult =
+  | { ok: true; summary: string | null; suggestions: TailoringSuggestion[] }
+  | {
+      ok: false
+      reason: 'unconfigured' | 'auth' | 'rate-limit' | 'bad-response' | 'network'
+      message: string
+    }
+
+export interface TailoringClientOptions {
+  config: IntegrationConfig
+  fetchImpl?: typeof fetch
+  timeoutMs?: number
+}
+
+/**
+ * The instruction. Kept as a constant so it is reviewable and diffable rather
+ * than assembled inline at the call site.
+ *
+ * It forbids invention explicitly. A CV that claims experience its owner does
+ * not have is worse than a CV that scores badly -- it fails at the interview
+ * instead of at the filter, and it is the single most likely harm from
+ * pointing a language model at this problem.
+ */
+const SYSTEM_PROMPT = [
+  'You rewrite CV text so it matches a job posting more closely.',
+  'You must not invent experience, employers, dates, qualifications or numbers.',
+  'Only rephrase what the CV already claims, using wording the posting uses.',
+  'If a missing keyword is not supported by anything in the CV, say so in the',
+  'rationale and leave it out rather than inserting it.',
+  'Reply with JSON only, no prose and no code fences, in exactly this shape:',
+  '{"summary": string|null, "suggestions": [{"section": string, "before": string,',
+  '"after": string, "rationale": string}]}',
+].join(' ')
+
+/** Pull a JSON object out of a reply, tolerating fences and stray prose. */
+export function parseTailoringReply(raw: string): TailoringResult {
+  const trimmed = raw.trim()
+  // Models add ```json fences even when told not to. Strip rather than fail:
+  // the alternative is discarding a good answer over its packaging.
+  const unfenced = trimmed.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  const start = unfenced.indexOf('{')
+  const end = unfenced.lastIndexOf('}')
+  if (start === -1 || end <= start) {
+    return { ok: false, reason: 'bad-response', message: 'The model did not return JSON.' }
+  }
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(unfenced.slice(start, end + 1))
+  } catch {
+    return { ok: false, reason: 'bad-response', message: 'The model returned malformed JSON.' }
+  }
+
+  const body = parsed as { summary?: unknown; suggestions?: unknown }
+  const suggestions: TailoringSuggestion[] = Array.isArray(body.suggestions)
+    ? body.suggestions
+        .map((item) => item as Record<string, unknown>)
+        // Every field must be a real string. A suggestion missing its `after`
+        // is a control the user cannot act on, and one missing its rationale
+        // is a change they cannot judge.
+        .filter(
+          (item) =>
+            typeof item?.section === 'string' &&
+            typeof item?.before === 'string' &&
+            typeof item?.after === 'string' &&
+            typeof item?.rationale === 'string'
+        )
+        .map((item) => ({
+          section: String(item.section),
+          before: String(item.before),
+          after: String(item.after),
+          rationale: String(item.rationale),
+        }))
+    : []
+
+  return {
+    ok: true,
+    summary: typeof body.summary === 'string' && body.summary.trim() ? body.summary.trim() : null,
+    suggestions,
+  }
+}
+
+export async function tailorCv(
+  input: TailoringInput,
+  options: TailoringClientOptions
+): Promise<TailoringResult> {
+  const { apiKey, baseUrl, model } = options.config.tailoring
+  if (!apiKey || !baseUrl || !model) {
+    return {
+      ok: false,
+      reason: 'unconfigured',
+      message:
+        'AI tailoring is not configured. Set TAILORING_BASE_URL, TAILORING_API_KEY and TAILORING_MODEL.',
+    }
+  }
+  if (!input.cvText.trim() || !input.jobDescription.trim()) {
+    return {
+      ok: false,
+      reason: 'bad-response',
+      message: 'Tailoring needs both a CV and a job description.',
+    }
+  }
+
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), options.timeoutMs ?? 45_000)
+  const doFetch = options.fetchImpl ?? fetch
+
+  const user = [
+    input.role || input.company ? `Target role: ${input.role ?? ''} ${input.company ?? ''}`.trim() : '',
+    input.missingKeywords?.length
+      ? `Keywords the CV is currently missing: ${input.missingKeywords.join(', ')}`
+      : '',
+    '--- JOB POSTING ---',
+    input.jobDescription,
+    '--- CURRENT CV ---',
+    input.cvText,
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+
+  try {
+    const response = await doFetch(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      signal: controller.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        // Low but not zero: this is a rewriting task where a little variation
+        // helps, and the no-invention rule is carried by the prompt.
+        temperature: 0.3,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: user },
+        ],
+      }),
+    })
+
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, reason: 'auth', message: 'The tailoring provider rejected the API key.' }
+    }
+    // 429 is the ordinary state of a free tier, not an error worth a stack
+    // trace -- so it gets its own reason and its own sentence.
+    if (response.status === 429) {
+      return {
+        ok: false,
+        reason: 'rate-limit',
+        message: 'The free tier is rate-limited right now. Try again in a minute.',
+      }
+    }
+    if (!response.ok) {
+      return {
+        ok: false,
+        reason: 'network',
+        message: `The tailoring provider returned ${response.status}.`,
+      }
+    }
+
+    const body = (await response.json()) as {
+      choices?: { message?: { content?: unknown } }[]
+    }
+    const content = body.choices?.[0]?.message?.content
+    if (typeof content !== 'string') {
+      return { ok: false, reason: 'bad-response', message: 'The provider returned no message.' }
+    }
+    return parseTailoringReply(content)
+  } catch (err) {
+    return {
+      ok: false,
+      reason: 'network',
+      message:
+        err instanceof Error && err.name === 'AbortError'
+          ? 'The tailoring provider took too long.'
+          : 'Could not reach the tailoring provider.',
+    }
+  } finally {
+    clearTimeout(timer)
+  }
+}

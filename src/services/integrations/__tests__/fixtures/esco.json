@@ -1,0 +1,92 @@
+{
+  "javascript": {
+    "total": 6,
+    "_embedded": {
+      "results": [
+        {
+          "title": "JavaScript",
+          "alternativeLabel": {
+            "en": [
+              "JavaScript 1.7",
+              "JavaScript 1.6",
+              "Escript",
+              "CSJS",
+              "Live Script",
+              "Server-side JavaScript",
+              "Mocha",
+              "Live script",
+              "Client-side JavaScript",
+              "JavaScripts"
+            ]
+          }
+        },
+        {
+          "title": "JavaScript Framework",
+          "alternativeLabel": {
+            "en": []
+          }
+        },
+        {
+          "title": "AJAX",
+          "alternativeLabel": {
+            "en": [
+              "Asynchronous Javascript and XML"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "react": {
+    "total": 93,
+    "_embedded": {
+      "results": [
+        {
+          "title": "react to emergency situations in a live performance environment",
+          "alternativeLabel": {
+            "en": [
+              "react to emergency situations appropriately",
+              "react to emergency situations according to procedures",
+              "react to situations of emergency in a live performance environment",
+              "react to situations of emergency in an environment of live performances"
+            ]
+          }
+        },
+        {
+          "title": "react acordingly to unexpected events outdoors",
+          "alternativeLabel": {
+            "en": [
+              "follow up on changing conditions",
+              "develop specific technical outdoor skills",
+              "react appropriately to outdoor unexpected events",
+              "react appropriately unexpected outdoor events"
+            ]
+          }
+        },
+        {
+          "title": "react calmly in stressful situations",
+          "alternativeLabel": {
+            "en": [
+              "stay calm in stressful situations",
+              "remain level headed in stressful circumstances",
+              "react in a calm manner to stressful situations",
+              "remain level headed in stressful conditions",
+              "react calmly to stressful situations",
+              "remain composed in stressful situations",
+              "remain calm in stressful situations",
+              "remain level headed in demanding situations",
+              "remain level headed in demanding circumstances",
+              "react calmly in unexpected situations"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "kubernetes": {
+    "total": 0,
+    "_embedded": {
+      "results": []
+    }
+  }
+}

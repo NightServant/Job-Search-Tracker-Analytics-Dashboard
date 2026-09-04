@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCreateResume, useDeleteResume, useResume, useUpdateResume } from '@/hooks/useResumes'
+import { useJobs } from '@/hooks/useJobs'
 import { useToast } from '@/contexts/ToastContext'
 import { RouteError, RouteLoading } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button-variants'
@@ -47,6 +48,10 @@ const DOCUMENTS = '/documents'
 function CvRoute() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  // For the CV editor's tailoring rail: the applications this CV can be
+  // tailored to. Read at the route, like every other read in this app, so the
+  // editors stay renderable with plain props and no QueryClient.
+  const { data: jobs = [] } = useJobs()
   const draftParam = searchParams.get('draft')
   const isNew = draftParam === 'new'
 
@@ -162,6 +167,9 @@ function CvRoute() {
       <Editor
         key={draft.id}
         draft={draft}
+        // The tailoring rail's application picker. Read here rather than in
+        // the editor, so the editors stay renderable without a QueryClient.
+        jobs={jobs}
         backHref={DOCUMENTS}
         onDelete={(id) => deleteDraft(id)}
         onPersistDraft={persistDraft}

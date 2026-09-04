@@ -28,6 +28,16 @@ const getSnapshotMock = vi.hoisted(() => vi.fn())
 vi.mock('next/navigation', () => ({
   useSearchParams: useSearchParamsMock,
   useRouter: () => ({ replace: routerReplace, push: vi.fn() }),
+  // AppShell reads the path to mark the active nav item. Only the
+  // hides-the-nav test renders the real shell, but the mock is module-wide.
+  usePathname: () => '/cv',
+}))
+
+// The tailoring rail's application picker. Stubbed empty: the rail's own
+// behaviour is covered in CvTailoring's tests, and importing the real hook
+// here would drag a QueryClient into every route-state test.
+vi.mock('@/hooks/useJobs', () => ({
+  useJobs: () => ({ data: [], isLoading: false, error: null }),
 }))
 
 vi.mock('@/hooks/useResumes', () => ({
@@ -67,6 +77,7 @@ vi.mock('@/lib/supabase', () => ({
   hasValidSupabaseConfig: false,
 }))
 
+import { AppShell } from '@/components/shell/AppShell'
 import Page from '../page'
 
 function params(value: string | null) {
@@ -152,7 +163,12 @@ describe('/cv?draft=<id> opens the right editor', () => {
     params('cv-1')
     resolved(wordDraft())
     const { container } = render(<Page />)
-    expect(screen.getByRole('heading', { name: 'Word CV' })).toBeTruthy()
+    // THE HEADING IS THE DOCUMENT'S NAME, not its category. It used to read
+    // "Word CV" while the actual name sat below it in a field labelled CV
+    // TITLE -- a category where a name belongs. "word" is now one crumb of
+    // the path, and the name is the h1.
+    expect(screen.getByRole('heading', { name: /backend cv/i })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'Word CV' })).toBeNull()
     expect(container.querySelector('.ProseMirror')).toBeTruthy()
     expect(container.textContent).toContain('Shipped the rewrite')
     expect((screen.getByLabelText(/cv title/i) as HTMLInputElement).value).toBe('Backend CV')
@@ -310,10 +326,82 @@ describe('the editor chrome carries no lucide glyphs', () => {
   })
 
   it('leaves the drafts list reachable from the editor', () => {
+    // Now the breadcrumb rather than a lone `back` link -- and it matters
+    // MORE than it did, because the sidebar is hidden while a document is
+    // open, so this is the only way out of the editor other than the browser.
     params('cv-1')
     resolved(wordDraft())
     render(<Page />)
-    expect(screen.getByRole('link', { name: /back/i }).getAttribute('href')).toBe('/documents')
+    expect(screen.getByRole('link', { name: 'documents' }).getAttribute('href')).toBe('/documents')
+  })
+
+  it('gives the LaTeX editor the same chrome as the Word one', () => {
+    // Gabe, 2026-09-04: "applied the same layout changes to the LaTeX editor".
+    // Asserted as SAMENESS rather than by re-listing the parts, because the
+    // failure mode here is drift -- the two editors had already grown
+    // different headers once, which is why they now share DocumentWorkspace.
+    params('cv-1')
+    resolved(latexDraft())
+    const { container } = render(<Page />)
+
+    expect(container.querySelector('[data-document-workspace]')).toBeTruthy()
+    // The heading is the document's NAME and it is editable in place -- not a
+    // static category label with the name in a form field below it.
+    //
+    // This fixture is called "LaTeX CV", which is also what the old static
+    // header said, so a name check alone cannot tell the two apart. What
+    // distinguishes them is that the heading is now a field: the first draft
+    // of this test asserted the absence of a "LaTeX CV" heading and failed
+    // against correct code for exactly that reason.
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading.querySelector('input')).toBeTruthy()
+    expect((screen.getByLabelText(/cv title/i) as HTMLInputElement).value).toBe('LaTeX CV')
+    // The category is a crumb on the trail, and the trail is the way back now
+    // that the sidebar is hidden.
+    expect(screen.getByRole('link', { name: 'documents' })).toBeTruthy()
+    expect(screen.getByText('latex')).toBeTruthy()
+    // Both tailoring rails, either side of the source.
+    expect(container.querySelector('[data-tailoring-target]')).toBeTruthy()
+    expect(container.querySelector('[data-tailoring-analysis]')).toBeTruthy()
+  })
+
+  it('puts a tailoring rail on BOTH sides of a Word document', () => {
+    params('cv-1')
+    resolved(wordDraft())
+    const { container } = render(<Page />)
+    expect(container.querySelector('[data-tailoring-target]')).toBeTruthy()
+    expect(container.querySelector('[data-tailoring-analysis]')).toBeTruthy()
+  })
+
+  it('hides the app navigation while a document is open, and restores it after', () => {
+    // Gabe, 2026-09-04: the sidebar goes when a CV is open. Asserted through
+    // the real AppShell rather than by checking a prop, because the mechanism
+    // is that an editor deep in the tree tells the shell.
+    //
+    // THE SHELL STAYS MOUNTED ACROSS THE CHANGE, which is the whole point. An
+    // earlier version of this test unmounted the shell and rendered a second
+    // one -- so the "restores it" half passed against a fresh shell with fresh
+    // state, and kept passing when the release was deleted outright. The case
+    // that actually matters is navigating from the editor to another screen
+    // WITHIN one shell, and that is the only way the cleanup is exercised.
+    params('cv-1')
+    resolved(wordDraft())
+    const { container, rerender } = render(
+      <AppShell>
+        <Page />
+      </AppShell>
+    )
+    expect(container.querySelector('[data-document-workspace]')).toBeTruthy()
+    expect(container.querySelector('nav[aria-label="Main"]')).toBeNull()
+
+    // Navigate away, same shell.
+    rerender(
+      <AppShell>
+        <p>some other screen</p>
+      </AppShell>
+    )
+    expect(container.querySelector('[data-document-workspace]')).toBeNull()
+    expect(container.querySelector('nav[aria-label="Main"]')).toBeTruthy()
   })
 })
 

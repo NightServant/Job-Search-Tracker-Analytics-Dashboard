@@ -1,20 +1,19 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import type { JSONContent } from '@tiptap/core'
 import { cn } from '@/lib/utils'
-import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { buttonVariants } from '@/components/ui/button-variants'
-import { Input } from '@/components/ui/input'
 import { DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
+import type { Job } from '@/types'
+import { DocumentWorkspace } from './DocumentWorkspace'
+import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
@@ -72,6 +71,17 @@ function ToolbarButton({
  * decides what to render, and a CV is linkable.
  */
 export interface WordResumeEditorProps {
+  /**
+   * The user's applications, for the tailoring rail's picker.
+   *
+   * A PROP, NOT A `useJobs()` CALL IN HERE. The route owns every read in this
+   * app -- it is what lets the screens be rendered in a test with plain props
+   * and no QueryClient -- and reaching for the hook here broke exactly that,
+   * in eight tests, the moment it was added. Defaulted so a caller that has
+   * no jobs list still renders.
+   */
+  jobs?: Job[]
+
   draft: ResumeDraft
   backHref: string
   onDelete: (draftId: string) => void
@@ -88,6 +98,7 @@ export function WordResumeEditor({
   backHref,
   onDelete,
   onPersistDraft,
+  jobs = [],
 }: WordResumeEditorProps) {
   const { user } = useAuth()
   const { success, error: showError, info } = useToast()
@@ -313,6 +324,14 @@ export function WordResumeEditor({
   // in the same toolbar. `reset` still restores the starter content, which is
   // the one in-editor case that is genuinely a reset rather than a swap.
 
+  // THE TAILORING RAILS' STATE (Gabe, 2026-09-04). The CV goes to them as
+  // plain text: the scorer counts words and the model rewrites sentences, and
+  // neither has any use for TipTap's node tree. `editor?.getText()` is read on
+  // every render rather than memoised, because it has to follow the document
+  // as it is typed -- a score computed against a stale copy is worse than no
+  // score, since it looks current.
+  const tailoring = useCvTailoring({ cvText: editor?.getText() ?? '', jobs })
+
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'doc') {
       editor?.commands.setContent(content as JSONContent)
@@ -322,39 +341,41 @@ export function WordResumeEditor({
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Word CV"
-        action={
-          <Link
-            href={backHref}
-            className={buttonVariants({ variant: 'ghost', size: 's' })}
-          >
-            back
-          </Link>
-        }
-      />
-
-      <div className="flex flex-wrap items-center gap-2 border-t border-border-subtle pt-4">
-        {user && (
-          <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
-        )}
-        <Button variant="secondary" size="s" onClick={resetTemplate} disabled={!editor}>
-          <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
-          reset
-        </Button>
-        <Button
-          variant="secondary"
-          size="s"
-          onClick={() => void handleSave()}
-          disabled={!editor || isSaving}
-        >
-          {isSaving ? 'Saving...' : 'Save'}
-        </Button>
-        <Button size="s" onClick={exportPdf} disabled={!editor || isExporting}>
-          <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
-          {isExporting ? 'Exporting...' : 'Export PDF'}
-        </Button>
+    <DocumentWorkspace
+      kindLabel="word"
+      documentsHref={backHref}
+      title={title}
+      onTitleChange={(next) => {
+        setTitle(next)
+        markDirty()
+      }}
+      savedLabel={formatSaveTime(lastSavedAt)}
+      dirty={isDirty}
+      actions={
+        <>
+          {user && (
+            <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
+          )}
+          <Button variant="ghost" size="s" onClick={resetTemplate} disabled={!editor}>
+            <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
+            reset
+          </Button>
+          <Button variant="secondary" size="s" onClick={exportPdf} disabled={!editor || isExporting}>
+            <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
+            {isExporting ? 'exporting' : 'export PDF'}
+          </Button>
+          {/*
+            SAVE IS PRIMARY, and Export is not. Before this, Export PDF was the
+            only filled control on the screen while Save was plain text --
+            which told the eye that leaving with a file mattered more than
+            keeping the work. In an editor the verb is Save.
+          */}
+          <Button size="s" onClick={() => void handleSave()} disabled={!editor || isSaving}>
+            {isSaving ? 'saving' : 'save'}
+          </Button>
+        </>
+      }
+      destructiveActions={
         <Button
           variant="ghost"
           size="s"
@@ -364,79 +385,56 @@ export function WordResumeEditor({
           <TrashIcon size={14} aria-hidden className={iconMotion('lid')} />
           delete
         </Button>
+      }
+      tools={
+        <>
+          <ToolbarButton
+            onClick={() => editor?.chain().focus().toggleBold().run()}
+            active={!!editor?.isActive('bold')}
+            disabled={!editor}
+          >
+            bold
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor?.chain().focus().toggleItalic().run()}
+            active={!!editor?.isActive('italic')}
+            disabled={!editor}
+          >
+            italic
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor?.chain().focus().toggleBulletList().run()}
+            active={!!editor?.isActive('bulletList')}
+            disabled={!editor}
+          >
+            bullets
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
+            active={!!editor?.isActive('heading', { level: 1 })}
+            disabled={!editor}
+          >
+            H1
+          </ToolbarButton>
+          <ToolbarButton
+            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
+            active={!!editor?.isActive('heading', { level: 2 })}
+            disabled={!editor}
+          >
+            H2
+          </ToolbarButton>
+        </>
+      }
+      leftRail={<TailoringTargetRail state={tailoring} jobs={jobs} />}
+      rightRail={<TailoringAnalysisRail state={tailoring} />}
+      footnote="letter-style layout preview with 0.8in margins for a print-ready CV."
+    >
+      <div className="mx-auto min-h-[11in] w-full max-w-[8.5in] bg-white">
+        <EditorContent
+          editor={editor}
+          className="min-h-[11in] p-[0.8in] [&_.ProseMirror]:min-h-[9.4in] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
+        />
       </div>
-
-      <div className="grid grid-cols-1 items-end gap-4 md:grid-cols-[1fr_auto]">
-        <label className="block">
-          <span className="text-label-caps uppercase text-text-secondary">CV title</span>
-          <Input
-            value={title}
-            onChange={(e) => {
-              setTitle(e.target.value)
-              markDirty()
-            }}
-            placeholder="untitled CV"
-            className="mt-1"
-          />
-        </label>
-        <p className="text-body-s text-text-muted md:text-right">
-          {formatSaveTime(lastSavedAt)}
-          {isDirty ? <span className="ml-2 text-amber-600">unsaved changes</span> : null}
-        </p>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2 border-y border-border-subtle py-2">
-        <ToolbarButton
-          onClick={() => editor?.chain().focus().toggleBold().run()}
-          active={!!editor?.isActive('bold')}
-          disabled={!editor}
-        >
-          bold
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor?.chain().focus().toggleItalic().run()}
-          active={!!editor?.isActive('italic')}
-          disabled={!editor}
-        >
-          italic
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor?.chain().focus().toggleBulletList().run()}
-          active={!!editor?.isActive('bulletList')}
-          disabled={!editor}
-        >
-          bullets
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-          active={!!editor?.isActive('heading', { level: 1 })}
-          disabled={!editor}
-        >
-          H1
-        </ToolbarButton>
-        <ToolbarButton
-          onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-          active={!!editor?.isActive('heading', { level: 2 })}
-          disabled={!editor}
-        >
-          H2
-        </ToolbarButton>
-      </div>
-
-      {/* The page preview keeps its own white sheet and letter geometry: it is a
-          print proof, not app chrome, so it does not follow the app's theme. */}
-      <div className="overflow-x-auto bg-bg-inset p-4">
-        <div className="mx-auto min-h-[11in] w-full max-w-[8.5in] bg-white">
-          <EditorContent
-            editor={editor}
-            className="min-h-[11in] p-[0.8in] [&_.ProseMirror]:min-h-[9.4in] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
-          />
-        </div>
-      </div>
-
-      <p className="text-body-s text-text-muted">
-        Letter-style layout preview with 0.8in margins for a print-ready CV.
-      </p>
-    </div>
+    </DocumentWorkspace>
   )
 }
