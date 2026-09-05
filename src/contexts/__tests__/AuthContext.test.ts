@@ -107,7 +107,7 @@ describe('Auth Context and RLS Enforcement', () => {
     })
 
     it('filters results by current_user_id in queries', () => {
-      const queryFilter = (jobs: any[], currentUserId: string) => {
+      const queryFilter = (jobs: { user_id: string }[], currentUserId: string) => {
         return jobs.filter((job) => job.user_id === currentUserId)
       }
 
@@ -227,7 +227,9 @@ describe('Auth Context and RLS Enforcement', () => {
         'date_applied',
       ]
 
-      expect(exportFields.every((field) => job.hasOwnProperty(field))).toBe(true)
+      expect(
+        exportFields.every((field) => Object.prototype.hasOwnProperty.call(job, field))
+      ).toBe(true)
     })
 
     it('generates downloadable CSV file', () => {
@@ -336,7 +338,7 @@ describe('Auth Context and RLS Enforcement', () => {
       let session = { user: { id: 'user1' } }
       
       // Session expires
-      session = null as any
+      session = null as unknown as typeof session
 
       // Should redirect to login or show error
       expect(session).toBeNull()
