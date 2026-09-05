@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { authedFetch } from '@/lib/authedFetch'
 
 /**
  * FNV-1a over the source, so the already-compiled check costs a number per
@@ -74,7 +75,9 @@ export function useLatexCompile(options?: {
     async (latex: string) => {
       if (!latex.trim()) return
       setState({ status: 'compiling' })
-      const doFetch = options?.fetchImpl ?? fetch
+      // authedFetch, not fetch: the route is authenticated because a compile
+      // spends FormaTeX quota.
+      const doFetch = options?.fetchImpl ?? authedFetch
       try {
         const response = await doFetch('/api/latex/compile', {
           method: 'POST',

@@ -360,17 +360,35 @@ describe('the editor chrome carries no lucide glyphs', () => {
     // that the sidebar is hidden.
     expect(screen.getByRole('link', { name: 'documents' })).toBeTruthy()
     expect(screen.getByText('latex')).toBeTruthy()
-    // Both tailoring rails, either side of the source.
-    expect(container.querySelector('[data-tailoring-target]')).toBeTruthy()
-    expect(container.querySelector('[data-tailoring-analysis]')).toBeTruthy()
+    // ONE RAIL, BOTH PANELS (Gabe, 2026-09-05). Asserted as a shared ancestor
+    // rather than as mere presence: the change was moving the analysis OUT of
+    // the right rail so the source and preview could have that 320px, and a
+    // presence check passes either way.
+    const target = container.querySelector('[data-tailoring-target]') as HTMLElement
+    const analysis = container.querySelector('[data-tailoring-analysis]') as HTMLElement
+    expect(target).toBeTruthy()
+    expect(analysis).toBeTruthy()
+    expect(target.parentElement).toBe(analysis.parentElement)
+    // And the target comes first: pick what you are tailoring to, then read
+    // how it scores.
+    expect(
+      target.compareDocumentPosition(analysis) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
   })
 
-  it('puts a tailoring rail on BOTH sides of a Word document', () => {
+  it('keeps the Word editor\'s rails on OPPOSITE sides', () => {
+    // The two editors differ deliberately. A Word CV is one block, so the
+    // analysis belongs beside it; the LaTeX editor is already two panes, so a
+    // second rail would squeeze both. Asserted as the difference, so it fails
+    // if either editor drifts into the other's shape.
     params('cv-1')
     resolved(wordDraft())
     const { container } = render(<Page />)
-    expect(container.querySelector('[data-tailoring-target]')).toBeTruthy()
-    expect(container.querySelector('[data-tailoring-analysis]')).toBeTruthy()
+    const target = container.querySelector('[data-tailoring-target]') as HTMLElement
+    const analysis = container.querySelector('[data-tailoring-analysis]') as HTMLElement
+    expect(target).toBeTruthy()
+    expect(analysis).toBeTruthy()
+    expect(target.parentElement).not.toBe(analysis.parentElement)
   })
 
   it('hides the app navigation while a document is open, and restores it after', () => {

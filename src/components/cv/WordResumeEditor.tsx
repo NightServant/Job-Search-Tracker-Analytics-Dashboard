@@ -11,6 +11,7 @@ import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { supabase } from '@/lib/supabase'
+import { authedFetch } from '@/lib/authedFetch'
 import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
 import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
@@ -324,7 +325,7 @@ export function WordResumeEditor({
     if (!editor) return
     setIsExportingDocx(true)
     try {
-      const response = await fetch('/api/cv/docx', {
+      const response = await authedFetch('/api/cv/docx', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: title.trim() || 'CV', content: editor.getJSON() }),

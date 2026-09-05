@@ -354,8 +354,27 @@ export function LatexResumeEditor({
           delete
         </Button>
       }
-      leftRail={<TailoringTargetRail state={tailoring} jobs={jobs} />}
-      rightRail={<TailoringAnalysisRail state={tailoring} />}
+      leftRail={
+        <div className="flex flex-col gap-8">
+          {/*
+            ONE RAIL, BOTH PANELS, STACKED (Gabe, 2026-09-05).
+
+            The analysis used to sit opposite the document, which is right for
+            the Word editor -- the page is a single block and the score belongs
+            beside it. The LaTeX editor is already two panes, so a rail on each
+            side left the source and the preview about 470px apart in the
+            middle: narrower than the preamble lines the source has to show,
+            and too narrow to judge a rendered page.
+
+            Collapsed into the left rail they read in the order they are used
+            anyway -- pick the target, then see how the document scores against
+            it -- and the 320px that was on the right goes to the editor and
+            the preview, which are what this screen is for.
+          */}
+          <TailoringTargetRail state={tailoring} jobs={jobs} />
+          <TailoringAnalysisRail state={tailoring} />
+        </div>
+      }
     >
       {/*
         SOURCE ABOVE PREVIEW, not beside it. Side by side was right when this

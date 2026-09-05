@@ -3,12 +3,12 @@
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import { PanelSection } from '@/components/ui/panel-section'
 import { AtsCheck, type AtsResult } from '@/components/ui/ats-check'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { iconMotion } from '@/components/icons/motion'
 import { ArrowRightIcon } from '@/components/icons'
+import { authedFetch } from '@/lib/authedFetch'
 import { matchKeywords, type KeywordMatch } from '@/services/atsMatch'
 import type { TailoringResult, TailoringSuggestion } from '@/services/integrations/tailoring'
 import type { Job } from '@/types'
@@ -48,9 +48,18 @@ function verdictFor(score: number): AtsResult {
 export interface CvTailoringState {
   jobId: string
   setJobId: (id: string) => void
-  pasted: string
-  setPasted: (text: string) => void
-  /** The posting text in play, whichever source it came from. */
+  /**
+   * The posting being tailored against -- always the selected application's
+   * stored description.
+   *
+   * THE PASTE BOX IS GONE (Gabe, 2026-09-05). It was a second place a posting
+   * could live, and a second place is a fork: paste one thing, select another,
+   * and the rail had to grow a rule about which wins and a sentence explaining
+   * it. An application already has a `description` field, and it is the field
+   * the ATS panel, the record view and the autofill all read. One posting, one
+   * home. If it is missing, the fix is to put it on the application, which is
+   * where every other part of the app will then find it too.
+   */
   description: string
   match: KeywordMatch | null
   running: boolean
@@ -72,7 +81,6 @@ export function useCvTailoring(options: {
   fetchImpl?: typeof fetch
 }): CvTailoringState {
   const [jobId, setJobId] = React.useState('')
-  const [pasted, setPasted] = React.useState('')
   const [running, setRunning] = React.useState(false)
   const [result, setResult] = React.useState<TailoringResult | null>(null)
 
@@ -81,10 +89,7 @@ export function useCvTailoring(options: {
     [options.jobs, jobId]
   )
 
-  // A pasted posting wins over a selected one: pasting is the more recent,
-  // more deliberate act, and a selection left over from earlier should not
-  // silently override what somebody just typed in.
-  const description = pasted.trim() || selectedJob?.description?.trim() || ''
+  const description = selectedJob?.description?.trim() ?? ''
 
   const match = React.useMemo(
     () => (description && options.cvText.trim() ? matchKeywords(options.cvText, description) : null),
@@ -95,7 +100,9 @@ export function useCvTailoring(options: {
     if (!description.trim() || !options.cvText.trim()) return
     setRunning(true)
     setResult(null)
-    const doFetch = options.fetchImpl ?? fetch
+    // authedFetch, not fetch: the route is authenticated because tailoring
+    // spends a metered LLM allowance.
+    const doFetch = options.fetchImpl ?? authedFetch
     try {
       // Through the app's own route, never straight at the provider: the key
       // lives on the server and must not reach the browser.
@@ -121,8 +128,6 @@ export function useCvTailoring(options: {
   return {
     jobId,
     setJobId,
-    pasted,
-    setPasted,
     description,
     match,
     running,
@@ -132,7 +137,7 @@ export function useCvTailoring(options: {
   }
 }
 
-/** LEFT RAIL: what this CV is being tailored to. */
+/** What this CV is being tailored to. */
 export function TailoringTargetRail({ state, jobs }: { state: CvTailoringState; jobs: Job[] }) {
   return (
     <div className="flex flex-col gap-6" data-tailoring-target>
@@ -154,36 +159,17 @@ export function TailoringTargetRail({ state, jobs }: { state: CvTailoringState; 
             />
           </label>
 
-          <label className="flex flex-col gap-1.5">
-            <span className="text-label-caps uppercase text-text-secondary">
-              or paste a posting
-            </span>
-            <Textarea
-              value={state.pasted}
-              onChange={(e) => state.setPasted(e.target.value)}
-              placeholder="paste the job description here"
-              className="min-h-40"
-            />
-          </label>
-
-          {/* A pasted posting wins, and says so rather than leaving the reader
-              to wonder which of the two filled controls is in effect. */}
-          {state.pasted.trim() && state.jobId && (
+          {state.selectedJob && !state.selectedJob.description && (
+            // Not an error, and not a dead end: the description lives on the
+            // application, and putting it there is what makes the ATS panel,
+            // the record view and this rail all work at once.
             <p className="text-body-s text-text-muted">
-              using the pasted posting, not the selected application.
+              that application has no job description saved, so there is nothing to score
+              against. add one on the application.
             </p>
           )}
         </div>
       </PanelSection>
-
-      {state.selectedJob && !state.pasted.trim() && !state.selectedJob.description && (
-        <PanelSection title="no description stored">
-          <p className="text-body-s text-text-muted">
-            that application has no job description saved, so there is nothing to score against.
-            add one on the application, or paste it above.
-          </p>
-        </PanelSection>
-      )}
     </div>
   )
 }

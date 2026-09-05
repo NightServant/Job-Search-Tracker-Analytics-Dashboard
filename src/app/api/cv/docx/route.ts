@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { authenticate } from '@/lib/apiAuth'
 import { buildDocx } from '@/services/integrations/docxExport'
 
 /**
@@ -27,6 +28,16 @@ function safeFileName(title: string): string {
 }
 
 export async function POST(request: Request) {
+  // Authenticated before anything is spent. These routes cost money per
+  // call, so the check comes first -- before parsing the body, before reading
+  // config, before any upstream request.
+  const auth = await authenticate(request)
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, reason: 'unauthorized', message: auth.message }, {
+      status: auth.status,
+    })
+  }
+
   let body: { title?: unknown; content?: unknown }
   try {
     const raw = await request.text()

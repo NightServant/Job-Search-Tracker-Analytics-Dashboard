@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { authenticate } from '@/lib/apiAuth'
 import { readIntegrationConfig, capabilitiesOf } from '@/services/integrations/config'
 import { tailorCv, type TailoringInput } from '@/services/integrations/tailoring'
 
@@ -22,6 +23,16 @@ export const runtime = 'nodejs'
 const MAX_CHARS = 24_000
 
 export async function POST(request: Request) {
+  // Authenticated before anything is spent. These routes cost money per
+  // call, so the check comes first -- before parsing the body, before reading
+  // config, before any upstream request.
+  const auth = await authenticate(request)
+  if (!auth.ok) {
+    return NextResponse.json({ ok: false, reason: 'unauthorized', message: auth.message }, {
+      status: auth.status,
+    })
+  }
+
   const config = readIntegrationConfig()
   if (!capabilitiesOf(config).tailorCv) {
     // 501, not 500: nothing is broken, the capability was never configured,

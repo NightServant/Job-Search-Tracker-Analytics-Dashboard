@@ -198,10 +198,24 @@ export function DocumentWorkspace({
           app's theme, because what is on it has to match what comes out of a
           printer.
         */}
+        {/*
+          THE GRID FOLLOWS WHICH RAILS EXIST.
+
+          Both rails -> three columns, the document between them: what the Word
+          editor wants, where the page is one block and the analysis flanks it.
+
+          Left rail only -> two columns, and the content column is free to
+          split itself. That is what the LaTeX editor wants: it puts source
+          beside preview inside that column, so the screen reads as three --
+          rail, editor, output -- and both panes get real width instead of the
+          ~470px they had when the analysis rail was still taking 320 on the
+          right.
+        */}
         <div
           className={cn(
             'grid gap-6',
-            hasRails && 'xl:grid-cols-[300px_minmax(0,1fr)_320px] xl:gap-8'
+            leftRail && rightRail && 'xl:grid-cols-[300px_minmax(0,1fr)_320px] xl:gap-8',
+            leftRail && !rightRail && 'xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-8'
           )}
         >
           {leftRail && <aside className="min-w-0 xl:order-1">{leftRail}</aside>}

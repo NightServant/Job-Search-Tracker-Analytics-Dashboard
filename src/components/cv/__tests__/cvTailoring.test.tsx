@@ -46,18 +46,20 @@ describe('the tailoring rails', () => {
     expect(screen.getByText(/missing keywords/i)).toBeTruthy()
   })
 
-  it('lets a pasted posting win over a selected one, and says so', async () => {
-    // Pasting is the more recent, more deliberate act. A stale selection
-    // silently overriding what somebody just typed is the confusing outcome,
-    // and two filled controls with no stated precedence is the confusing UI --
-    // so the rail states which one is in effect.
+  it('takes the posting from the application, with no second place to put one', async () => {
+    // THE PASTE BOX IS GONE (Gabe, 2026-09-05). It was a second home for a
+    // posting, and a second home is a fork: this test used to assert which of
+    // the two won and that the rail said so. An application already has a
+    // `description`, and it is the field the ATS panel, the record view and
+    // the autofill all read -- so there is one posting and one place it lives.
     const user = userEvent.setup({ delay: null })
-    render(<Harness cvText="Go and Kubernetes engineer." />)
+    render(<Harness cvText="React and TypeScript developer." />)
+
+    expect(screen.queryByLabelText(/paste a posting/i)).toBeNull()
+    expect(screen.queryByText(/using the pasted posting/i)).toBeNull()
 
     await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
-    await user.type(screen.getByLabelText(/paste a posting/i), 'We need Go and Kubernetes.')
-
-    expect(await screen.findByText(/using the pasted posting/i)).toBeTruthy()
+    expect(await screen.findByText(/%$/)).toBeTruthy()
   })
 
   it('says when the chosen application has no description stored', async () => {
