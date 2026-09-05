@@ -38,9 +38,42 @@ import { scrollToSection } from '@/lib/scrollToSection'
  * navbar's overHero follows, and for the same reason: two components deriving
  * their own idea of the active section is how they end up disagreeing.
  *
- * Hidden below lg. The rail lives in the margin beside a 1200px container, and
- * below lg there is no margin -- it would sit on top of the content. On a
- * phone the scrollbar is the progress indicator and the nav is the jump.
+ * Hidden below 2xl (1440). The rail lives in the MARGIN beside the page's
+ * 1200px container, and the margin is what decides where it can exist: at
+ * 1280 there is 40px a side, which is narrower than the rail's own plate and
+ * far narrower than its hover label, so it sat on top of the content it was
+ * supposed to be beside. At 1440 the margin is 120px, which is the first width
+ * where it is genuinely furniture rather than an overlay.
+ *
+ * It was `lg` (1024), where the margin is NEGATIVE -- the container is already
+ * wider than the viewport minus its gutters -- so every small laptop got a
+ * fixed rail floating over the right-hand edge of the text. Moved to 2xl on
+ * Gabe's instruction (2026-09-05): large laptops and desktops only.
+ *
+ * Below that the page is not left without a sense of position: the scrollbar
+ * is the progress indicator and the navbar is the jump.
+ *
+ * THE LABELS HAVE THEIR OWN, WIDER THRESHOLD, and it is arithmetic rather than
+ * taste. The <ol> is a flex column, so every row is as wide as the widest
+ * label -- 74px for "how it works" -- which makes this component a CONSTANT
+ * 121px box at every viewport: 12 (pl-3) + 7 (dot) + 12 (gap-3) + 74 + 16
+ * (pr-4). With `right-6` that puts its left edge at `100vw - 145`, and the
+ * container's right edge is at `(100vw + 1200) / 2`. The first is only clear of
+ * the second from 1490px up.
+ *
+ * So between 1440 and 1490 a labelled rail necessarily sits on the text, which
+ * is what it was doing. Below 1560 the labels are therefore clipped to zero
+ * width and the rail is dots only -- 35px, with 60px of daylight at 1440. 1560
+ * rather than the bare 1490 leaves ~35px of clearance instead of nothing, so
+ * the labels do not arrive touching the edge of the paragraph beside them, and
+ * a slightly longer label added later does not immediately overlap again.
+ * Recompute it as `1200 + 2 * (145 + clearance)` if the labels change.
+ *
+ * CLIPPED, NOT `hidden`. Zero width plus `overflow-hidden` is the same
+ * mechanism `sr-only` uses: the label contributes nothing to the box and paints
+ * nothing, and stays in the accessibility tree. `display: none` would take the
+ * section names away from a screen reader on exactly the widths where the dots
+ * are all a sighted reader has.
  *
  * `overHero` inverts it for the dark hero, exactly as the navbar does. Without
  * it the rail is a near-black line on near-black footage for the whole first
@@ -94,7 +127,7 @@ export function SectionRail({
       data-over-hero={overHero ? 'true' : 'false'}
       aria-label="Page sections"
       className={cn(
-        'fixed right-6 top-1/2 z-40 hidden -translate-y-1/2 rounded-md py-4 pl-3 pr-4 lg:block',
+        'fixed right-6 top-1/2 z-40 hidden -translate-y-1/2 rounded-md py-4 pl-3 pr-4 2xl:block',
         'transition-colors duration-150 motion-reduce:transition-none',
         // Its own plate over the hero, for the reason the navbar has its own
         // scrim: the rail is pinned to the RIGHT edge, which is precisely
@@ -167,7 +200,9 @@ export function SectionRail({
                 // negative margin, so the dot spacing the fill percentage is
                 // measured against is unchanged. A dot you have to aim at is
                 // not really clickable, which is half of what was reported.
-                className="group -my-2 flex items-center gap-3 py-2 outline-none"
+                // `gap-0` until the labels exist -- a 12px gap after a
+                // zero-width label is 12px of nothing inside a 35px rail.
+                className="group -my-2 flex items-center gap-0 py-2 outline-none min-[1560px]:gap-3"
               >
                 <span
                   aria-hidden
@@ -190,7 +225,8 @@ export function SectionRail({
                   the indicator, and the words are there when you go looking.
                   Opacity rather than conditional rendering, so the label is in
                   the accessibility tree and reachable by screen readers at all
-                  times.
+                  times -- and the same reasoning is why the narrow-viewport
+                  treatment below clips it to zero width rather than hiding it.
                 */}
                 <span
                   className={cn(
@@ -198,6 +234,10 @@ export function SectionRail({
                     'group-hover:opacity-100 group-focus-visible:opacity-100',
                     'motion-reduce:transition-none',
                     active && 'opacity-100',
+                    // Clipped to nothing below 1560, where there is no margin
+                    // to reveal into -- see the docblock for the arithmetic.
+                    // This is what keeps the rail 35px wide and off the text.
+                    'max-w-0 overflow-hidden min-[1560px]:max-w-none min-[1560px]:overflow-visible',
                     overHero ? 'text-white' : 'text-text-secondary'
                   )}
                 >
