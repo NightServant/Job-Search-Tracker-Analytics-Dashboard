@@ -52,3 +52,7 @@ next-env.d.ts
 # TypeScript incremental build cache
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Written by the session-bridge plugin per project; a per-session pointer,
+# not configuration. `.claude/` is otherwise tracked here (launch.json).
+.claude/bridge-session
