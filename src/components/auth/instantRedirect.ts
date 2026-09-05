@@ -2,11 +2,11 @@
  * Does the browser already hold a live session?
  *
  * SELF-CONTAINED ON PURPOSE. This function is serialised with `.toString()`
- * into an inline `<script>` on the landing page (see InstantSignedInRedirect),
- * so it must reference nothing outside its own body -- no imports, no helpers,
- * no closure. If it ever grows a dependency it will still typecheck, still
- * pass its tests, and silently throw in the browser, so the rule is written
- * here rather than assumed.
+ * into an inline `<script>` on `/`, `/login` and `/signup` (see
+ * InstantSignedInRedirect), so it must reference nothing outside its own
+ * body -- no imports, no helpers, no closure. If it ever grows a dependency
+ * it will still typecheck, still pass its tests, and silently throw in the
+ * browser, so the rule is written here rather than assumed.
  *
  * Serialising the real function is what stops the inline script drifting from
  * the logic under test. The alternative -- a hand-written copy in a template
@@ -14,7 +14,7 @@
  * tests.
  *
  * IT DOES NOT VERIFY THE TOKEN, and does not need to. The only decision here
- * is whether to show the marketing page or go straight to the dashboard; the
+ * is whether to show a public page or go straight to the dashboard; the
  * dashboard's own guard, and every API route, still check with Supabase. A
  * forged localStorage entry buys a redirect to a screen that will then refuse
  * to load anything.

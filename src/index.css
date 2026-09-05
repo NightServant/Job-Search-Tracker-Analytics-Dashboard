@@ -954,3 +954,36 @@ body,
      Do not write a glob here: a `*` followed by a `/` closes this comment. */
   aspect-ratio: 1440 / 702;
 }
+
+/* ---------------------------------------------------------------------------
+   Signed-in / signed-out markup
+
+   Both versions of a control are in the HTML and CSS chooses between them, so
+   the choice can be made before the first paint -- see SessionAttributeScript
+   for why that is worth doing and why the DOM is not rewritten instead.
+
+   DELIBERATELY UNLAYERED. Tailwind's `utilities` layer is ordered after
+   everything else, so a `display: none` written inside a layer loses to the
+   `inline-flex` on a button. Unlayered rules beat every layer, which is what
+   makes this work on any element regardless of what it sets.
+
+   `revert-layer` and not a hardcoded `display`, because these attributes say
+   nothing about what the element is. Reverting hands the value back to the
+   layered cascade, so a button goes back to `inline-flex`, a paragraph to
+   `block`, and this file never has to know which.
+
+   IT IS PRESENTATION, NOT ACCESS CONTROL. `data-session` is set from
+   localStorage without verifying anything. Nothing that must not be read may
+   be hidden this way -- it is in the HTML either way.
+--------------------------------------------------------------------------- */
+[data-when-signed-in] {
+  display: none;
+}
+
+:root[data-session='live'] [data-when-signed-in] {
+  display: revert-layer;
+}
+
+:root[data-session='live'] [data-when-signed-out] {
+  display: none;
+}

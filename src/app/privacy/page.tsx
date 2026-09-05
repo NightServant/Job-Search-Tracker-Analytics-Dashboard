@@ -1,8 +1,9 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
-import { buttonVariants } from '@/components/ui/button-variants'
 import { BrandLockup } from '@/components/ui/brand-mark'
-import { ArrowRightIcon } from '@/components/icons'
+import { HomeOrDashboardLink } from '@/components/auth/HomeOrDashboardLink'
+import { SessionAttributeScript } from '@/components/auth/SessionAttributeScript'
+import { SessionAttributeSync } from '@/components/auth/SessionAttributeSync'
 
 export const metadata: Metadata = {
   // Just 'Privacy'. The root layout's title.template appends the product name,
@@ -103,6 +104,10 @@ const SECTIONS = [
 export default function Page() {
   return (
     <div className="flex min-h-screen flex-col bg-bg-canvas">
+      {/* First, so the header below is right on its first paint rather than
+          corrected a beat later. */}
+      <SessionAttributeScript />
+      <SessionAttributeSync />
       {/*
         Same container as the body below, so the lockup and the H1 share a
         vertical line at every width.
@@ -120,14 +125,7 @@ export default function Page() {
           <Link href="/" aria-label="Worktrack home">
             <BrandLockup />
           </Link>
-          <Link
-            href="/"
-            data-variant="secondary"
-            className={`${buttonVariants({ variant: 'secondary', size: 's' })} group`}
-          >
-            Back to the home page
-            <ArrowRightIcon size={14} aria-hidden />
-          </Link>
+          <HomeOrDashboardLink />
         </div>
       </header>
 

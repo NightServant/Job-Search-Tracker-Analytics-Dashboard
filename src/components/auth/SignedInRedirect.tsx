@@ -5,7 +5,13 @@ import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 
 /**
- * Sends a signed-in visitor from `/` to `/dashboard`.
+ * Sends a signed-in visitor from a public route to `/dashboard`.
+ *
+ * THREE ROUTES MOUNT IT: `/`, `/login` and `/signup`. On the auth pages it
+ * is doing more work than on the landing page, because signing in IS a state
+ * change that happens while the page is open -- the pre-paint script cannot
+ * see a session that does not exist yet, and this is what moves somebody who
+ * arrived signed out and left signed in.
  *
  * THIS REVERSES A SETTLED DECISION, so the record should say so rather than
  * quietly changing. `/` was made the homepage for everyone on 2026-09-02, on

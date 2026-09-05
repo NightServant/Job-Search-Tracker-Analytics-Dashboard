@@ -1,6 +1,6 @@
 import { Landing } from '@/components/landing/Landing'
-import { SignedInRedirect } from '@/components/landing/SignedInRedirect'
-import { InstantSignedInRedirect } from '@/components/landing/InstantSignedInRedirect'
+import { SignedInRedirect } from '@/components/auth/SignedInRedirect'
+import { InstantSignedInRedirect } from '@/components/auth/InstantSignedInRedirect'
 import { SCREENS } from '@/components/landing/screens'
 
 /**

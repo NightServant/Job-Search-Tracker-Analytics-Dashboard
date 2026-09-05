@@ -8,6 +8,14 @@ vi.mock('next-themes', () => ({
   useTheme: () => ({ resolvedTheme: 'light', setTheme: vi.fn() }),
 }))
 
+// The page mounts SessionAttributeSync, which reads the auth context -- and
+// reaching the real one drags in the supabase client, which needs credentials
+// this suite has no business holding. Signed OUT is the state most of these
+// assertions are about anyway: a policy read by somebody deciding whether to
+// sign up.
+const authState = vi.hoisted(() => ({ user: null as { id: string } | null, loading: false }))
+vi.mock('@/contexts/AuthContext', () => ({ useAuth: () => authState }))
+
 const MIGRATIONS = 'supabase/migrations'
 
 /** Every table the app really creates, read from the migrations. */
