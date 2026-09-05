@@ -24,6 +24,7 @@ export function JobDescription({ description, url, className, ...props }: JobDes
     <PanelSection
       aria-label="Job description"
       title="job description"
+      icon="Documents"
       actions={
         url ? (
           <a

@@ -50,6 +50,7 @@ export function ActivityTimeline({
     <PanelSection
       aria-label="Activity"
       title="activity"
+      icon="Clock"
       error={error ? 'Could not load activity. Try refreshing the page.' : undefined}
       className={className}
       {...props}

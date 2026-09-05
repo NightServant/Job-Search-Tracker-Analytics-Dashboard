@@ -1,7 +1,10 @@
 'use client'
 
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button-variants'
+import { ExternalIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { HeroMedia } from './HeroMedia'
 import { HERO } from './content'
 
@@ -73,13 +76,22 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
         <p className="max-w-[720px] text-body-l text-[rgba(250,250,250,0.82)]">{HERO.body}</p>
 
         <div>
+          {/*
+            THE ONE BUTTON ON THIS PAGE THAT LEAVES THE SITE, and until
+            2026-09-05 it was also the only CTA with no glyph at all. The
+            outbound arrow is not decoration here: every other control on the
+            landing page keeps you on it, and this one opens GitHub in a new
+            tab -- which `target="_blank"` does silently unless something on
+            the button says so.
+          */}
           <Link
             href={HERO.sourceCta.href}
             target="_blank"
             rel="noreferrer noopener"
             data-variant="primary"
-            className={buttonVariants({ variant: 'primary', size: 'm' })}
+            className={cn(buttonVariants({ variant: 'primary', size: 'm' }), ICON_MOTION_GROUP)}
           >
+            <ExternalIcon size={16} aria-hidden className={iconMotion('forward')} />
             {HERO.sourceCta.label}
           </Link>
         </div>

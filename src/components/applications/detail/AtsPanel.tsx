@@ -45,6 +45,7 @@ export function AtsPanel({ match, error = false, className, ...props }: AtsPanel
     <PanelSection
       aria-label="ATS match"
       title="ATS match"
+      icon="ShieldCheck"
       error={error ? 'Could not load your CV to check the match. Try refreshing the page.' : undefined}
       className={className}
       {...props}

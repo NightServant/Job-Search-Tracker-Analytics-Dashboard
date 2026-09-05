@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { PanelSection } from '@/components/ui/panel-section'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { TrashIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { SettingsRow } from './SettingsRow'
 
 /**
@@ -58,6 +60,7 @@ export function DangerZone({ onDeleteAccount, deleting = false }: DangerZoneProp
               disabled={deleting}
               className="border-status-rejected-mark text-status-rejected-mark hover:bg-status-rejected-mark/10"
             >
+              <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
               {deleting ? 'Deleting' : 'Delete account'}
             </Button>
           }

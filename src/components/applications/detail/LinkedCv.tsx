@@ -29,6 +29,7 @@ export function LinkedCv({ links, error = false, className, ...props }: LinkedCv
     <PanelSection
       aria-label="Linked CV"
       title="linked CV"
+      icon="Documents"
       error={error ? 'Could not load the linked CV. Try refreshing the page.' : undefined}
       className={className}
       {...props}

@@ -5,7 +5,7 @@ import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
-import { TrashIcon } from '@/components/icons'
+import { PencilIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { ApplicationForm } from '../ApplicationForm'
 import { ApplicationRecord } from './ApplicationRecord'
@@ -116,6 +116,7 @@ export function ApplicationRecordScreen({
           */}
           <div className="flex items-center gap-3">
             <Button className="h-11 flex-1" onClick={() => onModeChange('edit')}>
+              <PencilIcon size={16} aria-hidden className={iconMotion('edit')} />
               edit
             </Button>
             {onDelete && (

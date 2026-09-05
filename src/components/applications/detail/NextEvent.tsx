@@ -42,6 +42,7 @@ export function NextEvent({ event, error = false, className, ...props }: NextEve
     <PanelSection
       aria-label="Next event"
       title="next event"
+      icon="Calendar"
       error={error ? 'Could not load the next event. Try refreshing the page.' : undefined}
       className={className}
       {...props}

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { CheckIcon, CopyIcon, PlayIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -324,6 +324,7 @@ export function LatexResumeEditor({
             reset
           </Button>
           <Button variant="ghost" size="s" onClick={copyLatex}>
+            <CopyIcon size={14} aria-hidden className={iconMotion('none')} />
             copy LaTeX
           </Button>
           <Button
@@ -332,13 +333,18 @@ export function LatexResumeEditor({
             onClick={compileNow}
             disabled={compileState.status === 'compiling' || !latexSource.trim()}
           >
-            {compileState.status === 'compiling' && <CssSpinner size={14} />}
+            {compileState.status === 'compiling' ? (
+              <CssSpinner size={14} />
+            ) : (
+              <PlayIcon size={14} aria-hidden className={iconMotion('forward')} />
+            )}
             {compileState.status === 'compiling' ? 'compiling' : 'compile'}
           </Button>
           {/* Save is primary here for the same reason it is in the Word
               editor: in an editor the verb is Save, and it was previously the
               only plain-text control in a row of outlined ones. */}
           <Button size="s" onClick={() => void handleSave()} disabled={isSaving}>
+            {isSaving ? <CssSpinner size={14} /> : <CheckIcon size={14} aria-hidden />}
             {isSaving ? 'saving' : 'save'}
           </Button>
         </>

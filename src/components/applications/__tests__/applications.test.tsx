@@ -572,12 +572,19 @@ describe('ApplicationForm', () => {
     })
   })
 
-  it('saves with a text button, never an icon', () => {
-    // Save was one of the four glyphs M5 eliminated outright.
+  it('saves with a LABELLED button, which is the half of that rule that held', () => {
+    // REVERSED IN PART, 2026-09-05. This asserted the submit had no icon at
+    // all -- "Save was one of the four glyphs M5 eliminated outright" -- and
+    // Gabe asked for icons on CTA buttons, then on tertiary and danger ones,
+    // which supersedes it.
+    //
+    // What M5 was actually protecting against survives and is asserted here:
+    // an ICON-ONLY save. A glyph beside a word is not the thing that was
+    // eliminated; a glyph INSTEAD of the word was.
     const { container } = render(<ApplicationForm defaultCurrency="PHP" />)
     const submit = container.querySelector('button[type="submit"]')!
     expect(submit.textContent!.trim().length).toBeGreaterThan(0)
-    expect(submit.querySelector('svg')).toBeNull()
+    expect(submit.querySelectorAll('svg').length).toBe(1)
   })
 })
 
@@ -606,5 +613,85 @@ describe('ApplicationsTable accent header', () => {
     // The old neutral band is gone -- a grey table with an orange header was
     // the thing that read as two unrelated decisions.
     expect(rows[1].className).not.toMatch(/bg-bg-surface/)
+  })
+})
+
+/**
+ * Gabe asked for icons on the fields in the application edit dialog
+ * (2026-09-05). The rule that decides WHICH fields get one is the part worth
+ * pinning, because it is invisible in the source -- it lives across nineteen
+ * separate `icon=` props and one person adding a field will not know it.
+ */
+describe('naming the form\'s fields with glyphs', () => {
+  function renderForm() {
+    return render(<ApplicationForm defaultCurrency="PHP" onSubmit={vi.fn()} />)
+  }
+
+  /** The glyph a control carries, if any. */
+  function glyphFor(id: string): SVGElement | null {
+    const control = document.getElementById(id)!
+    // Input, Select and Textarea all wrap the control in a `relative` box and
+    // put the glyph in it as a sibling.
+    return control.closest('.relative')?.querySelector('svg') ?? null
+  }
+
+  it('names every field in a section that holds more than one', () => {
+    // The nine-field job-information grid and the four-field contact grid.
+    // Half a grid with glyphs reads as a rendering fault rather than a
+    // system, so this is all-or-nothing per group.
+    renderForm()
+    for (const id of [
+      'company',
+      'role',
+      'salary_min',
+      'salary_max',
+      'salary_currency',
+      'status',
+      'location',
+      'work_mode',
+      'source',
+      'tags',
+      'tech_stack',
+      'contact_name',
+      'contact_email',
+      'contact_linkedin',
+      'contact_notes',
+    ]) {
+      expect(glyphFor(id), `${id} has no glyph`).toBeTruthy()
+    }
+  })
+
+  it('lets the heading carry it where a section holds exactly one field', () => {
+    // Saying it twice, three lines apart. The section heading above each of
+    // these already names it.
+    renderForm()
+    for (const id of ['url', 'date_applied', 'description', 'notes']) {
+      expect(glyphFor(id), `${id} repeats its section's glyph`).toBeNull()
+    }
+  })
+
+  it('never puts a second calendar in the date field', () => {
+    // The one case where this was a defect rather than a preference: a
+    // `type="date"` input draws the browser's own calendar button inside the
+    // box, so a leading calendar made two of them in one field.
+    renderForm()
+    const date = document.getElementById('date_applied')!
+    expect(date.getAttribute('type')).toBe('date')
+    expect(date.parentElement!.querySelectorAll('svg').length).toBe(0)
+  })
+
+  it('gives the submit and cancel controls a glyph too', () => {
+    renderForm()
+    const submit = screen.getByRole('button', { name: /add application/i })
+    expect(submit.querySelector('svg')).toBeTruthy()
+  })
+
+  it('drops the submit glyph while saving, so the spinner stands alone', () => {
+    // Button renders its spinner in the same leading slot. Two marks where the
+    // control has one thing to say.
+    render(<ApplicationForm defaultCurrency="PHP" saving onSubmit={vi.fn()} />)
+    const busy = screen.getByRole('button', { name: /saving/i })
+    expect(busy.querySelectorAll('svg').length).toBe(0)
+    expect(busy.querySelector('[role="status"], .animate-spin, [data-spinner]')).toBeTruthy()
   })
 })

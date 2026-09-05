@@ -317,12 +317,21 @@ describe('the editor still saves', () => {
   })
 })
 
-describe('the editor chrome carries no lucide glyphs', () => {
-  it('renders Save as a text button, one of the four icons the set eliminated', () => {
+describe('the editor chrome', () => {
+  it('renders Save as a LABELLED button, glyph and all', () => {
+    // REVERSED IN PART, 2026-09-05. This asserted Save had no glyph, "one of
+    // the four icons the set eliminated" in M5. Gabe asked for icons on CTA
+    // buttons and then on tertiary and danger ones, which supersedes that.
+    //
+    // The half of the old rule that still holds -- and that M5 was actually
+    // protecting -- is asserted instead: an editor's Save says the word. A
+    // glyph beside it is fine; a glyph INSTEAD of it is what was eliminated.
     params('cv-1')
     resolved(wordDraft())
     render(<Page />)
-    expect(screen.getByRole('button', { name: /^save$/i }).querySelector('svg')).toBeNull()
+    const save = screen.getByRole('button', { name: /^save$/i })
+    expect(save.textContent!.trim()).toBe('save')
+    expect(save.querySelectorAll('svg').length).toBe(1)
   })
 
   it('leaves the drafts list reachable from the editor', () => {

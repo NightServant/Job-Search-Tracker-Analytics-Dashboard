@@ -4,7 +4,7 @@ import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { PlusIcon } from '@/components/icons'
+import { CloseIcon, PlusIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
 import { ApplicationsTable } from './ApplicationsTable'
@@ -443,9 +443,11 @@ export function ApplicationsPage({
           </label>
           <div className="flex items-center gap-2">
             <Button size="s" onClick={runImport} disabled={importing}>
+              <UploadIcon size={16} aria-hidden className={iconMotion('raise')} />
               Import {skipDuplicates ? csv.importable.length : csv.rows.length}
             </Button>
             <Button variant="ghost" size="s" onClick={() => setCsv(null)} disabled={importing}>
+              <CloseIcon size={16} aria-hidden className={iconMotion('none')} />
               cancel
             </Button>
           </div>

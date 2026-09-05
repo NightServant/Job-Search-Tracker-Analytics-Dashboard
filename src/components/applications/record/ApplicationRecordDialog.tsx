@@ -4,7 +4,7 @@ import * as React from 'react'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
-import { TrashIcon } from '@/components/icons'
+import { PencilIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { ApplicationForm } from '../ApplicationForm'
 import { ApplicationRecord } from './ApplicationRecord'
@@ -86,6 +86,7 @@ export function ApplicationRecordDialog({
         job && !editing ? (
           <div className="flex items-center gap-2">
             <Button size="s" onClick={() => onModeChange('edit')}>
+              <PencilIcon size={16} aria-hidden className={iconMotion('edit')} />
               edit
             </Button>
             {onDelete && (

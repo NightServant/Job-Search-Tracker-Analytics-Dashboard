@@ -4,6 +4,8 @@ import * as React from 'react'
 import Link from 'next/link'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
+import { ClockIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { useAppHref } from '@/components/shell/routeBase'
 import { formatTouchedDate } from '@/services/date'
 import type { StaleCandidate } from '@/services/followUp'
@@ -68,6 +70,7 @@ export function FollowUpNudge({ stale }: { stale: StaleCandidate[] }) {
       */}
       <div className="mt-2">
         <Button size="s" variant="secondary" onClick={() => setOpen(true)}>
+          <ClockIcon size={16} aria-hidden className={iconMotion('none')} />
           review {count} follow-up{count === 1 ? '' : 's'}
         </Button>
       </div>

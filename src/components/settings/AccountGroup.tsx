@@ -1,5 +1,7 @@
 import { PanelSection } from '@/components/ui/panel-section'
 import { Button } from '@/components/ui/button'
+import { LogOutIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { Input } from '@/components/ui/input'
 import { SettingsRow } from './SettingsRow'
 
@@ -40,6 +42,7 @@ export function AccountGroup({ email = null, onSignOut, signingOut = false }: Ac
             description="end your session on this device."
             control={
               <Button variant="secondary" size="s" onClick={() => onSignOut?.()} disabled={signingOut}>
+                <LogOutIcon size={16} aria-hidden className={iconMotion('forward')} />
                 {signingOut ? 'Signing out' : 'Sign out'}
               </Button>
             }

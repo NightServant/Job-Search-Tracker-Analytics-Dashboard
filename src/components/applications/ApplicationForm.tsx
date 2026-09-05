@@ -11,6 +11,8 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { STATUSES } from '@/components/ui/status-marker'
+import { CheckIcon, CloseIcon, DownloadIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
 import { assertJobFormDataValid, jobValidation } from '@/services/jobValidation'
 import {
@@ -281,6 +283,7 @@ export function ApplicationForm({
           <Field id="company" label="company" required>
             <Input
               id="company"
+              icon="Building"
               value={company}
               onChange={(e) => setCompany(e.target.value)}
               onBlur={blur('company')}
@@ -293,6 +296,7 @@ export function ApplicationForm({
           <Field id="role" label="role" required>
             <Input
               id="role"
+              icon="UserRound"
               value={role}
               onChange={(e) => setRole(e.target.value)}
               onBlur={blur('role')}
@@ -305,6 +309,7 @@ export function ApplicationForm({
           <Field id="salary_min" label="min salary">
             <Input
               id="salary_min"
+              icon="BankNote"
               type="number"
               inputMode="numeric"
               value={salaryMin}
@@ -318,6 +323,7 @@ export function ApplicationForm({
           <Field id="salary_max" label="max salary">
             <Input
               id="salary_max"
+              icon="BankNote"
               type="number"
               inputMode="numeric"
               value={salaryMax}
@@ -335,6 +341,7 @@ export function ApplicationForm({
           >
             <Select
               id="salary_currency"
+              icon="Coins"
               value={currency}
               onValueChange={(next) => setCurrency(next as SupportedCurrency)}
               error={errorFor('salary_currency')}
@@ -345,6 +352,7 @@ export function ApplicationForm({
           <Field id="status" label="status">
             <Select
               id="status"
+              icon="Flag"
               value={status}
               onValueChange={(next) => setStatus(next as JobStatus)}
               items={STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
@@ -354,6 +362,7 @@ export function ApplicationForm({
           <Field id="location" label="location">
             <Input
               id="location"
+              icon="MapPin"
               value={location}
               onChange={(e) => setLocation(e.target.value)}
               onBlur={blur('location')}
@@ -366,6 +375,7 @@ export function ApplicationForm({
           <Field id="work_mode" label="work mode">
             <Select
               id="work_mode"
+              icon="Monitor"
               value={workMode}
               onValueChange={(next) => setWorkMode(next as WorkMode | '')}
               items={[
@@ -378,6 +388,7 @@ export function ApplicationForm({
           <Field id="source" label="source">
             <Input
               id="source"
+              icon="Globe"
               value={source}
               onChange={(e) => setSource(e.target.value)}
               onBlur={blur('source')}
@@ -409,7 +420,11 @@ export function ApplicationForm({
                 disabled={autofilling}
                 className="shrink-0"
               >
-                {autofilling && <CssSpinner size={14} />}
+                {autofilling ? (
+                  <CssSpinner size={14} />
+                ) : (
+                  <DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />
+                )}
                 {autofilling ? 'Reading' : 'Auto-fill'}
               </Button>
             )}
@@ -426,6 +441,7 @@ export function ApplicationForm({
           <Field id="tags" label="tags" hint="separated by commas.">
             <Input
               id="tags"
+              icon="Tag"
               value={tagsInput}
               onChange={(e) => setTagsInput(e.target.value)}
               onBlur={blur('tags')}
@@ -437,6 +453,7 @@ export function ApplicationForm({
           <Field id="tech_stack" label="tech stack" hint="separated by commas.">
             <Input
               id="tech_stack"
+              icon="Code"
               value={techInput}
               onChange={(e) => setTechInput(e.target.value)}
               onBlur={blur('tech_stack')}
@@ -520,6 +537,7 @@ export function ApplicationForm({
           <Field id="contact_name" label="name">
             <Input
               id="contact_name"
+              icon="UserRound"
               value={contactName}
               onChange={(e) => setContactName(e.target.value)}
               onBlur={blur('contact_name')}
@@ -532,6 +550,7 @@ export function ApplicationForm({
           <Field id="contact_email" label="email">
             <Input
               id="contact_email"
+              icon="Mail"
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
@@ -545,6 +564,7 @@ export function ApplicationForm({
           <Field id="contact_linkedin" label="LinkedIn" span={layout === 'dialog'}>
             <Input
               id="contact_linkedin"
+              icon="Link"
               value={contactLinkedin}
               onChange={(e) => setContactLinkedin(e.target.value)}
               onBlur={blur('contact_linkedin')}
@@ -556,6 +576,7 @@ export function ApplicationForm({
           <Field id="contact_notes" label="contact notes" span={layout === 'dialog'}>
             <Textarea
               id="contact_notes"
+              icon="Info"
               value={contactNotes}
               onChange={(e) => setContactNotes(e.target.value)}
               onBlur={blur('contact_notes')}
@@ -586,11 +607,16 @@ export function ApplicationForm({
         )}
       >
         <Button type="submit" disabled={saving}>
-          {saving && <CssSpinner size={14} />}
+          {saving ? (
+            <CssSpinner size={14} />
+          ) : (
+            <CheckIcon size={16} aria-hidden className={iconMotion('none')} />
+          )}
           {saving ? 'Saving' : submitLabel}
         </Button>
         {onCancel && (
           <Button variant="ghost" onClick={onCancel} disabled={saving}>
+            <CloseIcon size={16} aria-hidden className={iconMotion('none')} />
             cancel
           </Button>
         )}

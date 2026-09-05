@@ -75,6 +75,44 @@ import { XIcon } from './x'
 import { BriefcaseIcon } from './briefcase'
 export { BriefcaseIcon }
 
+// The nine glyphs AnimateIcons has no answer for, drawn for the application
+// form's fields. Plain <svg>, so they are NOT put through `withDefaultSize`
+// below -- that passes `isAnimated: false`, which is a real prop on an
+// AnimateIcons component and an unknown attribute on an <svg>. They default
+// to 20 themselves. See ./field-glyphs for the rest of the reasoning.
+import {
+  BankNoteIcon,
+  BuildingIcon,
+  CodeIcon,
+  CoinsIcon,
+  CopyIcon,
+  FlagIcon,
+  GlobeIcon,
+  LinkIcon,
+  LogOutIcon,
+  MapPinIcon,
+  MonitorIcon,
+  PencilIcon,
+  PlayIcon,
+  TagIcon,
+} from './field-glyphs'
+export {
+  BankNoteIcon,
+  BuildingIcon,
+  CodeIcon,
+  CoinsIcon,
+  CopyIcon,
+  FlagIcon,
+  GlobeIcon,
+  LinkIcon,
+  LogOutIcon,
+  MapPinIcon,
+  MonitorIcon,
+  PencilIcon,
+  PlayIcon,
+  TagIcon,
+}
+
 /**
  * Forces this design system's authored 20px default over AnimateIcons' 24px
  * one, and TURNS THE REGISTRY'S OWN HOVER ANIMATION OFF.
@@ -209,6 +247,21 @@ export const icons = {
   GripVertical: asIconComponent(GripVerticalIcon),
   RotateCcw: asIconComponent(RotateCcwIcon),
   Briefcase: asIconComponent(BriefcaseIcon),
+  // Drawn here rather than vendored -- see ./field-glyphs.
+  Building: asIconComponent(BuildingIcon),
+  BankNote: asIconComponent(BankNoteIcon),
+  Coins: asIconComponent(CoinsIcon),
+  Flag: asIconComponent(FlagIcon),
+  MapPin: asIconComponent(MapPinIcon),
+  Monitor: asIconComponent(MonitorIcon),
+  Globe: asIconComponent(GlobeIcon),
+  Link: asIconComponent(LinkIcon),
+  Tag: asIconComponent(TagIcon),
+  Code: asIconComponent(CodeIcon),
+  Pencil: asIconComponent(PencilIcon),
+  LogOut: asIconComponent(LogOutIcon),
+  Copy: asIconComponent(CopyIcon),
+  Play: asIconComponent(PlayIcon),
 } as const
 
 export type IconName = keyof typeof icons

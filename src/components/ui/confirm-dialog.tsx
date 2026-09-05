@@ -11,8 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { icons, type IconName } from '@/components/icons'
-import { ICON_STATE_MOTION } from '@/components/icons/motion'
+import { CheckIcon, CloseIcon, TrashIcon, icons, type IconName } from '@/components/icons'
+import { ICON_MOTION_GROUP, ICON_STATE_MOTION, iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
 
 /**
@@ -42,6 +42,16 @@ import { cn } from '@/lib/utils'
  * A non-destructive confirmation gets a muted `Info` instead, and a caller can
  * name its own with `icon`. The glyph sits OUTSIDE `AlertDialogTitle`, so it
  * stays out of the name the dialog is announced by.
+ *
+ * BOTH FOOTER CONTROLS CARRY ONE TOO (Gabe, 2026-09-05: tertiary and danger
+ * buttons must have icons). This is the last screen before something
+ * irreversible happens, and it is the one place in the app where the two
+ * buttons mean opposite things while looking like a pair -- a bin on one and
+ * an x on the other separates them at a glance rather than by reading.
+ *
+ * The confirm control's glyph FOLLOWS `destructive`: a bin when something is
+ * being deleted, a tick when it is not. The label is the caller's, so the
+ * glyph is the only part of that button this component can keep honest.
  */
 export interface ConfirmDialogProps {
   open: boolean
@@ -88,15 +98,24 @@ export function ConfirmDialog({
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="-mx-0 -mb-0 border-t-0 bg-transparent p-0">
-          <AlertDialogCancel variant="secondary">cancel</AlertDialogCancel>
+          <AlertDialogCancel variant="secondary" className={ICON_MOTION_GROUP}>
+            <CloseIcon size={16} aria-hidden className={iconMotion('none')} />
+            cancel
+          </AlertDialogCancel>
           <AlertDialogAction
             onClick={() => void onConfirm()}
             className={cn(
+              ICON_MOTION_GROUP,
               destructive
                 ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90'
                 : 'bg-accent-default text-accent-on-accent hover:bg-accent-hover'
             )}
           >
+            {destructive ? (
+              <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
+            ) : (
+              <CheckIcon size={16} aria-hidden className={iconMotion('none')} />
+            )}
             {confirmLabel}
           </AlertDialogAction>
         </AlertDialogFooter>

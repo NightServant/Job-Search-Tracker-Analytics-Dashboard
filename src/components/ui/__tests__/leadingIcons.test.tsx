@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { globSync } from 'node:fs'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Card, CardHeader, CardTitle } from '../card'
@@ -6,6 +8,8 @@ import { AppDialog } from '../app-dialog'
 import { ConfirmDialog } from '../confirm-dialog'
 import { Input } from '../input'
 import { Select } from '../select'
+import { Textarea } from '../textarea'
+import { icons } from '@/components/icons'
 
 /**
  * Gabe's 2026-09-05 ask: icons before card titles, dialog headings, inputs and
@@ -226,5 +230,101 @@ describe('a select with a leading glyph', () => {
     const trigger = screen.getByLabelText('Status')
     expect(trigger.className).toContain('pl-3')
     expect(trigger.className).not.toContain('pl-10')
+  })
+})
+
+describe('a box with more than one line', () => {
+  it('moves the text off the glyph, same as a field', () => {
+    render(<Textarea id="notes" icon="Info" aria-label="Notes" />)
+    const box = screen.getByLabelText('Notes')
+    expect(box.className).toContain('pl-10')
+    expect(box.className).not.toContain('px-3')
+  })
+
+  it('pins the glyph to the first line rather than centring it', () => {
+    // A textarea grows -- min-h-48 on the job description, and the user can
+    // drag it taller. A centred glyph floats into the middle of a paragraph.
+    render(<Textarea id="notes" icon="Info" aria-label="Notes" />)
+    const holder = glyphIn(document.querySelector('.relative'))!.closest('[aria-hidden]')!
+    expect(holder.className).toContain('top-3')
+    expect(holder.className).not.toContain('-translate-y-1/2')
+  })
+
+  it('leaves the padding alone with no glyph', () => {
+    render(<Textarea id="plain" aria-label="Plain" />)
+    expect(screen.getByLabelText('Plain').className).toContain('px-3')
+  })
+})
+
+describe('the glyphs drawn for this app', () => {
+  // The nine (plus a pencil) that AnimateIcons has no answer for. They are
+  // plain <svg> rather than motion components, so the things a vendored glyph
+  // gets for free are exactly what has to be asserted here.
+  const DRAWN = [
+    'Building',
+    'BankNote',
+    'Coins',
+    'Flag',
+    'MapPin',
+    'Monitor',
+    'Globe',
+    'Link',
+    'Tag',
+    'Code',
+    'Pencil',
+  ] as const
+
+  it('are all in the barrel, so `icons[name]` resolves', () => {
+    for (const name of DRAWN) {
+      expect(icons[name], `${name} is missing from the icons record`).toBeTruthy()
+    }
+  })
+
+  it('inherit colour and default to this system\'s 20px', () => {
+    for (const name of DRAWN) {
+      const Icon = icons[name]
+      const { container, unmount } = render(<Icon />)
+      const svg = container.querySelector('svg')!
+      // `currentColor`, never a `color` prop: that is what makes a glyph pick
+      // up the accent and status tokens from whatever it sits in.
+      expect(svg.getAttribute('stroke'), name).toBe('currentColor')
+      expect(svg.getAttribute('width'), name).toBe('20')
+      expect(svg.querySelectorAll('path, circle, rect').length, name).toBeGreaterThan(0)
+      unmount()
+    }
+  })
+
+  it('take the size the call sites pass', () => {
+    // Every call site in the app passes an explicit numeric size; the default
+    // above is a safety net, not the thing being relied on.
+    const { container } = render(<icons.MapPin size={16} />)
+    expect(container.querySelector('svg')!.getAttribute('width')).toBe('16')
+  })
+})
+
+describe('every panel in the app is named', () => {
+  it('has no PanelSection without an icon', () => {
+    // THIS TEST EXISTS BECAUSE THE CHECK I RAN BY HAND COULD NOT SEE THE BUG.
+    // Sweeping the icons in was verified with
+    // `grep '<PanelSection' | grep title= | grep -v icon=`, which only matches
+    // when both props are on ONE line. The five `detail/` panels put them on
+    // separate lines, so the grep returned nothing and I read the silence as
+    // proof. They shipped bare, and it took opening the dialog to notice.
+    //
+    // So this parses the tag across newlines. A single-line grep is a
+    // single-line answer; the rule is about the tag.
+    const files = globSync('src/components/**/*.tsx').filter(
+      (f) => !f.includes('__tests__') && !f.endsWith('panel-section.tsx')
+    )
+    const bare: string[] = []
+    for (const file of files) {
+      const src = readFileSync(file, 'utf8')
+      for (const m of src.matchAll(/<PanelSection\b(.*?)>/gs)) {
+        if (!m[1].includes('icon=')) {
+          bare.push(`${file}:${src.slice(0, m.index).split('\n').length}`)
+        }
+      }
+    }
+    expect(bare).toEqual([])
   })
 })

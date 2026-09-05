@@ -6,7 +6,8 @@ import StarterKit from '@tiptap/starter-kit'
 import type { JSONContent } from '@tiptap/core'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { CheckIcon, DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { CssSpinner } from '@/components/ui/css-spinner'
 import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
@@ -414,6 +415,7 @@ export function WordResumeEditor({
             keeping the work. In an editor the verb is Save.
           */}
           <Button size="s" onClick={() => void handleSave()} disabled={!editor || isSaving}>
+            {isSaving ? <CssSpinner size={14} /> : <CheckIcon size={14} aria-hidden />}
             {isSaving ? 'saving' : 'save'}
           </Button>
         </>

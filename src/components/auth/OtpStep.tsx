@@ -3,6 +3,8 @@
 import * as React from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { ShieldCheckIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 
@@ -109,6 +111,7 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
         disabled={!ready}
         loading={busy}
       >
+        {!busy && <ShieldCheckIcon size={16} aria-hidden className={iconMotion('lift')} />}
         Verify and continue
       </Button>
 
