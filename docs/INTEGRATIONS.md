@@ -1,8 +1,12 @@
 # Integrations
 
 What is wired up, what is not, and why. Every claim below was checked against
-the live service on 2026-09-04 — none of it is from memory, and the three
-places the brief and reality disagreed are recorded rather than smoothed over.
+the live service — none of it is from memory, and the places the brief and
+reality disagreed are recorded rather than smoothed over. Most of it was
+checked on 2026-09-04; the Composio section on 2026-09-05, when it was
+actually connected and four of its documented details turned out to be wrong.
+Figures move: read each as of its date rather than as a fact about the
+service.
 
 ## What was asked for, and what exists
 
@@ -11,7 +15,7 @@ places the brief and reality disagreed are recorded rather than smoothed over.
 | **FormaTeX** | LaTeX generation and compiling | Real REST API at `api.formatex.io/api/v1` | **Integrated** |
 | **docx-editor.dev** | Word creation, editing, export | Real, Apache-2.0, **browser-only** (React/Vue). Its automation API is Pro at $500/mo | **Partly** — see below |
 | **Novoresume** | CV tailoring and ATS scoring "via API" | **No API exists.** No developer docs, no endpoints, no developer programme | **Replaced** |
-| **Composio** | Connectors, autofill, tracking | Real, 1326 toolkits, MCP | **Documented, needs your account** |
+| **Composio** | Connectors, autofill, tracking | Real, 1,505 toolkits, MCP | **Connected** as dev tooling (2026-09-05); not in the app |
 | **JobStreet** | A connector | **No toolkit exists** on Composio; SEEK's own API is employer-only | **Replaced** |
 
 ### How each was verified
@@ -110,15 +114,144 @@ Nothing here is required. Every client degrades to a documented fallback, and
 `/api/tailor`, which holds the key server-side. A token in the bundle is a
 token anyone can read out of the network tab and spend.
 
-## Composio (needs your account)
+## Composio
 
-The tool-router URL is per-account, so it cannot be committed. Run:
+**Connected on 2026-09-05**, at `local` scope — this repository only. Verified
+with `claude mcp list`:
 
-```bash
-claude mcp add --transport http composio <your-tool-router-url> --header "x-api-key: <your-key>"
+```
+composio: https://backend.composio.dev/tool_router/trs_.../mcp (HTTP) - ✔ Connected
 ```
 
-Then restart Claude Code. The first tool call triggers Composio's OAuth flow.
+It is DEVELOPER TOOLING, not a feature of the app. Nothing under `src/` imports
+Composio, no route calls it, and `COMPOSIO_API_KEY` is deliberately **absent
+from `.env.example`** — putting it there would say the application needs it,
+and the application does not. It gives Claude Code access to Composio's
+toolkits while working on this repo. Shipping Composio to users is a different
+project; see "If it ever goes in the app" below.
+
+### Getting a session
+
+`scripts/composio-session.sh` does this. Read it rather than this section if
+you only want the commands; what follows is why each step is what it is.
+
+**THE TOOL ROUTER URL IS NOT IN THE DASHBOARD.** This is the step the old
+version of this section omitted, and it sent a reader hunting for a URL that
+does not exist on any screen. It told you to run
+
+```bash
+claude mcp add --transport http composio <your-tool-router-url> …
+```
+
+with no way to obtain `<your-tool-router-url>`. You get one by creating a
+**session**, which is an API call:
+
+```bash
+curl -X POST https://backend.composio.dev/api/v3.1/tool_router/session \
+  -H "x-api-key: $COMPOSIO_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"user_id":"gabe"}'
+```
+
+The response carries `mcp.url`, and that is what goes in the `add` command.
+
+Four things that cost a round trip each, recorded so they cost nobody another:
+
+1. **`toolkits` is an OBJECT, not an array.** `{"toolkits":["gmail"]}` returns
+   `400 Error in payload.toolkits: Invalid input`. The allowlist form is
+   `{"toolkits":{"enabled":["gmail","googlecalendar"]}}`, with `disabled` as
+   the mutually exclusive denylist. The API reference types the field as `any`
+   and shows `null` in its example, so the shape is only in prose.
+
+   You usually want neither. `user_id` is the sole required field, and an
+   unrestricted router is the normal case — discovering the right tool is what
+   a router is *for*.
+
+2. **The returned host is not the documented one.** The docs give the format as
+   `app.composio.dev/tool_router/v3/{session_id}/mcp`; the API returns
+   `backend.composio.dev/tool_router/{session_id}/mcp`. Building the URL by
+   hand from the documentation produces a 404. Use what the response says.
+
+3. **No `mcp.headers` comes back** — only `type` and `url`. The auth header is
+   your plain API key.
+
+4. **Auth is checked before the payload**, so a bad body with a bad key returns
+   401 and tells you nothing about the body. A `400` is therefore good news: it
+   means the key, the endpoint and the method are all correct.
+
+### Registering it
+
+```bash
+claude mcp add --transport http composio "<mcp.url>" -H "x-api-key: $COMPOSIO_API_KEY"
+```
+
+`-H` / `--header`, singular, `"Name: value"`. Composio's own Claude Code page
+says `--headers` with no space, which this CLI rejects — checked against
+`claude mcp add --help`.
+
+`-s user` puts it in every project; the default is `local`, this one only.
+Then **start a new interactive session**: the per-toolkit OAuth runs on first
+use, through `COMPOSIO_MANAGE_CONNECTIONS`, and needs a terminal.
+
+The key is stored in `~/.claude.json` (`-rw-------`, home directory, outside
+the repo). It is not committed and must not be moved anywhere that is.
+
+### What you get
+
+Six meta-tools, not 1,505 individual ones — `COMPOSIO_SEARCH_TOOLS`,
+`COMPOSIO_GET_TOOL_SCHEMAS`, `COMPOSIO_MULTI_EXECUTE_TOOL`,
+`COMPOSIO_MANAGE_CONNECTIONS`, `COMPOSIO_REMOTE_WORKBENCH`,
+`COMPOSIO_REMOTE_BASH_TOOL`. The router searches and dispatches, which is why
+skipping `toolkits` costs nothing.
+
+**The workbench is on by default**, and it is worth knowing rather than
+discovering: `workbench.enable: true` with `proxy_execution_enabled` and a
+remote bash tool. It is an isolated sandbox on Composio's infrastructure, not
+this machine, but it is a code-execution environment nobody asked for. Pass
+`--no-workbench` to the script to create a session without it.
+
+**Session lifetime is unknown.** Nothing in the documentation states whether
+these expire, and it has not been long enough to find out. If `claude mcp list`
+starts reporting the server as failed, recreate the session and re-add it —
+that is a minute's work either way.
+
+### Toolkit count
+
+1,505 on 2026-09-05, read off the dashboard. This document previously said
+1,326, checked 2026-09-04. The number moves; treat any figure here as of its
+date rather than as a fact about the service.
+
+### Gmail and Calendar are already reachable without it
+
+The first-party claude.ai connectors for Gmail, Google Calendar and Google
+Drive are connected and authorised on this machine. For Gabe's own mail and
+calendar, prefer those — they are already authenticated and one hop shorter.
+Composio earns its place on the ~1,500 toolkits that have no first-party
+connector, not on the three that do.
+
+### If it ever goes in the app
+
+Not planned, and the shape is worth writing down so it is not re-derived under
+pressure. Users connecting *their own* Gmail is a genuinely different system
+from the above — the connectors on this machine are Gabe's, not theirs.
+
+- `COMPOSIO_API_KEY` server-side only, never `NEXT_PUBLIC_`. Same rule, same
+  reason as `TAILORING_API_KEY`.
+- One **auth config** per toolkit, created once.
+- Per-user **connected account** via `composio.connectedAccounts.link(userId,
+  authConfigId)`, which returns a `redirectUrl`. Use `link()`, **not**
+  `initiate()`: Composio is retiring `initiate()` for Composio-managed OAuth
+  (2026-05-08 for new organisations, 2026-07-03 for all). Most tutorials still
+  show `initiate()`.
+- `user_id` is the hinge. It is `"gabe"` in the session above; there it is the
+  Supabase user id, one session per user.
+- The route goes under `/api/` behind `requireUser`, or
+  `src/app/api/__tests__/routesAreGuarded.test.ts` fails.
+- **`src/app/privacy/page.tsx` changes in the same commit.** It currently
+  states that no AI is used anywhere and names every third party that receives
+  anything. Reading a user's mail through Composio makes both sentences false,
+  and `page.test.tsx` holds that page to the schema. A privacy policy
+  describing the previous version of the product is worse than a vague one.
 
 A JobStreet toolkit would have to be authored as a **custom** toolkit in the
 dashboard, and it would be a wrapper around scraping either way — which is
