@@ -70,7 +70,10 @@ async function confirmDeleteAccount() {
 function setup({
   email = 'gabe@example.com',
   prefs = null as { user_id: string; default_currency: string; created_at: string; updated_at: string } | null,
-  signOut = vi.fn(),
+  // Resolves a result now, not undefined: signOut reports whether the
+  // server revoke succeeded, because a failed one no longer aborts the
+  // sign-out.
+  signOut = vi.fn().mockResolvedValue({ revokedEverywhere: true }),
   mutateAsync = vi.fn().mockResolvedValue(undefined),
 } = {}) {
   useAuthMock.mockReturnValue({ user: { id: 'u1', email }, signOut })
@@ -112,6 +115,49 @@ describe('Settings route wrapper', () => {
     render(<Page />)
     fireEvent.click(screen.getByRole('button', { name: /^sign out$/i }))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
+  })
+
+  it('still leaves, and still lands home, when the server revoke fails', async () => {
+    // THE BUG THIS FIXES. auth-js returns early without removing the local
+    // session if the revoke call fails with anything but 401/403/404, so an
+    // offline or 500-ing server used to throw, show "Sign out failed", and
+    // leave the user sitting on Settings still signed in. Signing out must not
+    // be a request the network can veto.
+    const { signOut } = setup({
+      signOut: vi.fn().mockResolvedValue({
+        revokedEverywhere: false,
+        message: 'Signed out on this device. We could not reach the server.',
+      }),
+    })
+    render(<Page />)
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+
+    await waitFor(() => expect(signOut).toHaveBeenCalled())
+    await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/'))
+  })
+
+  it('says so when only this device was signed out', async () => {
+    // Other devices keep their session until their own token expires. Someone
+    // signing out on a shared machine deserves to know that did not reach the
+    // rest, even though this browser is definitely done.
+    setup({
+      signOut: vi.fn().mockResolvedValue({
+        revokedEverywhere: false,
+        message: 'Signed out on this device. We could not reach the server.',
+      }),
+    })
+    render(<Page />)
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    await waitFor(() => expect(showErrorMock).toHaveBeenCalled())
+    expect(showErrorMock.mock.calls[0][0]).toMatch(/signed out here only/i)
+  })
+
+  it('says nothing extra when the sign-out reached the server', async () => {
+    setup()
+    render(<Page />)
+    fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
+    await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/'))
+    expect(showErrorMock).not.toHaveBeenCalled()
   })
 
   it('sends the person to the homepage after signing out, not to the sign-in form', async () => {

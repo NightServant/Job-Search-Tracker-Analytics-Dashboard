@@ -50,7 +50,18 @@ export default function Page() {
 
   const handleSignOut = async () => {
     try {
-      await signOut()
+      const result = await signOut()
+      // A SERVER FAILURE NO LONGER STOPS THE SIGN-OUT. This browser is signed
+      // out by the time signOut() resolves, so the navigation happens either
+      // way -- previously an unreachable server threw, showed "Sign out
+      // failed", and left the user sitting on Settings still signed in.
+      //
+      // The partial outcome is still worth saying: other devices keep their
+      // session until their own token expires, and someone signing out on a
+      // shared machine deserves to know that did not reach the rest.
+      if (!result.revokedEverywhere && result.message) {
+        showError('Signed out here only', result.message)
+      }
       // A HARD NAVIGATION, NOT router.replace, and the reason is not style.
       //
       // Gabe reported from the deployed app on 2026-09-03 that this landed on
@@ -91,7 +102,9 @@ export default function Page() {
       await signOut()
       // Same destination and the same mechanism as an ordinary sign-out, and
       // more obviously right here: there is no account left to sign back into,
-      // and no cached row that should survive the deletion.
+      // and no cached row that should survive the deletion. The result is not
+      // inspected -- the account is gone, so there is no other session left to
+      // warn about.
       window.location.assign('/')
     } catch (err) {
       showError('Could not delete account', err instanceof Error ? err.message : 'Unknown error')

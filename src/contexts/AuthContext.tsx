@@ -3,6 +3,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { hasValidSupabaseConfig, supabase, supabaseConfigError } from '@/lib/supabase'
+import { clearStoredSession } from '@/lib/supabaseSession'
+import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 import { normalizeEmail } from '@/lib/credentials'
 import type { OAuthProviderId } from '@/lib/oauthProviders'
 
@@ -42,7 +44,7 @@ interface AuthContextType {
   signingOut: boolean
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
-  signOut: () => Promise<void>
+  signOut: () => Promise<SignOutResult>
   /**
    * Confirms a sign-up with the 6-digit code emailed to the address.
    *
@@ -59,7 +61,19 @@ interface AuthContextType {
   signInWithProvider: (provider: OAuthProviderId) => Promise<void>
 }
 
+/**
+ * What a sign-out achieved. `revokedEverywhere` is false when this browser is
+ * signed out but the server could not be told -- a real outcome worth naming,
+ * because the two differ for anyone signed in elsewhere.
+ */
+export interface SignOutResult {
+  revokedEverywhere: boolean
+  message?: string
+}
+
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+const supabaseUrl = readSupabaseConfig(currentEnvSource()).url
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
@@ -197,7 +211,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message)
   }
 
-  const signOut = async () => {
+  /**
+   * Sign out of this browser, unconditionally.
+   *
+   * IT USED TO BE POSSIBLE TO FAIL. `supabase.auth.signOut()` calls the server
+   * to revoke the token, and auth-js's `_signOut` returns early on any error
+   * that is not a 401/403/404 -- a 500, or an offline
+   * `AuthRetryableFetchError` -- WITHOUT reaching `_removeSession()`. The old
+   * code then threw, Settings caught it, showed "Sign out failed", and never
+   * navigated. The session was still in localStorage and the user was still
+   * signed in.
+   *
+   * That made signing out a request the network could veto, which is
+   * backwards. Revoking the token on the server is best-effort and worth
+   * attempting -- it is what ends the session on other devices -- but clearing
+   * it HERE is the part the user actually asked for, and it now happens
+   * whatever the server said.
+   *
+   * It no longer throws on a server failure, because throwing would mean the
+   * caller treats a successful local sign-out as a failure. The result says
+   * what happened instead, so the UI can leave AND mention that other devices
+   * may still be signed in.
+   */
+  const signOut = async (): Promise<SignOutResult> => {
     if (!hasValidSupabaseConfig) {
       throw new Error(supabaseConfigError || 'Supabase is not configured')
     }
@@ -206,15 +242,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // next render -- setting it afterwards would leave exactly the window this
     // is meant to close.
     setSigningOut(true)
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      // Lowered again only on failure. On success the caller navigates away
-      // and this provider unmounts, so leaving it raised is correct: clearing
-      // it would re-arm the guard during the navigation it is standing aside
-      // for, which is the bug.
-      setSigningOut(false)
-      throw authError(error)
+
+    let serverError: Error | null = null
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) serverError = authError(error)
+    } catch (err) {
+      // A rejected call is the same situation as a returned error: the local
+      // session still has to go.
+      serverError = err instanceof Error ? err : new Error('Sign out failed')
     }
+
+    // THE PART THAT CANNOT FAIL. Whatever happened above, this browser is
+    // signed out when this line has run.
+    clearStoredSession(supabaseUrl)
+    setSession(null)
+    setUser(null)
+
+    // `signingOut` stays raised deliberately. The caller navigates away with a
+    // document load and this provider is torn down with it; lowering the flag
+    // here would re-arm AppLayout's guard during the navigation it is standing
+    // aside for, which is the bug it was added to fix.
+    return serverError
+      ? {
+          revokedEverywhere: false,
+          message:
+            'Signed out on this device. We could not reach the server, so other devices may still be signed in.',
+        }
+      : { revokedEverywhere: true }
   }
 
   return (
