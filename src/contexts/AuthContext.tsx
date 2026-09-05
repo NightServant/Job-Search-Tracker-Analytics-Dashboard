@@ -68,22 +68,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [signingOut, setSigningOut] = useState(false)
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    /**
+     * `loading` MUST reach false on every path, and it did not.
+     *
+     * The bug Gabe hit: restart the dev server, open the app while signed in,
+     * and land on the marketing page instead of the dashboard.
+     * `getSession()` had no `.catch()`, so a rejected call -- a refresh that
+     * cannot reach Supabase, a network blip on the first load -- left
+     * `loading` true forever and raised an unhandled rejection. Nothing
+     * recovers from that state:
+     *
+     *   - `SignedInRedirect` fires on `!loading && user`, so `/` shows the
+     *     landing page and never moves. That is the reported symptom.
+     *   - `AppLayout` returns `null` while `loading || !user`, so a private
+     *     route renders a blank screen rather than redirecting.
+     *
+     * Both read as "signed out" while actually being "never finished asking".
+     *
+     * Two changes make the flag unwedgeable. The `.catch()` is the obvious
+     * one. The second is that `onAuthStateChange` now clears it too:
+     * supabase-js emits `INITIAL_SESSION` on subscribe, so if `getSession()`
+     * fails but the listener later delivers a session -- a refresh that
+     * succeeds on the retry -- the app notices instead of staying stuck
+     * behind a flag the failed call was the only thing able to clear.
+     *
+     * A CAUGHT FAILURE IS NOT A SIGN-OUT. It sets `user` to null because
+     * nothing better is known yet, and `onAuthStateChange` corrects that the
+     * moment a session turns up. Clearing the stored session here would turn
+     * one bad request into a real logout.
+     */
+    let active = true
+
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        if (!active) return
+        setSession(session)
+        setUser(session?.user ?? null)
+      })
+      .catch((err) => {
+        console.warn('Could not read the stored session', err)
+      })
+      .finally(() => {
+        if (active) setLoading(false)
+      })
 
     // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!active) return
       setSession(session)
       setUser(session?.user ?? null)
+      // Whichever of the two answers first releases the app.
+      setLoading(false)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      active = false
+      subscription.unsubscribe()
+    }
   }, [])
 
   const signIn = async (email: string, password: string) => {
