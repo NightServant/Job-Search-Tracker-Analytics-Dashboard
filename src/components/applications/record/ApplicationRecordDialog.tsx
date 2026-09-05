@@ -73,6 +73,7 @@ export function ApplicationRecordDialog({
       onOpenChange={onOpenChange}
       size={job ? 'xl' : 'l'}
       title={job ? job.role : 'New application'}
+      icon="Briefcase"
       eyebrow={
         job ? (
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2">

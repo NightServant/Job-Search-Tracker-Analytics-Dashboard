@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { makeJob } from '@/test/fixtures'
 
@@ -156,11 +156,17 @@ describe('the application record route, on a phone', () => {
   })
 
   it('offers a way back to the list, which a modal would have taken away', async () => {
+    // A BREADCRUMB SINCE 2026-09-05, not a "< applications" link, so the
+    // accessible name is the crumb's own word rather than a sentence. The
+    // trail is scoped so this cannot match the not-found panel's button
+    // below, which is a different control saying a different thing.
     render(<Page />)
-    expect(await screen.findByRole('link', { name: /back to applications/i })).toHaveAttribute(
+    const trail = await screen.findByRole('navigation', { name: /breadcrumb/i })
+    expect(within(trail).getByRole('link', { name: 'applications' })).toHaveAttribute(
       'href',
       '/applications'
     )
+    expect(within(trail).getByText('Staff Engineer')).toHaveAttribute('aria-current', 'page')
   })
 
   it('shows a not-found panel instead of a broken shell when the job errors', async () => {

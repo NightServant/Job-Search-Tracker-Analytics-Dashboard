@@ -6,6 +6,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, PasswordInput } from '@/components/ui/input'
+import { LockIcon, UserRoundIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import type { OAuthProviderId } from '@/lib/oauthProviders'
 import { AuthBrandPanel } from './AuthBrandPanel'
 import { OAuthButtons } from './OAuthButtons'
@@ -156,6 +158,7 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
             <Input
               id="auth-email"
               name="email"
+              icon="Mail"
               type="text"
               inputMode="email"
               autoComplete="email"
@@ -170,6 +173,7 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
             <PasswordInput
               id="auth-password"
               name="password"
+              icon="Lock"
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               required
               value={password}
@@ -182,6 +186,7 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
               <PasswordInput
                 id="auth-confirm"
                 name="confirmPassword"
+                icon="Lock"
                 autoComplete="new-password"
                 required
                 value={confirm}
@@ -196,7 +201,18 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
             received. A dead control with no motion is what makes people click
             a sign-in button a second time.
           */}
+          {/*
+            THE GLYPH IS DROPPED WHILE BUSY, not hidden. `Button` renders its
+            spinner in the same leading slot, and showing both would put two
+            marks where the control has one thing to say.
+          */}
           <Button type="submit" variant="primary" size="m" loading={busy}>
+            {!busy &&
+              (isSignUp ? (
+                <UserRoundIcon size={16} aria-hidden className={iconMotion('lift')} />
+              ) : (
+                <LockIcon size={16} aria-hidden className={iconMotion('lift')} />
+              ))}
             {copy.submit}
           </Button>
 

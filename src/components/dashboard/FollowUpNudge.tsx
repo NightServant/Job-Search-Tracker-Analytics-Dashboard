@@ -76,6 +76,7 @@ export function FollowUpNudge({ stale }: { stale: StaleCandidate[] }) {
         open={open}
         onOpenChange={setOpen}
         title="needs a follow-up"
+        icon="Clock"
         description="Longest silence first. Open one to pick up where it stopped."
       >
         <ul className="flex flex-col gap-3">

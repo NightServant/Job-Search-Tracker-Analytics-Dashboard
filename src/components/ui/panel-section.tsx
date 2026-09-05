@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { AlertCircleIcon } from '@/components/icons'
+import { AlertCircleIcon, icons, type IconName } from '@/components/icons'
 import { ICON_STATE_MOTION } from '@/components/icons/motion'
 
 /**
@@ -19,6 +19,12 @@ import { ICON_STATE_MOTION } from '@/components/icons/motion'
  * its *children* in their own inner `gap-4` -- that is content rhythm, not
  * the section-level title-to-content rhythm this component now owns.
  *
+ * `icon`, when given, marks the section: a muted 16px glyph before the
+ * heading, `aria-hidden`, carrying nothing the heading does not already say.
+ * It is for finding a section in a column of them, which is what a detail
+ * screen with eight of these actually is. Same rule as `CardTitle`'s -- a
+ * glyph that names the section, never one chosen to fill the space.
+ *
  * `error`, when given, replaces `children` with the same
  * `AlertCircleIcon` + `text-status-rejected-mark` treatment three panels used
  * to hand-roll identically apart from the wording, so a failed read reads as
@@ -26,6 +32,8 @@ import { ICON_STATE_MOTION } from '@/components/icons/motion'
  */
 export interface PanelSectionProps extends Omit<React.HTMLAttributes<HTMLElement>, 'title'> {
   title: React.ReactNode
+  /** A muted glyph before the heading. Decorative; see the docblock. */
+  icon?: IconName
   /**
    * Detail panels sit below a screen that already has its own page header,
    * so they default to the smaller heading. The dashboard's blocks are the
@@ -40,6 +48,7 @@ export interface PanelSectionProps extends Omit<React.HTMLAttributes<HTMLElement
 
 export function PanelSection({
   title,
+  icon,
   titleSize = 's',
   actions,
   error,
@@ -47,13 +56,20 @@ export function PanelSection({
   className,
   ...props
 }: PanelSectionProps) {
+  const Icon = icon ? icons[icon] : null
   return (
     <section
       className={cn('flex flex-col gap-3 border-t border-border-subtle pt-6', className)}
       {...props}
     >
       <div className="flex items-center justify-between gap-4">
-        <h2 className={cn(titleSize === 'm' ? 'text-heading-m' : 'text-heading-s', 'text-text-primary')}>
+        <h2
+          className={cn(
+            'flex items-center gap-2 text-text-primary',
+            titleSize === 'm' ? 'text-heading-m' : 'text-heading-s'
+          )}
+        >
+          {Icon && <Icon size={16} aria-hidden className="shrink-0 text-text-muted" />}
           {title}
         </h2>
         {actions}

@@ -198,6 +198,7 @@ export function DocumentsPage({
           if (!next && openDoc) onToggleVersions?.(openDoc)
         }}
         title={openDoc ? `versions of ${openDoc.title}` : 'versions'}
+        icon="RotateCcw"
       >
         {openDoc && (
           <VersionHistory
@@ -209,7 +210,7 @@ export function DocumentsPage({
         )}
       </AppDialog>
 
-      <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="new CV">
+      <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="new CV" icon="Documents">
         <ModeChooser creating={creatingDraft} onChoose={(mode) => onCreateDraft?.(mode)} />
       </AppDialog>
     </div>

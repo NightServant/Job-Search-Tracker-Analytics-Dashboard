@@ -11,7 +11,7 @@ import type { Job } from '@/types'
  */
 export function RecordNotes({ notes }: { notes: string | null }) {
   return (
-    <PanelSection aria-label="Notes" title="notes">
+    <PanelSection aria-label="Notes" title="notes" icon="Info">
       {notes ? (
         <p className="whitespace-pre-wrap text-body-m text-text-secondary">{notes}</p>
       ) : (
@@ -54,7 +54,7 @@ export function RecordContact({ job }: { job: Job }) {
   if (rows.length === 0 && !job.contact_notes) return null
 
   return (
-    <PanelSection aria-label="Contact" title="contact">
+    <PanelSection aria-label="Contact" title="contact" icon="Mail">
       <dl className="flex flex-col">
         {rows.map((row) => (
           <div

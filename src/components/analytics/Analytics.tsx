@@ -10,7 +10,7 @@ import {
   CardAction,
   CardContent,
 } from '@/components/ui/card'
-import { AlertCircleIcon } from '@/components/icons'
+import { AlertCircleIcon, type IconName } from '@/components/icons'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Callout } from './Callout'
 import { SalaryInsights } from './SalaryInsights'
@@ -67,12 +67,15 @@ export interface AnalyticsProps {
  */
 function AnalyticsPanel({
   title,
+  icon,
   description,
   action,
   error,
   children,
 }: {
   title: string
+  /** A muted glyph before the heading -- see CardTitle. Names the panel; never decoration. */
+  icon?: IconName
   /** One lowercase line saying what the panel answers. */
   description?: string
   action?: React.ReactNode
@@ -92,7 +95,7 @@ function AnalyticsPanel({
             panel heading from the accessibility tree and from the document
             outline. Tailwind's preflight resets heading size and weight to
             inherit, so this is semantics at zero visual cost. */}
-        <CardTitle>
+        <CardTitle icon={icon}>
           <h2>{title}</h2>
         </CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
@@ -296,6 +299,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="overview"
+          icon="Overview"
         description="the headline numbers for everything you have tracked."
           action={<Span>all time</Span>}
           error={conversionMetrics.error ? errorMessage(conversionMetrics.error) : undefined}
@@ -311,6 +315,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="conversion funnel"
+          icon="Analytics"
         description="how far applications get, and how long each stage takes to reach."
           action={<Span>all time</Span>}
           error={conversionFunnel.error ? errorMessage(conversionFunnel.error) : undefined}
@@ -330,6 +335,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="pipeline flow"
+          icon="Applications"
         description="where applications actually went, stage to stage."
           action={<Span>all time</Span>}
           error={statusTransitions.error ? errorMessage(statusTransitions.error) : undefined}
@@ -349,6 +355,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="time in stage"
+          icon="Clock"
         description="the average days an application sits before it moves on."
           action={<Span>all time</Span>}
           error={timeInStage.error ? errorMessage(timeInStage.error) : undefined}
@@ -371,6 +378,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="salary insights"
+          icon="Briefcase"
           description="the bands companies posted, with each one’s average marked."
           action={<Span>all time</Span>}
         >
@@ -387,6 +395,7 @@ export function Analytics({
       node: (
         <AnalyticsPanel
           title="cohort analysis"
+          icon="Calendar"
         description="each month of applications, followed through to its outcome."
           action={<Span>{rangeLabel(range)}</Span>}
           error={cohortAnalysis.error ? errorMessage(cohortAnalysis.error) : undefined}

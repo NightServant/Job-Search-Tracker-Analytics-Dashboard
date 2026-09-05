@@ -43,7 +43,7 @@ export function PreferencesGroup({
 }: PreferencesGroupProps) {
   return (
     <div data-settings-group="preferences">
-      <PanelSection title="preferences" titleSize="m">
+      <PanelSection title="preferences" icon="Settings" titleSize="m">
         {/* SettingsRow, not Field: this was the only settings group not using
             it, which is why it sat differently from account and danger zone.
             `wide` is the roadmap's 5.7 mobile rule -- the currency selector is

@@ -17,7 +17,12 @@ import { cn } from '@/lib/utils'
  */
 export interface SettingsRowProps {
   label: string
-  description?: string
+  /**
+   * `ReactNode`, not `string`: the danger zone's description carries a link
+   * into the privacy page's deletion section, which is the only route to that
+   * document from inside the app.
+   */
+  description?: React.ReactNode
   control: React.ReactNode
   wide?: boolean
 }

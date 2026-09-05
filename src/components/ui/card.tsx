@@ -1,6 +1,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { icons, type IconName } from "@/components/icons"
 
 /**
  * Installed because Gabe asked for the whole catalogue, not because a screen
@@ -12,6 +13,17 @@ import { cn } from "@/lib/utils"
  * Screens should prefer `PanelSection`, which supplies the heading, the
  * hairline and the failed-read treatment, and is what every existing screen
  * already composes.
+ *
+ * `CardTitle` TAKES AN `icon` (2026-09-05, Gabe's ask). It is a marker for the
+ * card, not a control and not information: `aria-hidden`, muted, and 16px
+ * against a 16px title, so it reads as punctuation rather than as a second
+ * thing on the line. On a grid of five cards it is what lets somebody find the
+ * one they want without reading five headings -- which is the whole and only
+ * argument for it.
+ *
+ * It is a NAME, not a picture. `icon="Calendar"` on "upcoming events" is worth
+ * having; a decorative glyph chosen because the row looked bare is the thing
+ * this system spent M4 removing.
  */
 
 function Card({
@@ -45,16 +57,25 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
+function CardTitle({
+  className,
+  icon,
+  children,
+  ...props
+}: React.ComponentProps<"div"> & { icon?: IconName }) {
+  const Icon = icon ? icons[icon] : null
   return (
     <div
       data-slot="card-title"
       className={cn(
-        "text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
+        "flex items-center gap-2 text-base leading-snug font-medium group-data-[size=sm]/card:text-sm",
         className
       )}
       {...props}
-    />
+    >
+      {Icon && <Icon size={16} aria-hidden className="shrink-0 text-text-muted" />}
+      {children}
+    </div>
   )
 }
 

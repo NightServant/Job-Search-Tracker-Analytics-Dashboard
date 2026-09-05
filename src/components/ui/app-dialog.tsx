@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
+import { icons, type IconName } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
 /**
@@ -40,11 +41,30 @@ import { cn } from '@/lib/utils'
  * renders inside `DialogTitle`, so whatever goes in is still the dialog's
  * accessible name; passing a node that contains no text would take that name
  * away, which is the one thing a caller must not do here.
+ *
+ * `icon` IS OUTSIDE `DialogTitle`, as a sibling (2026-09-05, Gabe's ask for
+ * icons on dialog headings). NOT because it would otherwise change the
+ * accessible name -- it would not, and an earlier draft of this note claimed
+ * so wrongly: these glyphs render an `<svg>` with no text, so a screen reader
+ * gets the same name either way. Verified by moving it inside and watching
+ * `getByRole('dialog', { name })` still pass.
+ *
+ * The reasons it is outside are smaller and real. `DialogTitle` carries the
+ * type scale, and a glyph inheriting `heading-m`'s line-height sits wrong
+ * against its own box. And the title node's content stays exactly the node the
+ * caller passed, which is what keeps `title` a string a test or a future
+ * feature can read back.
+ *
+ * 18px, not 16: a dialog heading is heading-m and the glyph is read at arm's
+ * length from the rest of the screen, with nothing else competing for the
+ * line. `mt-0.5` sits it on the cap height rather than the box.
  */
 export interface AppDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   title: React.ReactNode
+  /** A muted glyph before the title, outside its accessible name. */
+  icon?: IconName
   description?: string
   /** Rendered above the title. Metadata about the thing being shown, not a second heading. */
   eyebrow?: React.ReactNode
@@ -69,12 +89,14 @@ export function AppDialog({
   open,
   onOpenChange,
   title,
+  icon,
   description,
   eyebrow,
   actions,
   size = 'm',
   children,
 }: AppDialogProps) {
+  const Icon = icon ? icons[icon] : null
   return (
     <Dialog open={open} onOpenChange={(next) => onOpenChange(next)}>
       <DialogContent
@@ -87,7 +109,12 @@ export function AppDialog({
         <DialogHeader className="gap-0 p-6 pb-4">
           {eyebrow && <div className="mb-2 pr-8">{eyebrow}</div>}
           <div className="flex items-start justify-between gap-6">
-            <DialogTitle className="text-heading-m text-text-primary">{title}</DialogTitle>
+            <div className="flex min-w-0 items-start gap-2.5">
+              {Icon && (
+                <Icon size={18} aria-hidden className="mt-0.5 shrink-0 text-text-muted" />
+              )}
+              <DialogTitle className="text-heading-m text-text-primary">{title}</DialogTitle>
+            </div>
             {actions && <div className="shrink-0 pr-8">{actions}</div>}
           </div>
           {description && (

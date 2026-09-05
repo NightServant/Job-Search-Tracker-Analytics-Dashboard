@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { Reveal } from '@/components/motion/Reveal'
-import { ArrowRightIcon, InfoIcon } from '@/components/icons'
+import { EyeIcon, InfoIcon, LockIcon, UserRoundIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { Section } from './Section'
 import { LANDING_TYPE } from './typography'
 import { CLOSING_CTA } from './content'
@@ -77,19 +78,34 @@ export function ClosingCta() {
           */}
           <div className="flex flex-col items-start gap-3 pt-2">
             <div className="flex flex-wrap items-center gap-3">
+              {/*
+                ICONS LEAD, AND THE PRIMARY'S TRAILING ARROW IS GONE
+                (2026-09-05, Gabe's ask for icons before CTA buttons). The
+                arrow was doing hierarchy -- "this is the one that opens
+                something" -- and the paragraph below already says the fill
+                does that job, so it was the second answer to a settled
+                question. What replaces it is a different job: three buttons in
+                a row now say WHAT each one opens rather than which is
+                loudest. An eye for something to look at, a person for an
+                account, a lock for a door you already have a key to.
+
+                THE ROW ITSELF IS UNTOUCHED. One wrapping row of three is
+                Gabe's layout (`0038a8b`) and stays exactly that.
+              */}
               <Link
                 href={CLOSING_CTA.primary.href}
                 data-variant="primary"
-                className={`${buttonVariants({ variant: 'primary', size: 'm' })} group`}
+                className={cn(buttonVariants({ variant: 'primary', size: 'm' }), ICON_MOTION_GROUP)}
               >
+                <EyeIcon size={16} aria-hidden className={iconMotion('zoom')} />
                 {CLOSING_CTA.primary.label}
-                <ArrowRightIcon size={16} aria-hidden />
               </Link>
               <Link
                 href={CLOSING_CTA.secondary.href}
                 data-variant="secondary"
-                className={buttonVariants({ variant: 'secondary', size: 'm' })}
+                className={cn(buttonVariants({ variant: 'secondary', size: 'm' }), ICON_MOTION_GROUP)}
               >
+                <UserRoundIcon size={16} aria-hidden className={iconMotion('lift')} />
                 {CLOSING_CTA.secondary.label}
               </Link>
               {/*
@@ -101,16 +117,13 @@ export function ClosingCta() {
                 With all three now on one row, the filled primary is the only
                 thing carrying hierarchy, which is why it stays the only
                 filled one.
-
-                It carries no icon. The arrow on the primary marks the one
-                action that opens something immediately; repeating it here
-                would spend the distinction.
               */}
               <Link
                 href={CLOSING_CTA.tertiary.href}
                 data-variant="secondary"
-                className={buttonVariants({ variant: 'secondary', size: 'm' })}
+                className={cn(buttonVariants({ variant: 'secondary', size: 'm' }), ICON_MOTION_GROUP)}
               >
+                <LockIcon size={16} aria-hidden className={iconMotion('lift')} />
                 {CLOSING_CTA.tertiary.label}
               </Link>
             </div>

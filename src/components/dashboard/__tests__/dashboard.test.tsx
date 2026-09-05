@@ -166,6 +166,39 @@ describe('Overview layout and copy', () => {
     expect(table.className).toContain('lg:col-span-2')
   })
 
+  it('gives every panel a way through to the screen it summarises', () => {
+    // Four of the five used to be dead ends. Every panel here is an
+    // abridgement of a screen in the sidebar, and a reader who wanted more had
+    // to work out for themselves which one -- which is the work an overview
+    // exists to have already done.
+    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    const cards = [...container.querySelectorAll('[data-slot="card"]')]
+    const routes = new Map<string, string>()
+    for (const card of cards) {
+      const title = card.querySelector('h2')!.textContent!
+      const link = card.querySelector('[data-slot="card-action"] a')
+      expect(link, `"${title}" is a dead end`).toBeTruthy()
+      routes.set(title, link!.getAttribute('href')!)
+    }
+    expect(routes.get('applications over time')).toBe('/analytics')
+    expect(routes.get('by status')).toBe('/applications')
+    expect(routes.get('upcoming events')).toBe('/calendar')
+    expect(routes.get('by source')).toBe('/analytics')
+    expect(routes.get('recent applications')).toBe('/applications')
+  })
+
+  it('names each panel with a glyph the heading does not have to repeat', () => {
+    // Gabe's 2026-09-05 ask. `aria-hidden` and inside the title slot, so the
+    // heading's own name is unchanged -- which the assertion above relies on
+    // to find these cards by their text at all.
+    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    for (const card of container.querySelectorAll('[data-slot="card"]')) {
+      const title = card.querySelector('[data-slot="card-title"]')!
+      expect(title.querySelector('svg'), `${title.textContent} has no glyph`).toBeTruthy()
+      expect(title.textContent).toBe(card.querySelector('h2')!.textContent)
+    }
+  })
+
   it('says what the page and each panel are for', () => {
     const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     expect(container.querySelector('[data-page-description]')!.textContent).toMatch(/at a glance/i)

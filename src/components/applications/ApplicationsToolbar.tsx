@@ -5,8 +5,8 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CssSpinner } from '@/components/ui/css-spinner'
-import { DownloadIcon, SearchIcon, UploadIcon } from '@/components/icons'
-import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
+import { DownloadIcon, UploadIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 
 /**
  * Search plus the two CSV controls.
@@ -44,26 +44,20 @@ export function ApplicationsToolbar({
 
   return (
     <div className={cn('flex flex-col gap-3 sm:flex-row sm:items-center', className)}>
-      {/* The group is the FIELD'S WRAPPER, not a button: the lens should
-          react to the box being focused or typed into, which is what
-          `zoom`'s focus-within trigger is for. */}
-      <div className={cn(ICON_MOTION_GROUP, 'relative w-full sm:max-w-sm')}>
-        <SearchIcon
-          size={16}
-          aria-hidden
-          className={cn(
-            'pointer-events-none absolute left-3 top-3 text-text-muted',
-            iconMotion('zoom', { press: false })
-          )}
-        />
+      {/* The lens, the offset and the focus-within gesture all live in Input
+          now (`icon` + `type="search"`). They were hand-rolled here, which is
+          how this box came to sit its glyph at `left-3 top-3` with `pl-9`
+          while nothing else in the app agreed -- one field positioning its own
+          icon is a field that will eventually disagree with the next one. */}
+      <div className="w-full sm:max-w-sm">
         <Input
           id="applications-search"
           type="search"
+          icon="Search"
           aria-label="Search applications"
           placeholder="search company or role"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
-          className="pl-9"
         />
       </div>
 

@@ -141,7 +141,7 @@ export function useCvTailoring(options: {
 export function TailoringTargetRail({ state, jobs }: { state: CvTailoringState; jobs: Job[] }) {
   return (
     <div className="flex flex-col gap-6" data-tailoring-target>
-      <PanelSection title="tailor to" className="border-t-0 pt-0">
+      <PanelSection title="tailor to" icon="Briefcase" className="border-t-0 pt-0">
         <div className="flex flex-col gap-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-label-caps uppercase text-text-secondary">application</span>
@@ -212,7 +212,7 @@ export function TailoringAnalysisRail({
 
   return (
     <div className="flex flex-col gap-6" data-tailoring-analysis>
-      <PanelSection title="ATS match" className="border-t-0 pt-0">
+      <PanelSection title="ATS match" icon="ShieldCheck" className="border-t-0 pt-0">
         {match === null ? (
           <p className="text-body-s text-text-muted">
             pick an application or paste a posting to score this CV against it.
@@ -234,7 +234,7 @@ export function TailoringAnalysisRail({
         )}
       </PanelSection>
 
-      <PanelSection title="AI tailoring">
+      <PanelSection title="AI tailoring" icon="CircleCheck">
         <div className="flex flex-col gap-4">
           <Button
             size="s"

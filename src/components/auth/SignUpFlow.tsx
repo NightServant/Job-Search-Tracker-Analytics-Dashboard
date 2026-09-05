@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, PasswordInput } from '@/components/ui/input'
 import { CheckIcon, CircleCheckIcon, ShieldCheckIcon, UserRoundIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import {
   isPasswordStrong,
   isValidEmail,
@@ -168,6 +169,7 @@ export function SignUpFlow({
                 <Input
                   id="signup-email"
                   name="email"
+                  icon="Mail"
                   type="text"
                   inputMode="email"
                   autoComplete="email"
@@ -183,6 +185,7 @@ export function SignUpFlow({
                   <PasswordInput
                     id="signup-password"
                     name="password"
+                    icon="Lock"
                     autoComplete="new-password"
                     required
                     value={password}
@@ -196,6 +199,7 @@ export function SignUpFlow({
                 <PasswordInput
                   id="signup-confirm"
                   name="confirmPassword"
+                  icon="Lock"
                   autoComplete="new-password"
                   required
                   value={confirm}
@@ -203,7 +207,10 @@ export function SignUpFlow({
                 />
               </Field>
 
+              {/* The glyph is dropped while busy: Button's spinner uses the
+                  same leading slot. */}
               <Button type="submit" variant="primary" size="m" loading={busy}>
+                {!busy && <UserRoundIcon size={16} aria-hidden className={iconMotion('lift')} />}
                 Create account
               </Button>
 

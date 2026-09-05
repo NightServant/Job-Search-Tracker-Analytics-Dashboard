@@ -1,13 +1,12 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
-import { buttonVariants } from '@/components/ui/button-variants'
-import { ChevronLeftIcon, TrashIcon } from '@/components/icons'
-import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
+import { TrashIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
 import { ApplicationForm } from '../ApplicationForm'
 import { ApplicationRecord } from './ApplicationRecord'
 import { EMPTY_RECORD_DATA, type ApplicationRecordData } from './recordData'
@@ -24,8 +23,12 @@ import type { Job, JobAutofillResult, JobFormData } from '@/types'
  *   and a close button where the back button should be, and it takes the
  *   hardware back gesture away from the one interaction a phone user reaches
  *   for first. This is a route, so back is back.
- * - The header is a stacked block with its own back control at a 44px target,
- *   in place of the dialog's title bar and its 24px close affordance.
+ * - The header opens with a BREADCRUMB rather than a bare back arrow. It was
+ *   a "< applications" link, which says where you would end up but not where
+ *   you are; the trail says both, and it is the same component the document
+ *   editor uses -- this route was the one nested screen in the app without
+ *   one. `Breadcrumb` grows its ancestor crumbs to 44px on a coarse pointer,
+ *   so the target the back arrow had is not lost with it.
  * - The actions are a full-width row under the header rather than a cluster
  *   opposite the title. Two thumb-width buttons, not two pointer-width ones.
  * - The record below runs in `page` layout: one column, in the section list's
@@ -72,14 +75,14 @@ export function ApplicationRecordScreen({
 
   return (
     <div className="flex flex-col gap-6" data-application-screen={mode}>
-      <Link
-        href={backHref}
-        className={cnBack}
-        aria-label="Back to applications"
-      >
-        <ChevronLeftIcon size={18} aria-hidden className={iconMotion('back')} />
-        applications
-      </Link>
+      {/*
+        The leaf repeats the <h1> below it, and that is what a breadcrumb leaf
+        is: the trail is only readable as a path if it ends where you are.
+      */}
+      <Breadcrumb
+        className="-ml-0.5"
+        items={[{ label: 'applications', href: backHref }, { label: job.role }]}
+      />
 
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
@@ -134,10 +137,3 @@ export function ApplicationRecordScreen({
     </div>
   )
 }
-
-/**
- * A 44px target rather than a bare text link. `buttonVariants` is called once
- * at module scope because it is a pure function over strings and the classes
- * never change with props.
- */
-const cnBack = `${ICON_MOTION_GROUP} ${buttonVariants({ variant: 'ghost', size: 's' })} h-11 w-fit -ml-3 gap-2`

@@ -19,7 +19,7 @@ export interface AccountGroupProps {
 export function AccountGroup({ email = null, onSignOut, signingOut = false }: AccountGroupProps) {
   return (
     <div data-settings-group="account">
-      <PanelSection title="account" titleSize="m">
+      <PanelSection title="account" icon="UserRound" titleSize="m">
         <div className="flex flex-col gap-4">
           <SettingsRow
             label="email"

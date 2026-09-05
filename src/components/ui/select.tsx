@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { Select as SelectPrimitive } from '@base-ui/react/select'
 import { cn } from '@/lib/utils'
-import { CheckIcon, ChevronDownIcon } from '@/components/icons'
+import { CheckIcon, ChevronDownIcon, icons, type IconName } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 
 /**
@@ -40,6 +40,13 @@ import { iconMotion } from '@/components/icons/motion'
  * error contract -- `error` plus `id` renders the message and wires
  * `aria-describedby` -- so a form can hold a mix of the two without
  * special-casing either, exactly as before.
+ *
+ * That contract is why `icon` exists here too (2026-09-05). A form row is a
+ * mix of inputs and selects, and a leading glyph on one but not the other
+ * would put the two controls' text on different vertical lines -- so the
+ * feature is not "selects can have icons", it is "the two controls still
+ * match". Same rules as Input's: decorative, muted, and never a substitute
+ * for the label.
  */
 export interface SelectOption {
   value: string
@@ -67,6 +74,8 @@ export interface SelectProps {
   error?: string
   /** Shown when `value` matches no item. */
   placeholder?: string
+  /** A glyph inside the leading edge of the trigger. Decorative; see Input. */
+  icon?: IconName
   className?: string
   'aria-label'?: string
 }
@@ -81,11 +90,13 @@ export function Select({
   required,
   error,
   placeholder = 'select',
+  icon,
   className,
   'aria-label': ariaLabel,
 }: SelectProps) {
   const describedBy = error && id ? `${id}-error` : undefined
   const selected = items.find((item) => item.value === value)
+  const Icon = icon ? icons[icon] : null
 
   return (
     <div className="w-full">
@@ -105,7 +116,13 @@ export function Select({
           className={cn(
             iconMotion('none'),
             'group/icon flex h-10 w-full items-center justify-between gap-2 rounded-md border',
-            'bg-bg-canvas pl-3 pr-3 text-left text-body-m text-text-primary',
+            // Absolutely positioned and `pl-10`, exactly as Input does it,
+            // rather than an in-flow flex child. A flex child would sit at
+            // `pl-3` + gap, putting this control's text on a different
+            // vertical line from the field beside it -- which is the whole
+            // thing this prop exists to prevent.
+            'relative bg-bg-canvas pr-3 text-left text-body-m text-text-primary',
+            Icon ? 'pl-10' : 'pl-3',
             'transition-colors duration-(--duration-fast)',
             'focus-visible:border-accent-default focus-visible:outline-none',
             'focus-visible:ring-2 focus-visible:ring-accent-default/30',
@@ -114,6 +131,14 @@ export function Select({
             className
           )}
         >
+          {Icon && (
+            <span
+              aria-hidden
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-text-muted"
+            >
+              <Icon size={16} />
+            </span>
+          )}
           <SelectPrimitive.Value className="truncate">
             {selected ? selected.label : <span className="text-text-muted">{placeholder}</span>}
           </SelectPrimitive.Value>

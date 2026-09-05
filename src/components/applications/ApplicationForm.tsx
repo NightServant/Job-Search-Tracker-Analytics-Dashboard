@@ -276,7 +276,7 @@ export function ApplicationForm({
         different heading treatments for the same eleven sections is how the
         two modes start to look like two screens.
       */}
-      <PanelSection title="job information" className="border-t-0 pt-0">
+      <PanelSection title="job information" icon="Briefcase" className="border-t-0 pt-0">
         <div className={cn('grid gap-5', cols)}>
           <Field id="company" label="company" required>
             <Input
@@ -389,7 +389,7 @@ export function ApplicationForm({
       </PanelSection>
 
       {/* Section 3. Its own group because Auto-fill acts on this one field. */}
-      <PanelSection title="posting url">
+      <PanelSection title="posting url" icon="External">
         <Field id="url" label="posting URL">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
             <Input
@@ -421,7 +421,7 @@ export function ApplicationForm({
       {/* Section 4. One comma-separated input each, never a chip editor: the
           value is a list the user types in one go, and splitting it into an
           add-a-tag control would be three interactions for what is one. */}
-      <PanelSection title="tags and tech stack">
+      <PanelSection title="tags and tech stack" icon="Applications">
         <div className={cn('grid gap-5', cols)}>
           <Field id="tags" label="tags" hint="separated by commas.">
             <Input
@@ -451,7 +451,7 @@ export function ApplicationForm({
           used to be -- it inherits the accent through `--color-primary` and
           the system border through `--color-input`, and it carries the focus
           ring the raw input never had. */}
-      <PanelSection title="referral">
+      <PanelSection title="referral" icon="UserRound">
         <div className="flex items-center gap-3">
           <Checkbox
             id="is_referral"
@@ -465,7 +465,7 @@ export function ApplicationForm({
       </PanelSection>
 
       {/* Section 6. */}
-      <PanelSection title="date applied">
+      <PanelSection title="date applied" icon="Calendar">
         <div className={cn('grid gap-5', cols)}>
           <Field id="date_applied" label="date applied">
             <Input
@@ -485,7 +485,7 @@ export function ApplicationForm({
           six-line window means scrolling a box inside a scrolling dialog.
           Both keep `resize-y` from Textarea, so the height here is a floor
           and not a cap. */}
-      <PanelSection title="job description">
+      <PanelSection title="job description" icon="Documents">
         <Field
           id="description"
           label="job description"
@@ -502,7 +502,7 @@ export function ApplicationForm({
         </Field>
       </PanelSection>
 
-      <PanelSection title="notes">
+      <PanelSection title="notes" icon="Info">
         <Field id="notes" label="notes">
           <Textarea
             id="notes"
@@ -515,7 +515,7 @@ export function ApplicationForm({
         </Field>
       </PanelSection>
 
-      <PanelSection title="contact">
+      <PanelSection title="contact" icon="Mail">
         <div className={cn('grid gap-5', cols)}>
           <Field id="contact_name" label="name">
             <Input

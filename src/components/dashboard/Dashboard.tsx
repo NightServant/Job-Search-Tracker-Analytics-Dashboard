@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { useAppHref } from '@/components/shell/routeBase'
 import { PageHeader } from '@/components/ui/page-header'
 import {
@@ -19,6 +20,8 @@ import { StatusDonut } from './StatusDonut'
 import { SourceMix } from './SourceMix'
 import { UpcomingEvents } from './UpcomingEvents'
 import { RecentApplicationsTable } from './RecentApplicationsTable'
+import { ArrowRightIcon } from '@/components/icons'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { getStaleApplications } from '@/services/followUp'
 import { applicationsPerMonth, statusBreakdown, rankedSources } from '@/lib/overviewSeries'
 import type { CalendarEvent } from '@/services/events'
@@ -29,6 +32,35 @@ export interface DashboardProps {
   events?: CalendarEvent[]
   eventsLoading?: boolean
   eventsError?: boolean
+}
+
+/**
+ * The link out of a panel, to the screen that panel is a summary of.
+ *
+ * EVERY PANEL HERE IS AN ABRIDGEMENT. The trend is six months of a chart the
+ * analytics screen draws properly; "by status" is a donut of a board; "upcoming
+ * events" is the next few rows of a calendar. Before this only one of the five
+ * said so, and the other four were dead ends -- a reader who wanted more had to
+ * work out for themselves which sidebar entry the panel belonged to, which is
+ * exactly the work an overview is supposed to have already done.
+ *
+ * Wording is the destination, not "view all": four of these five are not lists,
+ * so "all" of them is not a thing. `appHref` keeps them inside /demo when the
+ * demo is what is being read.
+ */
+function PanelLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        ICON_MOTION_GROUP,
+        'inline-flex items-center gap-1.5 text-body-s text-accent-default hover:underline'
+      )}
+    >
+      {children}
+      <ArrowRightIcon size={14} aria-hidden className={iconMotion('forward')} />
+    </Link>
+  )
 }
 
 /** In-flight beyond two weeks with no sign of life is when chasing becomes reasonable. */
@@ -146,10 +178,13 @@ export function Dashboard({
       <div className="grid gap-8 lg:grid-cols-2">
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle icon="Analytics">
               <h2>applications over time</h2>
             </CardTitle>
             <CardDescription>how many you sent each month, over the last six.</CardDescription>
+            <CardAction>
+              <PanelLink href={appHref('/analytics')}>see the analytics</PanelLink>
+            </CardAction>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <ApplicationsOverTime data={trend} />
@@ -158,10 +193,13 @@ export function Dashboard({
 
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle icon="Applications">
               <h2>by status</h2>
             </CardTitle>
             <CardDescription>where everything you are tracking currently sits.</CardDescription>
+            <CardAction>
+              <PanelLink href={appHref('/applications')}>open the board</PanelLink>
+            </CardAction>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <StatusDonut data={statuses} />
@@ -170,10 +208,13 @@ export function Dashboard({
 
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle icon="Calendar">
               <h2>upcoming events</h2>
             </CardTitle>
             <CardDescription>interviews and calls already on the calendar.</CardDescription>
+            <CardAction>
+              <PanelLink href={appHref('/calendar')}>open the calendar</PanelLink>
+            </CardAction>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <UpcomingEvents
@@ -187,10 +228,13 @@ export function Dashboard({
 
         <Card>
           <CardHeader>
-            <CardTitle>
+            <CardTitle icon="External">
               <h2>by source</h2>
             </CardTitle>
             <CardDescription>your best channel, the runner-up, and the tail behind them.</CardDescription>
+            <CardAction>
+              <PanelLink href={appHref('/analytics')}>see the analytics</PanelLink>
+            </CardAction>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
             <SourceMix data={sources} />
@@ -201,14 +245,12 @@ export function Dashboard({
             it is the end of the page rather than one of a pair. */}
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>
+            <CardTitle icon="Clock">
               <h2>recent applications</h2>
             </CardTitle>
             <CardDescription>the five most recent, newest first.</CardDescription>
             <CardAction>
-              <Link href={appHref('/applications')} className="text-body-s text-accent-default hover:underline">
-                view all
-              </Link>
+              <PanelLink href={appHref('/applications')}>view all</PanelLink>
             </CardAction>
           </CardHeader>
           <CardContent>

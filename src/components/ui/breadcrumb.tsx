@@ -9,6 +9,13 @@ import { ArrowRightIcon } from '@/components/icons'
  * The last crumb is the current page, so it is text rather than a link and
  * carries `aria-current="page"`. A link to where you already are is a dead
  * control that still takes a tab stop.
+ *
+ * ANCESTOR CRUMBS ARE 44px TALL ON A COARSE POINTER. This started as a
+ * document-editor trail read with a mouse; it is now also the way out of a
+ * record on a phone, where "applications" at body-s is a 17px target. The rule
+ * is scoped to the pointer, so the desktop trail keeps its compact rhythm --
+ * `inline-flex` with `items-center` means the extra height goes around the
+ * text rather than under it.
  */
 export interface Crumb {
   label: string
@@ -47,7 +54,10 @@ export function Breadcrumb({ items, className, ...props }: BreadcrumbProps) {
               ) : (
                 <Link
                   href={item.href}
-                  className="text-text-muted hover:text-text-primary hover:underline"
+                  className={cn(
+                    'inline-flex items-center text-text-muted hover:text-text-primary hover:underline',
+                    '[@media(pointer:coarse)]:min-h-11'
+                  )}
                 >
                   {item.label}
                 </Link>
