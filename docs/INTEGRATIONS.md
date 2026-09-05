@@ -17,6 +17,7 @@ service.
 | **Novoresume** | CV tailoring and ATS scoring "via API" | **No API exists.** No developer docs, no endpoints, no developer programme | **Replaced** |
 | **Composio** | Connectors, autofill, tracking | Real, 1,505 toolkits, MCP | **Connected** as dev tooling (2026-09-05); not in the app |
 | **JobStreet** | A connector | **No toolkit exists** on Composio; SEEK's own API is employer-only | **Replaced** |
+| **LinkedIn** | (not asked for; tried 2026-09-05) | Toolkit exists and connects, but self-serve OAuth grants profile + post only. No jobs or applications data at any tier below partner | **Connected, and it cannot feed the tracker** |
 
 ### How each was verified
 
@@ -74,7 +75,14 @@ That is precisely the condition every usable row above meets and every trap
 fails. The cost is recall; the alternative was teaching the scorer that "react
 calmly in stressful situations" satisfies a React requirement.
 
-## JobStreet
+## Job boards: JobStreet and LinkedIn
+
+Two attempts, one conclusion, so they live together: **the posting data comes
+from parsing the page, not from an API.** Whatever a job board exposes to
+developers is built for employers and ATS vendors; the candidate-facing half is
+a posting tool.
+
+### JobStreet
 
 No Composio toolkit exists — its HR & Recruiting category has 22 toolkits
 (Ashby, BambooHR, Greenhouse, Lever, Workday, ZipRecruiter, Dice…) and no APAC
@@ -91,6 +99,40 @@ Per Gabe's decision, JobStreet is reached by extending the existing
 `supabase/functions/job-url-autofill` edge function, which already parses
 postings, is SSRF-hardened, and backs the Auto-fill button on the application
 form.
+
+### LinkedIn
+
+A toolkit DOES exist, it connects cleanly, and it still cannot feed the
+tracker. This is a measured result rather than a prediction -- connected
+2026-09-05, `status: active`, verified through `COMPOSIO_MANAGE_CONNECTIONS`.
+
+**What the active connection returns is the whole story:** `sub`, `name`,
+`given_name`, `family_name`, `email`, `email_verified`, `locale`, `picture`.
+That is the OpenID Connect `openid profile email` claim set verbatim -- the
+self-serve tier and nothing beyond it.
+
+The toolkit advertises 22 actions. They split by what LinkedIn will actually
+grant:
+
+| Works on self-serve | Needs partner approval |
+|---|---|
+| get my info, get person profile, create post, create article/URL share, comment, delete post, image and video upload | company info, organization page statistics, share statistics, audience counts, ad targeting facets, ad targeting search |
+
+The second column is Marketing API surface. LinkedIn's self-serve OAuth grants
+three scopes -- profile, email, and `w_member_social` -- and everything else,
+including connections, messaging and anything jobs-related, is gated behind a
+partner programme that is not self-service. (`r_liteprofile` was also replaced
+by `r_basicprofile`; older tutorials name a scope that no longer exists for new
+applications.)
+
+**There is no endpoint for your applications or for job postings at any tier
+below Talent Solutions partnership.** So a connected LinkedIn account can say
+who you are and post on your behalf. It cannot tell this app where you applied.
+
+DO NOT RECONNECT IT EXPECTING OTHERWISE. The connection working is not evidence
+that the data is reachable, and "active" is exactly what it looks like when it
+is not -- which is why this section records the claim set rather than just the
+status.
 
 ## Setup
 
