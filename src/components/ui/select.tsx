@@ -168,12 +168,29 @@ export function Select({
               HAIRLINE, 4px, NO SHADOW. The system separates with rules rather
               than elevation -- AppDialog makes the same call for the same
               reason -- so a drop shadow here would be the only soft edge in
-              the app. `min-w-(--anchor-width)` matches the trigger, because a
-              list narrower than the control it came from reads as detached.
+              the app.
+
+              IT IS THE TRIGGER'S WIDTH, FULL STOP. This was
+              `min-w-(--anchor-width)`, on the reasoning that a list narrower
+              than the control it came from reads as detached -- true, and
+              only half the rule. With no cap the popup grew to its WIDEST
+              ITEM, so the CV tailoring picker, whose options are job titles
+              like "Junior Java Developer (Open for Fresh Grads with Java and
+              Oracle knowledge) - Indra Philippines, Inc.", opened a list
+              roughly 750px wide out of a 300px control. Wide enough that the
+              positioner then shifted it left to keep it on screen, so it no
+              longer lined up with anything either. Gabe reported it as
+              "centered and too large"; both halves of that are the same
+              missing cap.
+
+              `min-w-[9rem]` is a floor for the genuinely tiny triggers (the
+              currency picker), so an option is never squeezed into a control
+              that happens to be 80px wide.
             */}
             <SelectPrimitive.Popup
               className={cn(
-                'max-h-[min(24rem,var(--available-height))] min-w-(--anchor-width) overflow-y-auto',
+                'max-h-[min(24rem,var(--available-height))] overflow-y-auto',
+                'w-(--anchor-width) min-w-[9rem] max-w-[var(--available-width)]',
                 'rounded-md border border-border-default bg-bg-canvas py-1',
                 'origin-(--transform-origin) outline-none'
               )}
@@ -184,9 +201,13 @@ export function Select({
                     key={item.value}
                     value={item.value}
                     disabled={item.disabled}
+                    // `title` because the label truncates: a job title is the
+                    // one option text in this app long enough to be cut, and
+                    // what the ellipsis hides has to stay reachable.
+                    title={item.label}
                     className={cn(
                       // 36px for a pointer, 44px for a finger.
-                      'flex h-9 cursor-default select-none items-center gap-2 pl-3 pr-3',
+                      'flex h-9 min-w-0 cursor-default select-none items-center gap-2 pl-3 pr-3',
                       'text-body-m text-text-primary outline-none',
                       '[@media(pointer:coarse)]:h-11',
                       // Highlight is a fill from an existing token, never a
@@ -196,7 +217,11 @@ export function Select({
                       'data-disabled:cursor-not-allowed data-disabled:text-text-muted'
                     )}
                   >
-                    <SelectPrimitive.ItemText className="flex-1 truncate">
+                    {/* `min-w-0` is what lets `truncate` engage at all: a
+                        flex item's default `min-width: auto` floors it at its
+                        content width, so the text would push the popup wider
+                        instead of being cut. */}
+                    <SelectPrimitive.ItemText className="min-w-0 flex-1 truncate">
                       {item.label}
                     </SelectPrimitive.ItemText>
                     {/*

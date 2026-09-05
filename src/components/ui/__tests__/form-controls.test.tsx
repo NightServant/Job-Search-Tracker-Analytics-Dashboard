@@ -120,6 +120,53 @@ describe('Select', () => {
     expect(screen.getByText('Pick one')).toBeTruthy()
   })
 
+  it('opens a list the width of the control, never the width of its longest option', async () => {
+    // Gabe, 2026-09-05: "dropdown from the document editor is center and too
+    // large". The popup was `min-w-(--anchor-width)` with NO cap, so it grew
+    // to its widest item -- the CV tailoring picker's options are job titles,
+    // and a 300px control opened a ~750px list. Wide enough that the
+    // positioner then shifted it sideways to keep it on screen, which is the
+    // "centered" half of the same bug.
+    //
+    // jsdom has no layout, so the WIDTH cannot be measured here; the class
+    // contract is what is asserted, and the real measurement was taken in a
+    // browser (trigger 481px, popup 481px, both left edges at 642px, with a
+    // 118-character option truncating).
+    const user = userEvent.setup({ delay: null })
+    render(
+      <Select
+        id="application"
+        aria-label="Application"
+        value=""
+        onValueChange={() => {}}
+        items={[
+          { value: '', label: 'none selected' },
+          {
+            value: 'long',
+            label:
+              'Junior Java Developer (Open for Fresh Grads with Java and Oracle knowledge) — Indra Philippines, Inc.',
+          },
+        ]}
+      />
+    )
+    await user.click(screen.getByLabelText('Application'))
+    const option = await screen.findByRole('option', { name: /Junior Java Developer/ })
+
+    const popup = option.closest('[class*="anchor-width"]')
+    expect(popup, 'the popup is not bound to the anchor width').toBeTruthy()
+    expect(popup!.className).toContain('w-(--anchor-width)')
+    expect(popup!.className).not.toContain('min-w-(--anchor-width)')
+
+    // And the label has to be able to give: `truncate` does nothing on a flex
+    // item whose default `min-width: auto` floors it at its content width, so
+    // the text would push the popup wider instead of being cut.
+    const text = option.querySelector('[class*="truncate"]')!
+    expect(text.className).toContain('min-w-0')
+
+    // What the ellipsis hides stays reachable.
+    expect(option.getAttribute('title')).toContain('Indra Philippines')
+  })
+
   it('keeps the accent for the choice and a neutral fill for the hover', () => {
     // The palette rule, made checkable: orange marks WHICH option is chosen;
     // moving over an option is a neutral token. Reversing those would make
