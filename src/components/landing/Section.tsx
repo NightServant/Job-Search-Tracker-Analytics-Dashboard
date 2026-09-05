@@ -68,7 +68,7 @@ export function Section({
         // margin -- 80 + 24 - 112 -- to express. A fallback that clears the
         // bar is the right amount of fidelity for a path that only runs when
         // the handler could not.
-        'w-full scroll-mt-[60px] px-5 py-20 md:scroll-mt-[80px] md:px-8 md:py-28',
+        'w-full scroll-mt-[60px] px-gutter py-20 md:scroll-mt-[80px] md:py-28',
         tone === 'surface' ? 'bg-bg-surface' : 'bg-bg-canvas',
         className
       )}

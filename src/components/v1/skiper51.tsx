@@ -81,7 +81,16 @@ export interface Carousel005Props {
    * One entry per slide, each carrying BOTH theme captures. See the render for
    * why both ship rather than one being chosen in JavaScript.
    */
-  images: { srcLight: string; srcDark: string; alt: string }[]
+  images: {
+    srcLight: string
+    srcDark: string
+    /** Optional narrow-viewport variants, as a `srcset` string. */
+    srcSetLight?: string
+    srcSetDark?: string
+    /** The slot's rendered width, for the browser to pick against. */
+    sizes?: string
+    alt: string
+  }[]
   className?: string
   showPagination?: boolean
   showNavigation?: boolean
@@ -194,6 +203,8 @@ const Carousel_005 = ({
               <img
                 className="h-full w-full rounded-md border border-border-subtle object-contain dark:hidden"
                 src={image.srcLight}
+                srcSet={image.srcSetLight}
+                sizes={image.sizes}
                 alt={image.alt}
                 loading="lazy"
                 decoding="async"
@@ -201,6 +212,8 @@ const Carousel_005 = ({
               <img
                 className="hidden h-full w-full rounded-md border border-border-subtle object-contain dark:block"
                 src={image.srcDark}
+                srcSet={image.srcSetDark}
+                sizes={image.sizes}
                 alt=""
                 aria-hidden
                 loading="lazy"

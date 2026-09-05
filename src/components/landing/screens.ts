@@ -54,6 +54,25 @@ export interface LandingScreen {
   caption: string
 }
 
+/**
+ * The 768px capture that sits beside each 1440px one.
+ *
+ * Every one of these ten files is a 1440-wide screenshot, and a phone was
+ * downloading all of them at full size to render them about 350px across --
+ * roughly 1.2MB of detail no 375px screen can resolve. The narrow variants are
+ * the same captures at 768 (`sips -Z 768`), around 35KB each.
+ *
+ * `sizes` is what makes the choice possible at all: without it the browser
+ * assumes the image fills the viewport, which on a phone is the one case where
+ * the guess is close and on a desktop is badly wrong. The slot is the page's
+ * 1200px container inset by its gutters, which is what this describes.
+ */
+export const SCREEN_SIZES = '(min-width: 1264px) 1200px, calc(100vw - 4rem)'
+
+export function screenSrcSet(src: string): string {
+  return `${src.replace(/\.jpg$/, '-768.jpg')} 768w, ${src} 1440w`
+}
+
 export const SCREENS: LandingScreen[] = [
   {
     srcLight: '/screens/light/dashboard.jpg',

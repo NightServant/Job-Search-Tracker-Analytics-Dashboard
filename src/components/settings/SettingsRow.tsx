@@ -31,15 +31,28 @@ export function SettingsRow({ label, description, control, wide = false }: Setti
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-4',
-        wide && 'flex-col items-start sm:flex-row sm:items-center'
+        // EVERY row stacks below 640, not just the `wide` ones. A label with a
+        // sentence of description beside a `shrink-0` control left the text
+        // about 150px wide on a 320px screen -- "permanently remove your
+        // account and everything tied to it" set four words to a line, next to
+        // a button that had taken half the row. Label above, control below, is
+        // the same treatment the tier map asks of a form field.
+        'flex flex-col items-start gap-2',
+        'sm:flex-row sm:items-center sm:justify-between sm:gap-4'
       )}
     >
-      <div className="flex flex-col gap-0.5">
+      {/* `min-w-0` so a long description wraps inside the row rather than
+          setting the row's minimum width. */}
+      <div className="flex min-w-0 flex-col gap-0.5">
         <p className="text-body-m text-text-primary">{label}</p>
         {description && <p className="text-body-s text-text-muted">{description}</p>}
       </div>
-      <div className={cn('shrink-0', wide && 'w-full sm:w-auto')}>{control}</div>
+      {/* `wide` no longer decides whether the row stacks -- it decides how the
+          control behaves once it HAS stacked. A currency selector fills the
+          width it has been given; a button keeps its own size. */}
+      <div className={cn('shrink-0', wide ? 'w-full sm:w-auto' : 'max-sm:w-full')}>
+        {control}
+      </div>
     </div>
   )
 }

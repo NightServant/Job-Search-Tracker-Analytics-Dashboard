@@ -32,7 +32,11 @@ export interface RangePickerProps {
 
 export function RangePicker({ value, onChange }: RangePickerProps) {
   return (
-    <div data-range-picker className="w-44">
+    // Full width on a phone, where it has wrapped onto its own line under the
+    // page title, and its natural 176px from 375 up. `w-44` alone made a
+    // 320px screen carry a control more than half the width of the viewport
+    // with nothing beside it.
+    <div data-range-picker className="w-full xs:w-44">
       <Select
         aria-label="Date range"
         value={value}

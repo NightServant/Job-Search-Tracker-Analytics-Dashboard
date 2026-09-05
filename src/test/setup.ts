@@ -1,11 +1,36 @@
 import '@testing-library/jest-dom/vitest'
 import { vi } from 'vitest'
 
-// Mock window.matchMedia for tests
+// jsdom has no matchMedia, so it has to be supplied. It used to be supplied as
+// `matches: false` for EVERY query, which is not a stub -- it is a wrong
+// answer. jsdom's viewport is 1024x768, so `(min-width: 1024px)` is true there,
+// and a component that asks whether it has desktop room was being told no.
+//
+// That went unnoticed while the only caller was `useIsMobile`, whose question
+// is `(max-width: 767px)` and whose right answer at 1024 happens to also be
+// false. It stopped being harmless the moment the sidebar started asking the
+// opposite question: it rendered as the tablet icon rail in every test, and
+// eight assertions about the expanded nav failed at once.
+//
+// So this evaluates the width features against `window.innerWidth` rather than
+// guessing. Anything else -- prefers-reduced-motion, prefers-color-scheme,
+// pointer -- is still false, which is the correct default for a jsdom run: no
+// stated user preference, and no pointer hardware to report.
+const WIDTH_FEATURE = /\((min|max)-width:\s*([\d.]+)(px|rem|em)\)/g
+
+function evaluateQuery(query: string): boolean {
+  const clauses = [...query.matchAll(WIDTH_FEATURE)]
+  if (clauses.length === 0) return false
+  return clauses.every(([, bound, value, unit]) => {
+    const px = unit === 'px' ? Number(value) : Number(value) * 16
+    return bound === 'min' ? window.innerWidth >= px : window.innerWidth <= px
+  })
+}
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: vi.fn().mockImplementation((query) => ({
-    matches: false,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: evaluateQuery(query),
     media: query,
     onchange: null,
     addListener: vi.fn(),

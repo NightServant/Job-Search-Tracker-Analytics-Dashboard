@@ -64,7 +64,7 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
     <section
       id="hero"
       data-landing-section="hero"
-      className="relative isolate flex h-full min-h-[88svh] flex-col justify-center overflow-hidden px-5 pb-24 pt-32 md:px-8 md:pb-32 md:pt-40 lg:min-h-[92svh]"
+      className="relative isolate flex h-full min-h-[88svh] flex-col justify-center overflow-hidden px-gutter pb-24 pt-32 md:pb-32 md:pt-40 lg:min-h-[92svh]"
     >
       <HeroMedia posterSrc={posterSrc} videoSrc={videoSrc} paused={unpinned} />
 
@@ -89,7 +89,15 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
             target="_blank"
             rel="noreferrer noopener"
             data-variant="primary"
-            className={cn(buttonVariants({ variant: 'primary', size: 'm' }), ICON_MOTION_GROUP)}
+            className={cn(
+              buttonVariants({ variant: 'primary', size: 'm' }),
+              ICON_MOTION_GROUP,
+              // Full width below 640 (Gabe, 2026-09-05), matching the closing
+              // CTA. The wrapping <div> is a block, so the button only needs
+              // permission to fill it -- there is no flex row here holding it
+              // to its content width.
+              'w-full sm:w-auto'
+            )}
           >
             <ExternalIcon size={16} aria-hidden className={iconMotion('forward')} />
             {HERO.sourceCta.label}

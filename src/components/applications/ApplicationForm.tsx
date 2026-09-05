@@ -602,8 +602,18 @@ export function ApplicationForm({
       <div
         className={cn(
           'flex items-center gap-3 border-t border-border-subtle pt-6',
+          // `-mx-gutter px-gutter`, not the old fixed `-mx-5 px-5`. The bar
+          // bleeds to the edges of the page and repaints the canvas behind
+          // itself, so the negative margin has to be exactly the shell's own
+          // padding -- and that is now fluid (16px at 320, 32px from 1200).
+          // Pinned at 20px it overhung a 320px screen by 4px each side and
+          // fell 12px short of the edge on a desktop.
           layout === 'page' &&
-            'sticky bottom-0 -mx-5 bg-bg-canvas px-5 pb-5 [&_button]:h-11 [&_button]:flex-1'
+            'sticky bottom-0 -mx-gutter bg-bg-canvas px-gutter pb-5 [&_button]:h-11 [&_button]:flex-1',
+          // In the dialog the same treatment below 640, where the dialog is a
+          // full-width bottom sheet: two buttons sharing the width, each at a
+          // 44px target. From 640 up they go back to their natural size.
+          layout === 'dialog' && 'max-sm:[&_button]:h-11 max-sm:[&_button]:flex-1'
         )}
       >
         <Button type="submit" disabled={saving}>

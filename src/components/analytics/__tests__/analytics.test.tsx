@@ -365,8 +365,13 @@ describe('Analytics', () => {
     expect(rows.length).toBeGreaterThan(1)
     // Striping is only striping if neighbours differ; asserting the class is
     // present somewhere would pass on every row carrying it.
-    expect(rows[0].className).not.toMatch(/bg-accent-surface/)
-    expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
+    expect(rows[0].className).not.toMatch(/\brow-zebra\b/)
+    expect(rows[0].className).toMatch(/bg-bg-canvas/)
+        // `row-zebra` rather than the literal `bg-accent-surface/30` this used to
+    // assert. Same colour, now opaque (see the utility): a sticky first column
+    // has the rest of its row sliding underneath it, and a translucent band
+    // lets that show through.
+    expect(rows[1].className).toMatch(/\brow-zebra\b/)
     // The old neutral band is gone, same as the applications table.
     expect(rows[1].className).not.toMatch(/bg-bg-surface/)
   })
@@ -374,7 +379,7 @@ describe('Analytics', () => {
   it('spans the KPI strip and the cohort table, and pairs the four charts', () => {
     const { container } = render(<Analytics {...fullProps()} />)
     const span = (key: string) =>
-      container.querySelector(`[data-panel-slot="${key}"]`)!.className.includes('lg:col-span-2')
+      container.querySelector(`[data-panel-slot="${key}"]`)!.className.includes('md:col-span-2')
     expect(span('overview')).toBe(true)
     expect(span('cohort')).toBe(true)
     for (const key of ['funnel', 'pipeline', 'time-in-stage', 'salary']) {
@@ -390,7 +395,7 @@ describe('Analytics', () => {
     const { container } = render(<Analytics {...fullProps()} jobs={[]} />)
     expect(
       container.querySelector('[data-panel-slot="salary"]')!.className
-    ).not.toContain('lg:col-span-2')
+    ).not.toContain('md:col-span-2')
     // It is still on the page, saying it is empty.
     expect(screen.getByRole('heading', { name: 'salary insights' })).toBeTruthy()
   })

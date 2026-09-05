@@ -173,9 +173,16 @@ export function Dashboard({
 
       <FollowUpNudge stale={stale} />
 
-      {/* Two equal columns from lg, in Gabe's order: over-time beside status,
-          events beside source, and the table across both. */}
-      <div className="grid gap-8 lg:grid-cols-2">
+      {/* Two equal columns from md, in Gabe's order: over-time beside status,
+          events beside source, and the table across both.
+
+          FROM md (768), NOT lg (1024). At 768 the nav has already become a
+          64px rail, so the content column is ~700px -- two 340px panels, which
+          is a real pair rather than two slivers, and it halves a page that was
+          five full-width panels deep on every tablet. Below 768 they stack:
+          a donut and a six-month bar chart at 300px each are two charts you
+          cannot read instead of one you can. */}
+      <div className="grid gap-section md:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle icon="Analytics">
@@ -243,7 +250,7 @@ export function Dashboard({
 
         {/* Full width: four columns of table read badly at half a screen, and
             it is the end of the page rather than one of a pair. */}
-        <Card className="lg:col-span-2">
+        <Card className="md:col-span-2">
           <CardHeader>
             <CardTitle icon="Clock">
               <h2>recent applications</h2>

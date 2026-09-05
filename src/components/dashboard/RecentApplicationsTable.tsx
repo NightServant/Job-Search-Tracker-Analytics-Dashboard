@@ -59,10 +59,12 @@ export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsT
   }
 
   return (
-    <Table data-recent-applications>
+    <Table stacked data-recent-applications>
       <TableHeader className="bg-accent-surface [&_th]:text-accent-on-surface">
-        <TableRow className="hover:bg-transparent">
-          <TableHead>company</TableHead>
+        {/* The fill is on the row too, so the sticky header cell's
+            `background: inherit` resolves to it. See ApplicationsTable. */}
+        <TableRow className="bg-accent-surface hover:bg-accent-surface">
+          <TableHead sticky>company</TableHead>
           <TableHead>position</TableHead>
           <TableHead>status</TableHead>
           <TableHead className="text-right">applied on</TableHead>
@@ -72,17 +74,19 @@ export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsT
         {rows.map((job, i) => (
           // Zebra on the odd rows only, so the first row sits on the card and
           // the banding reads as an aid rather than as a fill.
-          <TableRow key={job.id} className={cn(i % 2 === 1 && 'bg-accent-surface/30')}>
-            <TableCell className="max-w-0 truncate text-text-primary">
+          <TableRow key={job.id} className={cn(i % 2 === 1 ? 'row-zebra' : 'bg-bg-canvas')}>
+            <TableCell label="company" sticky className="max-w-0 truncate text-text-primary">
               <Link href={appHref(`/applications/${job.id}`)} className="hover:text-accent-default">
                 {job.company}
               </Link>
             </TableCell>
-            <TableCell className="max-w-0 truncate text-text-secondary">{job.role}</TableCell>
-            <TableCell>
+            <TableCell label="position" className="max-w-0 truncate text-text-secondary">
+              {job.role}
+            </TableCell>
+            <TableCell label="status">
               <StatusMarker status={job.status as Status} />
             </TableCell>
-            <TableCell className="tabular text-right text-text-muted">
+            <TableCell label="applied on" className="tabular text-right text-text-muted">
               {/* A wishlist job has no date_applied. An em dash says "no
                   value"; "not applied" says which value is missing and why,
                   and it is what this column said before the table replaced

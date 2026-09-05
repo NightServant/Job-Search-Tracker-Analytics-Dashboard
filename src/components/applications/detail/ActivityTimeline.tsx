@@ -62,7 +62,16 @@ export function ActivityTimeline({
           {sorted.map((entry) => (
             <li
               key={entry.id}
-              className="flex items-start gap-3 border-b border-border-subtle py-3 last:border-b-0"
+              // `content-auto` per ENTRY, not on the list. An unbounded activity
+              // log is the one place in this app where a scroll container
+              // really does hold hundreds of rows, and skipping the layout and
+              // paint of the ones off-screen is free here: these are two lines
+              // of text and a glyph, with nothing that has to be measured to
+              // be correct. Deliberately not used on the chart panels or the
+              // landing page -- Recharts sizes itself from a real measurement
+              // and reports 0 for skipped content, and the pinned scroll
+              // sections need their true heights to drive the animation.
+              className="content-auto flex items-start gap-3 border-b border-border-subtle py-3 last:border-b-0"
             >
               <ClockIcon size={16} className="mt-0.5 shrink-0 text-text-muted" />
               <div className="min-w-0">

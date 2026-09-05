@@ -13,6 +13,12 @@ import { iconMotion } from '@/components/icons/motion'
  * The bar is 64px because two 44px targets plus breathing room does not fit in
  * the 55px it used to be. Body scroll absorbs the difference; the bottom nav
  * does not move.
+ *
+ * STICKY, not static. The bottom nav was already pinned, so on a long list the
+ * two halves of the mobile chrome disagreed: primary navigation stayed and the
+ * theme and settings controls scrolled away. `z-20` sits above the bottom nav's
+ * `z-10` -- they never overlap, but a shared stacking order is one fewer thing
+ * to work out later -- and below the dialog overlay, which must cover both.
  */
 export function TopBar({
   settingsActive,
@@ -25,7 +31,7 @@ export function TopBar({
   return (
     <header
       data-top-bar
-      className="flex h-16 items-center gap-2 border-b border-border-subtle bg-bg-canvas px-3 md:hidden"
+      className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border-subtle bg-bg-canvas px-3 md:hidden"
     >
       <BrandLockup />
       <div className="flex-1" />

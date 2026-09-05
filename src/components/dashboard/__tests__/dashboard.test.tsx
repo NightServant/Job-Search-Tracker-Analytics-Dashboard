@@ -148,7 +148,7 @@ describe('Dashboard', () => {
 describe('Overview layout and copy', () => {
   it('lays the panels out two-up in the order Gabe specified, table last and full width', () => {
     const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
-    const grid = container.querySelector('.lg\\:grid-cols-2')!
+    const grid = container.querySelector('.md\\:grid-cols-2')!
     const titles = [...grid.querySelectorAll('[data-slot="card"] h2')].map((h) => h.textContent)
     expect(titles).toEqual([
       'applications over time',
@@ -163,7 +163,7 @@ describe('Overview layout and copy', () => {
     const table = [...grid.querySelectorAll('[data-slot="card"]')].find((c) =>
       c.querySelector('h2')?.textContent === 'recent applications'
     )!
-    expect(table.className).toContain('lg:col-span-2')
+    expect(table.className).toContain('md:col-span-2')
   })
 
   it('gives every panel a way through to the screen it summarises', () => {
@@ -233,8 +233,13 @@ describe('Overview layout and copy', () => {
     // band of it is the over-bright header Gabe rejected on the calendar.
     expect(head.className).not.toMatch(/bg-accent-default/)
     const rows = [...container.querySelectorAll('[data-recent-applications] tbody tr')]
-    expect(rows[0].className).not.toMatch(/bg-accent-surface/)
-    expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
+    expect(rows[0].className).not.toMatch(/\brow-zebra\b/)
+    expect(rows[0].className).toMatch(/bg-bg-canvas/)
+        // `row-zebra` rather than the literal `bg-accent-surface/30` this used to
+    // assert. Same colour, now opaque (see the utility): a sticky first column
+    // has the rest of its row sliding underneath it, and a translucent band
+    // lets that show through.
+    expect(rows[1].className).toMatch(/\brow-zebra\b/)
   })
 })
 

@@ -129,7 +129,7 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
     <div className="flex min-h-screen">
       <AuthBrandPanel />
 
-      <div className="relative flex w-full flex-col px-5 py-10 lg:min-w-0 lg:flex-1 lg:px-24">
+      <div className="relative flex w-full flex-col px-gutter py-10 lg:min-w-0 lg:flex-1 lg:px-24">
         {/*
           Two switch links, one per breakpoint. A top-right link on a 375px
           screen is an awkward tap target beside nothing else, so mobile gets

@@ -120,7 +120,7 @@ export default function Page() {
         links home for anyone who expects it to; the button is for everyone
         else.
       */}
-      <header className="w-full border-b border-border-subtle px-5 py-5 md:px-8">
+      <header className="w-full border-b border-border-subtle px-gutter py-5">
         <div className="mx-auto flex w-full max-w-[1200px] items-center justify-between gap-6">
           <Link href="/" aria-label="Worktrack home">
             <BrandLockup />
@@ -129,7 +129,7 @@ export default function Page() {
         </div>
       </header>
 
-      <main className="w-full flex-1 px-5 py-16 md:px-8 md:py-20">
+      <main className="w-full flex-1 px-gutter py-16 md:py-20">
         <div className="mx-auto grid w-full max-w-[1200px] grid-cols-1 gap-x-16 gap-y-12 lg:grid-cols-[minmax(0,15rem)_minmax(0,1fr)]">
           {/*
             Sticky, and `top-16` rather than `top-0` so it does not sit flush
@@ -186,7 +186,22 @@ export default function Page() {
                 by column, not read line by line -- so the 68ch cap that
                 protects the paragraphs only cramps it here.
               */}
-              <dl className="flex flex-col border-t border-border-subtle lg:w-[calc(100%+8rem)]">
+              <dl
+                className={
+                  // The table bleeds 8rem past the article's 68ch measure into
+                  // the page gutter, so a two-column row has room for a 14rem
+                  // term beside its definition.
+                  //
+                  // FROM xl, NOT lg. The bleed needs the gutter to actually be
+                  // there, and at exactly 1024 -- where the two-column layout
+                  // starts -- it is not: the article track is 656px against a
+                  // 612px measure, leaving 44px, and a 128px bleed simply ran
+                  // 45px off the side of the page. By 1280 the grid has hit its
+                  // 1200px cap and the track is 896px, which is the slack the
+                  // bleed was drawn against.
+                  'flex flex-col border-t border-border-subtle xl:w-[calc(100%+8rem)]'
+                }
+              >
                 {STORED.map((row) => (
                   <div
                     key={row.table}

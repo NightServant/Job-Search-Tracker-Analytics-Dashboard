@@ -89,8 +89,25 @@ export function ApplicationsTable({
   }
 
   return (
-    <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy} className="overflow-x-auto">
-      <Table data-applications-table>
+    // No `overflow-x-auto` here any more: `Table` brings its own scroll
+    // container, and two nested scrollports meant the sticky first column
+    // resolved against one of them while the row scrolled in the other.
+    <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy}>
+      {/* Stacked below 640 (six columns do not fit a phone), a normal table
+          with a pinned company column from there up -- so a sideways scroll
+          on a tablet never leaves you looking at a row you cannot identify. */}
+      {/* `min-w` from sm up is what turns "six columns squeezed into 700px"
+          into "six columns at their real widths, scrolled". Without it the
+          table auto-layout hands company and position whatever is left after
+          the four rigid columns, and at 768 that was about seven characters --
+          `Glasswi...`, `Tracklin...`, a column of ellipses. A tablet scrolls a
+          little sideways instead, with company pinned so the row it belongs to
+          is never in doubt.
+
+          Not applied below sm: the table is stacked there, and a 780px minimum
+          on a block-displayed table would reintroduce the page-wide horizontal
+          scroll the stacking exists to remove. Reset in the stacked rule. */}
+      <Table stacked className="sm:min-w-[780px]" data-applications-table>
         {/*
           The same accent band the calendar's weekday row wears, from the same
           `accent-surface` pair. accent-surface is the token for a FIELD of
@@ -102,12 +119,26 @@ export function ApplicationsTable({
           foreground, which would otherwise win over anything inherited.
         */}
         <TableHeader className="bg-accent-surface [&_th]:text-accent-on-surface">
-          <TableRow className="hover:bg-transparent">
-            <TableHead>company</TableHead>
-            <TableHead>position</TableHead>
-            <TableHead>status</TableHead>
-            <TableHead>salary</TableHead>
-            <TableHead className="text-right">applied on</TableHead>
+          {/* The band is declared on the ROW as well as on the thead. A sticky
+                header cell paints `background: inherit`, and `inherit` reads
+                its own parent -- the row -- not the thead two levels up. With
+                the fill only on the thead the pinned company header was
+                transparent and the scrolling columns slid visibly through it,
+                while every body cell (whose row does carry a fill) was
+                correct. */}
+          <TableRow className="bg-accent-surface hover:bg-accent-surface">
+            {/* Widths are declared, not inferred. `max-w-0` on the company and
+                position CELLS is what lets a long name truncate instead of
+                widening the table -- but to the auto-layout it also reads as
+                "these two want no width at all", so the surplus went to
+                salary, which needs none of it. The header row is where a table
+                states its proportions; these five add up to 92% and the
+                remainder is the actions column's fixed w-20. */}
+            <TableHead sticky className="w-[24%]">company</TableHead>
+            <TableHead className="w-[22%]">position</TableHead>
+            <TableHead className="w-[14%]">status</TableHead>
+            <TableHead className="w-[20%]">salary</TableHead>
+            <TableHead className="w-[12%] text-right">applied on</TableHead>
             {(onOpen || onDelete) && <TableHead className="w-20 text-right">actions</TableHead>}
           </TableRow>
         </TableHeader>
@@ -124,9 +155,9 @@ export function ApplicationsTable({
               // band above it instead of reading as a grey table wearing an
               // orange hat. At 30% it stays a guide for the eye across a row
               // and never competes with the StatusMarker in the row itself.
-              className={cn(i % 2 === 1 && 'bg-accent-surface/30')}
+              className={cn(i % 2 === 1 ? 'row-zebra' : 'bg-bg-canvas')}
             >
-              <TableCell className="max-w-0 truncate text-text-primary">
+              <TableCell label="company" sticky className="max-w-0 truncate text-text-primary">
                 {/*
                   STILL A REAL LINK, even on desktop where clicking it opens
                   the dialog instead of navigating. Rendering a <button> here
@@ -149,15 +180,20 @@ export function ApplicationsTable({
                   {job.company}
                 </Link>
               </TableCell>
-              <TableCell className="max-w-0 truncate text-text-secondary">{job.role}</TableCell>
-              <TableCell>
+              <TableCell label="position" className="max-w-0 truncate text-text-secondary">
+                {job.role}
+              </TableCell>
+              <TableCell label="status">
                 <StatusMarker status={job.status as Status} />
               </TableCell>
-              <TableCell className="tabular whitespace-nowrap text-text-secondary">
+              <TableCell label="salary" className="tabular whitespace-nowrap text-text-secondary">
                 {formatSalaryRange(job.salary_min, job.salary_max, job.salary_currency) ||
                   'not specified'}
               </TableCell>
-              <TableCell className="tabular whitespace-nowrap text-right text-text-muted">
+              <TableCell
+                label="applied on"
+                className="tabular whitespace-nowrap text-right text-text-muted"
+              >
                 {job.date_applied ? formatAppliedDate(job.date_applied) : 'not applied'}
               </TableCell>
               {(onOpen || onDelete) && (

@@ -137,7 +137,7 @@ export function SignUpFlow({
     <div className="flex min-h-screen">
       <AuthBrandPanel />
 
-      <div className="flex w-full flex-col px-5 py-10 lg:min-w-0 lg:flex-1 lg:px-24">
+      <div className="flex w-full flex-col px-gutter py-10 lg:min-w-0 lg:flex-1 lg:px-24">
         <div data-switch-desktop className="hidden text-body-s lg:block lg:self-end">
           <span className="text-text-muted">have an account? </span>
           <Link href="/login" className="text-accent-default underline underline-offset-4">

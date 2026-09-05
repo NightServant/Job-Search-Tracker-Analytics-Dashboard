@@ -607,9 +607,15 @@ describe('ApplicationsTable accent header', () => {
     )
     const rows = [...container.querySelectorAll('tbody tr')]
     // Striping is only striping if neighbours differ.
-    expect(rows[0].className).not.toMatch(/bg-accent-surface/)
-    expect(rows[1].className).toMatch(/bg-accent-surface\/30/)
-    expect(rows[2].className).not.toMatch(/bg-accent-surface/)
+    expect(rows[0].className).not.toMatch(/\brow-zebra\b/)
+    expect(rows[0].className).toMatch(/bg-bg-canvas/)
+        // `row-zebra` rather than the literal `bg-accent-surface/30` this used to
+    // assert. Same colour, now opaque (see the utility): a sticky first column
+    // has the rest of its row sliding underneath it, and a translucent band
+    // lets that show through.
+    expect(rows[1].className).toMatch(/\brow-zebra\b/)
+    expect(rows[2].className).not.toMatch(/\brow-zebra\b/)
+    expect(rows[2].className).toMatch(/bg-bg-canvas/)
     // The old neutral band is gone -- a grey table with an orange header was
     // the thing that read as two unrelated decisions.
     expect(rows[1].className).not.toMatch(/bg-bg-surface/)

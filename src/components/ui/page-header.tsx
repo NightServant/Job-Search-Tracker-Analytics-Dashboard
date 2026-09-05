@@ -38,9 +38,20 @@ export function PageHeader({
   ...props
 }: PageHeaderProps) {
   return (
-    <div data-body-header className={cn('flex flex-col gap-1', className)} {...props}>
-      <div className="flex items-center justify-between gap-4">
-        <h1 className="text-display-m text-text-primary">{title}</h1>
+    // `min-w-0` on both boxes. A flex or grid item's automatic minimum size is
+    // its content's, not zero, so this header refused to be narrower than the
+    // `max-w-prose` description it contains -- 65ch, about 470px. On analytics,
+    // where the header is a grid item beside a 176px range picker, that pinned
+    // the whole page at ~600px and every screen below that scrolled sideways.
+    // The description already wraps; it just needed permission to.
+    //
+    // `flex-wrap` on the title row is the other half. At 320px "analytics" plus
+    // a 176px select plus the gap does not fit on one line, and without this
+    // the two simply overlap the edge. Wrapping puts the control on its own
+    // line, which is what the tier map asks for below 640 anyway.
+    <div data-body-header className={cn('flex min-w-0 flex-col gap-1', className)} {...props}>
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <h1 className="min-w-0 text-display-m text-text-primary">{title}</h1>
         {action}
       </div>
       {description ? (

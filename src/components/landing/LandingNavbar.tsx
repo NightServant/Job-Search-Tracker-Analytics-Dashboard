@@ -111,7 +111,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
       data-landing-nav
       data-over-hero={overHero ? 'true' : 'false'}
       className={cn(
-        'fixed inset-x-0 top-0 z-50 flex h-[60px] items-center gap-6 px-5',
+        'fixed inset-x-0 top-0 z-50 flex h-[60px] items-center gap-6 px-gutter',
         'md:h-20 md:gap-8 md:px-16',
         // Colour only, and only these three properties. A bar that resizes or
         // slides on scroll is the pattern this design system's restraint rules
@@ -241,7 +241,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
           data-nav-mobile-panel
           className={cn(
             'fixed inset-x-0 top-[60px] z-40 flex flex-col gap-1 border-b border-border-subtle',
-            'bg-bg-canvas px-5 pb-6 pt-2 md:hidden'
+            'bg-bg-canvas px-gutter pb-6 pt-2 md:hidden'
           )}
         >
           {/*

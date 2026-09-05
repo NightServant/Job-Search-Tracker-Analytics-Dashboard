@@ -3,7 +3,7 @@
 import type { Swiper as SwiperClass } from 'swiper'
 import { Carousel_005 } from '@/components/v1/skiper51'
 import { carouselOptionsFor } from './carouselOptions'
-import type { LandingScreen } from './screens'
+import { SCREEN_SIZES, screenSrcSet, type LandingScreen } from './screens'
 
 /**
  * The product screens, shown through skiper51 (Swiper.js).
@@ -44,6 +44,9 @@ export function ScreenCarousel({
         images={screens.map((s) => ({
           srcLight: s.srcLight,
           srcDark: s.srcDark,
+          srcSetLight: screenSrcSet(s.srcLight),
+          srcSetDark: screenSrcSet(s.srcDark),
+          sizes: SCREEN_SIZES,
           alt: s.alt,
         }))}
         loop={options.loop}

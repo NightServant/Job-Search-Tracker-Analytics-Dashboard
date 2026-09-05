@@ -46,11 +46,25 @@ export function CohortTable({ data }: CohortTableProps) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    // `min-w-0` so this scroll container can be narrower than the 560px table
+    // inside it. Without it the container reports the table's floor as its own
+    // minimum and the panel -- then the grid, then the page -- widens to match,
+    // which is the opposite of what an overflow container is for.
+    <div className="min-w-0 overflow-x-auto">
       <table className="w-full min-w-[560px] border-collapse text-body-s">
         <thead className="bg-accent-surface text-accent-on-surface">
-          <tr className="border-b border-border-subtle text-left">
-            <th className="py-2 px-4 font-medium">cohort</th>
+          {/* The fill is repeated on the row so the pinned `cohort` header
+              cell has an opaque background to inherit. */}
+          <tr className="bg-accent-surface border-b border-border-subtle text-left">
+            {/* PINNED. Seven columns need 560px and a phone has 320, so this
+                table scrolls sideways by design -- stacking a cohort matrix
+                one cell per line would destroy the row-to-row comparison it
+                exists to make. Pinning the cohort keeps every scrolled column
+                attached to the month it belongs to. `bg-[inherit]` so the cell
+                paints the header band, and the body cells the zebra fill,
+                rather than a fixed colour that would be wrong in one of
+                them. */}
+            <th className="sticky left-0 z-20 bg-[inherit] py-2 px-4 font-medium">cohort</th>
             <th className="py-2 px-4 text-right font-medium">applied</th>
             <th className="py-2 px-4 text-right font-medium">interviewing</th>
             <th className="py-2 px-4 text-right font-medium">offered</th>
@@ -65,10 +79,12 @@ export function CohortTable({ data }: CohortTableProps) {
               key={row.cohort}
               className={cn(
                 'border-b border-border-subtle last:border-0',
-                i % 2 === 1 && 'bg-accent-surface/30'
+                i % 2 === 1 ? 'row-zebra' : 'bg-bg-canvas'
               )}
             >
-              <td className="py-2 px-4 text-text-primary">{monthLabel(row.cohort)}</td>
+              <td className="sticky left-0 z-10 bg-[inherit] py-2 px-4 text-text-primary">
+                {monthLabel(row.cohort)}
+              </td>
               <td className="tabular py-2 px-4 text-right text-text-primary">{row.jobsApplied}</td>
               <td className="tabular py-2 px-4 text-right text-text-primary">{row.jobsInterviewing}</td>
               <td className="tabular py-2 px-4 text-right text-text-primary">{row.jobsOffered}</td>

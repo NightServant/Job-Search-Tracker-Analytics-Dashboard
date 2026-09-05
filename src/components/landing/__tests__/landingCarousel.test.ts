@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
 
@@ -75,11 +75,35 @@ describe('the landing carousel slide', () => {
     // A single slide ratio is only correct if the captures agree with each
     // other. One odd screenshot would letterbox on its own slide, and the
     // assertion above would not say which end of the mismatch was wrong.
-    const sizes = screenshots().map((f) => {
+    //
+    // SHAPE, NOT PIXEL SIZE. This asserted one exact `WxH` for every file,
+    // which was the same thing while there was one capture per screen per
+    // theme. There are now two -- a 1440 and a 768 for the srcset -- so the
+    // invariant it was really protecting has to be stated directly: same
+    // ratio, any resolution.
+    const ratios = screenshots().map((f) => {
       const { width, height } = jpegSize(f)
-      return `${width}x${height}`
+      return { f, ratio: width / height, size: `${width}x${height}` }
     })
-    expect(new Set(sizes).size, `mixed screenshot sizes: ${[...new Set(sizes)].join(', ')}`).toBe(1)
+    const spread = Math.max(...ratios.map((r) => r.ratio)) - Math.min(...ratios.map((r) => r.ratio))
+    expect(
+      spread,
+      `mixed screenshot shapes: ${ratios.map((r) => `${r.f} ${r.size}`).join(', ')}`
+    ).toBeLessThan(0.01)
+  })
+
+  it('gives every capture the narrow variant its srcset promises', () => {
+    // `screenSrcSet()` builds `<name>-768.jpg 768w` from the full-size path by
+    // string substitution, so a capture added without its variant produces a
+    // srcset entry that 404s -- and a 404 in a srcset is silent: the browser
+    // simply falls back, and the phone quietly downloads 1440px again.
+    const full = screenshots().filter((f) => !f.endsWith('-768.jpg'))
+    expect(full.length).toBeGreaterThan(0)
+    for (const file of full) {
+      const variant = file.replace(/\.jpg$/, '-768.jpg')
+      expect(existsSync(variant), `${variant} is missing`).toBe(true)
+      expect(jpegSize(variant).width, `${variant} is not 768 wide`).toBe(768)
+    }
   })
 
   it('fits the whole screenshot rather than cropping it', () => {

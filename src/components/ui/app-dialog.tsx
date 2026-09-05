@@ -102,11 +102,24 @@ export function AppDialog({
       <DialogContent
         className={cn(
           'gap-0 border border-border-subtle bg-bg-canvas p-0 ring-0',
-          'max-h-[85vh] w-[calc(100%-2rem)] overflow-hidden rounded-md',
+          // BOTTOM SHEET below 640. A centred dialog inset 16px each side is
+          // the desktop shape shrunk, and on a phone it wastes the two edges
+          // the thumb can actually reach while putting the close button at the
+          // top of the screen. Anchored to the bottom instead: full width, top
+          // corners rounded, no bottom border (it is the screen edge), and
+          // `dvh` rather than `vh` so the browser's own collapsing chrome is
+          // not counted twice.
+          //
+          // `flex flex-col` replaces DialogContent's `grid`: the header is
+          // fixed and the body scrolls, and that needs a `flex-1 min-h-0`
+          // child, which a grid row does not give.
+          'inset-x-0 bottom-0 left-0 top-auto flex max-h-[92dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-md rounded-b-none border-b-0',
+          // From 640 up it is a centred dialog again, unchanged.
+          'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[85vh] sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-md sm:border-b',
           MAX_WIDTH[size]
         )}
       >
-        <DialogHeader className="gap-0 p-6 pb-4">
+        <DialogHeader className="shrink-0 gap-0 p-gutter pb-4">
           {eyebrow && <div className="mb-2 pr-8">{eyebrow}</div>}
           <div className="flex items-start justify-between gap-6">
             <div className="flex min-w-0 items-start gap-2.5">
@@ -123,8 +136,16 @@ export function AppDialog({
             </DialogDescription>
           )}
         </DialogHeader>
-        <Separator />
-        <div className="max-h-[calc(85vh-6rem)] overflow-y-auto p-6">{children}</div>
+        <Separator className="shrink-0" />
+        {/* `flex-1 min-h-0` rather than a second viewport calculation. The old
+            `max-h-[calc(85vh-6rem)]` had to guess the header's height, and the
+            guess was wrong for any dialog whose header wrapped to two lines or
+            carried an eyebrow -- and wrong again for the sheet, which is 92dvh.
+            Letting the container own the height and this child own the scroll
+            is right at every height without arithmetic. `min-h-0` is what
+            allows a flex child to shrink below its content and actually
+            scroll. */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-gutter">{children}</div>
       </DialogContent>
     </Dialog>
   )

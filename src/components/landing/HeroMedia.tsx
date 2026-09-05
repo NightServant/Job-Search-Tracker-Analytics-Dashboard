@@ -104,6 +104,24 @@ export function HeroMedia({ posterSrc, videoSrc, paused = false }: HeroMediaProp
           data-testid="hero-poster"
           className="h-full w-full object-cover grayscale"
           src={posterSrc}
+          /*
+            The poster is the LCP image on every phone -- the video is gated off
+            below 768 (see above), so this is the hero. It was one 1280x720
+            file at 66KB regardless of screen; the 768 variant is 51KB and is
+            the one a phone should get, since the element is full-bleed and a
+            375px screen cannot resolve 1280 of anything.
+
+            `sizes="100vw"` because that is literally true here: `absolute
+            inset-0` on a full-width hero. Derived from `posterSrc` rather than
+            passed in, so the two stay one decision -- and falls back to the
+            single source if the caller ever points at a non-jpg.
+          */
+          srcSet={
+            posterSrc.endsWith('.jpg')
+              ? `${posterSrc.replace(/\.jpg$/, '-768.jpg')} 768w, ${posterSrc} 1280w`
+              : undefined
+          }
+          sizes="100vw"
           alt=""
         />
       )}

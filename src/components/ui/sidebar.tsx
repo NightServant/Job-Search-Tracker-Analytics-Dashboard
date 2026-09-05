@@ -265,7 +265,48 @@ function SidebarNav({
   )
 }
 
+/**
+ * Expanded from 1024, an icon rail below it -- and still manually togglable
+ * inside either tier.
+ *
+ * The tier map puts tablets and small laptops at 768-1023, and 240px of nav
+ * out of a 768px viewport is nearly a third of the screen spent on chrome. The
+ * rail costs 64px for the same five destinations, with the labels carried by
+ * NavItem's tooltips.
+ *
+ * The listener re-reads the query only when the viewport CROSSES 1024, not on
+ * every render, which is the whole point: someone who collapses the nav on a
+ * 1440px monitor keeps it collapsed, and someone who expands the rail on a
+ * tablet keeps it expanded. Only crossing the line resets it, because crossing
+ * the line is the only event that means the previous answer was for a
+ * different screen.
+ *
+ * `useState(true)` then correcting in the effect, rather than reading
+ * matchMedia during render: this component server-renders on /demo, and a
+ * first client render that disagreed with the server's markup is a hydration
+ * mismatch. The correction lands in the same frame as mount and the nav
+ * already animates `width`, so a tablet sees the rail arrive rather than a
+ * jump. It matches how `useIsMobile` in this tree already behaves.
+ */
+const EXPANDED_FROM = '(min-width: 1024px)'
+
+function useTierSidebarState() {
+  const [open, setOpen] = React.useState(true)
+
+  React.useEffect(() => {
+    const mql = window.matchMedia(EXPANDED_FROM)
+    const apply = () => setOpen(mql.matches)
+    apply()
+    mql.addEventListener('change', apply)
+    return () => mql.removeEventListener('change', apply)
+  }, [])
+
+  return [open, setOpen] as const
+}
+
 export function Sidebar(props: SidebarProps) {
+  const [open, setOpen] = useTierSidebarState()
+
   return (
     // shadcn's SidebarProvider wrapper defaults to `min-h-svh w-full`, meant
     // for wrapping the whole app shell rather than just the nav mounted here
@@ -289,7 +330,7 @@ export function Sidebar(props: SidebarProps) {
     // verified live: with a short main, dashboard-height nav; with a 3000px
     // main (the /analytics-length case), nav still measures exactly one
     // viewport tall, sticky-pinned, footer inside the fold both times.
-    <SidebarProvider className="min-h-0 w-fit shrink-0">
+    <SidebarProvider open={open} onOpenChange={setOpen} className="min-h-0 w-fit shrink-0">
       <SidebarNav {...props} />
     </SidebarProvider>
   )

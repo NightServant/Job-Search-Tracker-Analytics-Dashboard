@@ -178,31 +178,51 @@
   --spacing-hairline: 1px;
 
   /* Type scale. Line height and tracking come from the Figma styles; percentages
-     are converted to the unitless / em forms CSS wants. */
-  --text-display-xl: 56px;
+     are converted to the unitless / em forms CSS wants.
+
+     FLUID, from M7. Eight of the sixteen sizes now interpolate between a 320px
+     viewport and a 1440px one; the other eight are held still on purpose.
+
+     The moving ones are the eight that are big enough for the difference to be
+     felt -- display/*, heading-l, heading-m, body-l and the two large Data
+     styles. Their CEILINGS are unchanged, so every screen at 1440 and above
+     renders the exact sizes the Figma file specifies: this is a floor being
+     added below the design, not a new design.
+
+     The eight held still are 11-14px: heading-s, body-m, body-s, label-m,
+     label-caps, caption, data-m, data-s. Scaling those down is the one thing a
+     fluid ramp must not do -- 14px body at 320px would land near 12, which is
+     below what this app should ask anyone to read on the smallest screen it
+     supports. They are already at the floor, so the floor is where they stay.
+
+     Each clamp is `rem + vw`, never bare `vw`. A viewport-only middle term
+     ignores the browser's font-size setting, so text stops responding to zoom
+     and to a user who has set a larger default -- an accessibility regression
+     dressed as responsiveness. The rem term keeps that working. */
+  --text-display-xl: clamp(2rem, 1.571rem + 2.143vw, 3.5rem);
   --text-display-xl--line-height: 1;
   --text-display-xl--letter-spacing: -0.03em;
   --text-display-xl--font-weight: 700;
-  --text-display-l: 40px;
+  --text-display-l: clamp(1.625rem, 1.375rem + 1.25vw, 2.5rem);
   --text-display-l--line-height: 1.05;
   --text-display-l--letter-spacing: -0.025em;
   --text-display-l--font-weight: 700;
-  --text-display-m: 28px;
+  --text-display-m: clamp(1.375rem, 1.268rem + 0.536vw, 1.75rem);
   --text-display-m--line-height: 1.1;
   --text-display-m--letter-spacing: -0.02em;
   --text-display-m--font-weight: 700;
-  --text-heading-l: 20px;
+  --text-heading-l: clamp(1.0625rem, 1.009rem + 0.268vw, 1.25rem);
   --text-heading-l--line-height: 1.3;
   --text-heading-l--letter-spacing: -0.01em;
   --text-heading-l--font-weight: 700;
-  --text-heading-m: 16px;
+  --text-heading-m: clamp(0.9375rem, 0.92rem + 0.089vw, 1rem);
   --text-heading-m--line-height: 1.4;
   --text-heading-m--letter-spacing: -0.005em;
   --text-heading-m--font-weight: 700;
   --text-heading-s: 14px;
   --text-heading-s--line-height: 1.4;
   --text-heading-s--font-weight: 700;
-  --text-body-l: 16px;
+  --text-body-l: clamp(0.9375rem, 0.92rem + 0.089vw, 1rem);
   --text-body-l--line-height: 1.6;
   --text-body-l--font-weight: 400;
   --text-body-m: 14px;
@@ -221,11 +241,11 @@
   --text-caption: 12px;
   --text-caption--line-height: 1.4;
   --text-caption--font-weight: 500;
-  --text-data-xl: 40px;
+  --text-data-xl: clamp(1.75rem, 1.536rem + 1.071vw, 2.5rem);
   --text-data-xl--line-height: 1;
   --text-data-xl--letter-spacing: -0.02em;
   --text-data-xl--font-weight: 400;
-  --text-data-l: 24px;
+  --text-data-l: clamp(1.25rem, 1.179rem + 0.357vw, 1.5rem);
   --text-data-l--line-height: 1.1;
   --text-data-l--letter-spacing: -0.01em;
   --text-data-l--font-weight: 400;
@@ -241,6 +261,50 @@
   --duration-fast: 160ms;
   --duration-base: 240ms;
   --duration-slow: 400ms;
+
+  /* --- 04 Responsive ---------------------------------------------------------
+     Breakpoints. Tailwind v4 ships sm/md/lg/xl/2xl and no way to add to them
+     from a JS config, so the two the tier map needs are declared here.
+
+       xs   375px  the phone floor. Below it (320-374) is the UNPREFIXED base:
+                   every layout is authored smallest-first, so `xs:` marks
+                   "there is now room for the normal phone treatment" rather
+                   than being a place to fix 320px afterwards.
+       sm   640px  large phones / small tablets      (default)
+       md   768px  tablets, small laptops            (default)
+       lg  1024px  desktops                          (default)
+       xl  1280px  a wide desktop, inside the same tier as lg
+       2xl 1440px  RETUNED from Tailwind's 1536. 1440 is where the tier map
+                   puts "large desktop" and where the wide container caps, so
+                   leaving it at 1536 meant the one breakpoint that matters for
+                   a 1440 monitor could not be named. Safe to move: `2xl:` had
+                   zero users in src when this changed.
+       3xl 1920px  ultra-wide. Content stops growing well before here -- the
+                   tier is about giving the extra width away as margin, not
+                   about filling it.
+
+     Everything below is the fluid half of the strategy, and it does the bulk
+     of the work: sizes that move continuously with the viewport mean a
+     breakpoint is only needed where the STRUCTURE changes (a column count, a
+     nav shape), not where a number does. */
+  --breakpoint-xs: 375px;
+  --breakpoint-2xl: 1440px;
+  --breakpoint-3xl: 1920px;
+
+  /* Container caps, as `max-w-page` / `max-w-wide`. Below lg every shell runs
+     full-bleed with gutters; from lg one of these takes over so a line of text
+     never runs the width of a 2560px monitor. `wide` is for the grid screens
+     (overview, analytics) where a 1440 measure is columns rather than prose. */
+  --container-page: 1200px;
+  --container-wide: 1440px;
+
+  /* Fluid gutters and rhythm, as `p-gutter` / `gap-section` and friends.
+     `gutter` is the page's own side padding: 16px on a 320 phone, ~23px on a
+     tablet, 32px from 1440 up. `section` is the vertical gap between major
+     blocks. Both are single tokens rather than `p-4 md:p-8` pairs so the step
+     between tiers is continuous instead of a jump at 768. */
+  --spacing-gutter: clamp(1rem, 0.5rem + 2vw, 2rem);
+  --spacing-section: clamp(1.5rem, 1rem + 2.5vw, 2rem);
 }
 
 /* Dark mode redefines the semantic layer only. Primitives never change --
@@ -482,6 +546,231 @@ body,
   /* Focus styles */
   *:focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 dark:ring-offset-zinc-950;
+  }
+
+  /* The horizontal-scroll guard, applied at the one place it cannot cause
+     collateral damage.
+
+     A long unbroken string -- a job URL pasted into a note, an ATS reference,
+     an email address in a table cell -- is a single unbreakable box, and at
+     320px it pushes the document wider than the viewport. Every other element
+     then LOOKS broken because the page can scroll sideways, which is why this
+     usually gets "fixed" with `overflow-x: hidden` on body. That fix breaks
+     `position: sticky` on every descendant (the sidebar, the table headers
+     below) and hides the overflow instead of resolving it.
+
+     `break-word` only breaks a word that has no other way to fit, so normal
+     copy is untouched and nothing re-wraps at desktop widths. */
+  body {
+    overflow-wrap: break-word;
+  }
+
+  /* TOUCH TARGETS. The 44x44 floor is a property of the INPUT DEVICE, not of
+     the screen, so it keys off `pointer: coarse` rather than a breakpoint: a
+     1024px tablet needs it and a 500px-wide desktop window does not.
+
+     `min-height` only, no width. Every control below is laid out as a row or
+     an inline run of text and already spans the width it should; forcing a
+     width would stretch buttons sitting in a flex row into each other.
+
+     The square icon buttons are the exception and are handled separately
+     below, because a min-height alone would take a 28x36 glyph button to
+     44x36 -- a target that passes the rule on one axis and looks wrong on
+     both. */
+  @media (pointer: coarse) {
+    button:not([data-icon-button]),
+    [role='tab'],
+    [role='menuitem'],
+    [role='option'],
+    summary,
+    select,
+    input:not([type='checkbox']):not([type='radio']):not([type='range']),
+    textarea {
+      min-height: 44px;
+    }
+
+    /* Square, so it grows on both axes and stays a glyph in a box. The
+       28x36 resting size is right for a dense table row under a mouse and is
+       simply too small for a finger.
+
+       `min-*`, not `height`/`width`, and that is the whole reason this works:
+       IconButton sets `h-7 w-9`, which are utilities, and the utilities layer
+       beats `@layer base`. A `height` here loses that fight silently -- the
+       rule is in the stylesheet, matches the element, and changes nothing.
+       `min-height`/`min-width` are different properties, so there is no fight:
+       both declarations apply and the larger minimum wins the computation.
+       (Same reason the `min-height` above survives against `h-10`/`h-8`.) */
+    [data-icon-button] {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+}
+
+/* Long scroll containers -- the applications list, the activity timeline --
+   skip layout and paint for off-screen children. `contain-intrinsic-size`
+   is the placeholder height so the scrollbar does not jump as they resolve. */
+@utility content-auto {
+  content-visibility: auto;
+  /* `auto` first: once a row has been rendered the browser remembers its real
+     height and uses that, so the scrollbar stops resizing after the first
+     pass. The 4rem is only the guess for a row that has never been on
+     screen -- roughly one activity entry. */
+  contain-intrinsic-size: auto 4rem;
+}
+
+/* iOS home-indicator clearance. `pb-safe` is for the fixed bar itself, which
+   has no other bottom padding to compete with.
+
+   `pb-nav` is for the scrolling content ABOVE that bar, and it is one calc
+   rather than two utilities on purpose: `pb-20 pb-safe` sets the same property
+   twice, so whichever rule the cascade happens to order last wins outright and
+   the other is silently discarded -- the content would clear the nav OR the
+   home indicator, never both. */
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+@utility pb-nav {
+  padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* The page shell: full-bleed with fluid gutters below lg, capped and centred
+   from lg up. `page` is the reading width (1200); `wide` is the grid width
+   (1440), for screens whose content is columns rather than prose. Ultra-wide
+   monitors get the surplus as margin -- the cap does not move again. */
+@utility shell-page {
+  width: 100%;
+  margin-inline: auto;
+  max-width: var(--container-page);
+}
+
+@utility shell-wide {
+  width: 100%;
+  margin-inline: auto;
+  max-width: var(--container-wide);
+}
+
+/* The zebra band on a data row, as an OPAQUE colour.
+
+   It used to be `bg-accent-surface/30`, which is the same picture and a
+   different thing: a translucent fill lets whatever is behind it show through.
+   That was harmless while every row simply sat on the card -- and became a bug
+   the moment the first column was pinned, because a sticky cell has the rest of
+   its own row sliding underneath it and needs a fill that actually covers.
+
+   `color-mix` gives the identical result over the card's canvas without the
+   transparency. The even rows now declare `bg-bg-canvas` for the same reason:
+   `background: inherit` on the sticky cell has to resolve to something opaque,
+   and on an unstyled row it resolved to `transparent`. */
+@utility row-zebra {
+  background-color: color-mix(in srgb, var(--color-accent-surface) 30%, var(--color-bg-canvas));
+}
+
+/* ---------------------------------------------------------------------------
+   Stacked tables (below 640px)
+
+   Opted into per table with <Table stacked>. Six columns of application data
+   at 320px is a table you read by dragging, and dragging loses the row you
+   were on -- so below `sm` each ROW becomes the card and each CELL becomes a
+   labelled line inside it.
+
+   The label comes from `data-label` on the cell rather than from the header
+   row, because the header row is the thing being removed: it prints once at
+   the top of a table and a stacked list needs it repeated on every record.
+
+   Two things this deliberately does NOT do:
+
+   - It does not hide any column. "Column priority" usually means the phone
+     gets less data than the desktop, and the columns here are company, role,
+     status, salary, applied-on -- there is no fifth-most-important one worth
+     dropping. Stacking keeps all of them and spends height instead of width,
+     which a phone has.
+   - It does not touch the roles. `display: block` is what removes a table's
+     implicit semantics; the explicit role on every part (see table.tsx) is
+     what puts them back, so this rule only ever changes the picture.
+--------------------------------------------------------------------------- */
+@media (width < 40rem) {
+  [data-stacked] table,
+  [data-stacked] tbody,
+  [data-stacked] tr,
+  [data-stacked] td {
+    display: block;
+    width: 100%;
+  }
+
+  /* A table that opts into a min-width for the scrolling tiers must not carry
+     it here -- it would put the page-wide sideways scroll straight back. */
+  [data-stacked] table {
+    min-width: 0;
+  }
+
+  /* Visually hidden, not `display: none`: the header cells are still the
+     accessible names for the columns, and removing them from the box tree
+     entirely takes that away from anything reading the table linearly. */
+  [data-stacked] thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  /* The card. The row already carries a bottom hairline from TableRow, which
+     becomes the separator between records; the padding is what turns a run of
+     lines into a block you can see the edges of. */
+  [data-stacked] tr {
+    padding-block: 0.75rem;
+  }
+
+  /* Label left, value right, on one line where it fits and wrapped where it
+     does not. `whitespace-nowrap` from TableCell is cancelled here -- it is
+     right for a table cell and wrong for a line that now has the full width
+     of a phone and a label sharing it. */
+  [data-stacked] td {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding-inline: 0;
+    white-space: normal;
+  }
+
+  [data-stacked] td[data-label]::before {
+    content: attr(data-label);
+    flex: none;
+    color: var(--color-text-muted);
+    font-size: var(--text-label-caps);
+    font-weight: var(--text-label-caps--font-weight);
+    letter-spacing: var(--text-label-caps--letter-spacing);
+    line-height: var(--text-label-caps--line-height);
+    text-transform: uppercase;
+  }
+
+  /* `max-w-0 truncate` is how these cells fit a long company name into a
+     desktop column. Stacked, the column is the whole screen and there is
+     nothing to truncate against -- a 0-width box just clips every value to an
+     ellipsis. */
+  [data-stacked] td.max-w-0 {
+    max-width: none;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  /* An actions cell has no label and belongs at the foot of its card, aligned
+     with the values above rather than opposite an empty label. */
+  [data-stacked] td:not([data-label]) {
+    justify-content: flex-end;
+  }
+
+  /* Nothing is pinned when nothing scrolls sideways. Left in place, the
+     sticky column would sit on top of its own stacked card. */
+  [data-stacked] td,
+  [data-stacked] th {
+    position: static;
   }
 }
 
@@ -740,6 +1029,27 @@ body,
 .icon-trigger:active .icon-motion-press {
   transform: scale(0.9);
   transition-duration: var(--duration-instant);
+}
+
+/* TOUCH. On a device with no hover, a tap leaves `:hover` matching until the
+   next tap somewhere else -- so every one of the gestures above became a
+   STATE rather than a gesture: tap `applications` and its icon stays lifted a
+   pixel for as long as you read the page, tap `export CSV` and the arrow sits
+   2px low indefinitely. That is not the animation firing on touch; it is the
+   animation getting stuck on touch.
+
+   What a tap should give is the press, and the press already fires: `:active`
+   is real on touch and is exactly the 100ms acknowledgement the vocabulary
+   was built around. So this suppresses the stuck half and leaves the two that
+   work -- `:active` (excluded below, so the press still wins while the finger
+   is down) and `:focus-visible` (a keyboard attached to a tablet).
+
+   Specificity, deliberately: four class-level selectors, so it beats the
+   three-selector gesture rules above without `!important`. */
+@media (hover: none) {
+  .icon-trigger:hover:not(:active):not(:focus-visible) .icon-motion {
+    transform: none;
+  }
 }
 
 /* The gate. Returning every transform to `none` rather than shortening it:

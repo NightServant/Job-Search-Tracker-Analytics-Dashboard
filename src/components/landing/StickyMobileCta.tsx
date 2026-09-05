@@ -75,7 +75,7 @@ export function StickyMobileCta() {
       // is a focus stop in the middle of the page that nobody can see.
       aria-hidden={!visible}
       className={[
-        'fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-bg-canvas px-5 py-3 md:hidden',
+        'fixed inset-x-0 bottom-0 z-40 border-t border-border-subtle bg-bg-canvas px-gutter pt-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] md:hidden',
         'transition-transform duration-200 ease-out motion-reduce:transition-none',
         visible ? 'translate-y-0' : 'pointer-events-none translate-y-full',
       ].join(' ')}

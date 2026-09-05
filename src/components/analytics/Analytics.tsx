@@ -17,6 +17,7 @@ import { SalaryInsights } from './SalaryInsights'
 import { PipelineFlow } from './PipelineFlow'
 import type { Job } from '@/types'
 import { KpiStat } from '@/components/ui/kpi-stat'
+import { cn } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RangePicker } from './RangePicker'
 import { FunnelChart, normalizeFunnel } from './FunnelChart'
@@ -431,25 +432,35 @@ export function Analytics({
   // (salary), then the month-by-month breakdown last, which is reference
   // material rather than a headline.
   return (
-    // Two columns from lg. A 2560px single column meant a lot of scrolling
-    // past half-empty panels; paired, each panel gets a width that suits it
-    // and the page halves in height.
+    // Two columns from md -- see Dashboard for why 768 and not 1024. A 2560px
+    // single column meant a lot of scrolling past half-empty panels; paired,
+    // each panel gets a width that suits it and the page halves in height.
     //
     // Cards in a row share the row's height, which is what Gabe asked for --
     // and the dead space that used to come with it is handled at the other
     // end: `Card` is h-full, `CardContent` is flex-1, and every panel body
     // grows into the height it is handed. A card matching a taller neighbour
     // has content in the difference rather than air.
-    <div className="grid gap-8 lg:grid-cols-2">
+    <div className="grid gap-section md:grid-cols-2">
       <PageHeader
-        className="lg:col-span-2"
+        className="md:col-span-2"
         title="analytics"
         description="how your applications actually move, how long each step takes, and what they pay."
         action={<RangePicker value={range} onChange={setRange} />}
       />
 
       {layOut(specs).map(({ key, node, full }) => (
-        <div key={key} data-panel-slot={key} className={full ? 'lg:col-span-2' : undefined}>
+        // `min-w-0` on every slot. A grid item's automatic minimum size is its
+        // CONTENT's minimum, and the cohort panel contains a table with a
+        // 560px floor -- so that one panel widened the single column on every
+        // phone to 598px and the whole analytics screen scrolled sideways. The
+        // table is already inside its own `overflow-x-auto`; this is what lets
+        // that container actually be narrower than the table it scrolls.
+        <div
+          key={key}
+          data-panel-slot={key}
+          className={cn('min-w-0', full && 'md:col-span-2')}
+        >
           {node}
         </div>
       ))}

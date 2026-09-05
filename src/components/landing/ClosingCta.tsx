@@ -70,14 +70,22 @@ export function ClosingCta() {
             2026-09-04 (`0038a8b`). His call; the note is here so the next
             reader does not "restore" a split that was deliberately removed.
 
-            `items-start` on the outer column still earns its place: it stops
-            the row stretching its children, which inside a grid track running
-            to ~46rem on desktop would give every button the full width.
+            FULL WIDTH BELOW 640 (Gabe, 2026-09-05). The three already stacked
+            at 375px -- the row wraps -- but each kept its own content width, so
+            the closing ask ended as three left-aligned tabs of different
+            lengths with a ragged right edge. Stretched, they read as three
+            equal choices and each is a full-width tap target, which is what
+            the last section on a phone should be asking for.
 
-            The row wraps, so at 375px the three stack rather than squeeze.
+            `items-start` is the reason this needed more than `w-full` on the
+            links: it is what stops a flex row stretching its children, and on
+            desktop it earns its place -- inside a grid track running to ~46rem
+            it is all that keeps every button from filling the row. So it is
+            now `sm:items-start`, present exactly where it is wanted. From 640
+            up nothing about this row has changed.
           */}
-          <div className="flex flex-col items-start gap-3 pt-2">
-            <div className="flex flex-wrap items-center gap-3">
+          <div className="flex w-full flex-col gap-3 pt-2 sm:items-start">
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
               {/*
                 ICONS LEAD, AND THE PRIMARY'S TRAILING ARROW IS GONE
                 (2026-09-05, Gabe's ask for icons before CTA buttons). The
@@ -95,7 +103,11 @@ export function ClosingCta() {
               <Link
                 href={CLOSING_CTA.primary.href}
                 data-variant="primary"
-                className={cn(buttonVariants({ variant: 'primary', size: 'm' }), ICON_MOTION_GROUP)}
+                className={cn(
+                  buttonVariants({ variant: 'primary', size: 'm' }),
+                  ICON_MOTION_GROUP,
+                  'w-full sm:w-auto'
+                )}
               >
                 <EyeIcon size={16} aria-hidden className={iconMotion('zoom')} />
                 {CLOSING_CTA.primary.label}
@@ -103,7 +115,11 @@ export function ClosingCta() {
               <Link
                 href={CLOSING_CTA.secondary.href}
                 data-variant="secondary"
-                className={cn(buttonVariants({ variant: 'secondary', size: 'm' }), ICON_MOTION_GROUP)}
+                className={cn(
+                  buttonVariants({ variant: 'secondary', size: 'm' }),
+                  ICON_MOTION_GROUP,
+                  'w-full sm:w-auto'
+                )}
               >
                 <UserRoundIcon size={16} aria-hidden className={iconMotion('lift')} />
                 {CLOSING_CTA.secondary.label}
@@ -121,7 +137,11 @@ export function ClosingCta() {
               <Link
                 href={CLOSING_CTA.tertiary.href}
                 data-variant="secondary"
-                className={cn(buttonVariants({ variant: 'secondary', size: 'm' }), ICON_MOTION_GROUP)}
+                className={cn(
+                  buttonVariants({ variant: 'secondary', size: 'm' }),
+                  ICON_MOTION_GROUP,
+                  'w-full sm:w-auto'
+                )}
               >
                 <LockIcon size={16} aria-hidden className={iconMotion('lift')} />
                 {CLOSING_CTA.tertiary.label}
