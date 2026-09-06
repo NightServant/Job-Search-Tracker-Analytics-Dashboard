@@ -309,32 +309,50 @@ export const jobService = {
     })
 
     try {
-      const { data, error } = await supabase.functions.invoke('job-url-autofill', {
-        body: { url },
+      // `/api/autofill`, NOT the Supabase edge function any more (M7).
+      //
+      // The extractor is a Python service on the same deployment, reachable
+      // only over an internal binding, and `/api/autofill` is the door that
+      // authenticates, throttles and SSRF-checks before anything is fetched.
+      // What changed is the transport and the parser; the RESPONSE SHAPE is
+      // identical -- `{ values, confidence, warnings }` -- which is why the
+      // checks below and every caller are untouched.
+      //
+      // The bearer token is the same scheme `/api/tailor` and `/api/latex`
+      // already use: this app has one answer to "how does a request prove who
+      // it is", not two.
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      const response = await fetch('/api/autofill', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token
+            ? { Authorization: `Bearer ${session.access_token}` }
+            : {}),
+        },
+        body: JSON.stringify({ url }),
       })
 
-      if (error) {
-        const errorMsg = error instanceof Error ? error.message : JSON.stringify(error)
+      const data = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        const message =
+          (data && typeof data === 'object' && 'error' in data && String(data.error)) ||
+          `Auto-fill failed (${response.status})`
+        const error = new Error(message)
         Sentry.captureException(error, {
-          tags: {
-            function: 'job-url-autofill',
-            requestId,
-          },
-          extra: {
-            url: url.substring(0, 100),
-            errorMessage: errorMsg,
-          },
+          tags: { function: 'api-autofill', requestId },
+          extra: { url: url.substring(0, 100), status: response.status },
         })
-        throw this._toError(error)
+        throw error
       }
 
       if (!data || typeof data !== 'object' || !('values' in data)) {
         const invalidErr = new Error('Auto-fill returned an invalid response')
         Sentry.captureException(invalidErr, {
-          tags: {
-            function: 'job-url-autofill',
-            requestId,
-          },
+          tags: { function: 'api-autofill', requestId },
           extra: {
             url: url.substring(0, 100),
             responseData: JSON.stringify(data).substring(0, 200),
