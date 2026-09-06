@@ -4,7 +4,9 @@ import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
 import { PanelSection } from '@/components/ui/panel-section'
-import { AtsCheck, type AtsResult } from '@/components/ui/ats-check'
+import { type AtsResult } from '@/components/ui/ats-check'
+import { AtsDonut } from '@/components/ui/ats-donut'
+import { AtsKeywords } from '@/components/ui/ats-keywords'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { iconMotion } from '@/components/icons/motion'
 import { ArrowRightIcon } from '@/components/icons'
@@ -219,17 +221,24 @@ export function TailoringAnalysisRail({
           </p>
         ) : (
           <div className="flex flex-col gap-4">
-            <AtsCheck result={verdictFor(match.score)} label={`${match.score}%`} />
-            <div className="flex flex-col gap-1">
-              <p className="text-label-caps uppercase text-text-secondary">missing keywords</p>
-              {match.missing.length === 0 ? (
-                <p className="text-body-s text-text-muted">
-                  none — every term in the posting shows up in this CV.
-                </p>
-              ) : (
-                <p className="text-body-s text-text-primary">{match.missing.join(', ')}</p>
-              )}
-            </div>
+            {/* THE SAME RING AS THE APPLICATION RECORD, and it sizes itself
+                by its CONTAINER rather than the viewport -- this rail is
+                320px on the same wide screen where the record dialog is
+                roomy, and a viewport query cannot tell those apart. */}
+            <AtsDonut
+              score={match.score}
+              matched={match.matched.length}
+              missing={match.missing.length}
+              verdict={verdictFor(match.score)}
+            />
+            <AtsKeywords
+              label="missing keywords"
+              terms={match.missing}
+              emptyText="none — every term in the posting shows up in this CV."
+              // Fewer than the record dialog gets: this is a 320px rail beside
+              // a document, not a panel someone opened to study.
+              limit={12}
+            />
           </div>
         )}
       </PanelSection>

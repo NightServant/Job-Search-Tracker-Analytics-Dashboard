@@ -1,5 +1,6 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import type { Job } from '@/types'
 import { AtsPanel } from '../AtsPanel'
 import { NextEvent } from '../NextEvent'
@@ -269,5 +270,44 @@ describe.each(['dialog', 'page'] as const)('ApplicationRecord (%s layout)', (lay
     expect(screen.getByText('posting url')).toBeTruthy()
     expect(screen.queryByText(/no activity logged/i)).toBeNull()
     expect(screen.getByText(/loading this application/i)).toBeTruthy()
+  })
+})
+
+describe('the keyword lists', () => {
+  /**
+   * A real posting yields sixty-odd terms. Rendered as one comma-joined
+   * string that is eleven lines of prose in a 320px rail, which made the most
+   * actionable thing on the panel also the least readable.
+   */
+  const MANY = Array.from({ length: 40 }, (_, i) => `term${i + 1}`)
+
+  it('folds a long list and says how many there are', () => {
+    render(<AtsPanel match={{ score: 30, matched: [], missing: MANY }} />)
+    // The count is beside the heading whether folded or not: "how much work
+    // is this" is the first thing a reader wants.
+    expect(screen.getByText('(40)')).toBeTruthy()
+    expect(screen.getByRole('button', { name: /show 22 more/i })).toBeTruthy()
+    expect(screen.queryByText(/term40/)).toBeNull()
+  })
+
+  it('shows the rest on request, and folds back', async () => {
+    render(<AtsPanel match={{ score: 30, matched: [], missing: MANY }} />)
+    await userEvent.click(screen.getByRole('button', { name: /show 22 more/i }))
+    expect(screen.getByText(/term40/)).toBeTruthy()
+    await userEvent.click(screen.getByRole('button', { name: /show fewer/i }))
+    expect(screen.queryByText(/term40/)).toBeNull()
+  })
+
+  it('does not offer to expand a list that already fits', () => {
+    render(<AtsPanel match={{ score: 30, matched: [], missing: ['go', 'rust'] }} />)
+    expect(screen.queryByRole('button', { name: /show .* more/i })).toBeNull()
+  })
+
+  it('keeps the posting\'s own order rather than inventing a ranking', () => {
+    // `atsMatch` yields terms in the order the posting uses them, which is a
+    // weak but real signal. Re-ranking in a view would be a relevance model
+    // nobody could see.
+    render(<AtsPanel match={{ score: 30, matched: [], missing: ['zebra', 'apple', 'mango'] }} />)
+    expect(screen.getByText(/zebra, apple, mango/)).toBeTruthy()
   })
 })

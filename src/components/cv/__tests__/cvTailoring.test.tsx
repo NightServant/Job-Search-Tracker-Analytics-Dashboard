@@ -42,7 +42,10 @@ describe('the tailoring rails', () => {
 
     await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
     // A real percentage from the deterministic scorer, not a model's opinion.
-    expect(await screen.findByText(/%$/)).toBeTruthy()
+    // The score is a ring now, and its number is an SVG tspan the chart
+    // draws. Matched against the panel's TEXT summary, which exists so a
+    // screen reader -- and a test -- can read the score at all.
+    expect(await screen.findByText(/\d+% match\./)).toBeTruthy()
     expect(screen.getByText(/missing keywords/i)).toBeTruthy()
   })
 
@@ -59,7 +62,10 @@ describe('the tailoring rails', () => {
     expect(screen.queryByText(/using the pasted posting/i)).toBeNull()
 
     await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
-    expect(await screen.findByText(/%$/)).toBeTruthy()
+    // The score is a ring now, and its number is an SVG tspan the chart
+    // draws. Matched against the panel's TEXT summary, which exists so a
+    // screen reader -- and a test -- can read the score at all.
+    expect(await screen.findByText(/\d+% match\./)).toBeTruthy()
   })
 
   it('says when the chosen application has no description stored', async () => {

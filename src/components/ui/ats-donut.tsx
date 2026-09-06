@@ -28,9 +28,15 @@ import type { AtsResult } from '@/components/ui/ats-check'
  * own, and a red "missing" arc against an amber "matched" arc would read as
  * two competing verdicts.
  *
- * RESPONSIVE: ring and legend stack below `sm`, where two columns would leave
- * the ring at roughly 120px and truncate every legend row; side by side from
- * `sm`, which is what the panel has room for on a record dialog.
+ * RESPONSIVE BY CONTAINER, NOT BY VIEWPORT, and that distinction is the whole
+ * reason this reads correctly in both places it appears. The record dialog
+ * gives it most of a wide panel; the document editor gives it a 320px rail on
+ * the SAME wide screen. A viewport `sm:grid-cols-2` cannot tell those apart --
+ * it would split that rail into two 150px columns, squeezing the ring and
+ * truncating every legend row, on exactly the screens that look roomiest.
+ *
+ * So the query is on the container: stacked until the panel itself is wide
+ * enough, side by side after. Same mechanism `ui/card` already uses.
  */
 
 const CONFIG = {
@@ -70,7 +76,12 @@ export function AtsDonut({ score, matched, missing, verdict }: AtsDonutProps) {
   const total = matched + missing
 
   return (
-    <div className="grid items-center gap-4 sm:grid-cols-2">
+    // The container is the OUTER element and the grid is inside it: an
+    // element cannot query its own container, so declaring both on one div
+    // would resolve `@sm/ats` against some ancestor instead -- silently, and
+    // looking correct in whichever layout happened to match.
+    <div className="@container/ats">
+     <div className="grid items-center gap-4 @sm/ats:grid-cols-2">
       {/* THE NUMBER IN TEXT, not only in the ring.
           The score is drawn as an SVG `<tspan>` inside the chart, which a
           screen reader does not announce and which does not exist at all
@@ -149,6 +160,7 @@ export function AtsDonut({ score, matched, missing, verdict }: AtsDonutProps) {
           <span className="tabular shrink-0 text-text-muted">{total}</span>
         </li>
       </ul>
+     </div>
     </div>
   )
 }

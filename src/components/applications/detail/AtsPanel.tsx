@@ -1,7 +1,8 @@
 import * as React from 'react'
 import { type AtsResult } from '@/components/ui/ats-check'
-import { AtsDonut } from './AtsDonut'
+import { AtsDonut } from '@/components/ui/ats-donut'
 import { PanelSection } from '@/components/ui/panel-section'
+import { AtsKeywords } from '@/components/ui/ats-keywords'
 import type { KeywordMatch } from '@/services/atsMatch'
 
 /**
@@ -69,21 +70,16 @@ export function AtsPanel({ match, error = false, className, ...props }: AtsPanel
             missing={match.missing.length}
             verdict={verdictFor(match.score)}
           />
-          <div className="flex flex-col gap-1">
-            <p className="text-label-caps uppercase text-text-secondary">missing keywords</p>
-            {match.missing.length === 0 ? (
-              <p className="text-body-s text-text-muted">
-                none -- every term in the posting shows up in the CV.
-              </p>
-            ) : (
-              <p className="text-body-s text-text-primary">{match.missing.join(', ')}</p>
-            )}
-          </div>
+          {/* FOLDED, because a real posting yields sixty-odd terms and the
+              most actionable thing on this panel was also the least
+              readable. See ui/ats-keywords. */}
+          <AtsKeywords
+            label="missing keywords"
+            terms={match.missing}
+            emptyText="none -- every term in the posting shows up in the CV."
+          />
           {match.matched.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <p className="text-label-caps uppercase text-text-secondary">matched</p>
-              <p className="text-body-s text-text-muted">{match.matched.join(', ')}</p>
-            </div>
+            <AtsKeywords label="matched" terms={match.matched} muted />
           )}
         </div>
       )}
