@@ -85,6 +85,7 @@ const STORED: { table: string; what: string }[] = [
   { table: 'resume_snapshots', what: 'Version snapshots of those CVs, so an earlier draft can be restored.' },
   { table: 'application_documents', what: 'Links between an application and the CV version sent with it.' },
   { table: 'user_preferences', what: 'Your settings, such as default currency.' },
+  { table: 'user_profiles', what: 'Your professional profile, if you import your LinkedIn data export in Settings: name, headline, summary, work history, education, skills and anything else that export contains — which can include a postal address and a birth date. Only if you import one, and removable from the same screen.' },
   { table: 'analytics_cache', what: 'Computed results of your own analytics, stored so the charts do not recalculate on every visit.' },
   { table: 'demo_accounts', what: 'The identifiers of the public read-only demo accounts. It holds no data belonging to you.' },
 ]

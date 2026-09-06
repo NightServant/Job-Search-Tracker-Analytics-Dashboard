@@ -53,6 +53,19 @@ export function PreferencesGroup({
           description="seeds the currency for every new application. existing applications keep the currency they were saved in."
           wide
           control={
+            // IT SCROLLS INSIDE ITS OWN ROW BELOW 320px, rather than pushing
+            // the page sideways. Six segments of a currency code come to
+            // 312px, and a 320px screen has 288px between the gutters -- so
+            // this was an 8px horizontal overflow on the whole settings page,
+            // measured 2026-09-06. It predates the tab removal; the tabs were
+            // simply hiding it half the time.
+            //
+            // `overflow-y-hidden` IS NOT REDUNDANT: per the CSS overflow spec
+            // a `visible` value coerces to `auto` the moment the other axis
+            // scrolls, which would draw a vertical scrollbar in a 36px-tall
+            // control that has nothing to scroll to. Same coercion the tab
+            // strip and the applications table both hit.
+            <div className="max-w-full overflow-x-auto overflow-y-hidden">
             <SegmentedControl
               options={CURRENCY_OPTIONS}
               value={defaultCurrency}
@@ -60,6 +73,7 @@ export function PreferencesGroup({
               aria-label="Default currency"
               disabled={saving}
             />
+            </div>
           }
         />
       </PanelSection>

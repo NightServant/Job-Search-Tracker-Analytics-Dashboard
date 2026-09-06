@@ -1,10 +1,15 @@
 'use client'
 
+import * as React from 'react'
+
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useUserPreferences, useSetDefaultCurrency } from '@/hooks/useUserPreferences'
 import { SettingsPage } from '@/components/settings/SettingsPage'
+import { ProfileImport, ProfileImportSteps } from '@/components/settings/ProfileImport'
+import type { ProfileState } from '@/components/settings/ProfileGroup'
+import { useUserProfile, useImportProfile, useClearUserProfile } from '@/hooks/useUserProfile'
 import { toError } from '@/services/supabaseHelpers'
 import type { SupportedCurrency } from '@/services/userPreferences'
 
@@ -33,6 +38,14 @@ import type { SupportedCurrency } from '@/services/userPreferences'
 export default function Page() {
   const { user, signOut } = useAuth()
   const { data: prefs = null } = useUserPreferences()
+  const { data: stored, isPending: profileLoading } = useUserProfile()
+  const importProfile = useImportProfile()
+  const clearProfile = useClearUserProfile()
+  // What the last import did, kept here rather than read off the mutation: a
+  // file set that matched no known header resolves SUCCESSFULLY with nothing
+  // recognised, so `mutation.error` is empty on exactly the case worth saying
+  // something about.
+  const [profileNote, setProfileNote] = React.useState<string | null>(null)
   const setDefaultCurrency = useSetDefaultCurrency()
   const { success, error: showError } = useToast()
 
@@ -111,9 +124,67 @@ export default function Page() {
     }
   }
 
+
+
+  const handleImportProfile = async (files: { name: string; text: string }[]) => {
+    setProfileNote(null)
+    try {
+      const result = await importProfile.mutateAsync(files)
+      if (!result.recognised.length) {
+        // Naming the files is the whole message: "nothing was recognised" on
+        // its own leaves someone guessing which of six CSVs was wrong.
+        setProfileNote(
+          `Could not recognise ${result.unrecognised.join(', ')}. ` +
+            'Pick the CSVs from your LinkedIn export, such as Profile.csv.'
+        )
+        return
+      }
+      success(`Imported ${result.recognised.join(', ')}`)
+      if (result.unrecognised.length) {
+        setProfileNote(`Skipped ${result.unrecognised.join(', ')} — not a table this reads.`)
+      }
+    } catch (err) {
+      setProfileNote(err instanceof Error ? err.message : 'Could not read those files.')
+    }
+  }
+
+  const handleClearProfile = async () => {
+    try {
+      await clearProfile.mutateAsync()
+      setProfileNote(null)
+      success('Profile removed')
+    } catch (err) {
+      showError('Could not remove the profile', err instanceof Error ? err.message : 'Unknown error')
+    }
+  }
+
+  const profileState: ProfileState = profileLoading
+    ? { status: 'loading' }
+    : stored?.profile
+      ? { status: 'ready', profile: stored.profile }
+      : {
+          status: 'empty',
+          message:
+            'No profile yet. Import your LinkedIn data export and everything in it — ' +
+            'headline, summary, roles and their descriptions, education, skills — appears here ' +
+            'and feeds CV tailoring.',
+        }
+
   return (
     <SettingsPage
       prefs={prefs}
+      profile={profileState}
+      profileSource={
+        <ProfileImport
+          onImport={(files) => void handleImportProfile(files)}
+          onClear={() => void handleClearProfile()}
+          importing={importProfile.isPending}
+          clearing={clearProfile.isPending}
+          hasProfile={!!stored?.profile}
+          note={profileNote}
+        />
+      }
+      profileSteps={<ProfileImportSteps />}
       email={user?.email ?? null}
       onDefaultCurrencyChange={(code) => void handleDefaultCurrencyChange(code)}
       savingCurrency={setDefaultCurrency.isPending}

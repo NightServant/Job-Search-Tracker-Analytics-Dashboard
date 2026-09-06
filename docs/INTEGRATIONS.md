@@ -21,9 +21,10 @@ that stops someone re-investigating.
 | **Any OpenAI-compatible endpoint** | CV tailoring | 2026-09-04 | **Integrated** — `src/services/integrations/tailoring.ts` |
 | **ESCO** (EU skills taxonomy) | ATS skill synonyms | 2026-09-04 | **Integrated, narrowly** — `src/services/integrations/esco.ts` |
 | **`docx`** (npm, 9.7.1) | headless Word export | 2026-09-04 | **Integrated** — `src/services/integrations/docxExport.ts` |
-| **Scrapling** | job posting extraction | 2026-09-06 | **Planned, M7. Not installed.** |
+| **Scrapling** | job posting extraction | 2026-09-06 | **Integrated** — `scraper/`, deployed as a Vercel service |
+| **LinkedIn data export** | your own profile | 2026-09-06 | **Integrated** — `src/services/linkedinExport.ts` |
 
-That is the whole list. Four working integrations and one planned. Anything
+That is the whole list. Six working integrations. Anything
 not in this table is not in this application.
 
 ---
@@ -37,13 +38,66 @@ Each line is a measured result, not a guess. The date is when it was measured.
 | **Novoresume** | No API exists. No developer docs, no endpoints, no developer programme. Its career AI tools are consumer web pages. | 2026-09-04 |
 | **JobStreet / SEEK API** | No Composio toolkit exists; SEEK's own API is employer/ATS-partner only. Its terms also forbid "automatically submitting an application" — so auto-submit is off the table by contract, and pre-fill with a human in the loop is the only compliant shape. | 2026-09-04 |
 | **LinkedIn API** | Connects cleanly and still cannot feed the tracker. Self-serve OAuth grants `openid profile email` + `w_member_social` — the connection returns `sub, name, given_name, family_name, email, email_verified, locale, picture` and nothing else. **There is no endpoint for your applications or for job postings at any tier below Talent Solutions partnership.** DO NOT RECONNECT IT EXPECTING OTHERWISE — "active" is exactly what it looks like when the data is unreachable. | 2026-09-05 |
-| **Composio** | Real and it connects (1,505 toolkits), but it is developer tooling, never a feature: nothing under `src/` imports it and no route calls it. It was tried for JobStreet and LinkedIn and delivered neither. `scripts/composio-session.sh` still works if it is ever wanted; the session recipe lives in that script's comments, which is the right place for it. | 2026-09-05 |
+| **Composio** | Tried as a real feature on 2026-09-06 and REMOVED the same day. It does broker a LinkedIn profile connection, and that part worked — but it is a whole vendor, an org-wide API key and a per-user credential store in exchange for eight OIDC fields, and Gabe rejected the trade. It has no toolkit that returns your applications or a job posting. `scripts/composio-session.sh` remains the dev-tooling entry point; nothing under `src/` imports it. | 2026-09-06 |
 | **docx-editor.dev automation API** | The editor core is Apache-2.0 and browser-only; its Office.js-compatible automation API (`@docx-editor.dev/editor-api`) is under the EigenPal Pro Licence at **$500/month**. The free editor component plus the `docx` npm package do the whole job for nothing. | 2026-09-04 |
 
-**The lesson these five share:** whatever a job board or a career service
+**The lesson these share:** whatever a job board or a career service
 exposes to developers is built for employers and ATS vendors. The
 candidate-facing half is a posting tool. Posting data comes from reading the
 page, which is what M7 is about.
+
+---
+
+## LinkedIn data export — your own profile
+
+**Integrated 2026-09-06**, after two other approaches were built and thrown
+away the same day. Both failures are worth keeping, because each looked
+reasonable right up to the point it did not work:
+
+| Attempt | Why it went |
+|---|---|
+| **Composio connector** | It worked. But it is a whole vendor, an org-wide API key and a per-user credential store in exchange for eight OIDC fields — no work history, no bullet text. Gabe rejected the trade. |
+| **Profile page scraper** | Read JSON-LD and Voyager payloads. Recovered titles and dates and almost never the bullet text under a role, which is the part a CV is written from. Also needed a session cookie or a browser LinkedIn would accept. |
+
+**Settings & Privacy → Get a copy of your data.** First-party, sanctioned, no
+credential, cannot be rate limited or blocked, and it carries the descriptions,
+certifications, projects and languages that neither of the above could reach.
+The cost is that it is not instant — LinkedIn takes minutes to a day.
+
+Files are matched **by their header row, not their filename**, because LinkedIn
+renames and re-cases them between exports and a user can drag one file in
+without the archive around it. `Profile.csv` is confirmed against a real
+export; the other tables are handled from their documented headers and are
+each independent, so an unrecognised one costs only itself.
+
+Parsing happens in the browser; only the result is stored, in `user_profiles`.
+That table can hold a **postal address and a birth date**, because the export
+contains them — `/privacy` says so, and Settings shows them under their own
+heading so anyone who does not want them stored knows to clear the profile.
+
+---
+
+## Scrapling — job posting extraction
+
+**Integrated**, `scraper/`, deployed as a Vercel service reached only over a
+binding. See `docs/superpowers/plans/2026-09-06-m7-scrapling-autofill.md`.
+
+Two things measured on 2026-09-06 that change how it is used:
+
+* **Some boards render postings with JavaScript.** Cloudstaff answers a plain
+  fetch with 110KB of HTML containing *fifteen* visible characters. A headless
+  browser is tried when the static fetch comes back as a shell or a challenge.
+* **`playwright` does not work on Vercel as configured.** The library installs;
+  the Chromium binary never does, because the Python builder runs no
+  post-install step. So JavaScript rendering works locally and **not in
+  production** — deployed, those sites still fall back. The remedies are a
+  container runtime, or the caller supplying HTML, which `/extract` already
+  accepts.
+
+An ordinary headless browser is used (`DynamicFetcher`), never Scrapling's
+`StealthyFetcher`. A challenge aimed at clients that cannot run a page is not
+something a real browser is getting around; a site that refuses an honest
+browser has said no.
 
 ---
 

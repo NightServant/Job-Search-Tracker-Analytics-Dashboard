@@ -10,6 +10,7 @@ import userEvent from '@testing-library/user-event'
 const useAuthMock = vi.hoisted(() => vi.fn())
 const useUserPreferencesMock = vi.hoisted(() => vi.fn())
 const useSetDefaultCurrencyMock = vi.hoisted(() => vi.fn())
+const useUserProfileMock = vi.hoisted(() => vi.fn())
 const rpcMock = vi.hoisted(() => vi.fn())
 const showErrorMock = vi.hoisted(() => vi.fn())
 const showSuccessMock = vi.hoisted(() => vi.fn())
@@ -25,6 +26,15 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/useUserPreferences', () => ({
   useUserPreferences: useUserPreferencesMock,
   useSetDefaultCurrency: useSetDefaultCurrencyMock,
+}))
+// The Profile tab reads and writes through its own hooks. Mocked for the same
+// reason the preferences ones are: this suite drives the route's own logic --
+// sign-out, deletion, the currency write -- without standing up a
+// QueryClientProvider, and an unmocked useQuery throws before any of it runs.
+vi.mock('@/hooks/useUserProfile', () => ({
+  useUserProfile: useUserProfileMock,
+  useImportProfile: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useClearUserProfile: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
 // error/success are hoisted mocks, not inline vi.fn()s, so a failure-path
 // test can assert on the actual message a real Supabase error produces --
@@ -79,6 +89,11 @@ function setup({
   useAuthMock.mockReturnValue({ user: { id: 'u1', email }, signOut })
   useUserPreferencesMock.mockReturnValue({ data: prefs, isLoading: false, error: null })
   useSetDefaultCurrencyMock.mockReturnValue({ mutateAsync, isPending: false })
+  // Resolved and empty -- the state a fresh account is actually in.
+  useUserProfileMock.mockReturnValue({
+    data: { profile: null, fetchedAt: null },
+    isPending: false,
+  })
   return { signOut, mutateAsync }
 }
 
