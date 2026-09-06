@@ -142,7 +142,19 @@ export function Select({
           <SelectPrimitive.Value className="truncate">
             {selected ? selected.label : <span className="text-text-muted">{placeholder}</span>}
           </SelectPrimitive.Value>
-          <SelectPrimitive.Icon className="shrink-0 text-text-muted">
+          {/* `flex items-center` ON THE ICON WRAPPER, and it is not cosmetic.
+              The wrapper is inline by default, so its box is a LINE BOX --
+              taller than the 16px glyph inside it, with the glyph sitting on
+              the text baseline rather than in the middle. The trigger's own
+              `items-center` then centres that line box correctly and the
+              chevron still lands high inside it.
+
+              Measured 2026-09-06 on the status filter at 375px: the chevron's
+              centre sat 3.3px above the trigger's while the label's sat 0.8px
+              above -- a 2.5px disagreement between two things on one row,
+              which is exactly the size that reads as "off" without reading as
+              broken. A flex box has no baseline to hang from. */}
+          <SelectPrimitive.Icon className="flex shrink-0 items-center text-text-muted">
             {/* Turns to point up while the list is open -- the chevron says
                 which way the control will move, which is the one thing it is
                 for. */}

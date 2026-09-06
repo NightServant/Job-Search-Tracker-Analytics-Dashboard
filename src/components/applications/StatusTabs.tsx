@@ -113,7 +113,20 @@ export function StatusTabs({ value, onChange, counts, panelId, className }: Stat
           // scrolls -- so `overflow-x-auto` alone made this a scrollport on
           // BOTH axes and drew a vertical scrollbar in a 32px-tall row that
           // has nothing to scroll to. Same coercion the table container hit.
+          //
+          // AND THE HEIGHT HAS TO GO WITH IT. Clipping alone hid the active
+          // tab's orange rule from tablet up: the list is a fixed 32px, its
+          // triggers are 32px, and the horizontal scrollbar plus rounding put
+          // content 1-5px past the padding box -- exactly the bottom edge the
+          // 2px rule sits on. Sizing the list to its content means there is no
+          // vertical overflow for `hidden` to clip.
+          //
+          // Written with the SAME variant the height it replaces uses, because
+          // a plain `h-auto` loses: `group-data-[orientation=horizontal]/tabs:h-8`
+          // is a variant class and outranks it, so the override was inert.
+          // Matching the variant lets tailwind-merge resolve the pair.
           '-mx-4 w-full justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 px-4',
+          'group-data-[orientation=horizontal]/tabs:h-auto',
           className
         )}
       >

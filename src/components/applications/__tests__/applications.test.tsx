@@ -779,4 +779,25 @@ describe('the status filter', () => {
     expect(list.className).toContain('overflow-x-auto')
     expect(list.className).toContain('overflow-y-hidden')
   })
+
+  it('sizes the strip to its content, so clipping has nothing to clip', () => {
+    // THE REGRESSION THIS EXISTS FOR. `overflow-y-hidden` on its own hid the
+    // active tab's orange rule from tablet up: the list was a fixed 32px, its
+    // triggers are 32px, and a horizontal scrollbar plus rounding pushed
+    // content 1-5px past the padding box -- exactly the bottom edge that rule
+    // sits on. Reported by Gabe within minutes of the fix that caused it.
+    //
+    // The height must carry the SAME variant as the rule it overrides.
+    // `group-data-[orientation=horizontal]/tabs:h-8` is a variant class, so a
+    // plain `h-auto` loses to it and is inert -- which is what the first
+    // attempt shipped until the measurement showed the list still 32px.
+    //
+    // Verified in the browser afterwards: zero vertical overflow at 640, 768,
+    // 1024, 1440 and 1600, and the rule painted orange at each.
+    const { container } = render(
+      <StatusTabs value="all" onChange={() => {}} counts={COUNTS} />
+    )
+    const list = container.querySelector('[data-slot="tabs-list"]')!
+    expect(list.className).toContain('group-data-[orientation=horizontal]/tabs:h-auto')
+  })
 })
