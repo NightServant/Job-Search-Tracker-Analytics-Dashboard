@@ -22,6 +22,22 @@ VALUE_FIELDS: tuple[str, ...] = (
     "source",
     "salary_min",
     "salary_max",
+    #: The ISO code the salary was quoted in. Without it a peso range is stored
+    #: under whatever default the user happened to set -- right by accident,
+    #: and wrong the moment they read a posting from anywhere else.
+    "salary_currency",
+    #: The posting itself, in full. It is what the ATS keyword match reads and
+    #: what AI tailoring is given, so a blank description makes both of those
+    #: features guess -- and it is the field a human is least willing to
+    #: retype, which is the whole argument for auto-fill.
+    "description",
+    #: Technologies named by the posting. Feeds the ATS keyword match and AI
+    #: tailoring directly, which is why it is worth extracting rather than
+    #: leaving to the reader to retype out of the description.
+    "tech_stack",
+    #: Employment type, industry, category -- the facets worth filtering a
+    #: pipeline by. Kept apart from tech_stack because they are not skills.
+    "tags",
     "url",
 )
 

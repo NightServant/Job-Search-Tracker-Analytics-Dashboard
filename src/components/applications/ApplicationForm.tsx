@@ -253,6 +253,35 @@ export function ApplicationForm({
       }
       if (!salaryMin.trim() && values.salary_min != null) setSalaryMin(String(values.salary_min))
       if (!salaryMax.trim() && values.salary_max != null) setSalaryMax(String(values.salary_max))
+      // THE CURRENCY GOES WITH THE FIGURES, and only with them. Without this
+      // a peso range from a Philippine posting was stored under whatever
+      // default the user had set -- correct by accident for them, wrong the
+      // moment they read a posting from anywhere else. Guarded against the
+      // supported set for the same reason `work_mode` is: it arrives from a
+      // remote page, and an unrecognised code would fail the CHECK constraint
+      // at the insert rather than here.
+      if (
+        !salaryMin.trim() &&
+        !salaryMax.trim() &&
+        values.salary_currency &&
+        isSupportedCurrency(values.salary_currency)
+      ) {
+        setCurrency(values.salary_currency)
+      }
+      // The posting body. It is what the ATS keyword match reads and what AI
+      // tailoring is given, so leaving it out made both of those features work
+      // from an empty string -- and it is the one field nobody wants to retype.
+      if (!description.trim() && values.description) setDescription(values.description)
+      // Both are `string[]` columns the extractor never filled until now, and
+      // `tech_stack` is exactly what the ATS keyword match reads -- leaving it
+      // empty meant the match scored a CV against nothing. Rendered as comma
+      // lists here, so they join the same way `parseCommaList` splits them.
+      if (!techInput.trim() && values.tech_stack?.length) {
+        setTechInput(values.tech_stack.join(', '))
+      }
+      if (!tagsInput.trim() && values.tags?.length) {
+        setTagsInput(values.tags.join(', '))
+      }
       setAutofillNote(
         result.warnings?.length
           ? `${result.warnings.join(' ')} Review every field before saving.`

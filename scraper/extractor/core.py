@@ -56,12 +56,17 @@ def extract(url: str, html: str, status: int = 200) -> Envelope:
             del values[key]
             confidence.pop(key, None)
 
-    warnings: list[str] = []
-    if not values.get("company"):
-        warnings.append("Could not confidently detect company. Please fill manually.")
-    if not values.get("role"):
-        warnings.append("Could not confidently detect role title. Please fill manually.")
-    if values.get("salary_min") is None and values.get("salary_max") is None:
-        warnings.append("Salary was not found in page metadata.")
-
-    return {"values": values, "confidence": confidence, "warnings": warnings}
+    # NO WARNING FOR A FIELD THE PAGE DID NOT HAVE (Gabe, 2026-09-06).
+    #
+    # This used to announce every absent field: no company, no role, no salary.
+    # Most job postings do not publish a salary at all -- almost none in the
+    # Philippines do -- so the commonest outcome of a PERFECT extraction was a
+    # row of warnings, which trains a reader to stop reading them. And an empty
+    # field is already visible: it is the empty field.
+    #
+    # The form says "Filled the empty fields only. Review every field before
+    # saving," which covers it. What is left here is the case where something
+    # actually went wrong and the values are a guess rather than a reading --
+    # see `autofill_from_url_alone`, which sets its own warning because a
+    # caller cannot otherwise tell that nothing was read at all.
+    return {"values": values, "confidence": confidence, "warnings": []}

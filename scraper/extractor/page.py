@@ -41,6 +41,29 @@ class Page:
         value = node.get() if hasattr(node, "get") else node
         return None if value is None else str(value)
 
+    def text_block(self, css: str) -> str | None:
+        """All visible text under the first match, newlines between blocks.
+
+        `get_all_text()` rather than `.get()`: the latter hands back the node's
+        outer HTML, which is markup a textarea should never receive. This is
+        the one call that reads a container's PROSE rather than an attribute,
+        and it exists because a job posting's body is not in any meta tag.
+        """
+        try:
+            found = self._sel.css(css)
+        except Exception:
+            return None
+        if not len(found):
+            return None
+        node = found[0]
+        if not hasattr(node, "get_all_text"):
+            return None
+        try:
+            text = node.get_all_text()
+        except Exception:
+            return None
+        return str(text) if text else None
+
     def all(self, css: str) -> list[str]:
         try:
             found = self._sel.css(css)

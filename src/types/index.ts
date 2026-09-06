@@ -157,6 +157,10 @@ export type JobAutofillField =
   | 'source'
   | 'salary_min'
   | 'salary_max'
+  | 'salary_currency'
+  | 'description'
+  | 'tech_stack'
+  | 'tags'
   | 'url';
 
 export interface JobAutofillResult {
@@ -170,6 +174,10 @@ export interface JobAutofillResult {
       | 'source'
       | 'salary_min'
       | 'salary_max'
+      | 'salary_currency'
+      | 'description'
+      | 'tech_stack'
+      | 'tags'
       | 'url'
     >
   >;

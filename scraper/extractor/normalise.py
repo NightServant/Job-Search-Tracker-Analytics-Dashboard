@@ -119,17 +119,100 @@ def parse_salary_value(value: object) -> float | None:
     return None
 
 
-_RANGE = re.compile(
-    r"\$\s?([\d,]{2,})(?:\.\d+)?\s*(?:-|to|–|—)\s*\$\s?([\d,]{2,})(?:\.\d+)?",
+#: Currency tokens, MOST SPECIFIC FIRST.
+#:
+#: The order is load-bearing rather than cosmetic: `S$` and `A$` both end in
+#: `$`, so a pattern that tried plain `$` first would read "S$7,000" as USD
+#: 7,000 and silently mislabel a Singapore salary.
+#:
+#: These are exactly the six currencies the app supports -- the same vocabulary
+#: as SUPPORTED_CURRENCIES and the `jobs_salary_currency_check` constraint. A
+#: seventh detected here would be a value the form cannot store.
+_CURRENCIES: tuple[tuple[str, str], ...] = (
+    ("SGD", r"S\$|SGD"),
+    ("AUD", r"A\$|AUD"),
+    ("USD", r"US\$|USD|\$"),
+    ("PHP", r"₱|PHP|Php"),
+    ("EUR", r"€|EUR"),
+    ("GBP", r"£|GBP"),
+)
+
+_CURRENCY_ALT = "|".join(pattern for _, pattern in _CURRENCIES)
+
+#: A number, optionally with thousands separators and an optional `k` suffix.
+#:
+#: Built per-name rather than reused as one constant: a pattern cannot carry
+#: the same group name twice, and reading the two amounts out by POSITION is
+#: what broke the first version of this -- adding the named currency group
+#: silently shifted every index by one.
+def _number(name: str) -> str:
+    return rf"(?P<{name}>[\d,]{{2,}}(?:\.\d+)?)\s*(?P<{name}_k>k\b)?"
+
+
+_DASH = r"\s*(?:-|to|–|—|until)\s*"
+
+#: `₱50,000 - ₱70,000`, `$120,000 to $150,000`, `S$5,000-7,000`.
+_RANGE_PREFIXED = re.compile(
+    rf"(?P<cur>{_CURRENCY_ALT})\s?{_number('lo')}{_DASH}"
+    rf"(?:{_CURRENCY_ALT})?\s?{_number('hi')}",
+    re.I,
+)
+
+#: `50,000 - 70,000 PHP`, `40k to 55k GBP`. The suffix form is common on job
+#: boards outside the US, which is exactly where the old dollar-only pattern
+#: found nothing.
+_RANGE_SUFFIXED = re.compile(
+    rf"{_number('lo')}{_DASH}{_number('hi')}\s*(?P<cur>{_CURRENCY_ALT})",
     re.I,
 )
 
 
-def salary_range_from_text(text: str) -> tuple[float | None, float | None]:
-    match = _RANGE.search(_WS.sub(" ", text))
-    if not match:
-        return None, None
+def _currency_of(token: str) -> str | None:
+    """Maps a matched symbol or code back to its ISO code."""
+    cleaned = token.strip().upper()
+    for code, pattern in _CURRENCIES:
+        if re.fullmatch(pattern, cleaned, re.I):
+            return code
+    return None
+
+
+def _amount(digits: str, k_suffix: str | None) -> float | None:
     try:
-        return float(match.group(1).replace(",", "")), float(match.group(2).replace(",", ""))
+        value = float(digits.replace(",", ""))
     except ValueError:
-        return None, None
+        return None
+    # "70k" is 70,000. Applied AFTER the comma strip so "70,000k" -- which is
+    # not a thing anyone writes -- cannot quietly become 70 million.
+    return value * 1000 if k_suffix else value
+
+
+def salary_range_from_text(text: str) -> tuple[float | None, float | None, str | None]:
+    """A salary range and its currency, from free text.
+
+    WAS DOLLAR-ONLY UNTIL 2026-09-06, and that was a real defect rather than a
+    simplification: the pattern required a literal `$` before BOTH numbers, so
+    `₱50,000 - ₱70,000` -- the ordinary shape of a Philippine posting, which is
+    most of what this deployment reads -- could never match. Auto-fill reported
+    "Salary was not found in page metadata" on pages that stated it plainly.
+
+    Returns the currency too. Without it a peso range would be stored under
+    whatever default the user happened to have set, which is right only by
+    accident and wrong the moment they look at a posting from anywhere else.
+    """
+    flat = _WS.sub(" ", text)
+    for pattern in (_RANGE_PREFIXED, _RANGE_SUFFIXED):
+        match = pattern.search(flat)
+        if not match:
+            continue
+        # BY NAME, never by index. The first version read positional groups
+        # and the named currency group shifted all of them by one.
+        low = _amount(match.group("lo"), match.group("lo_k"))
+        high = _amount(match.group("hi"), match.group("hi_k"))
+        if low is None or high is None:
+            continue
+        # A "range" that runs backwards is a false positive -- almost always a
+        # date, a page number or an unrelated pair of figures.
+        if high < low:
+            continue
+        return low, high, _currency_of(match.group("cur"))
+    return None, None, None

@@ -22,6 +22,9 @@ well as the status.
 
 from __future__ import annotations
 
+import html as _html
+import re
+
 import re
 from urllib.parse import urlsplit
 
@@ -94,3 +97,36 @@ def autofill_from_url_alone(url: str) -> Envelope:
         else "That page could not be read automatically. Paste the description in by hand."
     )
     return {"values": values, "confidence": confidence, "warnings": [warning]}
+
+
+#: Below this much visible text, a page has no posting on it to read.
+#:
+#: MEASURED, not guessed. Cloudstaff's careers site returns 110KB of HTML
+#: containing FIFTEEN visible characters -- "Cloudstaff Jobs" -- because every
+#: posting is rendered client-side. The extractor reported three separate
+#: vague warnings about that page ("could not confidently detect role title",
+#: "salary was not found in page metadata") when the single true statement was
+#: that the page it was handed contained nothing at all.
+_MIN_VISIBLE_CHARS = 200
+
+_TAG = re.compile(r"(?s)<(script|style|noscript|template)[^>]*>.*?</\1>", re.I)
+_ANY_TAG = re.compile(r"(?s)<[^>]+>")
+_SPACES = re.compile(r"\s+")
+
+
+def visible_text_length(html: str) -> int:
+    """Roughly how much a reader would see. Scripts and styles are bytes, not
+    words, and an app shell is almost entirely both."""
+    stripped = _TAG.sub(" ", html or "")
+    text = _html.unescape(_ANY_TAG.sub(" ", stripped))
+    return len(_SPACES.sub(" ", text).strip())
+
+
+def looks_like_javascript_shell(html: str) -> bool:
+    """Whether this document is an application shell rather than a page.
+
+    Deliberately narrow: a SHORT page is not the same as an empty one, so this
+    asks whether there is essentially no text at all. A real posting that is
+    merely terse still clears 200 characters comfortably.
+    """
+    return visible_text_length(html) < _MIN_VISIBLE_CHARS
