@@ -231,7 +231,11 @@ describe('the application record route, on a phone', () => {
     render(<Page />)
 
     // A real percentage, not the "nothing to score" copy.
-    expect(await screen.findByText(/%$/)).toBeTruthy()
+    //
+    // Matched against the panel's TEXT summary rather than the ring: the ring
+    // draws its number as an SVG tspan, which is not text a reader -- or a
+    // screen reader -- can pick up. The summary exists for exactly that.
+    expect(await screen.findByText(/\d+% match\./)).toBeTruthy()
     expect(screen.queryByText(/see how closely they match/i)).toBeNull()
   })
 

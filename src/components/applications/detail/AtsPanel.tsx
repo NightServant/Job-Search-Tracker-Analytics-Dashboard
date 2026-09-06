@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { AtsCheck, type AtsResult } from '@/components/ui/ats-check'
+import { type AtsResult } from '@/components/ui/ats-check'
+import { AtsDonut } from './AtsDonut'
 import { PanelSection } from '@/components/ui/panel-section'
 import type { KeywordMatch } from '@/services/atsMatch'
 
@@ -56,7 +57,18 @@ export function AtsPanel({ match, error = false, className, ...props }: AtsPanel
         </p>
       ) : (
         <div className="flex flex-col gap-4">
-          <AtsCheck result={verdictFor(match.score)} label={`${match.score}%`} />
+          {/* THE RING REPLACES THE RULE (Gabe, 2026-09-06). `AtsCheck` drew a
+              2px bar in the verdict colour with the number beside it, which
+              made 32% and 82% the same picture -- only the digits differed.
+              The score is a proportion of one whole, and the two lists below
+              are that same split spelled out, so the arc is the honest shape
+              for it. `AtsCheck` itself stays; CvTailoring still uses it. */}
+          <AtsDonut
+            score={match.score}
+            matched={match.matched.length}
+            missing={match.missing.length}
+            verdict={verdictFor(match.score)}
+          />
           <div className="flex flex-col gap-1">
             <p className="text-label-caps uppercase text-text-secondary">missing keywords</p>
             {match.missing.length === 0 ? (

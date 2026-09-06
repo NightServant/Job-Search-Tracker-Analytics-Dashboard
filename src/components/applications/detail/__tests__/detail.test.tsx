@@ -39,12 +39,30 @@ const JOB: Job = {
 }
 
 describe('AtsPanel', () => {
-  it('renders the ATS result as a rule and a label, never a pill', () => {
+  it('renders the ATS result as a ring and a number, never a pill', () => {
+    // CHANGED 2026-09-06: the verdict was a 2px rule beside the number, which
+    // drew nothing to scale -- 32% and 82% were the same picture. It is a ring
+    // now, and the arc IS the number.
+    //
+    // The Global Constraint the original assertion guarded still holds and is
+    // still checked: no pill, anywhere in this panel.
     const { container } = render(
       <AtsPanel match={{ score: 72, matched: ['react'], missing: ['go'] }} />
     )
-    const rule = container.querySelector('[data-status-rule]')!
-    expect(rule.className).toContain('rounded-none')
+    expect(container.querySelector('[data-ats-donut]')).toBeTruthy()
+    expect(container.querySelector('[class*="rounded-full"]')).toBeNull()
+  })
+
+  it('states the score in text, not only inside the chart', () => {
+    // The ring draws the number as an SVG tspan, which a screen reader does
+    // not announce and which is absent wherever the chart cannot lay itself
+    // out. The panel says what it shows either way.
+    const { container } = render(
+      <AtsPanel match={{ score: 72, matched: ['react', 'sql'], missing: ['go'] }} />
+    )
+    const summary = container.querySelector('[data-ats-score]')!
+    expect(summary.textContent).toContain('72%')
+    expect(summary.textContent).toContain('2 of 3')
   })
 
   it('names the missing keywords rather than only scoring', () => {
