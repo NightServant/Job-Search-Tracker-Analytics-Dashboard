@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select } from '@/components/ui/select'
 import { STATUSES, STATUS_MARK_CLASSES, type Status } from '@/components/ui/status-marker'
 
 export type StatusTabValue = Status | 'all'
@@ -69,13 +70,50 @@ export interface StatusTabsProps {
 
 export function StatusTabs({ value, onChange, counts, panelId, className }: StatusTabsProps) {
   return (
-    <Tabs value={value} onValueChange={(next) => onChange(next as StatusTabValue)}>
+    <>
+      {/* A PHONE GETS A DROPDOWN, NOT A SCROLLER (Gabe, 2026-09-06). Six tabs
+          do not fit 320-375px, so the strip became a horizontal scroller with
+          three destinations off-screen and no affordance saying so -- a filter
+          you cannot see is a filter you do not use. A select shows the current
+          one, names all six on open, and costs one row instead of one row plus
+          a scrollbar.
+
+          CSS rather than a JS breakpoint, deliberately. Both are form controls
+          over the SAME `value`/`onChange`, so the hidden one is inert; and
+          `display:none` takes it out of the accessibility tree, so nothing is
+          announced twice. A JS switch would buy nothing here and cost a
+          first-paint correction. */}
+      <div className={cn('sm:hidden', className)}>
+        <Select
+          aria-label="Filter applications by status"
+          value={value}
+          onValueChange={(next) => onChange(next as StatusTabValue)}
+          items={STATUS_TABS.map((tab) => ({
+            value: tab,
+            // The count comes along: it is why someone opens this at all --
+            // "is there anything in interviewing" is the question, and a list
+            // of bare labels makes them pick one to find out.
+            label: `${LABELS[tab]} (${counts[tab]})`,
+          }))}
+        />
+      </div>
+
+    <Tabs
+      value={value}
+      onValueChange={(next) => onChange(next as StatusTabValue)}
+      className="max-sm:hidden"
+    >
       <TabsList
         aria-label="Filter applications by status"
         variant="line"
         activateOnFocus
         className={cn(
-          '-mx-4 w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent p-0 px-4',
+          // `overflow-y-hidden` IS NOT REDUNDANT. Per the CSS overflow spec, a
+          // `visible` value coerces to `auto` the moment the other axis
+          // scrolls -- so `overflow-x-auto` alone made this a scrollport on
+          // BOTH axes and drew a vertical scrollbar in a 32px-tall row that
+          // has nothing to scroll to. Same coercion the table container hit.
+          '-mx-4 w-full justify-start gap-1 overflow-x-auto overflow-y-hidden rounded-none bg-transparent p-0 px-4',
           className
         )}
       >
@@ -114,5 +152,6 @@ export function StatusTabs({ value, onChange, counts, panelId, className }: Stat
         ))}
       </TabsList>
     </Tabs>
+    </>
   )
 }

@@ -737,3 +737,46 @@ describe('the applications table header', () => {
     }
   })
 })
+
+describe('the status filter', () => {
+  const COUNTS = Object.fromEntries(STATUS_TABS.map((t) => [t, 0])) as Record<
+    (typeof STATUS_TABS)[number],
+    number
+  >
+
+  it('offers a dropdown on a phone and tabs from sm, over one value', () => {
+    // Gabe, 2026-09-06. Six tabs do not fit 320-375px, so the strip became a
+    // horizontal scroller with three destinations off-screen and no affordance
+    // saying so -- a filter you cannot see is a filter you do not use.
+    //
+    // Both render; CSS shows one. They are form controls over the SAME value
+    // and callback, so the hidden one is inert, and `display:none` takes it
+    // out of the accessibility tree so nothing is announced twice.
+    const { container } = render(
+      <StatusTabs value="all" onChange={() => {}} counts={{ ...COUNTS, all: 27 }} />
+    )
+    const dropdown = container.querySelector('[role="combobox"]')!
+    expect(dropdown).not.toBeNull()
+    expect(dropdown.getAttribute('aria-label')).toBe('Filter applications by status')
+    // The count travels with the label: "is there anything in interviewing" is
+    // the question, and bare labels make you pick one to find out.
+    expect(dropdown.textContent).toContain('27')
+
+    expect(container.querySelector('.sm\\:hidden')).not.toBeNull()
+    expect(container.querySelector('[data-slot="tabs"]')!.className).toContain('max-sm:hidden')
+  })
+
+  it('does not let the tab strip scroll vertically', () => {
+    // `overflow-x-auto` alone is not enough: per the CSS overflow spec a
+    // `visible` value coerces to `auto` the moment the other axis scrolls, so
+    // the strip was a scrollport on BOTH axes and drew a vertical scrollbar in
+    // a 32px row with nothing to scroll to. Same coercion the table container
+    // hit earlier the same day.
+    const { container } = render(
+      <StatusTabs value="all" onChange={() => {}} counts={COUNTS} />
+    )
+    const list = container.querySelector('[data-slot="tabs-list"]')!
+    expect(list.className).toContain('overflow-x-auto')
+    expect(list.className).toContain('overflow-y-hidden')
+  })
+})
