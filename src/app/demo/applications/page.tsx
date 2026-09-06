@@ -3,9 +3,9 @@
 import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ApplicationsPage } from '@/components/applications/ApplicationsPage'
-import { RouteLoading } from '@/components/ui/route-states'
 import { DEMO } from '@/lib/demoFixture'
 import { demoReadOnly, demoReadOnlyAsync } from '../readOnly'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 
 /**
  * `onAutofill` is deliberately NOT passed. It calls an edge function, and the
@@ -37,7 +37,7 @@ function DemoApplications() {
 /** `useSearchParams` needs a Suspense boundary or Next 15 fails the build. */
 export default function Page() {
   return (
-    <Suspense fallback={<RouteLoading />}>
+    <Suspense fallback={<RouteSkeleton variant="table" />}>
       <DemoApplications />
     </Suspense>
   )

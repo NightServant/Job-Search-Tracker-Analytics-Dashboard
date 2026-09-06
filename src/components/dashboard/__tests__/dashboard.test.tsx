@@ -148,7 +148,7 @@ describe('Dashboard', () => {
 describe('Overview layout and copy', () => {
   it('lays the panels out two-up in the order Gabe specified, table last and full width', () => {
     const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
-    const grid = container.querySelector('.md\\:grid-cols-2')!
+    const grid = container.querySelector('.xl\\:grid-cols-2')!
     const titles = [...grid.querySelectorAll('[data-slot="card"] h2')].map((h) => h.textContent)
     expect(titles).toEqual([
       'applications over time',
@@ -163,7 +163,7 @@ describe('Overview layout and copy', () => {
     const table = [...grid.querySelectorAll('[data-slot="card"]')].find((c) =>
       c.querySelector('h2')?.textContent === 'recent applications'
     )!
-    expect(table.className).toContain('md:col-span-2')
+    expect(table.className).toContain('xl:col-span-2')
   })
 
   it('gives every panel a way through to the screen it summarises', () => {
@@ -398,5 +398,81 @@ describe('source chart colours', () => {
       expect(swatch).toMatch(/^var\(--color-chart-[123]\)$/)
       expect(swatch).not.toMatch(/status/)
     }
+  })
+})
+
+/**
+ * One way out of a panel, not two.
+ *
+ * WHAT WENT WRONG. `UpcomingEvents` carried its own "open calendar" link at
+ * the foot of its body, from before every panel got a `CardAction`. Once the
+ * actions landed, the events card had two links to /calendar -- one top-right
+ * and one bottom-left -- and the footer one rendered even in the empty state,
+ * where `EmptyState` already points at the calendar. Gabe spotted it on the
+ * overview 2026-09-06.
+ *
+ * The test is written over ALL panels rather than over the events one, because
+ * the defect is not specific to events: it is what happens whenever a panel
+ * body keeps a link the header now owns. Written narrowly it would pass again
+ * the next time one of the other four grows a footer.
+ */
+describe('panel links', () => {
+  it('gives each panel exactly one link to its own destination', () => {
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
+    for (const card of container.querySelectorAll('[data-slot="card"]')) {
+      const title = card.querySelector('h2')!.textContent!
+      const action = card.querySelector('[data-slot="card-action"] a')!
+      const destination = action.getAttribute('href')!
+      const all = [...card.querySelectorAll(`a[href="${destination}"]`)]
+      expect(all, `"${title}" links to ${destination} ${all.length} times`).toHaveLength(1)
+    }
+  })
+
+  it('keeps the empty calendar panel down to the card action alone', () => {
+    // The empty state is where the duplicate was worst: two invitations to
+    // open the calendar around one sentence already saying to.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
+    const card = [...container.querySelectorAll('[data-slot="card"]')].find(
+      (c) => c.querySelector('h2')!.textContent === 'upcoming events'
+    )!
+    expect(card.querySelector('[data-events-empty]')).not.toBeNull()
+    expect(card.querySelectorAll('a[href="/calendar"]')).toHaveLength(1)
+  })
+})
+
+describe('the upcoming events panel', () => {
+  const at = (days: number) => new Date(Date.now() + days * DAY_MS).toISOString()
+  const EVENTS = [1, 2, 3, 4, 5, 6].map((n) => ({
+    id: `e${n}`,
+    job_id: null,
+    user_id: 'u1',
+    kind: 'interview' as const,
+    title: `Event ${n}`,
+    starts_at: at(n),
+    duration_minutes: 60,
+    notes: null,
+  }))
+
+  it('shows four events, not three', () => {
+    // Four because the panel shares a row height with `by source`, and three
+    // rows left it visibly short of its neighbour once the footer link came
+    // out. The fourth row is information in that space rather than air.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={EVENTS} />)
+    expect(container.querySelectorAll('[data-event-row]')).toHaveLength(4)
+    expect(screen.getByText('Event 4')).toBeInTheDocument()
+    // Positive companion for the cut-off: the fifth really is withheld rather
+    // than the list having simply run out.
+    expect(screen.queryByText('Event 5')).toBeNull()
+  })
+
+  it('lets its rows share the panel height instead of one row taking it', () => {
+    // jsdom has no layout, so this pins the contract: rows grow between a
+    // floor and a ceiling. Unbounded `flex-1` turned four events into four
+    // slabs with the dividers a screen apart.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={EVENTS} />)
+    const row = container.querySelector('[data-event-row]')!
+    expect(row.className).toContain('flex-1')
+    expect(row.className).toContain('min-h-16')
+    expect(row.className).toContain('max-h-24')
   })
 })

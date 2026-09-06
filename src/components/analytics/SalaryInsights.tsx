@@ -162,16 +162,40 @@ function RangePlot({
           not draw three slabs. Same trick as the funnel: a bar's LENGTH is
           what carries the number here, so its height is free to stretch. */}
       <div className="flex flex-1 flex-col justify-center gap-1.5">
-        {ranges.map((row) => (
-          <div key={row.company} className="flex max-h-10 min-h-7 flex-1 items-center gap-3">
-            <span
-              title={row.company}
-              className="w-36 shrink-0 truncate text-body-s text-text-secondary"
-            >
-              {row.company}
-            </span>
+        {ranges.map((row) => {
+          // THE PLOT GETS THE ROW ON A PHONE. The two text columns are
+          // 144px and 128px with 24px of gaps -- 296px of fixed width in a
+          // 246px card at 320px wide, so the band and its average marker
+          // were squeezed to a few pixels against the left edge and the row
+          // read as a broken chart rather than a range.
+          //
+          // Below `sm` the company and its figures share a line and the plot
+          // takes the full width beneath them. `sm:contents` avoids a second
+          // copy of the markup: from `sm` the wrapper stops generating a box
+          // and its children rejoin this row, so the desktop layout is the
+          // original rather than a rebuilt lookalike, with `order` restoring
+          // company / plot / figures.
+          return (
+          <div
+            key={row.company}
+            className="flex flex-1 flex-col gap-1 sm:max-h-10 sm:min-h-7 sm:flex-row sm:items-center sm:gap-3"
+          >
+            <div className="flex min-w-0 items-baseline justify-between gap-3 sm:contents">
+              <span
+                title={row.company}
+                className="min-w-0 truncate text-body-s text-text-secondary sm:order-1 sm:w-36 sm:shrink-0"
+              >
+                {row.company}
+              </span>
+              <span className="tabular shrink-0 text-right text-body-s text-text-primary sm:order-3 sm:w-32">
+                {money.format(Math.round(row.min))}
+                <span className="text-text-muted">
+                  {row.max === row.min ? '' : `\u2013${compact(row.max)}`}
+                </span>
+              </span>
+            </div>
 
-            <div className="relative h-full max-h-6 min-h-5 flex-1 rounded-sm bg-bg-inset">
+            <div className="relative h-5 w-full rounded-sm bg-bg-inset sm:order-2 sm:h-full sm:max-h-6 sm:min-h-5 sm:flex-1">
               {median !== null && (
                 <span
                   aria-hidden
@@ -211,18 +235,16 @@ function RangePlot({
               />
             </div>
 
-            <span className="tabular w-32 shrink-0 text-right text-body-s text-text-primary">
-              {money.format(Math.round(row.min))}
-              <span className="text-text-muted">
-                {row.max === row.min ? '' : `\u2013${compact(row.max)}`}
-              </span>
-            </span>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="flex items-center gap-3 text-body-s text-text-muted">
-        <span className="w-36 shrink-0" />
+        {/* The two spacers exist to align the legend under the plot column.
+            Below `sm` there is no plot column -- the plot is the full width --
+            so aligning to it would indent the legend past nothing. */}
+        <span className="hidden w-36 shrink-0 sm:block" />
         <span className="flex-1">
           {/* The dot and the rule are the only two marks that need naming; the
               band is self-evident once they are. */}
@@ -230,7 +252,7 @@ function RangePlot({
           <span className="ml-3 inline-block h-3 w-px translate-y-0.5 bg-border-strong" /> median
           {median !== null ? ` ${money.format(Math.round(median))}` : ''}
         </span>
-        <span className="tabular w-32 shrink-0 text-right">up to {compact(max)}</span>
+        <span className="tabular hidden w-32 shrink-0 text-right sm:block">up to {compact(max)}</span>
       </div>
     </div>
   )

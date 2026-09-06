@@ -14,7 +14,8 @@ import {
 import { useToast } from '@/contexts/ToastContext'
 import { ApplicationsPage } from '@/components/applications/ApplicationsPage'
 import { useApplicationRecord } from '@/hooks/useApplicationRecord'
-import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
@@ -74,7 +75,7 @@ function ApplicationsRoute() {
   const openParam = useSearchParams().get('application')
 
   if (isLoading) {
-    return <RouteLoading />
+    return <RouteSkeleton variant="table" />
   }
 
   // An empty board and a failed fetch look identical, so the failure has to
@@ -176,7 +177,7 @@ function ApplicationsRoute() {
  */
 export default function Page() {
   return (
-    <Suspense fallback={<RouteLoading />}>
+    <Suspense fallback={<RouteSkeleton variant="table" />}>
       <ApplicationsRoute />
     </Suspense>
   )

@@ -78,6 +78,15 @@ export interface SidebarProps extends React.HTMLAttributes<HTMLElement> {
    * self-sufficient for standalone use (tests, the dev gallery).
    */
   activeHref?: string | null
+  /**
+   * An optional block rendered where settings sits, below the nav divider.
+   * /demo/* puts its "this is a demo" notice here so a wide screen does not
+   * spend a full horizontal band on a message the visitor has already read --
+   * see AppShell's `sidebarNotice`. Only drawn while the nav is expanded: the
+   * 64px rail has no room for a sentence, and a truncated warning is worse
+   * than none.
+   */
+  notice?: React.ReactNode
 }
 
 /**
@@ -162,6 +171,7 @@ function SidebarNav({
   activeHref,
   nav = NAV,
   settingsHref = '/settings',
+  notice,
   className,
   ...props
 }: SidebarProps) {
@@ -236,6 +246,8 @@ function SidebarNav({
         />
       )}
 
+      {notice && open && <div data-sidebar-notice>{notice}</div>}
+
       {/* Figma 19:11: the flexible Spacer (416, h122 in the 720-tall frame)
           sits between Settings and the Theme Toggle -- not after it. It
           absorbs all surplus column height so the theme control and footer
@@ -266,13 +278,15 @@ function SidebarNav({
 }
 
 /**
- * Expanded from 1024, an icon rail below it -- and still manually togglable
- * inside either tier.
+ * Expanded from 1024, an icon rail below it -- and still manually togglable.
  *
- * The tier map puts tablets and small laptops at 768-1023, and 240px of nav
- * out of a 768px viewport is nearly a third of the screen spent on chrome. The
- * rail costs 64px for the same five destinations, with the labels carried by
- * NavItem's tooltips.
+ * SINCE 2026-09-06 THE RAIL TIER IS EFFECTIVELY MANUAL-ONLY. AppShell now
+ * hides the sidebar entirely below lg (1024) and gives a tablet the Top Bar
+ * and Bottom Nav a phone gets, so the 768-1023 band this query was written
+ * for no longer renders a sidebar at all. The query is kept rather than
+ * deleted because it still sets the correct default the moment the sidebar
+ * appears, and because Sidebar is rendered standalone by tests and the dev
+ * gallery, where no AppShell is deciding visibility.
  *
  * The listener re-reads the query only when the viewport CROSSES 1024, not on
  * every render, which is the whole point: someone who collapses the nav on a

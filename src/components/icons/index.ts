@@ -48,7 +48,7 @@ import { ChevronLeftIcon as ChevronLeftIconBase } from './chevron-left'
 import { ChevronRightIcon as ChevronRightIconBase } from './chevron-right'
 import { ClockIcon as ClockIconBase } from './clock'
 import { DownloadIcon as DownloadIconBase } from './download'
-import { EllipsisVerticalIcon } from './ellipsis-vertical'
+import { EllipsisVerticalIcon as EllipsisVerticalIconBase } from './ellipsis-vertical'
 import { ExternalLinkIcon } from './external-link'
 import { EyeIcon as EyeIconBase } from './eye'
 import { EyeOffIcon as EyeOffIconBase } from './eye-off'
@@ -185,7 +185,16 @@ export const CheckIcon = withDefaultSize(CheckIconBase)
 export const CircleCheckIcon = withDefaultSize(CircleCheckIconBase)
 export const ShieldCheckIcon = withDefaultSize(ShieldCheckIconBase)
 export const UserRoundIcon = withDefaultSize(UserRoundIconBase)
-export const GripVerticalIcon = withDefaultSize(EllipsisVerticalIcon)
+/**
+ * The three-dot overflow glyph.
+ *
+ * `GripVerticalIcon` is the SAME COMPONENT under an older, wrong name -- the
+ * import below is `ellipsis-vertical`, and Lucide's "grip vertical" is six
+ * dots in two columns, which this is not. Both names are exported so existing
+ * call sites keep working while new ones can say what they mean.
+ */
+export const EllipsisVerticalIcon = withDefaultSize(EllipsisVerticalIconBase)
+export const GripVerticalIcon = EllipsisVerticalIcon
 export const RotateCcwIcon = withDefaultSize(HistoryIcon)
 
 /**

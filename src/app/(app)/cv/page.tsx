@@ -6,7 +6,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCreateResume, useDeleteResume, useResume, useUpdateResume } from '@/hooks/useResumes'
 import { useJobs } from '@/hooks/useJobs'
 import { useToast } from '@/contexts/ToastContext'
-import { RouteError, RouteLoading } from '@/components/ui/route-states'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
@@ -105,7 +106,7 @@ function CvRoute() {
     content: ResumeContent
   ) => updateResume.mutateAsync({ id: draftId, patch: { title, mode, content } })
 
-  if (!draftParam) return <RouteLoading />
+  if (!draftParam) return <RouteSkeleton variant="detail" />
 
   if (isNew) {
     // Nothing else on this route has anything behind it -- /cv?draft=new is
@@ -127,7 +128,7 @@ function CvRoute() {
     )
   }
 
-  if (draftQuery.isLoading) return <RouteLoading />
+  if (draftQuery.isLoading) return <RouteSkeleton variant="detail" />
 
   // A failed read and a CV that is not there are different facts, and the
   // second one cannot be fixed by reloading the same URL -- RLS makes a bad id
@@ -195,7 +196,7 @@ function CvRoute() {
  */
 export default function Page() {
   return (
-    <Suspense fallback={<RouteLoading />}>
+    <Suspense fallback={<RouteSkeleton variant="detail" />}>
       <CvRoute />
     </Suspense>
   )

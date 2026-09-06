@@ -61,7 +61,10 @@ export function ApplicationsToolbar({
         />
       </div>
 
-      <div className="flex items-center gap-2 sm:ml-auto">
+      {/* Full width on a phone, for the same reason as PageHeader's action:
+          two natural-width buttons on one 320px line leave each of them barely
+          wider than its own label. */}
+      <div className="flex items-center gap-2 max-sm:[&>button]:flex-1 sm:ml-auto">
         <input
           ref={fileRef}
           type="file"

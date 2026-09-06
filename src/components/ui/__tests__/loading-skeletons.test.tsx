@@ -58,17 +58,32 @@ describe('RouteSkeleton', () => {
     expect(region.textContent).toContain('Loading')
   })
 
-  it('draws a different shape per variant', () => {
+  it('draws a different shape for every variant', () => {
     // A single generic skeleton reused everywhere is a grey rectangle, which
-    // is the thing skeletons exist to not be.
-    const { container: dash, unmount } = show(<RouteSkeleton variant="dashboard" />)
-    const dashCount = dash.querySelectorAll('[data-skeleton]').length
-    unmount()
-    const { container: table } = show(<RouteSkeleton variant="table" />)
-    const tableCount = table.querySelectorAll('[data-skeleton]').length
-    expect(dashCount).toBeGreaterThan(0)
-    expect(tableCount).toBeGreaterThan(0)
-    expect(dashCount).not.toBe(tableCount)
+    // is the thing skeletons exist to not be. This is the guard on that, and
+    // it is written over ALL SIX rather than a chosen pair: the failure mode
+    // is someone adding a seventh route and pointing it at an existing
+    // variant because it was close enough.
+    const variants = ['dashboard', 'table', 'analytics', 'documents', 'calendar', 'detail'] as const
+    const counts = new Map<string, number>()
+    for (const variant of variants) {
+      const { container, unmount } = show(<RouteSkeleton variant={variant} />)
+      const n = container.querySelectorAll('[data-skeleton]').length
+      expect(n, `${variant} drew nothing`).toBeGreaterThan(0)
+      counts.set(variant, n)
+      unmount()
+    }
+    // Shape, not just presence: no two routes may resolve to the same sketch.
+    expect(new Set(counts.values()).size, `two variants are identical: ${[...counts]}`).toBe(
+      variants.length
+    )
+  })
+
+  it('names the route it is standing in for', () => {
+    // So a reader of the DOM -- and the next person debugging a load -- can
+    // tell which skeleton is on screen without counting rectangles.
+    const { container } = show(<RouteSkeleton variant="documents" />)
+    expect(container.querySelector('[data-route-skeleton="documents"]')).not.toBeNull()
   })
 })
 

@@ -701,3 +701,39 @@ describe('naming the form\'s fields with glyphs', () => {
     expect(busy.querySelector('[role="status"], .animate-spin, [data-spinner]')).toBeTruthy()
   })
 })
+
+describe('the applications table header', () => {
+  it('is the table that opts into a pinned header, because it is the long one', () => {
+    // /applications paginates at ten rows and carries 439px of chrome above
+    // it; the dashboard's "recent applications" shows five and does not. The
+    // opt-in is what keeps a summary panel from growing a scrollport it has
+    // no use for -- see ui/table.tsx for the arithmetic behind the cap.
+    const { container } = render(<ApplicationsTable jobs={JOBS} />)
+    const box = container.querySelector('[data-slot="table-container"]')!
+    expect(box.hasAttribute('data-sticky-header')).toBe(true)
+    expect(box.className).toContain('sm:overflow-y-auto')
+  })
+
+  it('lets every link of the chain shrink, and none of them grow', () => {
+    // TWO FAILURE MODES, ONE ASSERTION EACH, and both have actually happened.
+    //
+    // Missing `min-h-0`: a flex item's automatic minimum size is its content
+    // height, so one omission anywhere between AppShell and the scroll
+    // container silently restores page scrolling -- the table keeps its full
+    // height and the frame scrolls away with it.
+    //
+    // Present `flex-1`: that is `flex: 1 1 0%`, which forces GROWTH. The chain
+    // shipped with it on 2026-09-06 and a filtered list of one row stretched
+    // the card to the full height of the locked frame, leaving the empty panel
+    // Gabe reported on a large desktop.
+    //
+    // Each link is asserted rather than the end result, because the end result
+    // is invisible to jsdom.
+    const { container } = render(<ApplicationsTable jobs={JOBS} />)
+    for (const sel of ['[data-list]', '[data-slot="table-container"]']) {
+      const el = container.querySelector(sel)!
+      expect(el.className, `${sel} cannot give the space back`).toContain('sm:min-h-0')
+      expect(el.className, `${sel} would stretch to fill the frame`).not.toContain('flex-1')
+    }
+  })
+})

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen } from '@testing-library/react'
-import { DemoBanner } from '../DemoBanner'
+import { DemoBanner, DemoSidebarNotice } from '../DemoBanner'
 
 describe('the demo banner', () => {
   it('says all three things a visitor needs to know', () => {
@@ -32,6 +32,49 @@ describe('the demo banner', () => {
     expect(screen.queryByRole('button', { name: /dismiss|close/i })).toBeNull()
     // Positive companion: the banner really did render, so the absence above
     // is about the control and not about an empty component.
+    expect(screen.getByRole('link', { name: /create an account/i })).toBeInTheDocument()
+  })
+})
+
+describe('where the demo notice lives at each width', () => {
+  it('is a band on a phone, a card on a tablet, and gone from lg', () => {
+    // Gabe, 2026-09-06. From lg the sidebar carries it instead -- a wide screen
+    // should not spend a full horizontal band on a sentence already read.
+    const { container } = render(<DemoBanner />)
+    const banner = container.querySelector('[data-demo-banner]')!
+
+    // Phone: full-bleed, one bottom rule.
+    expect(banner.className).toContain('rounded-none')
+    expect(banner.className).toContain('border-x-0')
+    expect(banner.className).toContain('border-t-0')
+
+    // Tablet: margins, radius and the borders back -- a card.
+    expect(banner.className).toContain('md:mx-gutter')
+    expect(banner.className).toContain('md:rounded-md')
+    expect(banner.className).toContain('md:border-x')
+
+    // Desktop: not this component's job.
+    expect(banner.className).toContain('lg:hidden')
+  })
+})
+
+describe('the demo notice in the sidebar', () => {
+  it('says the same three things the banner does', () => {
+    // Two shapes, one claim. If these drift, one of them is lying about the
+    // product -- which is why the sentence is a shared constant and this test
+    // checks the rendered result rather than the constant.
+    render(<DemoSidebarNotice />)
+    expect(screen.getByText(/demo/i)).toBeInTheDocument()
+    expect(screen.getByText(/invented/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /create an account/i })).toHaveAttribute(
+      'href',
+      '/signup'
+    )
+  })
+
+  it('cannot be dismissed either', () => {
+    render(<DemoSidebarNotice />)
+    expect(screen.queryByRole('button', { name: /dismiss|close/i })).toBeNull()
     expect(screen.getByRole('link', { name: /create an account/i })).toBeInTheDocument()
   })
 })

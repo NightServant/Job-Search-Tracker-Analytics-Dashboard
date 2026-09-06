@@ -78,11 +78,40 @@ describe('DocumentRow', () => {
     expect(container.querySelector('[data-row-actions]')).toBeNull()
   })
 
-  it('lays out four columns on desktop and stacks on mobile', () => {
-    // Desktop is Info, ATS Check, version, date across 1104px. At 335px the
-    // marker, version and date drop onto their own line beneath the title.
+  it('is a file row below md and the four-column table from it', () => {
+    // Changed 2026-09-06, against Word for Android's Recent list: below `md`
+    // the row is a flex line -- glyph, name, overflow menu -- with the meta
+    // wrapping beneath, and from `md` it becomes the original grid. It used to
+    // be `grid-cols-1` stacking name, meta and a bare trash glyph on three
+    // separate lines.
     const { container } = render(<DocumentRow doc={DOC} />)
-    expect(container.firstElementChild!.className).toMatch(/grid-cols-1 .*md:grid-cols-\[/)
+    const row = container.firstElementChild!
+    expect(row.className).toContain('flex flex-wrap')
+    expect(row.className).toMatch(/md:grid .*md:grid-cols-\[/)
+  })
+
+  it("offers the row's actions in one overflow menu below md", () => {
+    // The compact row has no column to put controls in, so everything that is
+    // not "open it" goes behind the three dots. The desktop row keeps its own
+    // visible controls -- and must not render both, or one row would carry two
+    // deletes.
+    const { container } = render(
+      <DocumentRow doc={DOC} onDelete={() => {}} onOpenVersions={() => {}} actions={<button>del</button>} />
+    )
+    const menu = container.querySelector('[data-row-menu]')!
+    expect(menu).not.toBeNull()
+    expect(menu.className).toContain('md:hidden')
+    // The leading file glyph belongs to the same compact treatment: it says
+    // "this row is a document" where the row has no column header to say it.
+    expect(container.querySelector('[data-row-glyph]')!.className).toContain('md:hidden')
+    expect(menu.getAttribute('aria-label')).toContain(DOC.title)
+    // The desktop controls column is hidden where the menu shows.
+    expect(container.querySelector('[data-row-actions]')!.className).toContain('hidden')
+  })
+
+  it('renders no menu when the row has nothing to offer', () => {
+    const { container } = render(<DocumentRow doc={DOC} />)
+    expect(container.querySelector('[data-row-menu]')).toBeNull()
   })
 
   it('keeps the marker, version and date together on one line beneath the title at 335px', () => {

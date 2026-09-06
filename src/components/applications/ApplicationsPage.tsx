@@ -22,6 +22,7 @@ import { ApplicationRecordDialog } from './record/ApplicationRecordDialog'
 import type { ApplicationRecordData } from './record/recordData'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
+import { useViewportFit } from '@/components/shell/viewportFit'
 import type { Job, JobAutofillResult, JobFormData } from '@/types'
 
 interface CsvImport {
@@ -138,6 +139,15 @@ export function ApplicationsPage({
   onOpenJobChange,
   initialOpenId = null,
 }: ApplicationsPageProps) {
+  // THE SCREEN OWNS ITS SCROLLING, from `sm` up. Everything except the table
+  // is a fixed frame, so the shell stops growing and the table takes what is
+  // left -- see components/shell/viewportFit.
+  //
+  // NOT when there are no jobs: the empty state has nothing to scroll, and
+  // locking the viewport around it would strand a short paragraph at the top
+  // of a full-height frame.
+  useViewportFit(jobs.length > 0)
+
   const [search, setSearch] = React.useState('')
   const [tab, setTab] = React.useState<StatusTabValue>('all')
   const [page, setPage] = React.useState(1)
@@ -360,12 +370,17 @@ export function ApplicationsPage({
   }
 
   return (
-    <div className="flex flex-col gap-8">
+    // THE FIXED FRAME. From `sm` up this column is exactly the viewport
+    // (AppShell grants that in response to useViewportFit above): the title,
+    // tabs, toolbar and pagination hold their place and only the table between
+    // them moves. Below `sm` it is an ordinary stack that grows and lets the
+    // page scroll, because the table is stacked into cards there.
+    <div className="flex flex-col gap-8 sm:min-h-0 sm:flex-1">
       <PageHeader
         title="applications"
         description="every role you are tracking, from wishlist through to an offer."
         action={
-          <Button size="s" onClick={() => openRecord(null, 'edit')}>
+          <Button size="s" className="max-sm:w-full" onClick={() => openRecord(null, 'edit')}>
             <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
             add
           </Button>
@@ -475,8 +490,12 @@ export function ApplicationsPage({
             panelId="applications-list"
             className="border-b border-border-subtle"
           />
-          <Card>
-            <CardContent>
+          {/* `min-h-0` only, on both, for the reason spelled out in
+              ApplicationsTable: it permits the shrink that makes the table
+              scrollable, while the default `flex: 0 1 auto` keeps the card at
+              the height its rows actually need. */}
+          <Card className="sm:min-h-0">
+            <CardContent className="sm:flex sm:min-h-0 sm:flex-col">
               <ApplicationsTable
                 id="applications-list"
                 role="tabpanel"

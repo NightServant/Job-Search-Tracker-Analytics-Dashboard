@@ -8,7 +8,7 @@ import { SettingsIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 
 /**
- * Mobile only. Logo, spacer, Theme Toggle, Settings.
+ * Mobile and tablet. Logo, spacer, Theme Toggle, Settings.
  *
  * The bar is 64px because two 44px targets plus breathing room does not fit in
  * the 55px it used to be. Body scroll absorbs the difference; the bottom nav
@@ -31,7 +31,7 @@ export function TopBar({
   return (
     <header
       data-top-bar
-      className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border-subtle bg-bg-canvas px-3 md:hidden"
+      className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border-subtle bg-bg-canvas px-3 lg:hidden"
     >
       <BrandLockup />
       <div className="flex-1" />

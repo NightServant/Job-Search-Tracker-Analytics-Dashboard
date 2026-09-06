@@ -5,6 +5,15 @@ import Link from 'next/link'
 import { useAppHref } from '@/components/shell/routeBase'
 import { cn } from '@/lib/utils'
 import { AtsCheck } from '@/components/ui/ats-check'
+import { DocumentsIcon, EllipsisVerticalIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
+import { iconMotion } from '@/components/icons/motion'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { lintSections } from '@/services/atsLint'
 import { formatTouchedDate } from '@/services/date'
 import type { ResumeSummary } from '@/services/resumeService'
@@ -72,6 +81,26 @@ export interface DocumentRowProps extends React.HTMLAttributes<HTMLDivElement> {
    * control -- see `VersionCell`.
    */
   onOpenVersions?: () => void
+  /**
+   * Deletes this document. Used to build the compact row's overflow menu --
+   * the desktop row keeps taking its controls through `actions`, so the two
+   * surfaces do not have to agree on a button's appearance, only on the verb.
+   */
+  onDelete?: () => void
+  /**
+   * Why this document cannot be opened here, or undefined if it can.
+   *
+   * LaTeX CVs below `lg` (Gabe, 2026-09-06): the LaTeX editor and its preview
+   * are removed at those widths, so the row must not link into an editor that
+   * is not there. THE ROW STILL RENDERS. Hiding the document instead would
+   * read as data loss to the one person who knows it exists -- they saved it,
+   * it is theirs, and a screen that silently omits it is worse than one that
+   * says "not here".
+   *
+   * Nothing about the document's CONTENT renders in this state, which is what
+   * "no viewer" means: the row is a listing, not a preview.
+   */
+  unavailable?: string
 }
 
 /**
@@ -95,6 +124,8 @@ export function DocumentRow({
   doc,
   actions,
   onOpenVersions,
+  onDelete,
+  unavailable,
   className,
   ...props
 }: DocumentRowProps) {
@@ -105,30 +136,109 @@ export function DocumentRow({
     <div
       data-document-row
       className={cn(
-        'grid grid-cols-1 gap-2 border-b border-border-subtle py-3',
+        // A FILE ROW BELOW `md`, A TABLE ROW FROM IT (Gabe, 2026-09-06,
+        // against Word for Android's Recent list): a leading file glyph, the
+        // name, a muted second line, and an overflow menu on the trailing
+        // edge. It replaces a stack that put the name, then a metadata line,
+        // then a bare trash icon on three separate rows -- three lines per
+        // document, with the only control an unlabelled glyph floating under
+        // the text it acted on.
+        //
+        // `flex-wrap` rather than a second markup tree: the meta group takes
+        // `basis-full` and drops to its own line, indented to clear the glyph,
+        // and from `md` the whole thing becomes the original grid again.
+        'flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-border-subtle py-3',
         // Figma 48:548 is an 80px row; py-3 around ~40px of content made 68px,
         // which is what left the controls looking cramped against cells that
         // are vertically centred.
+        'md:grid md:grid-cols-1',
         DOCUMENT_GRID,
         'md:items-center md:py-5',
         className
       )}
       {...props}
     >
-      <div className="min-w-0">
-        <Link
-          href={appHref(`/cv?draft=${doc.id}`)}
-          className={cn(
-            'block truncate rounded-md text-body-m text-text-primary hover:text-accent-default',
-            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
-          )}
-        >
-          {doc.title}
-        </Link>
-        <p className="text-body-s text-text-muted">{MODE_LABELS[doc.mode]}</p>
+      {/* The file glyph. A NAME, not decoration -- it says "this row is a
+          document" in the one place the row has no other way to say it, and it
+          is what makes the list scan as files rather than as paragraphs. */}
+      <DocumentsIcon
+        size={20}
+        aria-hidden
+        data-row-glyph
+        className="shrink-0 text-text-muted md:hidden"
+      />
+
+      <div className="min-w-0 flex-1">
+        {unavailable ? (
+          // A SPAN, NOT A DISABLED LINK. A link that goes nowhere is still
+          // focusable, still announced as a link, and still looks clickable on
+          // a touch screen -- three promises the row cannot keep. The name is
+          // just text here, and the reason takes the line that normally
+          // carries the mode.
+          <p
+            data-document-unavailable
+            className="block truncate text-body-m text-text-muted"
+            title={doc.title}
+          >
+            {doc.title}
+          </p>
+        ) : (
+          <Link
+            href={appHref(`/cv?draft=${doc.id}`)}
+            className={cn(
+              'block truncate rounded-md text-body-m text-text-primary hover:text-accent-default',
+              'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
+            )}
+          >
+            {doc.title}
+          </Link>
+        )}
+        <p className="text-body-s text-text-muted">{unavailable ?? MODE_LABELS[doc.mode]}</p>
       </div>
 
-      <div data-row-meta className="flex items-center gap-4 md:contents">
+      {/* THE OVERFLOW MENU, compact only. Everything the row can do that is
+          not "open it": version history and delete. The desktop row keeps its
+          own visible controls, because there it has a column to put them in
+          and a mouse to hit them with. */}
+      {(onDelete || onOpenVersions) && (
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            data-row-menu
+            aria-label={`Actions for ${doc.title}`}
+            className={cn(
+              'grid h-11 w-11 shrink-0 place-items-center rounded-md text-text-secondary md:hidden',
+              'hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
+            )}
+          >
+            <EllipsisVerticalIcon size={18} aria-hidden />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            {onOpenVersions && (
+              <DropdownMenuItem onClick={onOpenVersions}>
+                <RotateCcwIcon size={16} aria-hidden className={iconMotion('back')} />
+                version history
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <>
+                {onOpenVersions && <DropdownMenuSeparator />}
+                <DropdownMenuItem variant="destructive" onClick={onDelete}>
+                  <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
+                  delete
+                </DropdownMenuItem>
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {/* `basis-full` drops the meta to its own line below `md`, and `pl-8`
+          indents it past the 20px glyph plus the 12px gap so it sits under the
+          name rather than under the icon. */}
+      <div
+        data-row-meta
+        className="flex basis-full items-center gap-4 pl-8 md:basis-auto md:contents md:pl-0"
+      >
         {ats ? (
           <AtsCheck result={ats} className="w-16 shrink-0" />
         ) : (
@@ -140,8 +250,10 @@ export function DocumentRow({
         </time>
       </div>
 
+      {/* Desktop only now: below `md` these same verbs live in the overflow
+          menu above, and rendering both would put two deletes on one row. */}
       {actions ? (
-        <div data-row-actions className="flex items-center gap-1 md:justify-end">
+        <div data-row-actions className="hidden items-center gap-1 md:flex md:justify-end">
           {actions}
         </div>
       ) : null}

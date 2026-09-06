@@ -212,7 +212,10 @@ function Overview({ data }: { data: ConversionMetrics | null }) {
     conversionBySource: {},
   }
   return (
-    <div data-overview-kpis className="grid grid-cols-2 gap-6 md:grid-cols-4">
+    // ONE COLUMN ON A PHONE. Two 120px columns wrapped every one of these
+    // labels -- "TOTAL APPLICATIONS", "TIME TO FIRST INTERVIEW",
+    // "CONVERSION RATE" -- onto two lines, so four stats read as eight.
+    <div data-overview-kpis className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-4">
       <KpiStat label="total applications" value={metrics.totalJobs} />
       <KpiStat
         label="time to first interview"
@@ -432,18 +435,28 @@ export function Analytics({
   // (salary), then the month-by-month breakdown last, which is reference
   // material rather than a headline.
   return (
-    // Two columns from md -- see Dashboard for why 768 and not 1024. A 2560px
-    // single column meant a lot of scrolling past half-empty panels; paired,
-    // each panel gets a width that suits it and the page halves in height.
+    // TWO COLUMNS FROM xl (1280), NOT md (768). Reported by Gabe 2026-09-06:
+    // the charts ran to an excessive height on tablets and small laptops.
+    //
+    // The cause is arithmetic, not the charts. The sidebar expands to 240px at
+    // exactly 1024, so it eats the width that breakpoint hands over: content is
+    // ~700px at 768 (64px rail) and ~720px at 1024 (240px nav), which is two
+    // 340px columns either way. At 340px every panel heading wraps to three
+    // lines and every chart holds its 192px floor, so the row grows tall while
+    // staying too narrow to read -- the worst of both. Content only reaches
+    // ~980px, and a column only reaches a legible ~470px, at 1280.
+    //
+    // Below that the page is a single column, which is what Gabe asked for:
+    // one readable chart beats two unreadable ones.
     //
     // Cards in a row share the row's height, which is what Gabe asked for --
     // and the dead space that used to come with it is handled at the other
     // end: `Card` is h-full, `CardContent` is flex-1, and every panel body
     // grows into the height it is handed. A card matching a taller neighbour
     // has content in the difference rather than air.
-    <div className="grid gap-section md:grid-cols-2">
+    <div className="grid gap-section xl:grid-cols-2">
       <PageHeader
-        className="md:col-span-2"
+        className="xl:col-span-2"
         title="analytics"
         description="how your applications actually move, how long each step takes, and what they pay."
         action={<RangePicker value={range} onChange={setRange} />}
@@ -459,7 +472,7 @@ export function Analytics({
         <div
           key={key}
           data-panel-slot={key}
-          className={cn('min-w-0', full && 'md:col-span-2')}
+          className={cn('min-w-0', full && 'xl:col-span-2')}
         >
           {node}
         </div>

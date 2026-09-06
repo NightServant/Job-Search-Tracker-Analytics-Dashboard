@@ -20,6 +20,9 @@ import { cn } from "@/lib/utils"
  * Cells opt in per-table via `TableCell`'s own `sticky` prop, because only the
  * FIRST column may take it and this component cannot know which cell that is.
  *
+ * `stickyHeader` pins the header ROW, and it is a separate opt-in because it
+ * costs the table its natural height -- see the prop's own note.
+ *
  * ROLES ARE EXPLICIT on every part. `display: block` strips a table of its
  * implicit ARIA semantics -- a stacked table with no roles is announced as a
  * pile of generic groups, which is the standard, silent failure of this
@@ -30,13 +33,67 @@ import { cn } from "@/lib/utils"
 function Table({
   className,
   stacked = false,
+  stickyHeader = false,
   ...props
-}: React.ComponentProps<"table"> & { stacked?: boolean }) {
+}: React.ComponentProps<"table"> & {
+  stacked?: boolean
+  /**
+   * Turns the table into its own vertical scrollport from `sm` up and pins the
+   * header row to its top. Off by default: it costs the table its natural
+   * height, which is wrong for a five-row summary panel and right for a long
+   * paginated list.
+   *
+   * IT TAKES ITS HEIGHT FROM ITS PARENT, not from a viewport fraction. The
+   * screen using this is expected to be a bounded flex column -- /applications
+   * claims `useViewportFit()` and hands this container `flex-1` of what is
+   * left after its title, tabs, toolbar and pagination. That is why there is
+   * no `max-h` here: a fraction of the viewport would either leave a gap below
+   * the table on a tall screen or fight the frame on a short one, and the
+   * parent already knows the exact answer.
+   *
+   * `min-h-0` is the load-bearing class, and it is the ONLY one. A flex item's
+   * automatic minimum size is its CONTENT height, so without it this container
+   * refuses to shrink below the full table and nothing ever scrolls inside it.
+   *
+   * DELIBERATELY NOT `flex-1`. That is `flex: 1 1 0%` -- it forces the item to
+   * GROW as well as shrink, so a filtered list of one row stretched to the
+   * full height of the locked frame and left a card of empty space beneath it
+   * (reported 2026-09-06 on a large desktop). The default `flex: 0 1 auto`
+   * plus `min-h-0` is what was wanted all along: size to content, and shrink
+   * -- into a scroll -- only when the frame is shorter than the content.
+   *
+   * THE 55svh CAP IS THE FALLBACK, for viewports the shell will not lock (see
+   * the `shell-fits` variant in index.css). There the page still scrolls, and
+   * the cap is what keeps the header clear of the top bar: it clips exactly
+   * enough out of the page's scroll range that the table never travels far
+   * enough for its header to reach the bar. 0.55 satisfies
+   * `cap <= viewport - below - topBar` for every viewport at least 500px tall.
+   * `shell-fits:max-h-none` drops it again once the parent is bounded, so a
+   * tall screen fills instead of stopping short.
+   *
+   * Outside a bounded parent `flex-1` is inert and the table simply keeps its
+   * natural height, which is the behaviour it had before this prop existed --
+   * so a careless opt-in degrades rather than breaks.
+   */
+  stickyHeader?: boolean
+}) {
   return (
     <div
       data-slot="table-container"
       data-stacked={stacked ? "" : undefined}
-      className="relative w-full overflow-x-auto"
+      data-sticky-header={stickyHeader ? "" : undefined}
+      className={cn(
+        // `isolate` so the pinned column and the pinned header resolve their
+        // z-indices AGAINST EACH OTHER and never against the app chrome. They
+        // used to compete with it: the sticky company header carries z-20, the
+        // Top Bar carries z-20, and the table comes later in the document --
+        // so at equal z the header won and painted over the logo. An isolated
+        // stacking context makes that impossible to reintroduce, whatever
+        // numbers the cells use.
+        "relative isolate w-full overflow-x-auto",
+        stickyHeader &&
+          "sm:max-h-[55svh] sm:min-h-0 sm:overflow-y-auto shell-fits:max-h-none"
+      )}
     >
       <table
         data-slot="table"

@@ -135,11 +135,15 @@ describe('/cv route states', () => {
     expect(routerReplace).toHaveBeenCalledWith('/documents')
   })
 
-  it('shows a spinner while the CV is loading', () => {
+  it('shows a route skeleton while the CV is loading', async () => {
     params('cv-1')
     useResumeMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
-    const { container } = render(<Page />)
-    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    render(<Page />)
+    // `findBy`, not `queryBy`: the route skeleton sits behind a 200ms gate
+    // (see ui/loading-skeletons) so a warm navigation never flashes a fake
+    // page for one frame. Nothing is in the DOM at t=0 BY DESIGN, and an
+    // immediate assertion was testing the absence of that gate.
+    expect(await screen.findByRole('status')).toBeTruthy()
   })
 
   it('says the CV could not be found rather than opening an empty editor', () => {

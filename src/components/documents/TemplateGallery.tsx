@@ -19,6 +19,18 @@ export interface TemplateChoice {
 }
 
 export interface TemplateGalleryProps {
+  /**
+   * Which template sets to offer. Below `lg` the LaTeX editor and preview do
+   * not exist, so the LaTeX cards must not either -- filtered out here rather
+   * than hidden with CSS, because a `display:none` card is still in the DOM,
+   * still in the tab order of some browsers, and still a card that can be
+   * clicked by a test that does not know it is meant to be invisible.
+   */
+  modes?: ResumeMode[]
+  /** When given, a "blank document" card is offered first. */
+  onChooseBlank?: () => void
+  /** `rail` is the strip above the documents list; `page` is the Templates screen. */
+  variant?: 'rail' | 'page'
   onChoose: (choice: TemplateChoice) => void
   busy?: boolean
   className?: string
@@ -66,24 +78,104 @@ const MODE_LABEL: Record<ResumeMode, string> = { word: 'word', latex: 'LaTeX' }
  * cards in a rail, not slides. Snapping a 132px card to the centre of a
  * 1000px rail would leave most of the row empty on every arrow press.
  */
-export function TemplateGallery({ onChoose, busy = false, className }: TemplateGalleryProps) {
+export function TemplateGallery({
+  onChoose,
+  onChooseBlank,
+  modes = ['word', 'latex'],
+  variant = 'rail',
+  busy = false,
+  className,
+}: TemplateGalleryProps) {
   const cards = React.useMemo(
     () => [
-      ...WORD_TEMPLATES.map((t) => ({
+      ...(modes.includes('word') ? WORD_TEMPLATES : []).map((t) => ({
         key: t.id,
         mode: 'word' as const,
         template: t,
         name: t.name.toLowerCase(),
       })),
-      ...LATEX_TEMPLATES.map((t) => ({
+      ...(modes.includes('latex') ? LATEX_TEMPLATES : []).map((t) => ({
         key: t.id,
         mode: 'latex' as const,
         template: t,
         name: t.name.toLowerCase(),
       })),
     ],
-    []
+    [modes]
   )
+
+  // THE BLANK CARD IS FIRST, as it is in Word's own New screen. Somebody who
+  // already knows what they are writing should not have to read eleven
+  // template names to find the option that gets out of the way.
+  const blankCard = onChooseBlank ? (
+    <button
+      type="button"
+      disabled={busy}
+      data-template-card="blank"
+      onClick={onChooseBlank}
+      className={cn(
+        'flex w-32 flex-col gap-2 text-left',
+        'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+        'disabled:pointer-events-none disabled:opacity-50',
+        'group/template'
+      )}
+    >
+      <span
+        aria-hidden
+        className={cn(
+          'aspect-[3/4] w-32 overflow-hidden rounded-sm border p-3',
+          'border-border-subtle bg-bg-canvas',
+          'transition-colors duration-(--duration-fast)',
+          'group-hover/template:border-accent-default'
+        )}
+      />
+      <span className="flex flex-col">
+        <span className="truncate text-body-s text-text-primary">blank document</span>
+        <span className="text-caption text-text-muted">word</span>
+      </span>
+    </button>
+  ) : null
+
+  const cardButton = (card: (typeof cards)[number]) => (
+    <button
+      type="button"
+      disabled={busy}
+      data-template-card={card.key}
+      onClick={() => onChoose({ mode: card.mode, template: card.template })}
+      className={cn(
+        'flex w-32 flex-col gap-2 text-left',
+        'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+        'disabled:pointer-events-none disabled:opacity-50',
+        'group/template'
+      )}
+    >
+      <Thumbnail id={card.template.id} mode={card.mode} />
+      <span className="flex flex-col">
+        <span className="truncate text-body-s text-text-primary">{card.name}</span>
+        <span className="text-caption text-text-muted">{MODE_LABEL[card.mode]}</span>
+      </span>
+    </button>
+  )
+
+  // A GRID, NOT A RAIL, on the Templates page. A carousel is right for a strip
+  // sitting above a list of documents -- it is a secondary offer and must not
+  // spend the page's height. On a screen whose ONLY job is choosing a
+  // template, hiding half the options behind a drag is the wrong trade, and
+  // Word's own New screen is a grid for the same reason.
+  if (variant === 'page') {
+    return (
+      <section
+        data-template-gallery
+        data-template-grid
+        className={cn('grid grid-cols-2 justify-items-center gap-6 sm:grid-cols-3 md:grid-cols-4', className)}
+      >
+        {blankCard}
+        {cards.map((card) => (
+          <React.Fragment key={card.key}>{cardButton(card)}</React.Fragment>
+        ))}
+      </section>
+    )
+  }
 
   return (
     <section data-template-gallery className={cn('relative flex flex-col gap-3', className)}>
@@ -100,26 +192,10 @@ export function TemplateGallery({ onChoose, busy = false, className }: TemplateG
             shifted left by one gap so the first card sits flush with the page
             margin while every later card keeps its spacing. */}
         <CarouselContent className="-ml-4">
+          {blankCard && <CarouselItem className="basis-auto pl-4">{blankCard}</CarouselItem>}
           {cards.map((card) => (
             <CarouselItem key={card.key} className="basis-auto pl-4">
-              <button
-                type="button"
-                disabled={busy}
-                data-template-card={card.key}
-                onClick={() => onChoose({ mode: card.mode, template: card.template })}
-                className={cn(
-                  'flex w-32 flex-col gap-2 text-left',
-                  'rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
-                  'disabled:pointer-events-none disabled:opacity-50',
-                  'group/template'
-                )}
-              >
-                <Thumbnail id={card.template.id} mode={card.mode} />
-                <span className="flex flex-col">
-                  <span className="truncate text-body-s text-text-primary">{card.name}</span>
-                  <span className="text-caption text-text-muted">{MODE_LABEL[card.mode]}</span>
-                </span>
-              </button>
+              {cardButton(card)}
             </CarouselItem>
           ))}
         </CarouselContent>

@@ -54,7 +54,14 @@ function PanelLink({ href, children }: { href: string; children: React.ReactNode
       href={href}
       className={cn(
         ICON_MOTION_GROUP,
-        'inline-flex items-center gap-1.5 text-body-s text-accent-default hover:underline'
+        // `whitespace-nowrap` so the phrase never breaks mid-link, and
+        // `shrink-0` so the grid gives it its natural width rather than
+        // compressing it into the heading beside it. Paired with CardHeader's
+        // narrow-card rule (see ui/card.tsx), which drops this below the
+        // heading instead of squeezing it alongside. Measured 2026-09-06: in
+        // the old two-column layout at 768 this link sat 4px from a heading
+        // that had wrapped to two lines.
+        'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-body-s text-accent-default hover:underline'
       )}
     >
       {children}
@@ -173,16 +180,17 @@ export function Dashboard({
 
       <FollowUpNudge stale={stale} />
 
-      {/* Two equal columns from md, in Gabe's order: over-time beside status,
+      {/* Two equal columns from xl, in Gabe's order: over-time beside status,
           events beside source, and the table across both.
 
-          FROM md (768), NOT lg (1024). At 768 the nav has already become a
-          64px rail, so the content column is ~700px -- two 340px panels, which
-          is a real pair rather than two slivers, and it halves a page that was
-          five full-width panels deep on every tablet. Below 768 they stack:
-          a donut and a six-month bar chart at 300px each are two charts you
-          cannot read instead of one you can. */}
-      <div className="grid gap-section md:grid-cols-2">
+          FROM xl (1280), NOT md (768) -- changed 2026-09-06, and changed in
+          lockstep with /analytics so the two chart-grid screens do not switch
+          at different widths. See Analytics.tsx for the arithmetic: the
+          sidebar expands at 1024 and takes back the width that breakpoint
+          gave, so md and lg both land on ~340px columns. That is where the
+          overview's headings started colliding with their "see the analytics"
+          links. Below xl the panels stack full-width. */}
+      <div className="grid gap-section xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle icon="Analytics">
@@ -250,7 +258,7 @@ export function Dashboard({
 
         {/* Full width: four columns of table read badly at half a screen, and
             it is the end of the page rather than one of a pair. */}
-        <Card className="md:col-span-2">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle icon="Clock">
               <h2>recent applications</h2>

@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { cn } from '@/lib/utils'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
@@ -79,7 +80,21 @@ export function ApplicationsOverTime({ data }: ApplicationsOverTimeProps) {
           where there is nothing to its left. */}
       <dl
         data-over-time-stats
-        className="grid grid-cols-3 divide-x divide-border-subtle"
+        // STACKED ON A PHONE. Three columns of a 246px card is ~80px each,
+        // which broke "busiest month" across two lines mid-word ("BUSIES /
+        // T MONTH") and left every figure fighting its own label for room.
+        // The rule follows: `divide-x` becomes `divide-y` when the row becomes
+        // a column, or the dividers sit at right angles to the split.
+        // The cells' own padding follows the axis too. `pr-4`/`px-4`/`pl-4`
+        // hold text off VERTICAL rules; stacked, those rules are horizontal and
+        // the same padding leaves the text flush against them while insetting
+        // it from an edge nothing sits on. Swapped here rather than on each
+        // cell so the three cannot drift apart.
+        className={cn(
+          "grid grid-cols-1 divide-y divide-border-subtle sm:grid-cols-3 sm:divide-x sm:divide-y-0",
+          "max-sm:[&>div]:px-0 max-sm:[&>div]:py-2",
+          "max-sm:[&>div:first-child]:pt-0 max-sm:[&>div:last-child]:pb-0"
+        )}
       >
         <div className="pr-4">
           <dt className="text-label-caps uppercase text-text-muted">total</dt>

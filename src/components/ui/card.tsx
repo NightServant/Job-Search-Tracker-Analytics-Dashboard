@@ -49,7 +49,34 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-header"
       className={cn(
-        "group/card-header @container/card-header grid auto-rows-min items-start gap-1 rounded-t-md px-(--card-spacing) has-data-[slot=card-action]:grid-cols-[1fr_auto] has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        "group/card-header @container/card-header grid auto-rows-min items-start gap-2 rounded-t-md px-(--card-spacing) has-data-[slot=card-description]:grid-rows-[auto_auto] [.border-b]:pb-(--card-spacing)",
+        // MOBILE-FIRST HERE TOO, for the same reason as the columns below.
+        // Once the action stacks under the description rather than sitting
+        // beside the title, a 4px gap puts three unrelated lines in one block;
+        // beside it, 4px is right. So the roomier value is the base and the
+        // tight one arrives with the second column, rather than a `@max-sm`
+        // override of a base -- which is the shape that failed before.
+        "@sm/card-header:gap-1",
+        // MOBILE-FIRST, AND THE ORDER IS THE WHOLE FIX.
+        //
+        // This began as a two-column rule with an `@max-sm` override to
+        // collapse it, and the override NEVER WON: both are single-class
+        // specificity, so whichever Tailwind emits last takes it, and the
+        // plain `has-` rule did. Worse, the matching reset on `CardAction`
+        // DID apply -- so the action stopped occupying (row 1, col 2), the
+        // description auto-placed into the hole it left, and every card on a
+        // phone rendered its heading and its description SIDE BY SIDE in two
+        // narrow columns. Measured 2026-09-06: a 333px header still computing
+        // `89.8px 207.2px`.
+        //
+        // There is now exactly ONE `grid-template-columns` declaration per
+        // width, so nothing races. Stacked by default; two columns only once
+        // the header is wide enough to seat them.
+        //
+        // A CONTAINER query, not a viewport one: the same card is full-width
+        // in one column and half-width in two at identical viewports, so only
+        // its own width can answer this.
+        "@sm/card-header:has-data-[slot=card-action]:grid-cols-[1fr_auto]",
         className
       )}
       {...props}
@@ -94,7 +121,12 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="card-action"
       className={cn(
-        "col-start-2 row-span-2 row-start-1 self-start justify-self-end",
+        // Mobile-first, matching CardHeader: auto-placed after the
+        // description by default, pinned into the second column only once that
+        // column exists. One rule per width rather than a base rule plus an
+        // override -- see CardHeader for what the override cost.
+        "justify-self-start pt-1",
+        "@sm/card-header:col-start-2 @sm/card-header:row-span-2 @sm/card-header:row-start-1 @sm/card-header:self-start @sm/card-header:justify-self-end @sm/card-header:pt-0",
         className
       )}
       {...props}

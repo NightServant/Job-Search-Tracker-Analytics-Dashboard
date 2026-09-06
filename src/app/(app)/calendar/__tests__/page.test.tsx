@@ -56,11 +56,15 @@ const JOB: Job = {
 }
 
 describe('Calendar route wrapper', () => {
-  it('shows a spinner while events are loading, not an empty calendar', () => {
+  it('shows a route skeleton while events are loading, not an empty calendar', async () => {
     useEventsMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
-    const { container } = render(<Page />)
-    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    render(<Page />)
+    // `findBy`, not `queryBy`: the route skeleton sits behind a 200ms gate
+    // (see ui/loading-skeletons) so a warm navigation never flashes a fake
+    // page for one frame. Nothing is in the DOM at t=0 BY DESIGN, and an
+    // immediate assertion was testing the absence of that gate.
+    expect(await screen.findByRole('status')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'calendar' })).toBeNull()
   })
 

@@ -5,7 +5,8 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { ApplicationRecordScreen } from '@/components/applications/record/ApplicationRecordScreen'
-import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { DEMO } from '@/lib/demoFixture'
 import { demoReadOnly } from '../../readOnly'
@@ -59,7 +60,7 @@ export default function Page() {
 
   const job = DEMO.jobs.find((candidate) => candidate.id === id) ?? null
 
-  if (wide === null || wide) return <RouteLoading />
+  if (wide === null || wide) return <RouteSkeleton variant="detail" />
 
   if (!job) {
     return (

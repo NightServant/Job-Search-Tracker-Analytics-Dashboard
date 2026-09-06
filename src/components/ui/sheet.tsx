@@ -79,11 +79,26 @@ function SheetContent({
   )
 }
 
+/**
+ * `pr-14` RESERVES THE CLOSE BUTTON'S CORNER.
+ *
+ * The close control is `absolute top-3 right-3` at 28px, and this header had a
+ * uniform `p-4` -- so it laid out as if that corner were free and any title
+ * long enough ran underneath it. Reported 2026-09-06 on the CV editor's action
+ * sheet, where the title is a filename: "Elijah Gabe Cervantes y Celestino -
+ * CV (ATS)" collided with the X at every width, and wrapped INTO it below
+ * 375px.
+ *
+ * 56px = the button's 12px offset + its 28px + a 16px gap. Applied
+ * unconditionally rather than only when `showCloseButton` is true: the header
+ * does not receive that flag, and a little extra right padding on the rare
+ * sheet without a close button is invisible, whereas the collision is not.
+ */
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="sheet-header"
-      className={cn("flex flex-col gap-0.5 p-4", className)}
+      className={cn("flex flex-col gap-0.5 p-4 pr-14", className)}
       {...props}
     />
   )

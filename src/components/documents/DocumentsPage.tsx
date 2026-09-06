@@ -12,6 +12,11 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ModeChooser } from '@/components/cv/ModeChooser'
 import { DocumentRow, DOCUMENT_GRID } from './DocumentRow'
 import { TemplateGallery, type TemplateChoice } from './TemplateGallery'
+import { useBelowDesktop } from '@/hooks/useBelowDesktop'
+import { buttonVariants } from '@/components/ui/button-variants'
+import { ICON_MOTION_GROUP } from '@/components/icons/motion'
+import Link from 'next/link'
+import { useAppHref } from '@/components/shell/routeBase'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
 import { IMPORT_ACCEPT } from '@/lib/documentImport'
 import type { ResumeSummary } from '@/services/resumeService'
@@ -81,10 +86,44 @@ export function DocumentsPage({
   onImport,
   creatingDraft = false,
 }: DocumentsPageProps) {
+  // BELOW `lg` THIS SCREEN IS A DIFFERENT SHAPE, on Gabe's instruction
+  // (2026-09-06): recents first, one CTA, and the template grid moved to its
+  // own page. Desktop is deliberately UNCHANGED -- he was explicit that the
+  // desktop layout stays as it is.
+  //
+  // LaTeX is gone entirely at these widths: no gallery entry, no mode chooser,
+  // no editor and no preview. Existing LaTeX CVs still list (see the row's
+  // `unavailable` note for why hiding them would be worse).
+  const compact = useBelowDesktop()
+  const appHref = useAppHref()
   const openDoc = docs.find((doc) => doc.id === openVersionsFor) ?? null
   const [newCvOpen, setNewCvOpen] = React.useState(false)
   const fileInput = React.useRef<HTMLInputElement>(null)
   const hasDocs = docs.length > 0
+
+  // ONE CTA, TWO BEHAVIOURS. Below `lg` it is a link to the Templates page;
+  // on desktop it opens the mode chooser exactly as before. A link and a
+  // button rather than one control that branches on click: the compact one is
+  // a navigation and should be middle-clickable, openable in a new tab, and
+  // announced as a link.
+  const newCvCta = compact ? (
+    // `buttonVariants` rather than <Button asChild>: this Button has no
+    // `asChild`, and the variants module exists precisely so a link can wear
+    // the button's clothes -- see button.tsx's note on why it is a separate
+    // file and must not be re-exported from there.
+    <Link
+      href={appHref('/documents/templates')}
+      className={cn(ICON_MOTION_GROUP, buttonVariants({ size: 's' }))}
+    >
+      <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
+      new CV
+    </Link>
+  ) : (
+    <Button size="s" onClick={() => setNewCvOpen(true)}>
+      <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
+      new CV
+    </Button>
+  )
 
   const importButton = (
     <Button variant="secondary" size="s" onClick={() => fileInput.current?.click()}>
@@ -120,22 +159,38 @@ export function DocumentsPage({
         title="documents"
         description="the CVs you send out, and every version you have saved of them."
         action={
-          hasDocs ? (
-            <div className="flex items-center gap-2">
+          // Below `lg` the CTA is present WHETHER OR NOT there are documents.
+          // On desktop it is suppressed on an empty screen because the empty
+          // state already carries the same offer three inches away -- but the
+          // compact screen puts recents first, so on a full list the empty
+          // state is not there to carry it.
+          //
+          // Stacked and full width on a phone; a row at their natural width
+          // from `sm`. Sized HERE rather than in PageHeader, whose action slot
+          // is deliberately untyped -- when PageHeader tried to size it
+          // generically it stacked /applications' single button's own icon
+          // above its own label.
+          hasDocs || compact ? (
+            <div className="flex items-center gap-2 max-sm:w-full max-sm:flex-col max-sm:[&>*]:w-full">
               {importButton}
-              <Button size="s" onClick={() => setNewCvOpen(true)}>
-                <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
-                new CV
-              </Button>
+              {newCvCta}
             </div>
           ) : undefined
         }
       />
 
-      <TemplateGallery
-        busy={creatingDraft}
-        onChoose={(choice) => onChooseTemplate?.(choice)}
-      />
+      {/* DESKTOP ONLY. Below `lg` the grid is a page of its own reached by
+          the CTA above -- a six-card gallery pushed the user's actual
+          documents below the fold on every phone, which is the wrong thing to
+          put first on a screen called "documents". Rendered conditionally
+          rather than with `hidden`, because it is the LaTeX cards' only
+          appearance and they must not exist in the compact DOM at all. */}
+      {!compact && (
+        <TemplateGallery
+          busy={creatingDraft}
+          onChoose={(choice) => onChooseTemplate?.(choice)}
+        />
+      )}
 
       <section className="flex flex-col gap-3">
         <h2 className="text-heading-s text-text-primary">your documents</h2>
@@ -160,7 +215,18 @@ export function DocumentsPage({
               <DocumentRow
                 key={doc.id}
                 doc={doc}
+                unavailable={
+                  compact && doc.mode === 'latex'
+                    ? 'LaTeX — opens on a larger screen'
+                    : undefined
+                }
                 onOpenVersions={() => onToggleVersions?.(doc)}
+                // The same verb, twice, for two surfaces: `onDelete` builds
+                // the compact row's overflow menu item, `actions` fills the
+                // desktop row's controls column. Passing the callback rather
+                // than a second button keeps the two from drifting on what
+                // delete MEANS while letting each look right where it is.
+                onDelete={() => onDelete?.(doc)}
                 actions={
                   <IconButton aria-label={`Delete ${doc.title}`} onClick={() => onDelete?.(doc)}>
                     <TrashIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('lid')}`} />
@@ -178,16 +244,14 @@ export function DocumentsPage({
               // a secondary button here would leave the page with no primary
               // at all. `import` sits beside it as the other way in.
               <div className="flex flex-wrap items-center justify-center gap-2">
-                <Button size="s" onClick={() => setNewCvOpen(true)}>
-                  <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
-                  new CV
-                </Button>
+                {newCvCta}
                 {importButton}
               </div>
             }
           >
-            no CVs yet. start from a template above, write one from scratch, or import a document
-            you already have.
+            {compact
+              ? 'no CVs yet. start from a template, or import a document you already have.'
+              : 'no CVs yet. start from a template above, write one from scratch, or import a document you already have.'}
           </EmptyState>
         )}
       </section>

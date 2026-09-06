@@ -3,8 +3,9 @@
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
 import { useResumes, useResumeVersions, useDeleteResume, useCreateResume } from '@/hooks/useResumes'
-import { useToast } from '@/contexts/ToastContext'
-import { RouteError, RouteLoading } from '@/components/ui/route-states'
+import { DocumentsNotice, useDocumentsNotice } from '@/components/documents/DocumentsNotice'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DocumentsPage } from '@/components/documents/DocumentsPage'
 import { DEFAULT_LATEX_SOURCE, DEFAULT_WORD_CONTENT } from '@/components/cv/content'
@@ -44,7 +45,9 @@ export default function Page() {
   const versionsQuery = useResumeVersions(openVersionsFor)
   const deleteResume = useDeleteResume()
   const createResume = useCreateResume()
-  const { success, error: showError, info } = useToast()
+  // Sonner on desktop, a persistent bottom banner below `lg` -- see
+  // DocumentsNotice for why a toast is the wrong shape on this screen.
+  const { notify, notice, dismiss } = useDocumentsNotice()
   const [pendingDelete, setPendingDelete] = React.useState<ResumeSummary | null>(null)
 
   const confirmDelete = async () => {
@@ -53,9 +56,9 @@ export default function Page() {
     try {
       await deleteResume.mutateAsync(doc.id)
       if (openVersionsFor === doc.id) setOpenVersionsFor(null)
-      success('CV deleted', 'The draft was removed.')
+      notify('success', 'CV deleted', 'The draft was removed.')
     } catch (err) {
-      showError('Delete failed', err instanceof Error ? err.message : 'Could not delete the CV')
+      notify('error', 'Delete failed', err instanceof Error ? err.message : 'Could not delete the CV')
     } finally {
       setPendingDelete(null)
     }
@@ -69,10 +72,10 @@ export default function Page() {
   const createDraft = async (mode: ResumeMode, title: string, content: ResumeContent) => {
     try {
       const created = await createResume.mutateAsync({ mode, title, content })
-      info('Draft created', `${mode === 'latex' ? 'LaTeX' : 'Word'} CV ready.`)
+      notify('info', 'Draft created', `${mode === 'latex' ? 'LaTeX' : 'Word'} CV ready.`)
       router.push(`/cv?draft=${created.id}`)
     } catch (err) {
-      showError('Create failed', err instanceof Error ? err.message : 'Could not create the CV')
+      notify('error', 'Create failed', err instanceof Error ? err.message : 'Could not create the CV')
     }
   }
 
@@ -99,7 +102,8 @@ export default function Page() {
       const draft = await importDocument(file)
       await createDraft(draft.mode, draft.title, draft.content)
     } catch (err) {
-      showError(
+      notify(
+        'error',
         err instanceof UnsupportedDocumentError ? 'Cannot import that file' : 'Import failed',
         err instanceof Error ? err.message : 'Could not read the document'
       )
@@ -107,7 +111,7 @@ export default function Page() {
   }
 
   if (isLoading) {
-    return <RouteLoading />
+    return <RouteSkeleton variant="documents" />
   }
 
   // An empty list and a failed fetch look identical, so the failure has to say
@@ -153,6 +157,7 @@ export default function Page() {
         destructive
         onConfirm={confirmDelete}
       />
+      <DocumentsNotice notice={notice} onDismiss={dismiss} />
     </>
   )
 }

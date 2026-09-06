@@ -3,7 +3,8 @@
 import { useJobs } from '@/hooks/useJobs'
 import { useEvents } from '@/hooks/useEvents'
 import { Dashboard } from '@/components/dashboard/Dashboard'
-import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 
 /**
  * Thin route wrapper. All the layout lives in `Dashboard`, which takes its
@@ -30,7 +31,7 @@ export default function Page() {
   const events = useEvents()
 
   if (isLoading) {
-    return <RouteLoading />
+    return <RouteSkeleton variant="dashboard" />
   }
 
   // A KPI strip full of zeros looks exactly like an empty account, so a

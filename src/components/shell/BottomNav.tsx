@@ -4,7 +4,7 @@ import { NAV, type NavEntry } from '@/components/ui/sidebar'
 import { NavItem } from '@/components/ui/nav-item'
 
 /**
- * Mobile only. The same five destinations as the sidebar, numberless -- see
+ * Mobile and tablet. The same five destinations as the sidebar, numberless -- see
  * NavItem's own note on why the number does not fit alongside icon and label
  * at 375px.
  *
@@ -23,7 +23,7 @@ export function BottomNav({
     <nav
       aria-label="Primary"
       data-bottom-nav
-      className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border-subtle bg-bg-canvas pb-safe md:hidden"
+      className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border-subtle bg-bg-canvas pb-safe lg:hidden"
     >
       {nav.map((item) => (
         <NavItem

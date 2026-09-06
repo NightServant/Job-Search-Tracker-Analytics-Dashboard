@@ -774,6 +774,62 @@ body,
   }
 }
 
+/* WHEN A FIXED FRAME IS WORTH IT.
+
+   /applications can lock itself to the viewport so its title, tabs, toolbar
+   and pagination hold still while only the list scrolls -- but that is only an
+   improvement if what is left over is a list worth looking at.
+
+   MEASURED 2026-09-06, and the numbers are why this is two conditions rather
+   than one. The frame is not the same size at every width: below `lg` the
+   shell adds a 64px top bar and a 45px bottom nav, and the chrome above the
+   table came to 439px at 780 wide against 274px at 1400. So a 780x700 tablet
+   locked to the viewport left the table NINETY-TWO PIXELS -- two rows -- which
+   is worse than the scrolling page it replaced.
+
+   Requiring ~300px of list after the frame gives 439+161+300 = 900 below `lg`,
+   and 274+137+300 = 711 from `lg` up, rounded to 45rem. Outside these the
+   screen keeps ordinary page scrolling and the table falls back to its own
+   height cap, which is sized so the header still never reaches the top bar.
+--------------------------------------------------------------------------- */
+@custom-variant shell-fits {
+  @media (min-width: 64rem) and (min-height: 45rem),
+         (min-width: 40rem) and (min-height: 56.25rem) {
+    @slot;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Sticky table header (640px and up)
+
+   Opted into per table with <Table stickyHeader>, which is also what gives the
+   container its height cap and its vertical scrollport -- the two halves are
+   useless apart. See table.tsx for why the cap is 55svh.
+
+   ON THE THEAD, NOT ON EACH TH. A sticky <th> pins only itself, which is what
+   the first-column rule already does horizontally; pinning the row means the
+   whole header travels together and the cells keep their shared border.
+
+   Not below 640: the table is stacked there, its <thead> is taken out of the
+   flow entirely (above), and a nested scrollport inside a page that already
+   scrolls is the worst thing to hand a thumb.
+
+   The fill comes from the table's own header row -- the applications table
+   wears the accent band. Nothing is declared here, deliberately: a colour at
+   this level would show as the wrong shade the moment a second table opts in.
+--------------------------------------------------------------------------- */
+@media (width >= 40rem) {
+  [data-sticky-header] thead {
+    position: sticky;
+    top: 0;
+    /* Above the pinned first column's cells (z-10 on the body cells, z-20 on
+       the header cell) so a row scrolling up passes UNDER the header rather
+       than through it. Local to the container's isolated stacking context, so
+       this number cannot reach the sidebar or the top bar. */
+    z-index: 20;
+  }
+}
+
 /* Utility to suppress hover/focus visuals when applied to a container.
    Keeps elements interactive but prevents hover/focus bounding boxes from appearing. */
 .no-hover .card-hover:hover,

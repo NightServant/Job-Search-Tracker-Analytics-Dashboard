@@ -11,7 +11,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
 import { ApplicationRecordScreen } from '@/components/applications/record/ApplicationRecordScreen'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button-variants'
 import type { Job, JobFormData } from '@/types'
 
@@ -90,7 +91,7 @@ export default function Page() {
   }, [wide, id, router])
 
   if (wide === null || wide || jobQuery.isLoading) {
-    return <RouteLoading />
+    return <RouteSkeleton variant="detail" />
   }
 
   // "Not found" covers a bad id and someone else's job identically -- RLS

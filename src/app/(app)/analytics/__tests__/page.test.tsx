@@ -54,10 +54,14 @@ describe('Analytics route wrapper', () => {
     useAuthMock.mockReturnValue({ user: { id: 'user-1' } })
   })
 
-  it('shows a spinner while every metric is still loading, not an empty screen', () => {
+  it('shows a route skeleton while every metric is still loading, not an empty screen', async () => {
     mockAll(LOADING)
-    const { container } = render(<Page />)
-    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    render(<Page />)
+    // `findBy`, not `queryBy`: the route skeleton sits behind a 200ms gate
+    // (see ui/loading-skeletons) so a warm navigation never flashes a fake
+    // page for one frame. Nothing is in the DOM at t=0 BY DESIGN, and an
+    // immediate assertion was testing the absence of that gate.
+    expect(await screen.findByRole('status')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'analytics' })).toBeNull()
   })
 

@@ -4,7 +4,8 @@ import * as React from 'react'
 import { useEvents } from '@/hooks/useEvents'
 import { useJobs } from '@/hooks/useJobs'
 import { Calendar } from '@/components/calendar/Calendar'
-import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 
 /**
  * Thin route wrapper, same split as `dashboard/page.tsx`: `Calendar` takes
@@ -38,7 +39,7 @@ export default function Page() {
   }, [jobs])
 
   if (isLoading) {
-    return <RouteLoading />
+    return <RouteSkeleton variant="calendar" />
   }
 
   if (error) {

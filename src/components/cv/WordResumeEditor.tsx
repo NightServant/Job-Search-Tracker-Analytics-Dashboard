@@ -16,6 +16,7 @@ import { authedFetch } from '@/lib/authedFetch'
 import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
 import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
+import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
@@ -371,6 +372,7 @@ export function WordResumeEditor({
   // as it is typed -- a score computed against a stale copy is worse than no
   // score, since it looks current.
   const tailoring = useCvTailoring({ cvText: editor?.getText() ?? '', jobs })
+  const compact = useBelowDesktop()
 
   const restoreSnapshot = async (content: unknown) => {
     if (content && typeof content === 'object' && (content as { type?: string }).type === 'doc') {
@@ -393,7 +395,16 @@ export function WordResumeEditor({
       dirty={isDirty}
       actions={
         <>
-          {user && (
+          {/* VERSION HISTORY IS DESKTOP-ONLY (Gabe, 2026-09-06). It is the one
+              control here that is not a button but a dropdown of snapshots,
+              and in the compact action sheet it read as a form field dropped
+              into a menu -- and it opens a list of dated entries that wants
+              more room than a sheet over a document has. Removed rather than
+              hidden: a `display:none` dropdown still mounts, still fetches its
+              snapshots, and is still in the tab order. The list remains
+              reachable from the documents screen, which is where a phone user
+              looks for it. */}
+          {user && !compact && (
             <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
           )}
           <Button variant="ghost" size="s" onClick={resetTemplate} disabled={!editor}>

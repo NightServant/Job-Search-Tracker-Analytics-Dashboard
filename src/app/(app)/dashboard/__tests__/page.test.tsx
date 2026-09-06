@@ -23,10 +23,14 @@ describe('Dashboard route wrapper', () => {
     useEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
   })
 
-  it('shows a spinner while jobs are loading, not an empty dashboard', () => {
+  it('shows a route skeleton while jobs are loading, not an empty dashboard', async () => {
     useJobsMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
-    const { container } = render(<Page />)
-    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    render(<Page />)
+    // `findBy`, not `queryBy`: the route skeleton sits behind a 200ms gate
+    // (see ui/loading-skeletons) so a warm navigation never flashes a fake
+    // page for one frame. Nothing is in the DOM at t=0 BY DESIGN, and an
+    // immediate assertion was testing the absence of that gate.
+    expect(await screen.findByRole('status')).toBeTruthy()
     expect(screen.queryByRole('heading', { name: 'overview' })).toBeNull()
   })
 

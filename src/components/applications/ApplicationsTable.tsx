@@ -92,7 +92,23 @@ export function ApplicationsTable({
     // No `overflow-x-auto` here any more: `Table` brings its own scroll
     // container, and two nested scrollports meant the sticky first column
     // resolved against one of them while the row scrolled in the other.
-    <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy}>
+    // `sm:flex sm:min-h-0 sm:flex-col` continues the chain that starts at
+    // AppShell and ends at Table's scroll container. `min-h-0` is what every
+    // link needs: without it a flex item's automatic minimum size is its
+    // content height, so the shrink never propagates and the table keeps its
+    // full height whatever the frame does.
+    //
+    // NO `flex-1` on this chain. It was there first and it was wrong: `flex-1`
+    // forces growth, so a one-row filter stretched the card to the full frame.
+    // Only the page frame itself grows; everything inside it is content-sized
+    // and merely allowed to shrink.
+    <div
+      data-list
+      id={id}
+      role={role}
+      aria-labelledby={ariaLabelledBy}
+      className="sm:flex sm:min-h-0 sm:flex-col"
+    >
       {/* Stacked below 640 (six columns do not fit a phone), a normal table
           with a pinned company column from there up -- so a sideways scroll
           on a tablet never leaves you looking at a row you cannot identify. */}
@@ -107,7 +123,7 @@ export function ApplicationsTable({
           Not applied below sm: the table is stacked there, and a 780px minimum
           on a block-displayed table would reintroduce the page-wide horizontal
           scroll the stacking exists to remove. Reset in the stacked rule. */}
-      <Table stacked className="sm:min-w-[780px]" data-applications-table>
+      <Table stacked stickyHeader className="sm:min-w-[780px]" data-applications-table>
         {/*
           The same accent band the calendar's weekday row wears, from the same
           `accent-surface` pair. accent-surface is the token for a FIELD of

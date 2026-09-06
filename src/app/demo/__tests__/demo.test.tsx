@@ -111,13 +111,33 @@ describe('the demo shell', () => {
     }
   })
 
-  it('renders the banner above the content on every demo route', () => {
-    render(
+  it('carries the demo notice in both places the shell has room for', () => {
+    // Changed 2026-09-06. The notice used to be one band above the content at
+    // every width; it is now a band (phone) or card (tablet) below lg, and a
+    // block inside the sidebar from lg up -- where the band was spending a
+    // full horizontal strip of a wide screen on a sentence already read.
+    const { container } = render(
       <DemoLayout>
         <p>demo content</p>
       </DemoLayout>
     )
-    expect(screen.getByText(/invented/i)).toBeInTheDocument()
+
+    const banner = container.querySelector('[data-demo-banner]')
+    expect(banner).not.toBeNull()
+    expect(banner!.className).toContain('lg:hidden')
+
+    const notice = container.querySelector('[data-demo-sidebar-notice]')
+    expect(notice).not.toBeNull()
+    const sidebar = container.querySelector('nav[aria-label="Main"]')!
+    expect(sidebar.contains(notice)).toBe(true)
+    expect(sidebar.className).toContain('lg:flex')
+
+    // BOTH ARE IN THE DOM AND THAT IS FINE. CSS picks one per viewport, and
+    // the `display:none` that hides the other takes it out of the
+    // accessibility tree too -- so nobody reads or hears the claim twice.
+    // jsdom applies no CSS, which is exactly why this asserts the classes
+    // above rather than counting what rendered.
+    expect(screen.getAllByText(/invented/i)).toHaveLength(2)
     expect(screen.getByText('demo content')).toBeInTheDocument()
   })
 

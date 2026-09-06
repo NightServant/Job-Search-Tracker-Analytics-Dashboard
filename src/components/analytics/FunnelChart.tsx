@@ -174,13 +174,32 @@ export function FunnelChart({ data }: FunnelChartProps) {
           const share = d.count / top
           return (
             <div key={d.stage} className="flex w-full flex-1 flex-col justify-center gap-0.5">
-              <div className="flex w-full items-center gap-3">
-              <span className="w-24 shrink-0 text-body-s text-text-secondary">
-                {LABELS[d.stage]}
-              </span>
+              <div className="flex w-full flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+              {/* THE BAR GETS THE ROW ON A PHONE. Measured 2026-09-06 at
+                  320px: the label column took 96px and the count 64px of a
+                  246px card, leaving the bar -- the only thing here carrying
+                  data -- SIXTY-TWO PIXELS, a quarter of the row. Below `sm`
+                  the label and the count share a line and the bar takes the
+                  full width beneath them.
+
+                  `sm:contents` is what avoids a second copy of the markup:
+                  from `sm` the wrapper stops generating a box and its two
+                  children become flex items of this row again, so the desktop
+                  layout is the original one rather than a rebuilt lookalike.
+                  `order` then restores label / bar / count, because in source
+                  order the count now precedes the bar. */}
+              <div className="flex w-full items-baseline justify-between gap-3 sm:contents">
+                <span className="shrink-0 text-body-s text-text-secondary sm:order-1 sm:w-24">
+                  {LABELS[d.stage]}
+                </span>
+                <span className="tabular shrink-0 text-right text-body-s text-text-primary sm:order-3 sm:w-16">
+                  {d.count}
+                  <span className="ml-1 text-text-muted">{Math.round(share * 100)}%</span>
+                </span>
+              </div>
               <div
                 data-stage={d.stage}
-                className="flex h-full max-h-12 min-h-7 flex-1 items-center justify-center"
+                className="flex h-full max-h-12 min-h-7 w-full flex-1 items-center justify-center sm:order-2"
               >
                 <div
                   data-fill={STAGE_FILL[d.stage]}
@@ -193,12 +212,6 @@ export function FunnelChart({ data }: FunnelChartProps) {
                   }}
                 />
               </div>
-              <span className="tabular w-16 shrink-0 text-right text-body-s text-text-primary">
-                {d.count}
-                <span className="ml-1 text-text-muted">
-                  {Math.round(share * 100)}%
-                </span>
-              </span>
               </div>
               <StageTiming days={d.avgDaysToStage} show={hasTimings} />
             </div>
@@ -213,14 +226,21 @@ export function FunnelChart({ data }: FunnelChartProps) {
         >
           {exits.map((d) => (
             <div key={d.stage} className="flex w-full flex-1 flex-col justify-center gap-0.5">
-              <div className="flex w-full items-center gap-3">
-              <span className="w-24 shrink-0 text-body-s text-text-secondary">
-                {LABELS[d.stage]}
-              </span>
+              <div className="flex w-full flex-col gap-1 sm:flex-row sm:items-center sm:gap-3">
+              {/* Same treatment as the stages above, and for the same
+                  measurement. */}
+              <div className="flex w-full items-baseline justify-between gap-3 sm:contents">
+                <span className="shrink-0 text-body-s text-text-secondary sm:order-1 sm:w-24">
+                  {LABELS[d.stage]}
+                </span>
+                <span className="tabular shrink-0 text-right text-body-s text-text-primary sm:order-3 sm:w-16">
+                  {d.count}
+                </span>
+              </div>
               <div
                 data-stage={d.stage}
                 data-exit="true"
-                className="flex h-5 flex-1 items-center"
+                className="flex h-5 w-full flex-1 items-center sm:order-2"
               >
                 <div
                   data-fill={STAGE_FILL[d.stage]}
@@ -231,9 +251,6 @@ export function FunnelChart({ data }: FunnelChartProps) {
                   }}
                 />
               </div>
-              <span className="tabular w-16 shrink-0 text-right text-body-s text-text-primary">
-                {d.count}
-              </span>
               </div>
               <StageTiming days={d.avgDaysToStage} show={hasTimings} />
             </div>

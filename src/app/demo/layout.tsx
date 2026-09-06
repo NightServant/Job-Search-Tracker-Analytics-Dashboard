@@ -1,5 +1,5 @@
 import { AppShell } from '@/components/shell/AppShell'
-import { DemoBanner } from '@/components/shell/DemoBanner'
+import { DemoBanner, DemoSidebarNotice } from '@/components/shell/DemoBanner'
 import { RouteBaseProvider } from '@/components/shell/routeBase'
 import { DEMO_NAV } from './nav'
 
@@ -29,7 +29,16 @@ import { DEMO_NAV } from './nav'
 export default function DemoLayout({ children }: { children: React.ReactNode }) {
   return (
     <RouteBaseProvider base="/demo">
-      <AppShell nav={DEMO_NAV} settingsHref={null} banner={<DemoBanner />}>
+      {/* The same notice twice, in the two places the shell has room for it:
+          a band (phone) or a card (tablet) above the page below lg, and the
+          sidebar block from lg up. Only one is ever visible -- DemoBanner is
+          `lg:hidden` and the sidebar itself does not exist below lg. */}
+      <AppShell
+        nav={DEMO_NAV}
+        settingsHref={null}
+        banner={<DemoBanner />}
+        sidebarNotice={<DemoSidebarNotice />}
+      >
         {children}
       </AppShell>
     </RouteBaseProvider>

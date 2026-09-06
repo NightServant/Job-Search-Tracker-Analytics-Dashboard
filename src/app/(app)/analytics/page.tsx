@@ -10,7 +10,8 @@ import {
 } from '@/hooks/useAnalytics'
 import { useJobs } from '@/hooks/useJobs'
 import { Analytics, type MetricState } from '@/components/analytics/Analytics'
-import { RouteLoading, RouteError } from '@/components/ui/route-states'
+import { RouteSkeleton } from '@/components/ui/loading-skeletons'
+import { RouteError } from '@/components/ui/route-states'
 
 function toState<T>(query: { data?: T; isLoading: boolean; error: unknown }): MetricState<T> {
   return { data: query.data ?? null, isLoading: query.isLoading, error: query.error }
@@ -56,7 +57,7 @@ export default function Page() {
   const queries = [timeInStage, conversionFunnel, statusTransitions, cohortAnalysis, conversionMetrics]
 
   if (queries.every((q) => q.isLoading)) {
-    return <RouteLoading />
+    return <RouteSkeleton variant="analytics" />
   }
 
   if (queries.every((q) => q.error)) {

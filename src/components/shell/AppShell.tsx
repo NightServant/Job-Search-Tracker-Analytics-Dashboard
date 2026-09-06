@@ -9,6 +9,8 @@ import { cn } from '@/lib/utils'
 import { TopBar } from './TopBar'
 import { BottomNav } from './BottomNav'
 import { DocumentFocusProvider } from './documentFocus'
+import { ViewportFitProvider } from './viewportFit'
+import { ShellBannerProvider } from './shellBanner'
 
 /**
  * The authenticated chrome every route renders inside.
@@ -28,8 +30,18 @@ export interface AppShellProps {
   nav?: NavEntry[]
   /** Where settings points, or null to omit it. The demo has no settings. */
   settingsHref?: string | null
-  /** Rendered above <main>. The demo puts its persistent banner here. */
+  /**
+   * Rendered above <main>, below lg only. The demo puts its persistent
+   * banner here; from lg up the same message lives in the sidebar instead,
+   * as `sidebarNotice`.
+   */
   banner?: React.ReactNode
+  /**
+   * Rendered inside the sidebar, so it exists only where the sidebar does
+   * (lg and up). The demo puts its notice here rather than spending a full
+   * horizontal band of a wide screen on a message that has already been read.
+   */
+  sidebarNotice?: React.ReactNode
 }
 
 /**
@@ -74,6 +86,7 @@ export function AppShell({
   nav = NAV,
   settingsHref = '/settings',
   banner,
+  sidebarNotice,
 }: AppShellProps) {
   const pathname = usePathname()
 
@@ -83,10 +96,32 @@ export function AppShell({
   // navigating away or closing the draft restores the nav without either side
   // having to remember. See ./documentFocus.
   //
-  // The Top Bar STAYS. It carries the theme toggle and the settings button,
-  // which are the only controls a full-screen editor still needs -- and
-  // removing it would leave a phone user in a document with no chrome at all.
+  // THE TOP BAR NOW GOES TOO, which reverses the note that stood here.
+  // It used to stay because a full-screen editor had no chrome of its own
+  // below `lg`, and leaving a phone user in a document with no controls at all
+  // would have been worse. Since 2026-09-06 the compact editor carries its own
+  // Word-style title bar and command row (see cv/DocumentWorkspace), so the
+  // app's top bar is a second, redundant bar above the document's own -- and
+  // Gabe asked for the editor to have no app shell at all.
   const [documentFocused, setDocumentFocused] = React.useState(false)
+
+  // VIEWPORT FIT. A screen that owns its own scroll region -- /applications is
+  // the only one so far -- asks the shell to stop being taller than the
+  // viewport, so its frame (title, tabs, toolbar, pagination) stays put while
+  // only its list moves. Claimed through context for the same reason document
+  // focus is; see ./viewportFit.
+  //
+  // Applied only under the `shell-fits` variant -- see index.css for the
+  // measurements behind it. Below 640 the table is stacked into cards and is
+  // meant to spend height; on a SHORT viewport the frame eats so much that the
+  // list is two rows, which is worse than the page scroll it replaces. Both
+  // cases fall through to ordinary scrolling.
+  const [viewportFit, setViewportFit] = React.useState(false)
+
+  // A screen can ask for the banner to stand down while it is open -- the
+  // Templates page does, so a second copy of the demo notice does not push its
+  // first row of cards off a phone. See ./shellBanner.
+  const [bannerHidden, setBannerHidden] = React.useState(false)
   const active = activeNavHref(pathname, nav.map((n) => n.href))
   const settingsActive = settingsHref ? isUnder(pathname, settingsHref) : false
   const width = contentWidth(pathname, documentFocused)
@@ -99,7 +134,13 @@ export function AppShell({
     // context, negative z-index children paint BEFORE in-flow block
     // backgrounds, so this div's opaque fill covered the fixed -z-10 backdrop
     // every time. Two "raise the opacity" fixes could never have worked.
-    <div className="flex min-h-screen">
+    <div
+      className={cn(
+        'flex',
+        'min-h-screen',
+        viewportFit && 'shell-fits:h-dvh shell-fits:min-h-0 shell-fits:overflow-hidden'
+      )}
+    >
       <AppBackground />
       {!documentFocused && (
         <Sidebar
@@ -107,12 +148,21 @@ export function AppShell({
           activeHref={active}
           nav={nav}
           settingsHref={settingsHref}
-          className="hidden md:flex"
+          notice={sidebarNotice}
+          // FROM lg (1024), NOT md (768). A tablet now gets the same Top Bar
+          // and Bottom Nav a phone does, on Gabe's instruction (2026-09-06).
+          // The old md switch handed a 768px viewport a 64px icon rail whose
+          // labels only existed in tooltips -- a hover affordance on a device
+          // with no hover. The bottom nav carries icon AND label at every
+          // size, so the tablet gains the labels it could not reach.
+          className="hidden lg:flex"
         />
       )}
       <div className="flex min-w-0 flex-1 flex-col">
-        <TopBar settingsActive={settingsActive} settingsHref={settingsHref} />
-        {banner}
+        {!documentFocused && (
+          <TopBar settingsActive={settingsActive} settingsHref={settingsHref} />
+        )}
+        {!bannerHidden && banner}
         <main
           className={cn(
             // `p-gutter` is one fluid token in place of the old `p-4 md:p-8`
@@ -125,15 +175,30 @@ export function AppShell({
             // see the utility for why it is not two classes. With the nav
             // hidden the padding is dead space at the foot of a document, so
             // it goes with it.
-            documentFocused ? 'pb-gutter' : 'pb-nav md:pb-gutter'
+            documentFocused ? 'pb-gutter' : 'pb-nav lg:pb-gutter',
+            // `min-h-0` is the load-bearing half: without it this flex item's
+            // automatic minimum size is its CONTENT height, so the column
+            // refuses to shrink and the "fit" does nothing at all.
+            viewportFit && 'shell-fits:flex shell-fits:min-h-0 shell-fits:overflow-hidden'
           )}
         >
           {/* THE CAP. Below lg this is a no-op and the shell is full-bleed
               with gutters; from lg up it stops content growing with the
               monitor and hands the surplus back as margin. Two widths because
               the screens want different things -- see contentWidth. */}
-          <div className={width}>
-            <DocumentFocusProvider setFocused={setDocumentFocused}>{children}</DocumentFocusProvider>
+          <div
+            className={cn(
+              width,
+              viewportFit && 'shell-fits:flex shell-fits:min-h-0 shell-fits:flex-1 shell-fits:flex-col'
+            )}
+          >
+            <ShellBannerProvider setHidden={setBannerHidden}>
+              <ViewportFitProvider setFit={setViewportFit}>
+                <DocumentFocusProvider setFocused={setDocumentFocused}>
+                  {children}
+                </DocumentFocusProvider>
+              </ViewportFitProvider>
+            </ShellBannerProvider>
           </div>
         </main>
         {!documentFocused && <BottomNav activeHref={active} nav={nav} />}

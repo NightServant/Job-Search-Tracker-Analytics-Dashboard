@@ -172,6 +172,19 @@ export function NavItem({
       <span
         className={cn(
           bottom ? 'text-label-caps' : 'text-body-m',
+          // ICONS ONLY ON A PHONE (Gabe, 2026-09-06). Measured at 320px: five
+          // items get 62px each while the labels are 51-72px wide, so
+          // "applications" overflowed its cell by 10px and the row read as one
+          // run of touching words.
+          //
+          // `sr-only`, NOT `hidden`: the label is the link's accessible name,
+          // and removing it would leave five nav destinations announced only
+          // by an `aria-hidden` glyph. This is the same treatment -- and the
+          // same reasoning -- the collapsed sidebar rail already uses above.
+          //
+          // From `sm` the labels come back, which is where the bottom bar now
+          // also serves tablets and has room for them.
+          bottom && 'max-sm:sr-only',
           active && !bottom && 'font-medium',
           rail && 'sr-only'
         )}

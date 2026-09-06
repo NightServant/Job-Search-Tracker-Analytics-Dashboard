@@ -379,7 +379,7 @@ describe('Analytics', () => {
   it('spans the KPI strip and the cohort table, and pairs the four charts', () => {
     const { container } = render(<Analytics {...fullProps()} />)
     const span = (key: string) =>
-      container.querySelector(`[data-panel-slot="${key}"]`)!.className.includes('md:col-span-2')
+      container.querySelector(`[data-panel-slot="${key}"]`)!.className.includes('xl:col-span-2')
     expect(span('overview')).toBe(true)
     expect(span('cohort')).toBe(true)
     for (const key of ['funnel', 'pipeline', 'time-in-stage', 'salary']) {
@@ -395,7 +395,7 @@ describe('Analytics', () => {
     const { container } = render(<Analytics {...fullProps()} jobs={[]} />)
     expect(
       container.querySelector('[data-panel-slot="salary"]')!.className
-    ).not.toContain('md:col-span-2')
+    ).not.toContain('xl:col-span-2')
     // It is still on the page, saying it is empty.
     expect(screen.getByRole('heading', { name: 'salary insights' })).toBeTruthy()
   })

@@ -55,10 +55,14 @@ beforeEach(() => {
 afterEach(() => cleanup())
 
 describe('Documents route wrapper', () => {
-  it('shows a spinner while the CVs are loading', () => {
+  it('shows a route skeleton while the CVs are loading', async () => {
     useResumesMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
-    const { container } = render(<Page />)
-    expect(container.querySelector('[role="status"]')).toBeTruthy()
+    render(<Page />)
+    // `findBy`, not `queryBy`: the route skeleton sits behind a 200ms gate
+    // (see ui/loading-skeletons) so a warm navigation never flashes a fake
+    // page for one frame. Nothing is in the DOM at t=0 BY DESIGN, and an
+    // immediate assertion was testing the absence of that gate.
+    expect(await screen.findByRole('status')).toBeTruthy()
   })
 
   it('says the read failed rather than falling through to the no-CVs state', () => {

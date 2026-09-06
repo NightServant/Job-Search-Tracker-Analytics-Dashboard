@@ -49,13 +49,48 @@ export function PageHeader({
     // a 176px select plus the gap does not fit on one line, and without this
     // the two simply overlap the edge. Wrapping puts the control on its own
     // line, which is what the tier map asks for below 640 anyway.
-    <div data-body-header className={cn('flex min-w-0 flex-col gap-1', className)} {...props}>
-      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <h1 className="min-w-0 text-display-m text-text-primary">{title}</h1>
-        {action}
+    // `gap-1` is right for a title sitting directly above its own sentence.
+    // It is NOT right once a full-width button joins the column below them:
+    // 4px between a description and a primary CTA reads as one crowded block
+    // rather than a heading, its explanation, and an action.
+    //
+    // Written mobile-first -- roomier base, tightened from `sm` -- rather than
+    // as a `max-sm` override, matching CardHeader. Measured at 320px: 8px
+    // title-to-description and 16px description-to-action, against 4px and
+    // 4px before.
+    <div
+      data-body-header
+      className={cn('flex min-w-0 flex-col gap-2 sm:gap-1', className)}
+      {...props}
+    >
+      {/* ON A PHONE THE READING ORDER IS TITLE, DESCRIPTION, ACTION (Gabe,
+          2026-09-06). It used to be title, action, description, which put a
+          full-width primary button between a heading and the sentence
+          explaining it -- the button interrupted its own explanation.
+          `max-sm:contents` makes this row stop generating a box below 640, so
+          its two children become items of the outer column and `order` can
+          place them around the description. From `sm` it is the original row
+          again, unchanged.
+
+          NOTE: no sizing rules here. An earlier pass put `flex-col` on
+          `[&>*:last-child]` to stack a pair of buttons, which on
+          /applications -- where the slot is a single Button -- stacked that
+          button's OWN icon above its own label. The slot is deliberately
+          untyped, so the caller sizes what the caller passed. */}
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 max-sm:contents">
+        <h1 className="min-w-0 text-display-m text-text-primary max-sm:order-1">{title}</h1>
+        {action ? (
+          // The extra `mt-2` is what separates the two RELATIONSHIPS in this
+          // column: the description belongs to the title, the action does not
+          // belong to either. A uniform gap says all three are one thing.
+          <div className="min-w-0 max-sm:order-3 max-sm:mt-2 max-sm:w-full">{action}</div>
+        ) : null}
       </div>
       {description ? (
-        <p data-page-description className="max-w-prose text-body-s text-text-muted">
+        <p
+          data-page-description
+          className="max-w-prose text-body-s text-text-muted max-sm:order-2"
+        >
           {description}
         </p>
       ) : null}
