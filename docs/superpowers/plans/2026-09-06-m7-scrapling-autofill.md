@@ -25,11 +25,36 @@ Two defects fell out of building it, both fixed and both shipped:
   form could not read it. The parity test is what found it.
 - **JobsDB was on the blocked list and is not blocked.** See Task 8 below.
 
-Not done, and deliberately: **Task 1 (the Vercel Services deployment), Task 6
-(the `/api/autofill` route and the client switch) and Task 9 (the cutover).**
-Those change production infrastructure and need the decision at the foot of
-this section. The Deno function is still the live path and is untouched apart
-from the JobsDB correction.
+**Tasks 1 and 6 are now done too, and deployed.**
+
+Task 1's gate was answered by a branch spike rather than by reading: Vercel
+Services WORKS on this Hobby account. The build log reads `Using Python 3.13
+from scraper/.python-version` and `Creating virtual environment at
+.../python/services/extractor/.venv`, and the deployment reports
+`{"nodejs":4,"python":1}` where every previous one reported `{"nodejs":4}`. It
+also settled the second unknown: `web` rooted at `.` is accepted while
+`extractor` is rooted at `scraper/` INSIDE it, which the docs' sibling-directory
+example did not cover.
+
+Verified on production after the merge:
+
+| probe | result | what it proves |
+|---|---|---|
+| `POST /api/autofill`, no token | `401 {"error":"Sign in to use this."}` | the route exists and authenticates |
+| `GET /health` | **404** | the extractor has no public route |
+| `GET /` | 200 | the site is unaffected |
+
+**STILL UNVERIFIED BY ME: the binding at runtime.** Whether `EXTRACTOR_URL` is
+injected and reachable can only be seen from an authenticated request, and I
+cannot sign in. One signed-in click of Auto-fill settles it. If the binding is
+missing the route answers `503 "Auto-fill is not configured for this
+deployment."` rather than failing obscurely, and `git revert -m 1` on the merge
+puts Auto-fill back on the Deno function, which is still deployed.
+
+**Task 9 (deleting the edge function) is deliberately NOT done** until that
+click happens. Task 7's live canary is also not armed: it makes scheduled
+requests to third parties and is not worth arming until the path it guards is
+confirmed.
 
 **Supersedes** `2026-09-05-m7-scrapy-autofill.md` (deleted). Scrapy lost; the comparison is recorded in `docs/INTEGRATIONS.md` so it is not re-argued.
 
