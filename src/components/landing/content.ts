@@ -66,9 +66,18 @@ export const HERO = {
 export const NAV_LINKS = [
   // #solution, not #how-it-works: Section derives its id from its `name`, so
   // the anchor, the rail's target and the scroll tracking are all one string.
-  { label: 'how it works', href: '#solution', external: false },
-  { label: 'faq', href: '#faq', external: false },
-  { label: 'open source', href: REPO_URL, external: true },
+  //
+  // `icon` is read by the MOBILE MENU ONLY (Gabe, 2026-09-06). The desktop bar
+  // is three words on one line where a glyph would be noise; the mobile panel
+  // is three rows in a sheet, which is the shape a glyph helps you scan.
+  //
+  // Each one NAMES its destination rather than decorating the row, which is
+  // this app's rule for icons: `Play` is the walkthrough the link scrolls to,
+  // `Info` is a page of answers, `Code` is a repository. None of them is a
+  // picture chosen because the row looked bare.
+  { label: 'how it works', href: '#solution', external: false, icon: 'Play' },
+  { label: 'faq', href: '#faq', external: false, icon: 'Info' },
+  { label: 'open source', href: REPO_URL, external: true, icon: 'Code' },
 ] as const
 
 /**

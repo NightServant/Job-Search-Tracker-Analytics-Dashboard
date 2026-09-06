@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import { scrollToSection } from '@/lib/scrollToSection'
 import { BrandLockup } from '@/components/ui/brand-mark'
-import { CloseIcon, MenuIcon } from '@/components/icons'
+import { CloseIcon, MenuIcon, icons } from '@/components/icons'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { NAV_LINKS } from './content'
 
@@ -240,30 +240,52 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
           id="landing-mobile-nav"
           data-nav-mobile-panel
           className={cn(
-            'fixed inset-x-0 top-[60px] z-40 flex flex-col gap-1 border-b border-border-subtle',
-            'bg-bg-canvas px-gutter pb-6 pt-2 md:hidden'
+            'fixed inset-x-0 top-[60px] z-40 flex flex-col gap-1 border-b',
+            'px-gutter pb-6 pt-2 md:hidden',
+            // THE PANEL FOLLOWS THE BAR (Gabe, 2026-09-06). Over the hero the
+            // bar is light-on-dark and the panel dropped out of it white,
+            // which read as a different application appearing on top of the
+            // page rather than as the bar opening.
+            //
+            // OPAQUE IN BOTH STATES, and that part is unchanged: `#050507` is
+            // the hero's own base colour, the one its scrim runs from. The
+            // note that used to sit here argued against a TRANSLUCENT panel
+            // over video -- links that stop being readable -- and that
+            // argument still holds. This swaps the ground, not the opacity.
+            overHero
+              ? 'border-white/10 bg-[#050507] text-[#fafafa]'
+              : 'border-border-subtle bg-bg-canvas text-text-primary'
           )}
         >
-          {/*
-            Opaque `bg-bg-canvas` even when the bar above it is transparent
-            over the hero. A translucent panel over video is the case where
-            these links stop being readable, and this panel exists because
-            they were unreachable -- swapping unreachable for illegible is not
-            a fix.
-          */}
-          {NAV_LINKS.map((link) => (
-            <Link
-              key={link.label}
-              href={link.href}
-              {...(link.external
-                ? { target: '_blank', rel: 'noreferrer noopener' }
-                : { onClick: linkHandler(link.href) })}
-              onClickCapture={() => link.external && setMenuOpen(false)}
-              className="rounded-md px-2 py-3 text-body-l text-text-primary hover:bg-bg-inset"
-            >
-              {link.label}
-            </Link>
-          ))}
+          {NAV_LINKS.map((link) => {
+            const Icon = icons[link.icon]
+            return (
+              <Link
+                key={link.label}
+                href={link.href}
+                {...(link.external
+                  ? { target: '_blank', rel: 'noreferrer noopener' }
+                  : { onClick: linkHandler(link.href) })}
+                onClickCapture={() => link.external && setMenuOpen(false)}
+                className={cn(
+                  // `min-h-11` so each row is a 44px target. The panel is
+                  // reached by a thumb and nothing else.
+                  'flex min-h-11 items-center gap-3 rounded-md px-2 py-3 text-body-l',
+                  overHero
+                    ? 'text-[#fafafa] hover:bg-white/10'
+                    : 'text-text-primary hover:bg-bg-inset'
+                )}
+              >
+                <Icon
+                  size={18}
+                  aria-hidden
+                  data-nav-link-glyph
+                  className={cn('shrink-0', overHero ? 'text-white/60' : 'text-text-muted')}
+                />
+                {link.label}
+              </Link>
+            )
+          })}
         </div>
       )}
     </header>
