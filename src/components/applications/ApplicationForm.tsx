@@ -218,6 +218,14 @@ export function ApplicationForm({
       if (!role.trim() && values.role) setRole(values.role)
       if (!location.trim() && values.location) setLocation(values.location)
       if (!source.trim() && values.source) setSource(values.source)
+      // `work_mode` was extracted and thrown away for as long as auto-fill has
+      // existed -- the type did not declare it, so this line could not be
+      // written. Guarded against the union rather than trusted: it arrives
+      // from a remote page, and an unrecognised string would put the select
+      // into a state none of its options match.
+      if (!workMode && values.work_mode && WORK_MODES.some((m) => m.value === values.work_mode)) {
+        setWorkMode(values.work_mode)
+      }
       if (!salaryMin.trim() && values.salary_min != null) setSalaryMin(String(values.salary_min))
       if (!salaryMax.trim() && values.salary_max != null) setSalaryMax(String(values.salary_max))
       setAutofillNote(

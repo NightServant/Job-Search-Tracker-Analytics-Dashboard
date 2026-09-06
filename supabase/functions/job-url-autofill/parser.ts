@@ -31,9 +31,20 @@ export interface AutofillResponse {
  * description field both take pasted text, and a browser that is already past
  * the challenge is the only thing on the user's side that can read the page.
  */
+/**
+ * RE-MEASURED 2026-09-06 (M7 Task 8). JobsDB came OFF this list: it answered a
+ * plain server-side fetch with 950KB of real HTML and a real title, from the
+ * same headers below. Leaving it here refused a site we can read, which is the
+ * failure the test at the bottom of this file already guards in the other
+ * direction.
+ *
+ * JobStreet is unchanged -- still 403 with Cloudflare's "Just a moment...".
+ * SEEK is unchanged in BEHAVIOUR and corrected in DESCRIPTION: it 403s with
+ * its own page, not an interstitial, so the status is the refusal and there is
+ * no challenge to solve.
+ */
 const CHALLENGED_HOSTS: { match: RegExp; name: string }[] = [
   { match: /(^|\.)jobstreet\.com(\.[a-z]{2})?$/i, name: 'JobStreet' },
-  { match: /(^|\.)jobsdb\.com$/i, name: 'JobsDB' },
   { match: /(^|\.)seek\.com(\.[a-z]{2})?$/i, name: 'SEEK' },
 ]
 

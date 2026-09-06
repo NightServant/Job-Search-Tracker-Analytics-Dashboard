@@ -325,8 +325,13 @@ describe('sites that answer a fetch with a bot challenge', () => {
   it('recognises the APAC sites that block server-side reads', () => {
     expect(challengedSiteName('ph.jobstreet.com')).toBe('JobStreet')
     expect(challengedSiteName('www.jobstreet.com.ph')).toBe('JobStreet')
-    expect(challengedSiteName('hk.jobsdb.com')).toBe('JobsDB')
     expect(challengedSiteName('www.seek.com.au')).toBe('SEEK')
+    // JOBSDB CAME OFF THE LIST, re-measured 2026-09-06 (M7 Task 8): it answers
+    // a plain server-side fetch with 950KB of real HTML and a real title, from
+    // the same headers that JobStreet still refuses. Labelling it as blocking
+    // refused a site we can read -- the same failure the next assertion guards
+    // in the other direction.
+    expect(challengedSiteName('hk.jobsdb.com')).toBeNull()
     // A site that does NOT block must not be labelled as one, or the app would
     // stop trying to read pages it can read perfectly well.
     expect(challengedSiteName('boards.greenhouse.io')).toBeNull()

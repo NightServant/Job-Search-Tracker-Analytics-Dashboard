@@ -1,0 +1,32 @@
+name: extractor
+
+# The offline half of M7's automation: the fixture-locked suite, on every push
+# that touches the extractor. Deterministic and network-free -- every test is a
+# pure function of (url, html), which is why `extract()` is separate from the
+# fetching in app.py.
+#
+# The live canary is deliberately NOT here yet. It makes real requests to third
+# parties on a schedule, and it is not worth arming until the service it guards
+# is actually deployed.
+on:
+  push:
+    paths: ['scraper/**', '.github/workflows/scraper.yml', 'src/types/index.ts']
+  pull_request:
+    paths: ['scraper/**', '.github/workflows/scraper.yml', 'src/types/index.ts']
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version-file: scraper/.python-version
+      - name: install
+        run: pip install -e './scraper[dev]'
+      # `src/types/index.ts` is in the path filter above because
+      # tests/test_contract.py reads it: the field sets on the two sides of the
+      # wire must not drift, and a change to the TypeScript alone is exactly
+      # how they would.
+      - name: pytest
+        run: cd scraper && python -m pytest -q

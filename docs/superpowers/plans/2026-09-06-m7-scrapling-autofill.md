@@ -4,7 +4,32 @@
 
 **Goal:** Replace the regex-over-HTML extractor behind the Auto-fill button with Scrapling, so extraction runs against a real DOM with adaptive selectors, every supported site has a fixture-locked test plus a nightly live canary, and `docs/INTEGRATIONS.md` states measured per-site coverage generated from that canary.
 
-**Status:** PLAN ONLY. Nothing implemented, no branch.
+**Status, 2026-09-06: THE EXTRACTOR IS BUILT. THE DEPLOYMENT IS NOT.**
+
+Done, with 49 passing Python tests:
+
+- `scraper/` -- Scrapling 0.4.15 pinned, core only (7 packages, no browser).
+- `extractor/` -- schema, normalisers, the SSRF gate, the challenge handling,
+  a generic JSON-LD/OpenGraph extractor and four board heuristics, all behind
+  `Page`, the one module that touches Scrapling.
+- **All twenty of the Deno parser's cases ported and passing**, plus the SSRF
+  gate and a TS-to-Python field-parity test.
+- `app.py` -- the FastAPI service. Written, imports, not deployed.
+- `.github/workflows/scraper.yml` -- the offline suite on every push.
+
+Two defects fell out of building it, both fixed and both shipped:
+
+- **`work_mode` was extracted and thrown away.** The Deno parser had computed
+  it since it shipped -- from `jobLocationType` and from page text, with a
+  confidence score -- and `JobAutofillResult` never declared the field, so the
+  form could not read it. The parity test is what found it.
+- **JobsDB was on the blocked list and is not blocked.** See Task 8 below.
+
+Not done, and deliberately: **Task 1 (the Vercel Services deployment), Task 6
+(the `/api/autofill` route and the client switch) and Task 9 (the cutover).**
+Those change production infrastructure and need the decision at the foot of
+this section. The Deno function is still the live path and is untouched apart
+from the JobsDB correction.
 
 **Supersedes** `2026-09-05-m7-scrapy-autofill.md` (deleted). Scrapy lost; the comparison is recorded in `docs/INTEGRATIONS.md` so it is not re-argued.
 
@@ -223,7 +248,33 @@ One fixture set and one test file each, TDD, before the module.
 - [ ] Then assert the **failure** direction: delete the element entirely and confirm extraction reports it missing rather than relocating onto something plausible-but-wrong. A silent wrong answer is worse than a warning.
 - [ ] **Gate:** both directions covered by tests. If the second cannot be made to pass, `adaptive` goes off and this task records why.
 
-### Task 8 — The challenged hosts: measure, then decide whether a browser lane exists
+### Task 8 — DONE, 2026-09-06, and it changed the answer
+
+Measured from a residential PH connection with the service's own browser
+headers, on `/` and `/jobs` for each:
+
+| site | status | body | verdict |
+|---|---|---|---|
+| JobStreet | 403 | 6KB, `Just a moment...`, Cloudflare markers | **blocked** |
+| **JobsDB** | **200** | **950KB, `<title>Jobs in Hong Kong ...`** | **NOT blocked** |
+| SEEK | 403 | 50KB, SEEK's own page, no CF marker | **blocked (403, not a challenge)** |
+| Greenhouse | 200 | 190KB | control -- proves the client, not the sites |
+
+**JobsDB came off the blocked list, in both implementations.** It answers a
+plain server-side fetch with real HTML. Leaving it there refused a site the app
+can read, which is the exact failure `parser.ts`'s own test already guards in
+the other direction: "a site that does NOT block must not be labelled as one".
+
+**SEEK's description was wrong and its behaviour is unchanged.** It is a 403
+with SEEK's own page, not a Cloudflare interstitial. The status is the refusal
+either way; calling it Cloudflare would send the next person hunting for a
+challenge that is not there.
+
+**The browser lane was NOT attempted.** Decision 2 was never answered, and
+trying TLS impersonation or a headless browser against a site that is refusing
+us is not something to do on an assumption.
+
+### Task 8 (original text) — measure, then decide whether a browser lane exists
 - [ ] Run `Fetcher` against JobStreet, JobsDB and SEEK from a GitHub runner (a different egress from Supabase's — worth one data point, since 2026-09-05's measurement came from one network). Record status, `content-type`, first 200 bytes.
 - [ ] Per Decision 2, then try `StealthyFetcher`. **This is the test of the claim M7 was chosen on.**
 - [ ] **This task is allowed to conclude "still blocked."** If it does: no browser lane is built, `CHALLENGED_HOSTS` ports across unchanged, and `INTEGRATIONS.md` gains a second dated measurement — which is stronger evidence than one.

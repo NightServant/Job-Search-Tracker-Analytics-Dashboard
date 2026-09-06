@@ -56,3 +56,10 @@ tsconfig.tsbuildinfo
 # Written by the session-bridge plugin per project; a per-session pointer,
 # not configuration. `.claude/` is otherwise tracked here (launch.json).
 .claude/bridge-session
+
+# The extractor's own Python environment (M7). `venv/` at the repo root is a
+# separate scratch environment holding matplotlib/pandas and is NOT this.
+scraper/.venv/
+scraper/**/__pycache__/
+scraper/.pytest_cache/
+*.pyc

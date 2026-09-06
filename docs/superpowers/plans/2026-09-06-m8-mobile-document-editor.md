@@ -1,6 +1,24 @@
 # M8 — Word-first Documents on tablet and mobile
 
-**Status:** PLAN ONLY. Part 1 (the /applications flex-column restructure) is implemented and verified; this is the second half of Gabe's 2026-09-06 brief.
+**Status: BUILT AND SHIPPED, 2026-09-06.** Every task below is implemented, tested and deployed. Kept as the record of why the shape is what it is; the open questions at the foot were answered and the answers are recorded inline.
+
+**As built, differing from the plan in three places:**
+
+1. **Desktop `/documents` did NOT change.** The plan recommended changing all
+   widths; Gabe said no. So the template rail stays on desktop and only below
+   `lg` does the screen lead with recents plus a CTA.
+2. **LaTeX is removed below `lg`, not made read-only.** The plan proposed a
+   read-only viewer with an export. Gabe: "Remove anything related to LaTeX
+   editor and viewer." Existing LaTeX CVs still LIST -- hiding them reads as
+   data loss -- and say they open on a larger screen.
+3. **The action sheet grew a layout the plan did not anticipate**: one column
+   on a phone, three tracks from `sm` for the exports, and save beside delete.
+   That came out of three rounds of Gabe looking at it.
+
+Also unplanned and found on the way: `tabs.tsx` matched `data-horizontal:`
+against base-ui's `data-orientation="horizontal"`, so every orientation rule
+had always been dead; and `sheet.tsx` reserved no space for its own close
+button. Both were fixed in the primitives, so every consumer got the fix.
 
 **Goal:** Below `lg`, Documents becomes a Word-shaped surface: recents first, a CTA to a Templates page, and a full-screen editor modelled on Word mobile — with AI tailoring and the CV check still reachable. LaTeX disappears below `lg`.
 

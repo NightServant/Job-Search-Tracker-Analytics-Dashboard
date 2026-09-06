@@ -1,0 +1,30 @@
+[project]
+name = "worktrack-extractor"
+version = "0.1.0"
+description = "Job posting extraction for Worktrack's Auto-fill button."
+requires-python = ">=3.12"
+
+# PINNED EXACTLY, and that is the mitigation for the one real risk in choosing
+# Scrapling: it is 0.4.15, pre-1.0, and its API can move. The other half of the
+# mitigation is the boundary in extractor/core.py -- Scrapling types never
+# leave that module, so an upgrade is a diff in one file rather than a hunt.
+#
+# NO `[fetchers]` EXTRA. That pulls curl_cffi, playwright, patchright and
+# browserforge: hundreds of MB for a browser this lane never opens. The HTTP
+# fetch is httpx, which is already what a serverless function can afford. The
+# browser fetchers belong to the container lane, if Task 8 ever justifies one.
+dependencies = [
+  "scrapling==0.4.15",
+  "httpx>=0.27",
+  "fastapi>=0.115",
+  "uvicorn>=0.30",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+
+[tool.vercel]
+entrypoint = "app:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -141,10 +141,19 @@ export const STATUS_CONFIG: Record<JobStatus, { label: string; color: string; bg
 // View mode for jobs page
 export type ViewMode = 'list' | 'kanban';
 
+/**
+ * `work_mode` WAS MISSING HERE, and the extractor has been computing it since
+ * the Deno function shipped -- with a confidence score, from JSON-LD's
+ * `jobLocationType` and from the page text. The type never declared it, so the
+ * form could not read it and silently dropped it on every auto-fill. Found by
+ * M7's field-parity test, which compares this list against the extractor's own
+ * (see scraper/tests/test_contract.py); the two can no longer disagree.
+ */
 export type JobAutofillField =
   | 'company'
   | 'role'
   | 'location'
+  | 'work_mode'
   | 'source'
   | 'salary_min'
   | 'salary_max'
@@ -154,7 +163,14 @@ export interface JobAutofillResult {
   values: Partial<
     Pick<
       JobFormData,
-      'company' | 'role' | 'location' | 'source' | 'salary_min' | 'salary_max' | 'url'
+      | 'company'
+      | 'role'
+      | 'location'
+      | 'work_mode'
+      | 'source'
+      | 'salary_min'
+      | 'salary_max'
+      | 'url'
     >
   >;
   confidence: Partial<Record<JobAutofillField, number>>;

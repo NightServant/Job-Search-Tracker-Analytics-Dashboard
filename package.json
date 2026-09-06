@@ -16,7 +16,9 @@
     "start": "next start",
     "push:auth-config": "bash scripts/push-auth-config.sh",
     "verify:domain": "bash scripts/verify-sending-domain.sh",
-    "composio:session": "bash scripts/composio-session.sh"
+    "composio:session": "bash scripts/composio-session.sh",
+    "test:scraper": "cd scraper && .venv/bin/python -m pytest -q",
+    "setup:scraper": "python3.13 -m venv scraper/.venv && scraper/.venv/bin/pip install -e 'scraper[dev]'"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
