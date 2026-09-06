@@ -91,13 +91,24 @@ describe('NavItem', () => {
     expect(container.querySelector('[data-nav-index]')).toBeNull()
   })
 
-  it('keeps the bottom bar target at 44px', () => {
+  it('keeps the bottom bar target at 48px, not the 44px floor', () => {
+    // Raised from 44 on Gabe's instruction (2026-09-06). 44 is the MINIMUM an
+    // input device needs -- index.css states it as a property of `pointer:
+    // coarse` rather than of a breakpoint -- and a minimum is not a size to
+    // design to. This bar is the app's only navigation below `lg` and every
+    // destination in it is reached with a thumb.
+    //
+    // BOTH AXES, deliberately: a target 48 tall and 44 wide passes on one axis
+    // and fails the point, which is what the original pair was already
+    // guarding against.
     const { container } = render(
       <NavItem href="/jobs" label="Jobs" icon="Applications" variant="bottom" />
     )
     const cls = container.querySelector('a')!.className
-    expect(cls).toContain('h-11')
-    expect(cls).toContain('min-w-11')
+    expect(cls).toContain('h-12')
+    expect(cls).toContain('min-w-12')
+    // Verified in the browser at 320, 375, 768 and 1023: every item measures
+    // 48px tall, and the bar is absent at 1440 where the sidebar takes over.
   })
 })
 

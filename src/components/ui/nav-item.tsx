@@ -118,7 +118,18 @@ export function NavItem({
           ? 'text-accent-default'
           : 'text-text-secondary group-focus-visible:text-accent-default hover:text-text-primary focus-visible:text-accent-default',
         bottom
-          ? 'h-11 min-w-11 flex-1 flex-col justify-center gap-1'
+          // 48px, not the 44px floor (Gabe, 2026-09-06). 44 is the MINIMUM an
+          // input device needs -- the `pointer: coarse` rule in index.css
+          // states it as a property of the device rather than of the screen --
+          // and a minimum is not a target to design to. This bar is the app's
+          // only navigation below `lg` and every destination in it is reached
+          // with a thumb, so it gets the comfortable size rather than the
+          // legal one.
+          //
+          // `min-w-12` with it: a target 48 tall and 44 wide is a rectangle
+          // that passes on one axis, which is the shape the original pair was
+          // already avoiding.
+          ? 'h-12 min-w-12 flex-1 flex-col justify-center gap-1'
           : rail
             ? 'h-9 w-9'
             : 'h-9 pr-4',
