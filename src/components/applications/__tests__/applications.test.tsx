@@ -801,3 +801,58 @@ describe('the status filter', () => {
     expect(list.className).toContain('group-data-[orientation=horizontal]/tabs:h-auto')
   })
 })
+
+describe('the open record follows the list', () => {
+  /**
+   * THE BUG, 2026-09-06: "saved the application, new data is not rendering
+   * immediately."
+   *
+   * The dialog held the whole `Job` in state, so it was a snapshot taken when
+   * it opened. Saving invalidated the query, fresh rows arrived through the
+   * `jobs` prop a moment later, and the dialog carried on showing the copy it
+   * had. The save had worked; the view had not moved.
+   *
+   * Nothing in 1653 tests caught it, because every one of them rendered the
+   * dialog once against a list that never changed underneath it. These
+   * exercise the thing that actually happens: the list updates while a record
+   * is open.
+   */
+  const openFirst = async (jobs: Job[]) => {
+    const view = render(<ApplicationsPage jobs={jobs} />)
+    await userEvent.click(screen.getByText('Initech'))
+    return view
+  }
+
+  it('shows values that arrive after the record was opened', async () => {
+    const before = [makeJob({ id: '1', status: 'applied', company: 'Initech', location: null })]
+    const { rerender } = await openFirst(before)
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+
+    // What a refetch after a save looks like from this component's side.
+    const after = [makeJob({ id: '1', status: 'applied', company: 'Initech', location: 'Pasig City' })]
+    rerender(<ApplicationsPage jobs={after} />)
+
+    expect(await screen.findByText('Pasig City')).toBeInTheDocument()
+  })
+
+  it('follows a company rename without being told', async () => {
+    const { rerender } = await openFirst([makeJob({ id: '1', status: 'applied', company: 'Initech' })])
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+
+    rerender(<ApplicationsPage jobs={[makeJob({ id: '1', status: 'applied', company: 'Initrode' })]} />)
+    await waitFor(() => {
+      expect(within(screen.getByRole('dialog')).getByText('Initrode')).toBeInTheDocument()
+    })
+  })
+
+  it('closes when the open row disappears from the list', async () => {
+    // Already true before the change, and worth keeping: deriving the row
+    // means a deleted one renders as nothing rather than as a stale record
+    // with a live edit button.
+    const { rerender } = await openFirst([makeJob({ id: '1', status: 'applied', company: 'Initech' })])
+    expect(await screen.findByRole('dialog')).toBeTruthy()
+
+    rerender(<ApplicationsPage jobs={[]} />)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+})

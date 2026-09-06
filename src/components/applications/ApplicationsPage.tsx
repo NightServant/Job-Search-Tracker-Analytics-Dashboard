@@ -34,10 +34,21 @@ interface CsvImport {
 }
 
 /**
- * What the record dialog is showing. `job: null` is a new application, which
+ * What the record dialog is showing. `id: null` is a new application, which
  * exists only in `edit` -- there is nothing to view until it is saved.
+ *
+ * AN ID, NOT THE ROW. It used to hold the whole `Job`, which made the dialog a
+ * SNAPSHOT taken when it opened: saving an edit invalidated the query, fresh
+ * rows arrived through `jobs` a moment later, and the dialog carried on
+ * showing the copy it had. Gabe saw it as "saved the application, new data is
+ * not rendering immediately" (2026-09-06) -- the save had worked, the view had
+ * not moved.
+ *
+ * Holding only the id means the row is derived on every render, so any change
+ * to `jobs` -- a save here, a refetch, an edit in another tab -- reaches the
+ * open dialog without anyone having to remember to push it there.
  */
-type RecordState = { job: Job | null; mode: 'view' | 'edit' } | null
+type RecordState = { id: string | null; mode: 'view' | 'edit' } | null
 
 /**
  * M5 Task 4's removed pagination was 20 a page. Ten instead: at twenty, an
@@ -176,8 +187,11 @@ export function ApplicationsPage({
   const [skipDuplicates, setSkipDuplicates] = React.useState(true)
   const [parsingCsv, setParsingCsv] = React.useState(false)
 
+  // DERIVED, never stored. See RecordState for what storing it cost.
+  const openJob = open?.id ? (jobs.find((candidate) => candidate.id === open.id) ?? null) : null
+
   const openRecord = (job: Job | null, mode: 'view' | 'edit') => {
-    setOpen({ job, mode })
+    setOpen({ id: job?.id ?? null, mode })
     // Told, not derived. The route runs the record's four reads against this
     // id, and it can only do that if it is informed the moment the selection
     // changes rather than by watching a prop it does not own.
@@ -223,11 +237,11 @@ export function ApplicationsPage({
   // it fires, `dismiss` sets `open` to null and the next run returns at the
   // first line, so there is no loop.
   React.useEffect(() => {
-    const openId = open?.job?.id
+    const openId = open?.id
     if (!openId) return
     if (!jobs.some((candidate) => candidate.id === openId)) dismiss()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobs, open?.job?.id])
+  }, [jobs, open?.id])
 
   // `?application=<id>` from the desktop redirect off `/applications/<id>`.
   // Runs once per id: re-running it on every render of `jobs` would reopen
@@ -239,7 +253,7 @@ export function ApplicationsPage({
     const job = jobs.find((candidate) => candidate.id === initialOpenId)
     if (!job) return
     openedInitial.current = initialOpenId
-    setOpen({ job, mode: 'view' })
+    setOpen({ id: job.id, mode: 'view' })
     onOpenJobChange?.(job)
     // `jobs` is the only other value read, and it is here so a deep link that
     // arrives before the list has loaded still opens once it has.
@@ -368,7 +382,7 @@ export function ApplicationsPage({
     // onCreate/onUpdate resolve to false on a caught failure rather than
     // throwing, so a rejected save leaves the panel open with every typed
     // field intact instead of discarding them behind a toast.
-    const editingJob = open?.job ?? null
+    const editingJob = openJob
     const ok = editingJob
       ? await onUpdate?.(editingJob.id, data, resumeChoice)
       : await onCreate?.(data, resumeChoice)
@@ -387,8 +401,10 @@ export function ApplicationsPage({
       // It re-reads `job` from the incoming `jobs` prop rather than keeping
       // the stale row it opened with: the mutation has already invalidated
       // that cache, so the fresh row is on its way down through props.
-      const fresh = jobs.find((candidate) => candidate.id === editingJob.id) ?? editingJob
-      setOpen({ job: fresh, mode: 'view' })
+      // Just the mode. The row itself is derived from `jobs`, so the saved
+      // values appear the moment the refetch lands -- which is the whole
+      // reason this state holds an id rather than a copy of the row.
+      setOpen({ id: editingJob.id, mode: 'view' })
       return
     }
     // A NEW application has no record to fall back to, so it closes.
@@ -418,7 +434,7 @@ export function ApplicationsPage({
         onOpenChange={(next) => {
           if (!next) closeRecord()
         }}
-        job={open?.job ?? null}
+        job={openJob}
         mode={open?.mode ?? 'view'}
         onModeChange={(mode) => setOpen((prev) => (prev ? { ...prev, mode } : prev))}
         data={record}
@@ -434,7 +450,7 @@ export function ApplicationsPage({
         // prompt, exactly as it behaved before the dialog existed.
         onCancelEdit={() => {
           setFormDirty(false)
-          if (open?.job) setOpen({ job: open.job, mode: 'view' })
+          if (open?.id) setOpen({ id: open.id, mode: 'view' })
           else dismiss()
         }}
         onDelete={onDelete}

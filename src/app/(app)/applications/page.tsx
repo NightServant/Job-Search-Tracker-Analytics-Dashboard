@@ -74,11 +74,22 @@ function ApplicationsRoute() {
   // needs the row's `description`, and holding the row avoids a second lookup
   // through `jobs` on every render.
   const [openJob, setOpenJob] = React.useState<Job | null>(null)
-  const record = useApplicationRecord(openJob?.id, openJob?.description)
+  // THE SAME SNAPSHOT PROBLEM AS THE SCREEN'S OWN, one level up. `openJob` is
+  // the row as it was when the dialog opened; `useApplicationRecord` reads the
+  // DESCRIPTION off it to score the ATS match. Save a description and the
+  // match would keep scoring against the old one -- part of what Gabe saw as
+  // "new data is not rendering immediately" (2026-09-06).
+  //
+  // Only the id is really being held; the row is re-read from the list every
+  // render, so a save, a refetch or an edit in another tab all reach it.
+  const liveOpenJob = openJob
+    ? (jobs.find((candidate) => candidate.id === openJob.id) ?? openJob)
+    : null
+  const record = useApplicationRecord(liveOpenJob?.id, liveOpenJob?.description)
   // The CVs offered by the form's "CV submitted" field, and whichever one is
   // already pinned to the row that is open.
   const { data: resumes = [] } = useResumes()
-  const { data: openLinks = [] } = useDocumentLinks(openJob?.id)
+  const { data: openLinks = [] } = useDocumentLinks(liveOpenJob?.id)
   const pinLink = usePinDocumentLink()
   const unpinLink = useUnpinDocumentLink()
 
