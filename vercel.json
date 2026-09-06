@@ -1,4 +1,23 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": "nextjs"
+  "services": {
+    "web": {
+      "root": ".",
+      "framework": "nextjs",
+      "bindings": [
+        {
+          "type": "service",
+          "service": "extractor",
+          "format": "url",
+          "env": "EXTRACTOR_URL"
+        }
+      ]
+    },
+    "extractor": {
+      "root": "scraper/",
+      "framework": "fastapi",
+      "entrypoint": "app:app"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": { "service": "web" } }]
 }
