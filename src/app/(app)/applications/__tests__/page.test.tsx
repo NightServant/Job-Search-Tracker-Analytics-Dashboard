@@ -43,9 +43,16 @@ vi.mock('@/contexts/ToastContext', () => ({
 // record's own behaviour is covered in detail.test.tsx -- but they have to be
 // stubbed, or importing them drags in the real Supabase client.
 vi.mock('@/hooks/useActivity', () => ({ useActivity: () => ({ data: [], isLoading: false }) }))
+// The route now also writes CV links -- the "CV submitted" field on the form
+// pins a row in `application_documents` after the application itself saves.
 vi.mock('@/hooks/useDocumentLinks', () => ({
   useDocumentLinks: () => ({ data: [], isLoading: false }),
+  useResumeLinks: () => ({ data: [], isLoading: false }),
+  usePinDocumentLink: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useUnpinDocumentLink: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
+// The form's "CV submitted" field offers the user's CVs.
+vi.mock('@/hooks/useResumes', () => ({ useResumes: () => ({ data: [], isLoading: false }) }))
 vi.mock('@/hooks/useJobEvents', () => ({ useJobEvents: () => ({ data: [], isLoading: false }) }))
 vi.mock('@/hooks/useCvText', () => ({ useCvText: () => ({ data: undefined }) }))
 

@@ -7,6 +7,23 @@ export interface DocumentLinkSummary {
 }
 
 /**
+ * The other direction: one application a CV was submitted to.
+ *
+ * A separate type rather than a widened `DocumentLinkSummary`, because the two
+ * answer different questions and carry different fields -- this one has no
+ * snapshot version (the editor is showing the CV as it is now, not as it was)
+ * and does carry the company and role, which is the whole point of it.
+ */
+export interface ResumeLinkSummary {
+  job_id: string
+  company: string
+  role: string
+  /** The application's pipeline status, or null if the row went missing. */
+  status: string | null
+  sent_at: string
+}
+
+/**
  * Formats a DATE column for display.
  *
  * Read entirely in UTC. `sent_at` is a bare DATE, which parses as UTC midnight,
@@ -28,4 +45,14 @@ function formatSentDate(iso: string): string {
 export function describeLink(link: DocumentLinkSummary): string {
   const version = link.version === null ? 'latest' : `version ${link.version}`
   return `${link.title} · ${version} · sent ${formatSentDate(link.sent_at)}`
+}
+
+/**
+ * One-line summary of an application a CV went to, for the editor's dropdown.
+ *
+ * Role first, then company: a person with four CVs open is scanning for the
+ * ROLE they tailored one against, and the company is the disambiguator.
+ */
+export function describeResumeLink(link: ResumeLinkSummary): string {
+  return `${link.role} · ${link.company} · sent ${formatSentDate(link.sent_at)}`
 }

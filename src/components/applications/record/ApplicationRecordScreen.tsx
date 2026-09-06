@@ -56,6 +56,10 @@ export interface ApplicationRecordScreenProps {
   onDelete?: (job: Job) => void
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   autofilling?: boolean
+  /** For the form's "CV submitted" field. See ApplicationForm. */
+  resumes?: { id: string; title: string }[]
+  linkedResumeId?: string | null
+  onLinkedResumeChange?: (resumeId: string | null) => void
 }
 
 export function ApplicationRecordScreen({
@@ -70,6 +74,9 @@ export function ApplicationRecordScreen({
   onDelete,
   onAutofill,
   autofilling = false,
+  resumes,
+  linkedResumeId,
+  onLinkedResumeChange,
 }: ApplicationRecordScreenProps) {
   const editing = mode === 'edit'
 
@@ -99,6 +106,9 @@ export function ApplicationRecordScreen({
           key={job.id}
           layout="page"
           defaultCurrency={defaultCurrency}
+          resumes={resumes}
+          linkedResumeId={linkedResumeId}
+          onLinkedResumeChange={onLinkedResumeChange}
           job={job}
           saving={saving}
           onSubmit={onSubmit}

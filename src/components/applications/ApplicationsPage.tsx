@@ -94,8 +94,21 @@ function downloadCsv(fileName: string, text: string) {
 export interface ApplicationsPageProps {
   jobs: Job[]
   defaultCurrency?: SupportedCurrency
-  onCreate?: (data: JobFormData) => Promise<boolean>
-  onUpdate?: (id: string, data: JobFormData) => Promise<boolean>
+  /**
+   * `resumeId` is the CV recorded as submitted: an id to pin, `null` to unpin,
+   * `undefined` to leave whatever link exists alone.
+   *
+   * It rides alongside `JobFormData` rather than inside it because the link
+   * lives in `application_documents`, keyed on a job id that does not exist
+   * yet when creating -- so only the caller, which has the insert's result,
+   * can sequence the write.
+   */
+  onCreate?: (data: JobFormData, resumeId?: string | null) => Promise<boolean>
+  onUpdate?: (id: string, data: JobFormData, resumeId?: string | null) => Promise<boolean>
+  /** The CVs available to the "CV submitted" field. */
+  resumes?: { id: string; title: string }[]
+  /** The CV already linked to whichever row is open, if any. */
+  linkedResumeId?: string | null
   onDelete?: (job: Job) => void
   onImport?: (rows: JobFormData[]) => Promise<boolean>
   onAutofill?: (url: string) => Promise<JobAutofillResult>
@@ -128,6 +141,8 @@ export function ApplicationsPage({
   defaultCurrency = resolveDefaultCurrency(null),
   onCreate,
   onUpdate,
+  resumes = [],
+  linkedResumeId = null,
   onDelete,
   onImport,
   onAutofill,
@@ -153,6 +168,9 @@ export function ApplicationsPage({
   const [page, setPage] = React.useState(1)
   const [open, setOpen] = React.useState<RecordState>(null)
   const [formDirty, setFormDirty] = React.useState(false)
+  // `undefined` means the field was never touched, which is different from
+  // `null` (explicitly "no CV"). Only the second should unpin an existing link.
+  const [resumeChoice, setResumeChoice] = React.useState<string | null | undefined>(undefined)
   const [discardOpen, setDiscardOpen] = React.useState(false)
   const [csv, setCsv] = React.useState<CsvImport | null>(null)
   const [skipDuplicates, setSkipDuplicates] = React.useState(true)
@@ -169,6 +187,9 @@ export function ApplicationsPage({
   const dismiss = () => {
     setOpen(null)
     setFormDirty(false)
+    // Abandoned along with the rest of the form. A choice made and then
+    // dismissed must not be applied to the next record opened.
+    setResumeChoice(undefined)
     onOpenJobChange?.(null)
   }
 
@@ -348,8 +369,13 @@ export function ApplicationsPage({
     // throwing, so a rejected save leaves the panel open with every typed
     // field intact instead of discarding them behind a toast.
     const editingJob = open?.job ?? null
-    const ok = editingJob ? await onUpdate?.(editingJob.id, data) : await onCreate?.(data)
+    const ok = editingJob
+      ? await onUpdate?.(editingJob.id, data, resumeChoice)
+      : await onCreate?.(data, resumeChoice)
     if (ok === false) return
+    // Consumed. Leaving it set would re-apply the same link to the NEXT row
+    // opened in this session, which is a link the person never asked for.
+    setResumeChoice(undefined)
 
     setFormDirty(false)
     if (editingJob) {
@@ -398,6 +424,9 @@ export function ApplicationsPage({
         data={record}
         defaultCurrency={defaultCurrency}
         saving={saving}
+        resumes={resumes}
+        linkedResumeId={linkedResumeId}
+        onLinkedResumeChange={setResumeChoice}
         onSubmit={submit}
         // Cancel on an EXISTING record goes back to viewing it; on a new one
         // there is nothing behind the form, so it closes. Either way it is

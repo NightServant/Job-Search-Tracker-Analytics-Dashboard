@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { requireUserId, toError } from './supabaseHelpers'
 import type { ApplicationDocument } from '@/types'
-import type { DocumentLinkSummary } from './applicationDocuments'
+import type { DocumentLinkSummary, ResumeLinkSummary } from './applicationDocuments'
 
 export interface DocumentLinkInput {
   job_id: string
@@ -67,6 +67,42 @@ export const documentLinkService = {
         resume_id: row.resume_id as string,
         title: resume?.title ?? 'untitled cv',
         version: snapshot?.version ?? null,
+        sent_at: row.sent_at as string,
+      }
+    })
+  },
+
+  /**
+   * The REVERSE lookup: which applications a given CV was submitted to.
+   *
+   * `listForJob` answers "which CV did I send to Stripe?"; this answers "where
+   * did this CV go?", which is the question the document editor asks -- a CV
+   * open on screen is most useful when you can see the roles it was actually
+   * sent for, and tailor the next edit against them.
+   *
+   * The company and role live on `jobs`, so they are embedded in the query
+   * rather than fetched per row. Ordered newest first: the last place a CV
+   * went is the one you are most likely to be thinking about.
+   */
+  async listForResume(client: SupabaseClient, resumeId: string): Promise<ResumeLinkSummary[]> {
+    const { data, error } = await client
+      .from('application_documents')
+      .select('job_id, sent_at, jobs(company, role, status)')
+      .eq('resume_id', resumeId)
+      .order('sent_at', { ascending: false })
+    if (error) throw toError(error)
+
+    return (data ?? []).map((row) => {
+      const job = row.jobs as unknown as {
+        company: string
+        role: string
+        status: string
+      } | null
+      return {
+        job_id: row.job_id as string,
+        company: job?.company ?? 'unknown company',
+        role: job?.role ?? 'unknown role',
+        status: job?.status ?? null,
         sent_at: row.sent_at as string,
       }
     })

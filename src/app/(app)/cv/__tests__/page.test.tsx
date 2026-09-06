@@ -40,6 +40,10 @@ vi.mock('@/hooks/useJobs', () => ({
   useJobs: () => ({ data: [], isLoading: false, error: null }),
 }))
 
+// The editor's command row shows which applications this CV was sent to.
+vi.mock('@/hooks/useDocumentLinks', () => ({
+  useResumeLinks: () => ({ data: [], isLoading: false }),
+}))
 vi.mock('@/hooks/useResumes', () => ({
   useResume: useResumeMock,
   useCreateResume: () => ({ mutateAsync: createMutate, isPending: false }),

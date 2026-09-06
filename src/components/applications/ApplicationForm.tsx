@@ -107,6 +107,27 @@ export interface ApplicationFormProps {
    * thumb and 40px is the height a pointer needs, not a finger.
    */
   layout?: 'dialog' | 'page'
+  /**
+   * The CVs this user has written, for the "CV submitted" field.
+   *
+   * Empty is a real state, not a missing prop -- somebody tracking their first
+   * application has not written a CV yet -- so the control says so rather than
+   * rendering an empty dropdown.
+   */
+  resumes?: { id: string; title: string }[]
+  /** Which CV is already recorded as sent for this application. */
+  linkedResumeId?: string | null
+  /**
+   * Reports the choice as it changes, rather than folding it into
+   * `JobFormData`.
+   *
+   * THE LINK IS NOT A COLUMN ON `jobs`. It lives in `application_documents`,
+   * which is keyed on a job id that does not exist yet when the form is
+   * creating one -- so the write has to happen after the insert returns, which
+   * only the caller can sequence. Putting `resume_id` into `JobFormData` would
+   * also send a non-column straight into `jobService.createJob`.
+   */
+  onLinkedResumeChange?: (resumeId: string | null) => void
 }
 
 export function ApplicationForm({
@@ -119,6 +140,9 @@ export function ApplicationForm({
   autofilling = false,
   onDirtyChange,
   layout = 'dialog',
+  resumes = [],
+  linkedResumeId = null,
+  onLinkedResumeChange,
 }: ApplicationFormProps) {
   const [company, setCompany] = React.useState(job?.company ?? '')
   const [role, setRole] = React.useState(job?.role ?? '')
@@ -140,6 +164,7 @@ export function ApplicationForm({
   const [techInput, setTechInput] = React.useState((job?.tech_stack ?? []).join(', '))
   const [description, setDescription] = React.useState(job?.description ?? '')
   const [notes, setNotes] = React.useState(job?.notes ?? '')
+  const [resumeId, setResumeId] = React.useState(linkedResumeId ?? '')
   const [contactName, setContactName] = React.useState(job?.contact_name ?? '')
   const [contactEmail, setContactEmail] = React.useState(job?.contact_email ?? '')
   const [contactLinkedin, setContactLinkedin] = React.useState(job?.contact_linkedin ?? '')
@@ -500,6 +525,43 @@ export function ApplicationForm({
               onChange={(e) => setDateApplied(e.target.value)}
               onBlur={blur('date_applied')}
               error={errorFor('date_applied')}
+            />
+          </Field>
+        </div>
+      </PanelSection>
+
+      {/* WHICH CV WENT WITH IT. Its own section rather than a field inside
+          "date applied", because it is answering a different question and the
+          two only look related -- and `application_documents` is a different
+          table from `jobs`, which is exactly why this value leaves the form
+          through `onLinkedResumeChange` instead of through `JobFormData`. */}
+      <PanelSection title="cv submitted" icon="Documents">
+        <div className={cn('grid gap-5', cols)}>
+          <Field
+            id="resume_id"
+            label="cv submitted"
+            hint={
+              resumes.length
+                ? 'which CV you sent for this application.'
+                : 'no CVs yet — write one in Documents and it will appear here.'
+            }
+          >
+            <Select
+              id="resume_id"
+              icon="Documents"
+              disabled={resumes.length === 0}
+              value={resumeId}
+              onValueChange={(next) => {
+                setResumeId(next)
+                // '' is the "none" option, and it has to reach the caller as
+                // null -- that is the difference between "no CV" and "do not
+                // change the link", and the caller unpins on the former.
+                onLinkedResumeChange?.(next || null)
+              }}
+              items={[
+                { value: '', label: resumes.length ? 'none' : 'no CVs yet' },
+                ...resumes.map((resume) => ({ value: resume.id, label: resume.title })),
+              ]}
             />
           </Field>
         </div>

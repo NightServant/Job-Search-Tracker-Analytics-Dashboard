@@ -17,6 +17,8 @@ import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
 import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
+import { useResumeLinks } from '@/hooks/useDocumentLinks'
+import { LinkedApplications } from './LinkedApplications'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
@@ -104,6 +106,9 @@ export function WordResumeEditor({
   jobs = [],
 }: WordResumeEditorProps) {
   const { user } = useAuth()
+  // Which applications this CV was submitted to. Read here rather than passed
+  // down because the editor already owns every other read keyed on draft.id.
+  const { data: resumeLinks = [] } = useResumeLinks(draft.id)
   const { success, error: showError, info } = useToast()
   const [title, setTitle] = useState(draft.title)
   const [isSaving, setIsSaving] = useState(false)
@@ -407,6 +412,11 @@ export function WordResumeEditor({
           {user && !compact && (
             <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
           )}
+          {/* WHERE THIS CV HAS ALREADY GONE. The other end of the application
+              form's "CV submitted" field -- one row in `application_documents`,
+              read from both sides. At every width, unlike version history
+              above: this is one or two entries, not a dated snapshot list. */}
+          <LinkedApplications links={resumeLinks} />
           <Button variant="ghost" size="s" onClick={resetTemplate} disabled={!editor}>
             <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
             reset

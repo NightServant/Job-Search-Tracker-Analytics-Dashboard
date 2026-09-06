@@ -18,6 +18,12 @@ import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
+import { useResumes } from '@/hooks/useResumes'
+import {
+  useDocumentLinks,
+  usePinDocumentLink,
+  useUnpinDocumentLink,
+} from '@/hooks/useDocumentLinks'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
 import type { Job, JobFormData } from '@/types'
 
@@ -69,6 +75,12 @@ function ApplicationsRoute() {
   // through `jobs` on every render.
   const [openJob, setOpenJob] = React.useState<Job | null>(null)
   const record = useApplicationRecord(openJob?.id, openJob?.description)
+  // The CVs offered by the form's "CV submitted" field, and whichever one is
+  // already pinned to the row that is open.
+  const { data: resumes = [] } = useResumes()
+  const { data: openLinks = [] } = useDocumentLinks(openJob?.id)
+  const pinLink = usePinDocumentLink()
+  const unpinLink = useUnpinDocumentLink()
 
   // A desktop visitor landing on `/applications/<id>` is redirected here with
   // the id in the query, because that route is the mobile surface now.
@@ -89,10 +101,50 @@ function ApplicationsRoute() {
     )
   }
 
-  const handleCreate = async (data: JobFormData) => {
+  /**
+   * Records which CV was submitted, after the application itself is saved.
+   *
+   * IT RUNS AFTER, and for creates it has to: `application_documents.job_id`
+   * references a row that does not exist until the insert returns. That is
+   * also why `createJob` is awaited for its RESULT here rather than fired and
+   * forgotten.
+   *
+   * A FAILED LINK DOES NOT FAIL THE SAVE. The application is the thing the
+   * person was writing; losing it because a secondary row would not write
+   * would be the wrong trade. The toast says which half worked.
+   */
+  const linkResume = async (jobId: string, resumeId: string | null | undefined) => {
+    // `undefined` means the field was never touched. Only an explicit `null`
+    // means "no CV", and only that should remove an existing link.
+    if (resumeId === undefined) return
     try {
-      await createJob.mutateAsync(data)
+      if (resumeId) await pinLink.mutateAsync({ job_id: jobId, resume_id: resumeId })
+      else await unpinAllLinks(jobId)
+    } catch (err) {
+      showError('Saved, but the CV link did not', message(err, 'Unknown error'))
+    }
+  }
+
+  /**
+   * Clears every CV pinned to an application, which is what "none" means.
+   *
+   * Uses the links already loaded for the open row rather than re-reading
+   * them. A newly created application cannot have any, so the only case that
+   * reaches here with something to remove is the one where `openLinks` is
+   * already correct -- and re-fetching would drag the Supabase client into
+   * this module for a list it is holding.
+   */
+  const unpinAllLinks = async (jobId: string) => {
+    for (const link of openLinks) {
+      await unpinLink.mutateAsync({ jobId, resumeId: link.resume_id })
+    }
+  }
+
+  const handleCreate = async (data: JobFormData, resumeId?: string | null) => {
+    try {
+      const created = await createJob.mutateAsync(data)
       success('Application added')
+      if (created?.id) await linkResume(created.id, resumeId)
       return true
     } catch (err) {
       showError('Could not add the application', message(err, 'Unknown error'))
@@ -100,10 +152,11 @@ function ApplicationsRoute() {
     }
   }
 
-  const handleUpdate = async (id: string, data: JobFormData) => {
+  const handleUpdate = async (id: string, data: JobFormData, resumeId?: string | null) => {
     try {
       await updateJob.mutateAsync({ id, data })
       success('Application updated')
+      await linkResume(id, resumeId)
       return true
     } catch (err) {
       showError('Could not update the application', message(err, 'Unknown error'))
@@ -142,6 +195,8 @@ function ApplicationsRoute() {
       <ApplicationsPage
         jobs={jobs}
         defaultCurrency={resolveDefaultCurrency(prefs)}
+        resumes={resumes.map((resume) => ({ id: resume.id, title: resume.title }))}
+        linkedResumeId={openLinks[0]?.resume_id ?? null}
         onCreate={handleCreate}
         onUpdate={handleUpdate}
         onDelete={handleDelete}

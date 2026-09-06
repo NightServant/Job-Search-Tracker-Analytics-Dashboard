@@ -47,6 +47,10 @@ export interface ApplicationRecordDialogProps {
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   autofilling?: boolean
   onDirtyChange?: (dirty: boolean) => void
+  /** For the form's "CV submitted" field. See ApplicationForm. */
+  resumes?: { id: string; title: string }[]
+  linkedResumeId?: string | null
+  onLinkedResumeChange?: (resumeId: string | null) => void
 }
 
 export function ApplicationRecordDialog({
@@ -64,6 +68,9 @@ export function ApplicationRecordDialog({
   onAutofill,
   autofilling = false,
   onDirtyChange,
+  resumes,
+  linkedResumeId,
+  onLinkedResumeChange,
 }: ApplicationRecordDialogProps) {
   const editing = job === null || mode === 'edit'
 
@@ -113,6 +120,9 @@ export function ApplicationRecordDialog({
             key={job?.id ?? 'new'}
             layout="dialog"
             defaultCurrency={defaultCurrency}
+            resumes={resumes}
+            linkedResumeId={linkedResumeId}
+            onLinkedResumeChange={onLinkedResumeChange}
             job={job}
             saving={saving}
             onSubmit={onSubmit}
