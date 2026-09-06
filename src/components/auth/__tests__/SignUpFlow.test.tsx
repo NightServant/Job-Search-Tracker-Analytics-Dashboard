@@ -1,20 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEventDefault from '@testing-library/user-event'
 
 /**
  * `delay: null` removes user-event's artificial pause between keystrokes.
  *
- * The rate-limit test types six full registrations -- three fields a round,
- * six rounds -- and the default inter-keystroke delay made that take longer
- * than the 5s timeout once the suite grew, so it failed roughly two runs in
- * three under full-suite load while passing on its own. A flaky test is worse
- * than a slow one: it teaches you to re-run rather than to read.
- *
  * The delay exists to simulate human typing speed. Nothing here asserts on
  * timing -- the rate limiter is driven by attempt COUNT, not by how fast the
  * attempts arrive -- so removing it changes how long the test takes and not
  * what it proves.
+ *
+ * IT WAS NOT ENOUGH ON ITS OWN. See `setField` below.
  */
 const userEvent = userEventDefault.setup({ delay: null })
 import { SignUpFlow } from '../SignUpFlow'
@@ -35,10 +31,41 @@ function setup(overrides: Partial<React.ComponentProps<typeof SignUpFlow>> = {})
   return props
 }
 
+/**
+ * Sets a field's value in ONE event instead of one per character.
+ *
+ * WHY THIS EXISTS, since `userEvent.type` is the house default and stays the
+ * default everywhere typing is the subject. `fillDetails` is the hot path: the
+ * rate-limit test runs it six times, and at a 15-character password plus a
+ * confirm plus an email that is ~280 keystrokes, each one a state update that
+ * re-renders the whole flow -- the brand panel, the progress bar and the
+ * six-item requirements checklist included.
+ *
+ * MEASURED 2026-09-06: that test took ~1.2s alone and 5.2s under full-suite
+ * load, against a 5s timeout. It was not slow because it waited for anything;
+ * it was slow because it did ~1,700 renders, and a test with no headroom fails
+ * whenever the machine is busy. It failed roughly twice in eight full runs.
+ *
+ * The submit path reads component STATE, not keystrokes, so a single change
+ * event exercises exactly the same code. Tests whose subject IS typing -- the
+ * requirements checklist updating as you type, the code field stripping
+ * non-digits -- keep `userEvent.type`, because for those the keystrokes are
+ * the thing being tested.
+ *
+ * It also replaces the value rather than appending, which removes the
+ * accumulation hazard the rate-limit loop used to clear three fields to avoid:
+ * six rounds of appending made a 90-character password that tripped the
+ * bcrypt 72-byte check first, so the limiter was never reached and the test
+ * passed or failed for a reason unrelated to its name.
+ */
+function setField(label: RegExp, value: string) {
+  fireEvent.change(screen.getByLabelText(label), { target: { value } })
+}
+
 async function fillDetails(email = 'Gabe@Example.com', password = STRONG, confirm = password) {
-  await userEvent.type(screen.getByLabelText(/^Email/), email)
-  await userEvent.type(screen.getByLabelText(/^Password/), password)
-  await userEvent.type(screen.getByLabelText(/^Confirm password/), confirm)
+  setField(/^Email/, email)
+  setField(/^Password/, password)
+  setField(/^Confirm password/, confirm)
   await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
 }
 
@@ -223,15 +250,10 @@ describe('registration rate limiting', () => {
     // An affordance rather than a boundary -- the server-side limits are the
     // real control -- but it does stop a stuck retry loop and rage-clicks.
     const props = setup({ onSignUp: vi.fn().mockRejectedValue(new Error('nope')) })
+    // No clearing round to round: `setField` REPLACES each value, so the
+    // accumulation that used to need three clears cannot happen. See its note
+    // for what that accumulation broke.
     for (let i = 0; i < 6; i += 1) {
-      // EVERY field is cleared each round. Clearing only the email lets the
-      // password field accumulate, and six copies of a 15-character password
-      // is 90 characters -- which trips the bcrypt 72-byte check first and
-      // means the rate limiter is never reached. The test would then pass or
-      // fail for a reason unrelated to what it is named after.
-      await userEvent.clear(screen.getByLabelText(/^Email/))
-      await userEvent.clear(screen.getByLabelText(/^Password/))
-      await userEvent.clear(screen.getByLabelText(/^Confirm password/))
       await fillDetails('a@b.co')
     }
     expect(await screen.findByText(/Too many attempts/i)).toBeInTheDocument()
