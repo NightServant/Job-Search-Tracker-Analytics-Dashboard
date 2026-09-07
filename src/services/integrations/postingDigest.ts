@@ -128,13 +128,28 @@ export function ungroundedWords(text: string, source: string): string[] {
   })
 }
 
-const SYSTEM_PROMPT = `You extract facts from a job posting. You never infer, guess or complete.
+const SYSTEM_PROMPT = `You read a job posting and report what it says. You never infer, guess or complete.
 
-Rules:
+EXTRACTION RULES
 - Copy values EXACTLY as they appear in the posting. Do not rephrase, expand or tidy them.
 - If the posting does not state something, return null. Returning null is always correct when unsure.
-- The summary must use only words that appear in the posting. Two sentences at most.
 - Never state a salary, company or location the posting does not contain.
+
+THE SUMMARY: write it as a person would, telling a friend what the job is.
+- Two sentences at most. Use only words that appear in the posting.
+- Lead with the concrete facts: what the work is, what it needs, where it is, the terms.
+- Job adverts sell. Do not repeat the selling. Drop "exciting", "dynamic",
+  "fast-paced", "world-class", "rockstar", "passionate" and anything like them
+  even when the posting uses them - they describe no fact.
+- No inflated significance: nothing "plays a vital role", "stands as a testament"
+  or "offers a unique opportunity".
+- Do not end a sentence with a trailing clause that adds a feeling rather than a
+  fact. "Hybrid in Pasig, 50-70k" is a fact. "...offering excellent growth" is not.
+- Never write "not just X, but Y".
+- Do not open with "This role", "The company is seeking" or "We are looking for".
+  Start with the thing itself.
+- Plain connectives. "and", "but", "so" - not "moreover", "furthermore",
+  "additionally".
 
 Reply with JSON only, no prose and no code fence:
 {"summary": string,
@@ -142,6 +157,43 @@ Reply with JSON only, no prose and no code fence:
  "work_mode": "onsite"|"hybrid"|"remote"|null,
  "salary_min": number|null, "salary_max": number|null, "salary_currency": string|null,
  "tech_stack": string[]}`
+
+/**
+ * Phrases a summary should never contain, whatever the posting said.
+ *
+ * THE GROUNDING CHECK CANNOT CATCH THESE, which is why they are a separate
+ * pass. A posting that calls itself "an exciting opportunity" makes those words
+ * part of its own vocabulary, so a summary echoing them is perfectly grounded
+ * and still reads like a brochure. The prompt asks the model not to; this is
+ * what happens when it does anyway.
+ *
+ * Matched on the summary only. The posting keeps its own words -- the job of
+ * `formatPostingText` is to tidy, not to censor what an employer wrote.
+ */
+const BROCHURE = [
+  'exciting opportunity',
+  'unique opportunity',
+  'fast-paced environment',
+  'dynamic team',
+  'world-class',
+  'best-in-class',
+  'cutting-edge',
+  'rockstar',
+  'ninja',
+  'plays a vital role',
+  'stands as a testament',
+  'not just',
+  'we are looking for',
+  'the company is seeking',
+  'moreover',
+  'furthermore',
+]
+
+/** Whether a summary reads like the advert rather than like a person. */
+export function brochurePhrases(summary: string): string[] {
+  const flat = summary.toLowerCase()
+  return BROCHURE.filter((phrase) => flat.includes(phrase))
+}
 
 interface Options {
   config?: IntegrationConfig
@@ -232,7 +284,9 @@ export async function digestPosting(rawText: string, options: Options = {}): Pro
   const formatted = formatPostingText(rawText)
   const base: PostingDigest = {
     formatted,
-    summary: extractiveSummary(formatted),
+    // Skipping the advert's own sales lines: rejecting the model's brochure
+    // copy only to print the posting's is no improvement.
+    summary: extractiveSummary(formatted, 2, (line) => brochurePhrases(line).length > 0),
     fields: { ...EMPTY_FIELDS, tech_stack: [] },
     usedModel: false,
     dropped: [],
@@ -276,12 +330,19 @@ export async function digestPosting(rawText: string, options: Options = {}): Pro
 
     let summary = base.summary
     if (typeof raw.summary === 'string' && raw.summary.trim()) {
-      const invented = ungroundedWords(raw.summary, formatted)
-      if (invented.length === 0) {
-        summary = raw.summary.trim()
-      } else {
+      const candidate = raw.summary.trim()
+      const invented = ungroundedWords(candidate, formatted)
+      const brochure = brochurePhrases(candidate)
+      if (invented.length > 0) {
         // The extractive fallback stands, and the reader is told why.
         dropped.push(`summary (invented: ${invented.slice(0, 5).join(', ')})`)
+      } else if (brochure.length > 0) {
+        // Grounded but still the advert talking. Rejected on different
+        // grounds, and said differently, because this is not the model
+        // making something up -- it is the model repeating a sales line.
+        dropped.push(`summary (advert copy: ${brochure.slice(0, 3).join(', ')})`)
+      } else {
+        summary = candidate
       }
     }
 

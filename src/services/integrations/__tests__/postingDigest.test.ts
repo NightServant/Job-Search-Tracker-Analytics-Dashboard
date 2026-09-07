@@ -1,5 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { digestPosting, groundFields, ungroundedWords } from '../postingDigest'
+import {
+  brochurePhrases,
+  digestPosting,
+  groundFields,
+  ungroundedWords,
+} from '../postingDigest'
 import { formatPostingText, extractiveSummary } from '../../postingFormat'
 import type { IntegrationConfig } from '../config'
 
@@ -214,5 +219,107 @@ describe('the digest end to end', () => {
     })
     expect(digest.usedModel).toBe(false)
     expect(digest.formatted).toBeTruthy()
+  })
+})
+
+describe('keeping the advert out of the summary', () => {
+  /**
+   * THE GAP GROUNDING CANNOT CLOSE. A posting that calls itself "an exciting
+   * opportunity" makes those words part of its own vocabulary, so a summary
+   * echoing them passes every grounding check and still reads like a brochure
+   * rather than like a person saying what the job is.
+   */
+  const SELLING = `An exciting opportunity for a rockstar Senior Frontend Engineer!
+    Join our dynamic team at Acme Corp in Pasig City. We are looking for someone
+    passionate about React and TypeScript. Salary: PHP 50,000 - 70,000.`
+
+  it('spots the advert phrases', () => {
+    expect(brochurePhrases('An exciting opportunity with a dynamic team'))
+      .toEqual(expect.arrayContaining(['exciting opportunity', 'dynamic team']))
+  })
+
+  it('leaves a plain factual summary alone', () => {
+    expect(brochurePhrases('Senior Frontend Engineer at Acme Corp, hybrid in Pasig.')).toEqual([])
+  })
+
+  it('rejects a grounded summary that is still selling', async () => {
+    const digest = await digestPosting(SELLING, {
+      config: configWith(),
+      fetchImpl: vi.fn().mockResolvedValue(
+        reply({ summary: 'An exciting opportunity for a rockstar engineer at Acme Corp.' })
+      ) as unknown as typeof fetch,
+    })
+    // Every one of those words IS in the posting, so grounding passes. This is
+    // the second gate.
+    expect(digest.summary).not.toContain('exciting opportunity')
+    expect(digest.dropped.join(' ')).toContain('advert copy')
+  })
+
+  it('keeps a summary that reports rather than sells', async () => {
+    const digest = await digestPosting(SELLING, {
+      config: configWith(),
+      fetchImpl: vi.fn().mockResolvedValue(
+        reply({ summary: 'Senior Frontend Engineer at Acme Corp in Pasig City. React and TypeScript, PHP 50,000 - 70,000.' })
+      ) as unknown as typeof fetch,
+    })
+    expect(digest.summary).toContain('Senior Frontend Engineer')
+    expect(digest.dropped).toEqual([])
+  })
+})
+
+describe('formatting text a page shouted', () => {
+  it('stops a heading shouting, without renaming a technology', () => {
+    // `QUALIFICATIONS:` is a raised voice. `PHP`, `AWS` and `CSS` are not.
+    expect(formatPostingText('QUALIFICATIONS AND REQUIREMENTS:')).toBe(
+      'Qualifications And Requirements:'
+    )
+    expect(formatPostingText('PHP AWS CSS SQL')).toBe('PHP AWS CSS SQL')
+  })
+
+  it('leaves a single shouted word alone', () => {
+    // One word is a label or an acronym, not a sentence being yelled.
+    expect(formatPostingText('URGENT')).toBe('URGENT')
+  })
+
+  it('removes a decorative rule between sections', () => {
+    expect(formatPostingText('About us\n=======\nWe build things.')).toBe(
+      'About us\nWe build things.'
+    )
+  })
+
+  it('strips leading emoji from a line', () => {
+    expect(formatPostingText('🔥 Hiring now')).toBe('Hiring now')
+  })
+
+  it('calms repeated punctuation', () => {
+    expect(formatPostingText('Apply now!!! Ready???')).toBe('Apply now! Ready?')
+  })
+
+  it('closes the gap a markup extraction leaves before punctuation', () => {
+    expect(formatPostingText('React , TypeScript and Node .')).toBe('React, TypeScript and Node.')
+  })
+
+  it('leaves a label and its value on one line', () => {
+    // `Salary: PHP 50,000` is a label and its value, not a heading welded to a
+    // paragraph. Breaking it in two made it harder to read, not easier.
+    expect(formatPostingText('Salary: PHP 50,000 per month')).toBe(
+      'Salary: PHP 50,000 per month'
+    )
+  })
+
+  it('still splits a heading welded to the end of a sentence', () => {
+    expect(formatPostingText('Issues as they arise. Qualifications: Enrolled in a degree'))
+      .toBe('Issues as they arise.\n\nQualifications:\nEnrolled in a degree')
+  })
+
+  it('strips decoration from either end of a line', () => {
+    expect(formatPostingText('🔥 Hiring now 🔥')).toBe('Hiring now')
+  })
+
+  it('changes no word while doing any of it', () => {
+    const out = formatPostingText('🔥 URGENT HIRING FOR REACT DEVELOPERS!!!')
+    for (const word of ['Urgent', 'Hiring', 'For', 'React', 'Developers']) {
+      expect(out.toLowerCase()).toContain(word.toLowerCase())
+    }
   })
 })
