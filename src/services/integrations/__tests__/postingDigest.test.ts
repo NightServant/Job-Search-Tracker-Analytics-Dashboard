@@ -64,6 +64,55 @@ describe('formatting a scraped posting', () => {
     const summary = extractiveSummary('First sentence here. Second one. Third one.')
     expect(summary).toBe('First sentence here. Second one.')
   })
+
+  describe('and does not run away with itself', () => {
+    /**
+     * THE 810-CHARACTER "SUMMARY", measured 2026-09-07 on a real posting. The
+     * first version flattened newlines to spaces and split on `.!?` -- but a
+     * posting is mostly bullets and bullets carry no full stop, so the first
+     * "sentence" ran from the top of the advert to the first period several
+     * paragraphs down.
+     */
+    const BULLETED = `Who Thrives Here:
+Strong understanding of DNS, SEO and accessibility
+Experience with GoDaddy, WIX and related website platforms
+Bachelor's degree in Computer Science or related fields
+Must be willing to work onsite in Taguig
+Job Responsibilities:
+Engage with customers by telephone, email and chat.`
+
+    it('treats a line break as the end of a unit', () => {
+      const summary = extractiveSummary(BULLETED, 2)
+      expect(summary.length).toBeLessThan(200)
+      expect(summary).not.toContain('Taguig')
+    })
+
+    it('skips a heading, which is a label rather than a fact', () => {
+      // A summary that opens "Who Thrives Here:" has spent its first line
+      // saying nothing.
+      expect(extractiveSummary(BULLETED, 2)).not.toContain('Who Thrives Here')
+      expect(extractiveSummary(BULLETED, 2)).not.toContain('Job Responsibilities')
+    })
+
+    it('punctuates the bullets it joins', () => {
+      // Two bullets joined by a space read as one run-on. The words are the
+      // posting's; the full stops are ours.
+      const summary = extractiveSummary(BULLETED, 2)
+      expect(summary).toContain('accessibility. Experience with')
+    })
+
+    it('caps a single enormous line rather than printing it whole', () => {
+      const long = `${'word '.repeat(200)}.`
+      const summary = extractiveSummary(long, 2)
+      expect(summary.length).toBeLessThanOrEqual(281)
+      expect(summary.endsWith('…')).toBe(true)
+    })
+
+    it('does not cut a word in half', () => {
+      const summary = extractiveSummary(`${'alpha '.repeat(120)}.`, 2)
+      expect(summary).not.toMatch(/alph…$/)
+    })
+  })
 })
 
 describe('grounding what the model returns', () => {

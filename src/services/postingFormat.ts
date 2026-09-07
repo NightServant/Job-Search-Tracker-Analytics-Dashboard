@@ -153,33 +153,82 @@ export function formatPostingText(raw: string): string {
 }
 
 /**
- * The first few sentences, as a fallback summary.
+ * A short, readable summary built only from what the posting already says.
  *
- * EXTRACTIVE ON PURPOSE: it can only return text that was already in the
- * posting, so it cannot invent. It is what the digest falls back to when no
- * model is configured, and when a model's summary fails the grounding check.
+ * EXTRACTIVE ON PURPOSE: it can only return text that was already there, so it
+ * cannot invent. It is what the digest falls back to when no model is
+ * configured, and when a model's summary fails a check.
+ *
+ * A LINE BREAK ENDS A UNIT, and getting that wrong produced an 810-character
+ * "summary". The first version flattened newlines to spaces and then split on
+ * `.!?` -- but a posting is mostly bullets, and bullets carry no full stop. So
+ * the first "sentence" ran from the top of the advert all the way down to the
+ * first period, several paragraphs later. In a job posting a line IS a unit,
+ * whether or not anyone punctuated it.
+ *
+ * HEADINGS ARE SKIPPED. "Who Thrives Here:" and "Job Responsibilities:" are
+ * labels for the thing that follows; a summary that opens with one has spent
+ * its first line saying nothing.
+ *
+ * There is a hard character cap as well as a unit count, because two long
+ * bullets are still a wall.
  */
+const MAX_SUMMARY_CHARS = 280
+
+/** A label like "Job Responsibilities:" -- a heading, not a fact. */
+function isHeading(line: string): boolean {
+  return /:\s*$/.test(line.trim())
+}
+
+/** The posting broken into the units a reader would call sentences. */
+function summaryUnits(text: string): string[] {
+  return formatPostingText(text)
+    .split('\n')
+    .map((line) => line.replace(/^- /, '').trim())
+    .filter((line) => line.length > 0 && !isHeading(line))
+    // A line may still hold several sentences; a sentence is the smaller unit.
+    .flatMap((line) => line.match(/[^.!?]+[.!?]+|[^.!?]+$/g) ?? [line])
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
 export function extractiveSummary(
   text: string,
   sentences = 2,
   /**
-   * Sentences to step over.
+   * Units to step over.
    *
    * THE FALLBACK INHERITS THE ADVERT WITHOUT THIS. A posting that opens "An
-   * exciting opportunity for a rockstar engineer!" hands its first sentence
+   * exciting opportunity for a rockstar engineer!" hands its first line
    * straight to the summary, so rejecting the model's brochure copy only to
    * print the posting's own was no improvement. The caller decides what
    * counts as selling; this just skips it.
    */
   skip?: (sentence: string) => boolean
 ): string {
-  const flat = formatPostingText(text).replace(/\n+/g, ' ')
-  if (!flat) return ''
-  const parts = flat.match(/[^.!?]+[.!?]+(\s|$)/g)
-  if (!parts?.length) return flat.slice(0, 240).trim()
+  const units = summaryUnits(text)
+  if (!units.length) return ''
 
-  const usable = skip ? parts.filter((part) => !skip(part)) : parts
-  // Every sentence sells: the posting's own words still beat nothing.
-  const chosen = usable.length ? usable : parts
-  return chosen.slice(0, sentences).join('').trim()
+  const usable = skip ? units.filter((unit) => !skip(unit)) : units
+  // Every line sells: the posting's own words still beat nothing.
+  const chosen = usable.length ? usable : units
+
+  const out: string[] = []
+  for (const unit of chosen.slice(0, sentences)) {
+    // PUNCTUATE EACH UNIT AS IT GOES IN. These are bullets, and a bullet has
+    // no full stop -- joining two with a space produced "...best practices
+    // Experience with GoDaddy...", one run-on where a reader expects two
+    // statements. This is the formatting half of the job: the words are the
+    // posting's, the punctuation is ours.
+    const closed = /[.!?…]$/.test(unit) ? unit : `${unit}.`
+    const joined = [...out, closed].join(' ')
+    if (out.length && joined.length > MAX_SUMMARY_CHARS) break
+    out.push(closed)
+  }
+
+  const summary = out.join(' ').trim()
+  if (summary.length <= MAX_SUMMARY_CHARS) return summary
+  // One very long first line: cut at a word boundary rather than mid-word.
+  const cut = summary.slice(0, MAX_SUMMARY_CHARS)
+  return `${cut.slice(0, cut.lastIndexOf(' ')).trim()}…`
 }
