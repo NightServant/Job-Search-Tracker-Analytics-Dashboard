@@ -9,32 +9,26 @@ requires-python = ">=3.12"
 # mitigation is the boundary in extractor/core.py -- Scrapling types never
 # leave that module, so an upgrade is a diff in one file rather than a hunt.
 #
-# THE `[fetchers]` EXTRA IS NOW REQUIRED, reversing the note that stood here.
+# THE BROWSER IS OPTIONAL AGAIN, and Firecrawl is why.
 #
-# It used to say the browser fetchers were hundreds of MB for a browser this
-# lane never opens. That was true until 2026-09-06, when two of the sites Gabe
-# actually applies through turned out to be unreadable without one:
+# This note has now been written three ways in two days, so here is the whole
+# arc. It first said the browser fetchers were hundreds of MB for a browser
+# this lane never opens. Then two of the sites Gabe actually applies through
+# turned out to be unreadable without one -- Cloudstaff renders its postings
+# with JavaScript, JobStreet answers a raw fetch with a challenge -- so they
+# became required. Then the deployment proved that wrong in the other
+# direction: `playwright` installs on Vercel and its Chromium NEVER DOES,
+# because the Python builder runs no post-install step. Rendering worked
+# locally and nowhere that mattered, while production carried ~300MB it could
+# not use.
 #
-#   Cloudstaff  110KB of HTML containing FIFTEEN visible characters. Every
-#               posting is rendered client-side, so httpx sees an empty shell.
-#   JobStreet   403 "Just a moment" to httpx; 200 and the real page to an
-#               ordinary headless browser. The challenge is aimed at clients
-#               that cannot run the page.
-#
-# httpx is still the FIRST attempt and still handles most pages. The browser
-# opens only when the static fetch comes back as a shell or a challenge --
-# see app.py::_render.
-#
-# DEPLOYMENT COST, stated plainly: this adds curl_cffi, playwright and
-# browserforge, plus a Chromium download (~95MB compressed) that must happen at
-# BUILD time -- `playwright install chromium` does not run itself. Vercel
-# functions cap at 5GB so it fits, but the extractor's cold start will be
-# slower and the build longer. If that proves unworkable on Hobby, the fallback
-# is the caller supplying HTML from their own browser, which `/extract` already
-# accepts and which needs none of this.
+# Firecrawl is a hosted fetch. It needs no binary, so it works in the place the
+# browser could not, and the browser goes back to being a local convenience:
+# `_render` imports it inside a try/except and simply returns None when it is
+# absent. Install it with `pip install -e './scraper[dev,browser]'` if you want
+# JavaScript rendering without a Firecrawl key on your own machine.
 dependencies = [
-  "scrapling[fetchers]==0.4.15",
-  "playwright>=1.40",
+  "scrapling==0.4.15",
   "httpx>=0.27",
   "fastapi>=0.115",
   "uvicorn>=0.30",
@@ -42,6 +36,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0", "pytest-asyncio>=0.24"]
+# Local-only. Never installed in a deployment -- see the note above.
+browser = ["scrapling[fetchers]==0.4.15", "playwright>=1.40"]
 
 [tool.vercel]
 entrypoint = "app:app"

@@ -128,7 +128,7 @@ export interface ApplicationsPageProps {
   linkedResumeId?: string | null
   onDelete?: (job: Job) => void
   onImport?: (rows: JobFormData[]) => Promise<boolean>
-  onAutofill?: (url: string, html?: string) => Promise<JobAutofillResult>
+  onAutofill?: (url: string) => Promise<JobAutofillResult>
   onCsvError?: (message: string) => void
   saving?: boolean
   importing?: boolean

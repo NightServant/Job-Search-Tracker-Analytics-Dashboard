@@ -151,7 +151,7 @@ export default function Page() {
         saving={updateJob.isPending}
         onSubmit={handleSubmit}
         onDelete={setPendingDelete}
-        onAutofill={(url, html) => autofill.mutateAsync({ url, html })}
+        onAutofill={(url) => autofill.mutateAsync(url)}
         autofilling={autofill.isPending}
       />
       <ConfirmDialog

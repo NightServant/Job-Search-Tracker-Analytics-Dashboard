@@ -204,10 +204,6 @@ export function useDeleteJob() {
  */
 export function useAutofillJobFromUrl() {
   return useMutation({
-    // `html` is optional and means "parse this, do not fetch": the page came
-    // from a browser the site trusts, which is the only way to read the boards
-    // that refuse our server.
-    mutationFn: ({ url, html }: { url: string; html?: string }) =>
-      jobService.autofillFromUrl(url, html),
+    mutationFn: (url: string) => jobService.autofillFromUrl(url),
   })
 }

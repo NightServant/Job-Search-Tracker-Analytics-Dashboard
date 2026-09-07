@@ -216,7 +216,7 @@ function ApplicationsRoute() {
         onUpdate={handleUpdate}
         onDelete={handleDelete}
         onImport={handleImport}
-        onAutofill={(url, html) => autofill.mutateAsync({ url, html })}
+        onAutofill={(url) => autofill.mutateAsync(url)}
         onCsvError={(msg) => showError('CSV import failed', msg)}
         saving={createJob.isPending || updateJob.isPending}
         importing={createJobsBulk.isPending}

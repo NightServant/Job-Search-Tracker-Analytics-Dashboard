@@ -15,6 +15,7 @@ copy is not redundant.
 from __future__ import annotations
 
 import asyncio
+import os
 
 import httpx
 from fastapi import FastAPI
@@ -39,6 +40,20 @@ REQUEST_TIMEOUT_S = 12.0
 #: posting; three did not.
 RENDER_SETTLE_MS = 6000
 RENDER_TIMEOUT_MS = 45_000
+
+#: Firecrawl: a hosted fetcher that runs the page and handles the proxying.
+#:
+#: IT REPLACES THE BROWSER THIS SERVICE CANNOT SHIP. `playwright` installs on
+#: Vercel and its Chromium never does -- the Python builder runs no
+#: post-install step -- so JavaScript rendering worked locally and nowhere
+#: else. A hosted fetch needs no binary, which is the whole point.
+#:
+#: `onlyMainContent` MUST BE FALSE. It defaults to true and would hand back the
+#: article body without the `<head>` -- and `<head>` is where the JSON-LD
+#: JobPosting lives, which is the single best source this parser has. Asking
+#: for "the main content" would quietly throw away the good half.
+FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape"
+FIRECRAWL_TIMEOUT_S = 60.0
 MAX_HTML_BYTES = 2_000_000
 
 # The header set the Deno function arrived at. Kept verbatim: it is what a
@@ -72,6 +87,63 @@ class ExtractRequest(BaseModel):
     html: str | None = None
 
 
+def firecrawl_payload(url: str) -> dict[str, Any]:
+    """The request body, separated so it can be asserted on without a network."""
+    return {
+        "url": url,
+        # v2 takes format OBJECTS, not strings.
+        "formats": [{"type": "rawHtml"}],
+        # See FIRECRAWL_ENDPOINT: the head is not optional for this parser.
+        "onlyMainContent": False,
+        "waitFor": RENDER_SETTLE_MS,
+        "timeout": RENDER_TIMEOUT_MS,
+    }
+
+
+def firecrawl_html(payload: dict[str, Any]) -> tuple[str | None, str | None]:
+    """The HTML and the final URL out of a Firecrawl reply.
+
+    Returns `(html, final_url)`. The final URL matters as much as the HTML: a
+    hosted fetcher follows redirects on our behalf, so where it LANDED is the
+    thing that has to pass the host check -- exactly the reason the httpx path
+    re-checks `response.url` rather than trusting what was asked for.
+    """
+    if not isinstance(payload, dict) or not payload.get("success"):
+        return None, None
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return None, None
+    html = data.get("rawHtml") or data.get("html")
+    metadata = data.get("metadata") if isinstance(data.get("metadata"), dict) else {}
+    final = metadata.get("url") or metadata.get("sourceURL")
+    return (html if isinstance(html, str) and html.strip() else None,
+            final if isinstance(final, str) else None)
+
+
+async def _fetch_via_firecrawl(url: str) -> str | None:
+    """Fetch through Firecrawl, when a key is configured."""
+    key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
+    if not key:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=FIRECRAWL_TIMEOUT_S) as client:
+            response = await client.post(
+                FIRECRAWL_ENDPOINT,
+                headers={"Authorization": f"Bearer {key}"},
+                json=firecrawl_payload(url),
+            )
+        if response.status_code != 200:
+            # 402 is an exhausted plan and 429 a rate limit. Neither is worth a
+            # stack trace, and both fall through to whatever comes next.
+            return None
+        html, final = firecrawl_html(response.json())
+        if final and reject_reason(final):
+            return None
+        return html
+    except Exception:
+        return None
+
+
 def _render(url: str) -> str | None:
     """The page as a browser sees it, for sites that render themselves.
 
@@ -98,6 +170,24 @@ def _render(url: str) -> str | None:
         # the static HTML is still what gets parsed, and its own warnings then
         # describe what was missing.
         return None
+
+
+async def _fetch_rendered(url: str) -> str | None:
+    """The page as a browser sees it, by whichever route is available.
+
+    FIRECRAWL FIRST, because it is the one that works in production. The local
+    browser is the fallback: it needs a Chromium that only exists on a
+    developer's machine, so in a deployment this second attempt simply returns
+    None and the caller falls through to its own message.
+
+    Neither is reached unless the ordinary fetch already came back as a shell
+    or a challenge -- rendering costs money or a browser launch, and most pages
+    need neither.
+    """
+    via_firecrawl = await _fetch_via_firecrawl(url)
+    if via_firecrawl:
+        return via_firecrawl
+    return await asyncio.to_thread(_render, url)
 
 
 @app.get("/health")
@@ -156,7 +246,7 @@ async def extract_endpoint(body: ExtractRequest) -> JSONResponse:
     # said no, and the answer to that is the caller supplying HTML from their
     # own session, not a better disguise.
     if looks_like_bot_challenge(response.status_code, body_text):
-        rendered = await asyncio.to_thread(_render, final_url)
+        rendered = await _fetch_rendered(final_url)
         if rendered and not looks_like_bot_challenge(200, rendered):
             return JSONResponse(extract(final_url, rendered, 200), status_code=200)
         return JSONResponse(autofill_from_url_alone(final_url), status_code=200)
@@ -180,7 +270,7 @@ async def extract_endpoint(body: ExtractRequest) -> JSONResponse:
     # is tried only here, on the pages that need it, because it costs a browser
     # launch and most pages do not.
     if looks_like_javascript_shell(body_text):
-        rendered = await asyncio.to_thread(_render, final_url)
+        rendered = await _fetch_rendered(final_url)
         if rendered and not looks_like_javascript_shell(rendered):
             body_text = rendered
 

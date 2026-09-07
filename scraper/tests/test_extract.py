@@ -520,3 +520,54 @@ def test_duplicate_skills_collapse_keeping_the_first_spelling():
     """
     result = extract("https://careers.example.com/j/dupes", html)
     assert result["values"]["tech_stack"] == ["React"]
+
+
+# --- Firecrawl, the fetcher that works in production ---------------------
+
+from app import firecrawl_html, firecrawl_payload  # noqa: E402
+
+
+def test_firecrawl_asks_for_the_whole_page_not_the_main_content():
+    # `onlyMainContent` DEFAULTS TO TRUE and would hand back the article body
+    # without the <head> -- which is where the JSON-LD JobPosting lives, the
+    # single best source this parser has. Asking for "the main content" would
+    # quietly throw away the good half.
+    payload = firecrawl_payload("https://ph.jobstreet.com/job/1")
+    assert payload["onlyMainContent"] is False
+
+
+def test_firecrawl_asks_for_raw_html_in_the_v2_shape():
+    # v2 takes format OBJECTS, not strings. `["rawHtml"]` is the v1 shape and
+    # is rejected.
+    payload = firecrawl_payload("https://ph.jobstreet.com/job/1")
+    assert payload["formats"] == [{"type": "rawHtml"}]
+
+
+def test_firecrawl_reply_yields_html_and_where_it_landed():
+    html, final = firecrawl_html(
+        {
+            "success": True,
+            "data": {
+                "rawHtml": "<html>posting</html>",
+                "metadata": {"url": "https://ph.jobstreet.com/job/1?x=1"},
+            },
+        }
+    )
+    assert html == "<html>posting</html>"
+    # The FINAL url matters as much as the html: a hosted fetcher follows
+    # redirects for us, so where it landed is what has to pass the host check.
+    assert final == "https://ph.jobstreet.com/job/1?x=1"
+
+
+def test_firecrawl_falls_back_to_cleaned_html_when_raw_is_absent():
+    html, _ = firecrawl_html({"success": True, "data": {"html": "<html>b</html>"}})
+    assert html == "<html>b</html>"
+
+
+def test_firecrawl_failure_is_not_mistaken_for_a_page():
+    # 402 (plan exhausted) and 429 (rate limited) both arrive as success=false
+    # or a non-200; neither may look like a successful read.
+    assert firecrawl_html({"success": False, "error": "Payment Required"}) == (None, None)
+    assert firecrawl_html({"success": True, "data": {}}) == (None, None)
+    assert firecrawl_html({}) == (None, None)
+    assert firecrawl_html({"success": True, "data": {"rawHtml": "   "}}) == (None, None)

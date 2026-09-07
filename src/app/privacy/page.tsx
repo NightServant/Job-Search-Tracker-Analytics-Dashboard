@@ -263,9 +263,28 @@ export default function Page() {
               <p className="text-body-m font-normal text-text-secondary">
                 There is no advertising network, no session recorder, no
                 cross-site tracking pixel, and no data broker. Vercel and
-                Supabase — the two companies that host this application — are
-                the only third parties involved at all, and neither receives
-                anything beyond what running it requires.
+                Supabase — the two companies that host this application —
+                receive nothing beyond what running it requires.
+              </p>
+              <p className="text-body-m font-normal text-text-secondary">
+                One further service is involved{' '}
+                <strong className="font-bold text-text-primary">
+                  only when you use Auto-fill
+                </strong>
+                . Some job boards will not serve their postings to a server, so
+                the address you paste is sent to{' '}
+                <Link
+                  href="https://firecrawl.dev"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent-default underline underline-offset-4"
+                >
+                  Firecrawl
+                </Link>
+                , which fetches that public page and returns it to be read. They
+                receive the posting&rsquo;s web address and nothing else — not your
+                account, not your CV, and nothing about your other applications.
+                If you never use Auto-fill, they are never contacted.
               </p>
               <p className="text-body-m font-normal text-text-secondary">
                 No AI is used anywhere in this application. Nothing you write is

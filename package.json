@@ -17,7 +17,7 @@
     "push:auth-config": "bash scripts/push-auth-config.sh",
     "verify:domain": "bash scripts/verify-sending-domain.sh",
     "test:scraper": "cd scraper && .venv/bin/python -m pytest -q",
-    "setup:scraper": "python3.13 -m venv scraper/.venv && scraper/.venv/bin/pip install -e 'scraper[dev]'",
+    "setup:scraper": "python3.13 -m venv scraper/.venv && scraper/.venv/bin/pip install -e 'scraper[dev,browser]'",
     "dev:scraper": "cd scraper && .venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload"
   },
   "dependencies": {

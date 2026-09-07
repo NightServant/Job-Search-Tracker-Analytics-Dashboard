@@ -21,10 +21,11 @@ that stops someone re-investigating.
 | **Any OpenAI-compatible endpoint** | CV tailoring | 2026-09-04 | **Integrated** — `src/services/integrations/tailoring.ts` |
 | **ESCO** (EU skills taxonomy) | ATS skill synonyms | 2026-09-04 | **Integrated, narrowly** — `src/services/integrations/esco.ts` |
 | **`docx`** (npm, 9.7.1) | headless Word export | 2026-09-04 | **Integrated** — `src/services/integrations/docxExport.ts` |
-| **Scrapling** | job posting extraction | 2026-09-06 | **Integrated** — `scraper/`, deployed as a Vercel service |
+| **Scrapling** | job posting parsing | 2026-09-06 | **Integrated** — `scraper/`, deployed as a Vercel service |
+| **Firecrawl** | fetching the pages we cannot | 2026-09-07 | **Integrated, optional** — `scraper/app.py` |
 | **LinkedIn data export** | your own profile | 2026-09-06 | **Integrated** — `src/services/linkedinExport.ts` |
 
-That is the whole list. Six working integrations. Anything
+That is the whole list. Seven working integrations. Anything
 not in this table is not in this application.
 
 ---
@@ -87,17 +88,55 @@ Two things measured on 2026-09-06 that change how it is used:
 * **Some boards render postings with JavaScript.** Cloudstaff answers a plain
   fetch with 110KB of HTML containing *fifteen* visible characters. A headless
   browser is tried when the static fetch comes back as a shell or a challenge.
-* **`playwright` does not work on Vercel as configured.** The library installs;
-  the Chromium binary never does, because the Python builder runs no
-  post-install step. So JavaScript rendering works locally and **not in
-  production** — deployed, those sites still fall back. The remedies are a
-  container runtime, or the caller supplying HTML, which `/extract` already
-  accepts.
+* **`playwright` does not work on Vercel, and that is now settled.** The
+  library installs; the Chromium binary never does, because the Python builder
+  runs no post-install step. Production carried ~300MB it could not use, so the
+  browser is an optional extra again (`npm run setup:scraper` installs it) and
+  **Firecrawl is the fetch that works in a deployment**. `_render` keeps the
+  local browser as a second try and simply returns None where it is absent.
 
 An ordinary headless browser is used (`DynamicFetcher`), never Scrapling's
 `StealthyFetcher`. A challenge aimed at clients that cannot run a page is not
 something a real browser is getting around; a site that refuses an honest
 browser has said no.
+
+---
+
+## Firecrawl — the fetch this server cannot do itself
+
+**Integrated 2026-09-07, optional.** `POST https://api.firecrawl.dev/v2/scrape`
+with `Authorization: Bearer`, reached from `scraper/app.py` only after an
+ordinary HTTP fetch has already come back as a JavaScript shell or a challenge.
+Most pages never reach it.
+
+It exists because of a measured dead end, not a preference. Two of the boards
+Gabe applies through cannot be read by a plain fetch — Cloudstaff renders its
+postings client-side, JobStreet answers a raw request with a Cloudflare
+challenge — and the obvious fix, a headless browser, **cannot be deployed**:
+`playwright` installs on Vercel and its Chromium never does. A hosted fetch
+needs no binary.
+
+Two details that are easy to get wrong:
+
+* **`onlyMainContent` defaults to `true`** and must be set `false`. It would
+  return the article body without the `<head>`, and `<head>` is where the
+  JSON-LD `JobPosting` lives — the single best source this parser has.
+* **v2 takes format OBJECTS**: `[{"type": "rawHtml"}]`. The v1 string form is
+  rejected.
+
+The reply's `data.metadata.url` is re-checked against the host rules before the
+HTML is parsed. A hosted fetcher follows redirects on our behalf, so where it
+LANDED is what matters — the same reason the httpx path re-checks
+`response.url`.
+
+**It is a fetcher, not an extractor.** Firecrawl also offers LLM extraction and
+this deliberately does not use it: the parsing is Scrapling's, which is tested
+against real pages, and the field extraction is `postingDigest`, which verifies
+every value against the source text. Trusting a second model would give up that
+check for nothing.
+
+Free tier is 1,000 scrapes a month. **Every posting URL auto-filled is sent to
+Firecrawl**, which is why `/privacy` names them.
 
 ---
 

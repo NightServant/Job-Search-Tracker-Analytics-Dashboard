@@ -298,7 +298,7 @@ export const jobService = {
   /**
    * Attempt to auto-fill job form fields from a public posting URL.
    */
-  async autofillFromUrl(url: string, html?: string): Promise<JobAutofillResult> {
+  async autofillFromUrl(url: string): Promise<JobAutofillResult> {
     const requestId = `autofill-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
     
     Sentry.addBreadcrumb({
@@ -332,7 +332,7 @@ export const jobService = {
             ? { Authorization: `Bearer ${session.access_token}` }
             : {}),
         },
-        body: JSON.stringify(html ? { url, html } : { url }),
+        body: JSON.stringify({ url }),
       })
 
       const data = await response.json().catch(() => null)
