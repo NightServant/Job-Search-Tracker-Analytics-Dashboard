@@ -135,6 +135,19 @@ against real pages, and the field extraction is `postingDigest`, which verifies
 every value against the source text. Trusting a second model would give up that
 check for nothing.
 
+**Where the key goes.** The fetch is in `scraper/app.py`, so `FIRECRAWL_API_KEY`
+must reach the PYTHON process — it does nothing in `.env.local`, which only Next
+reads.
+
+| | |
+|---|---|
+| local | `scraper/.env` — gitignored, loaded by `app.py` at startup |
+| deployment | an ordinary Vercel project variable: `vercel env add FIRECRAWL_API_KEY production` |
+
+Vercel environment variables are project-scoped rather than per-service, so one
+entry reaches the Python service. A real environment variable always beats the
+local file.
+
 Free tier is 1,000 scrapes a month. **Every posting URL auto-filled is sent to
 Firecrawl**, which is why `/privacy` names them.
 

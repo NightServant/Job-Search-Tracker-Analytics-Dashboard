@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI
@@ -72,6 +73,43 @@ BROWSER_HEADERS = {
     "Sec-Fetch-Site": "none",
     "Upgrade-Insecure-Requests": "1",
 }
+
+def _load_local_env(path: Path = Path(__file__).with_name(".env")) -> None:
+    """Reads `scraper/.env` into the environment, for local runs only.
+
+    WHY THIS EXISTS. The web app's secrets live in `.env.local`, which Next
+    loads; this service is a separate Python process started by
+    `npm run dev:scraper` and never sees that file. Without something here the
+    only way to give the extractor a key locally is to export it in whichever
+    shell happens to start uvicorn -- which works once and is forgotten by the
+    next terminal.
+
+    A DEPLOYMENT NEVER REACHES THIS: the file is gitignored and absent, and
+    Vercel sets real environment variables, which take precedence because an
+    existing key is left alone.
+
+    Hand-parsed rather than pulling in python-dotenv: it is `KEY=VALUE`, and a
+    dependency for twelve lines is a dependency to keep upgrading.
+    """
+    try:
+        if not path.is_file():
+            return
+        for raw in path.read_text(encoding="utf-8").splitlines():
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            key = key.strip()
+            value = value.strip().strip("'\"")
+            # A real environment variable always wins.
+            if key and key not in os.environ:
+                os.environ[key] = value
+    except OSError:
+        # An unreadable local file must never stop the service starting.
+        pass
+
+
+_load_local_env()
 
 app = FastAPI(title="worktrack-extractor", docs_url=None, redoc_url=None)
 

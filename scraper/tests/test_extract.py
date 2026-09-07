@@ -12,6 +12,8 @@ Where an assertion is deliberately different from the TS original, it says so.
 
 from __future__ import annotations
 
+import os
+
 from extractor.challenge import (
     autofill_from_url_alone,
     challenged_site_name,
@@ -571,3 +573,26 @@ def test_firecrawl_failure_is_not_mistaken_for_a_page():
     assert firecrawl_html({"success": True, "data": {}}) == (None, None)
     assert firecrawl_html({}) == (None, None)
     assert firecrawl_html({"success": True, "data": {"rawHtml": "   "}}) == (None, None)
+
+
+def test_local_env_file_never_overrides_a_real_variable(tmp_path, monkeypatch):
+    # A deployment sets real environment variables and must win: the local file
+    # is a developer convenience, not a source of truth.
+    from app import _load_local_env
+
+    env_file = tmp_path / ".env"
+    env_file.write_text('FIRECRAWL_API_KEY=from-file\nOTHER_KEY="quoted"\n# a comment\n')
+
+    monkeypatch.setenv("FIRECRAWL_API_KEY", "from-environment")
+    monkeypatch.delenv("OTHER_KEY", raising=False)
+    _load_local_env(env_file)
+
+    assert os.environ["FIRECRAWL_API_KEY"] == "from-environment"
+    # Quotes are stripped, comments and blank lines skipped.
+    assert os.environ["OTHER_KEY"] == "quoted"
+
+
+def test_a_missing_local_env_file_is_not_an_error(tmp_path):
+    from app import _load_local_env
+
+    _load_local_env(tmp_path / "nope.env")
