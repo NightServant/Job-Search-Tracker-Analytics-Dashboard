@@ -18,7 +18,10 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from './StatusTabs'
-import { ApplicationRecordDialog } from './record/ApplicationRecordDialog'
+import {
+  ApplicationRecordDialog,
+  type ApplicationRecordDialogProps,
+} from './record/ApplicationRecordDialog'
 import type { ApplicationRecordData } from './record/recordData'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
@@ -116,6 +119,9 @@ export interface ApplicationsPageProps {
    */
   onCreate?: (data: JobFormData, resumeId?: string | null) => Promise<boolean>
   onUpdate?: (id: string, data: JobFormData, resumeId?: string | null) => Promise<boolean>
+  /** Tidies and summarises the pasted description. See ApplicationForm. */
+  onDigest?: ApplicationRecordDialogProps['onDigest']
+  digesting?: boolean
   /** The CVs available to the "CV submitted" field. */
   resumes?: { id: string; title: string }[]
   /** The CV already linked to whichever row is open, if any. */
@@ -152,6 +158,8 @@ export function ApplicationsPage({
   defaultCurrency = resolveDefaultCurrency(null),
   onCreate,
   onUpdate,
+  onDigest,
+  digesting,
   resumes = [],
   linkedResumeId = null,
   onDelete,
@@ -440,6 +448,8 @@ export function ApplicationsPage({
         data={record}
         defaultCurrency={defaultCurrency}
         saving={saving}
+        onDigest={onDigest}
+        digesting={digesting}
         resumes={resumes}
         linkedResumeId={linkedResumeId}
         onLinkedResumeChange={setResumeChoice}

@@ -7,7 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { PencilIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
-import { ApplicationForm } from '../ApplicationForm'
+import { ApplicationForm, type ApplicationFormProps } from '../ApplicationForm'
 import { ApplicationRecord } from './ApplicationRecord'
 import { EMPTY_RECORD_DATA, type ApplicationRecordData } from './recordData'
 import type { SupportedCurrency } from '@/services/userPreferences'
@@ -60,6 +60,9 @@ export interface ApplicationRecordScreenProps {
   resumes?: { id: string; title: string }[]
   linkedResumeId?: string | null
   onLinkedResumeChange?: (resumeId: string | null) => void
+  /** Tidies and summarises the pasted description. See ApplicationForm. */
+  onDigest?: ApplicationFormProps['onDigest']
+  digesting?: boolean
 }
 
 export function ApplicationRecordScreen({
@@ -77,6 +80,8 @@ export function ApplicationRecordScreen({
   resumes,
   linkedResumeId,
   onLinkedResumeChange,
+  onDigest,
+  digesting,
 }: ApplicationRecordScreenProps) {
   const editing = mode === 'edit'
 
@@ -109,6 +114,8 @@ export function ApplicationRecordScreen({
           resumes={resumes}
           linkedResumeId={linkedResumeId}
           onLinkedResumeChange={onLinkedResumeChange}
+          onDigest={onDigest}
+          digesting={digesting}
           job={job}
           saving={saving}
           onSubmit={onSubmit}

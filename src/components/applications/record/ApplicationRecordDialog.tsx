@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { PencilIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
-import { ApplicationForm } from '../ApplicationForm'
+import { ApplicationForm, type ApplicationFormProps } from '../ApplicationForm'
 import { ApplicationRecord } from './ApplicationRecord'
 import { EMPTY_RECORD_DATA, type ApplicationRecordData } from './recordData'
 import type { SupportedCurrency } from '@/services/userPreferences'
@@ -51,6 +51,9 @@ export interface ApplicationRecordDialogProps {
   resumes?: { id: string; title: string }[]
   linkedResumeId?: string | null
   onLinkedResumeChange?: (resumeId: string | null) => void
+  /** Tidies and summarises the pasted description. See ApplicationForm. */
+  onDigest?: ApplicationFormProps['onDigest']
+  digesting?: boolean
 }
 
 export function ApplicationRecordDialog({
@@ -71,6 +74,8 @@ export function ApplicationRecordDialog({
   resumes,
   linkedResumeId,
   onLinkedResumeChange,
+  onDigest,
+  digesting,
 }: ApplicationRecordDialogProps) {
   const editing = job === null || mode === 'edit'
 
@@ -123,6 +128,8 @@ export function ApplicationRecordDialog({
             resumes={resumes}
             linkedResumeId={linkedResumeId}
             onLinkedResumeChange={onLinkedResumeChange}
+            onDigest={onDigest}
+            digesting={digesting}
             job={job}
             saving={saving}
             onSubmit={onSubmit}

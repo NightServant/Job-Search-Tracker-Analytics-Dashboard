@@ -19,6 +19,7 @@ import { RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { useResumes } from '@/hooks/useResumes'
+import { usePostingDigest } from '@/hooks/usePostingDigest'
 import {
   useDocumentLinks,
   usePinDocumentLink,
@@ -90,6 +91,7 @@ function ApplicationsRoute() {
   // already pinned to the row that is open.
   const { data: resumes = [] } = useResumes()
   const { data: openLinks = [] } = useDocumentLinks(liveOpenJob?.id)
+  const digest = usePostingDigest()
   const pinLink = usePinDocumentLink()
   const unpinLink = useUnpinDocumentLink()
 
@@ -206,6 +208,8 @@ function ApplicationsRoute() {
       <ApplicationsPage
         jobs={jobs}
         defaultCurrency={resolveDefaultCurrency(prefs)}
+        onDigest={(text) => digest.mutateAsync(text)}
+        digesting={digest.isPending}
         resumes={resumes.map((resume) => ({ id: resume.id, title: resume.title }))}
         linkedResumeId={openLinks[0]?.resume_id ?? null}
         onCreate={handleCreate}

@@ -53,6 +53,11 @@ vi.mock('@/hooks/useDocumentLinks', () => ({
 }))
 // The form's "CV submitted" field offers the user's CVs.
 vi.mock('@/hooks/useResumes', () => ({ useResumes: () => ({ data: [], isLoading: false }) }))
+// Tidy-and-summarise runs through its own mutation, which needs a
+// QueryClient this suite deliberately does not stand up.
+vi.mock('@/hooks/usePostingDigest', () => ({
+  usePostingDigest: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
 vi.mock('@/hooks/useJobEvents', () => ({ useJobEvents: () => ({ data: [], isLoading: false }) }))
 vi.mock('@/hooks/useCvText', () => ({ useCvText: () => ({ data: undefined }) }))
 

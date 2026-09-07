@@ -11,7 +11,7 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { STATUSES } from '@/components/ui/status-marker'
-import { CheckIcon, CloseIcon, DownloadIcon } from '@/components/icons'
+import { CheckIcon, CloseIcon, DocumentsIcon, DownloadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
 import { assertJobFormDataValid, jobValidation } from '@/services/jobValidation'
@@ -128,6 +128,25 @@ export interface ApplicationFormProps {
    * also send a non-column straight into `jobService.createJob`.
    */
   onLinkedResumeChange?: (resumeId: string | null) => void
+  /**
+   * Tidies the pasted description and mines it for fields.
+   *
+   * Separate from `onAutofill` because it acts on TEXT ALREADY IN THE FORM
+   * rather than on a URL -- which is what makes it the answer for the boards
+   * no server can fetch. Nothing is invented: see postingDigest, which drops
+   * anything the model returns that the posting does not contain.
+   */
+  onDigest?: (text: string) => Promise<PostingDigestResult>
+  digesting?: boolean
+}
+
+/** What `onDigest` resolves. Mirrors `PostingDigest` minus the server shape. */
+export interface PostingDigestResult {
+  formatted: string
+  summary: string
+  fields: Partial<JobFormData> & { tech_stack?: string[] }
+  usedModel: boolean
+  dropped: string[]
 }
 
 export function ApplicationForm({
@@ -143,6 +162,8 @@ export function ApplicationForm({
   resumes = [],
   linkedResumeId = null,
   onLinkedResumeChange,
+  onDigest,
+  digesting = false,
 }: ApplicationFormProps) {
   const [company, setCompany] = React.useState(job?.company ?? '')
   const [role, setRole] = React.useState(job?.role ?? '')
@@ -165,6 +186,7 @@ export function ApplicationForm({
   const [description, setDescription] = React.useState(job?.description ?? '')
   const [notes, setNotes] = React.useState(job?.notes ?? '')
   const [resumeId, setResumeId] = React.useState(linkedResumeId ?? '')
+  const [digestNote, setDigestNote] = React.useState('')
   const [contactName, setContactName] = React.useState(job?.contact_name ?? '')
   const [contactEmail, setContactEmail] = React.useState(job?.contact_email ?? '')
   const [contactLinkedin, setContactLinkedin] = React.useState(job?.contact_linkedin ?? '')
@@ -291,6 +313,62 @@ export function ApplicationForm({
       setAutofillNote(
         err instanceof Error ? err.message : 'Could not read that posting. Fill it in by hand.'
       )
+    }
+  }
+
+  /**
+   * Tidy the description, summarise it, and fill whatever is still empty.
+   *
+   * IT REPLACES THE DESCRIPTION but only fills EMPTY fields, matching
+   * auto-fill's rule: reformatting text the user pasted is the thing they
+   * asked for, overwriting a company they typed is not.
+   */
+  const handleDigest = async () => {
+    if (!onDigest || !description.trim()) {
+      setDigestNote('Paste the job description first.')
+      return
+    }
+    setDigestNote('')
+    try {
+      const result = await onDigest(description)
+      setDescription(result.formatted)
+
+      const values = result.fields
+      if (!company.trim() && values.company) setCompany(values.company)
+      if (!role.trim() && values.role) setRole(values.role)
+      if (!location.trim() && values.location) setLocation(values.location)
+      if (!workMode && values.work_mode && WORK_MODES.some((m) => m.value === values.work_mode)) {
+        setWorkMode(values.work_mode)
+      }
+      if (!salaryMin.trim() && values.salary_min != null) setSalaryMin(String(values.salary_min))
+      if (!salaryMax.trim() && values.salary_max != null) setSalaryMax(String(values.salary_max))
+      if (
+        !salaryMin.trim() &&
+        !salaryMax.trim() &&
+        values.salary_currency &&
+        isSupportedCurrency(values.salary_currency)
+      ) {
+        setCurrency(values.salary_currency)
+      }
+      if (!techInput.trim() && values.tech_stack?.length) {
+        setTechInput(values.tech_stack.join(', '))
+      }
+
+      // WHAT WAS DROPPED IS SAID OUT LOUD. A silent drop looks exactly like
+      // the model getting it right, and whether anything was invented is the
+      // one thing worth knowing about a generated field.
+      const parts = [result.summary && `Summary: ${result.summary}`]
+      if (result.dropped.length) {
+        parts.push(
+          `Ignored ${result.dropped.length} value${result.dropped.length === 1 ? '' : 's'} ` +
+            'the posting does not actually contain.'
+        )
+      } else if (result.usedModel) {
+        parts.push('Every field was found in the posting.')
+      }
+      setDigestNote(parts.filter(Boolean).join(' '))
+    } catch (err) {
+      setDigestNote(err instanceof Error ? err.message : 'Could not read that description.')
     }
   }
 
@@ -616,6 +694,34 @@ export function ApplicationForm({
             className="min-h-48"
           />
         </Field>
+        {onDigest && (
+          <div className="flex flex-col gap-2">
+            {/* THE ANSWER FOR THE BOARDS NO SERVER CAN FETCH. Auto-fill needs
+                a URL our servers can read; several cannot be read at all --
+                JavaScript-rendered postings, and sites that refuse datacenter
+                traffic. Copying the posting into this box always works, and
+                this makes that paste as useful as a successful fetch. */}
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void handleDigest()}
+              disabled={digesting || !description.trim()}
+              className="w-full sm:w-auto"
+            >
+              {digesting ? (
+                <CssSpinner size={14} />
+              ) : (
+                <DocumentsIcon size={16} aria-hidden className={iconMotion('lift')} />
+              )}
+              {digesting ? 'Reading' : 'Tidy and summarise'}
+            </Button>
+            {digestNote && (
+              <p className="text-body-s text-text-muted" data-digest-note>
+                {digestNote}
+              </p>
+            )}
+          </div>
+        )}
       </PanelSection>
 
       <PanelSection title="notes" icon="Info">

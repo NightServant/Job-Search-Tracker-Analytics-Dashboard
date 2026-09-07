@@ -3,7 +3,6 @@
 import * as React from 'react'
 import { Label, Pie, PieChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
-import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type { StatusSlice } from '@/lib/overviewSeries'
 
 const CONFIG = {
@@ -51,12 +50,24 @@ export interface StatusDonutProps {
  * legend row, which is the part that actually answers "how many offers".
  */
 export function StatusDonut({ data }: StatusDonutProps) {
-  const reducedMotion = usePrefersReducedMotion()
   const total = React.useMemo(() => data.reduce((sum, slice) => sum + slice.count, 0), [data])
   const slices = React.useMemo(
     () => data.map((slice) => ({ ...slice, fill: `var(--color-status-${slice.status}-mark)` })),
     [data]
   )
+
+  // AN EMPTY PIPELINE DRAWS NOTHING. Recharts renders no arcs when every
+  // value is zero, which leaves a bare "0 applications" floating where a ring
+  // should be -- and that reads as a broken chart rather than an empty one.
+  if (total === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center py-8" data-donut-empty>
+        <p className="max-w-prose text-center text-body-s text-text-muted">
+          No applications yet. Add one and this fills in by status.
+        </p>
+      </div>
+    )
+  }
 
   return (
     <div className="grid flex-1 items-center gap-4 sm:grid-cols-2">
@@ -80,7 +91,14 @@ export function StatusDonut({ data }: StatusDonutProps) {
             innerRadius="62%"
             outerRadius="94%"
             strokeWidth={0}
-            isAnimationActive={!reducedMotion}
+            // NO ENTRY ANIMATION. Measured 2026-09-06 on the ATS ring and
+            // reproduced here: Recharts paints a Pie's arcs only as the
+            // animation ticks, so wherever it does not start -- a hidden
+            // container, a pane with no size, a tab that mounts offscreen --
+            // the ring renders as an empty circle with a label in the middle.
+            // A chart that always draws beats one that sometimes animates,
+            // and this one is the Overview's headline panel.
+            isAnimationActive={false}
           >
             <Label
               content={({ viewBox }) => {
@@ -99,7 +117,7 @@ export function StatusDonut({ data }: StatusDonutProps) {
                       y={(viewBox.cy ?? 0) + 24}
                       className="fill-text-muted text-body-s"
                     >
-                      total
+                      {total === 1 ? 'application' : 'applications'}
                     </tspan>
                   </text>
                 )
@@ -120,7 +138,19 @@ export function StatusDonut({ data }: StatusDonutProps) {
               style={{ background: `var(--color-status-${slice.status}-mark)` }}
             />
             <span className="min-w-0 flex-1 truncate text-text-secondary">{slice.label}</span>
-            <span className="tabular text-text-primary">{slice.count}</span>
+            {/* THE SHARE, NOT JUST THE COUNT. "4" answers how many; the ring
+                is drawn in proportions and the eye is already reading them,
+                so the number beside it should say the same thing the arc
+                does. Rounded, and 0 stays 0 rather than becoming "0%" noise
+                on a status nobody has reached. */}
+            {total > 0 && slice.count > 0 && (
+              <span className="tabular shrink-0 text-caption text-text-muted">
+                {Math.round((slice.count / total) * 100)}%
+              </span>
+            )}
+            <span className="tabular w-6 shrink-0 text-right text-text-primary">
+              {slice.count}
+            </span>
           </li>
         ))}
       </ul>
