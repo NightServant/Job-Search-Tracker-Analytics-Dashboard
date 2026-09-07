@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { readFileText } from '@/lib/readFileText'
 import { UploadIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 
@@ -60,7 +61,9 @@ export function ProfileImport({
     event.target.value = ''
     if (!chosen.length) return
     onImport(
-      await Promise.all(chosen.map(async (file) => ({ name: file.name, text: await file.text() })))
+      await Promise.all(
+        chosen.map(async (file) => ({ name: file.name, text: await readFileText(file) }))
+      )
     )
   }
 

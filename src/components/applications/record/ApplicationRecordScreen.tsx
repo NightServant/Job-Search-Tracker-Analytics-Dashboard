@@ -54,7 +54,7 @@ export interface ApplicationRecordScreenProps {
   saving?: boolean
   onSubmit: (data: JobFormData) => void | Promise<void>
   onDelete?: (job: Job) => void
-  onAutofill?: (url: string) => Promise<JobAutofillResult>
+  onAutofill?: (url: string, html?: string) => Promise<JobAutofillResult>
   autofilling?: boolean
   /** For the form's "CV submitted" field. See ApplicationForm. */
   resumes?: { id: string; title: string }[]

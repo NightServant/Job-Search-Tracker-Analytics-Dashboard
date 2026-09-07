@@ -11,9 +11,10 @@ import { Select } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { STATUSES } from '@/components/ui/status-marker'
-import { CheckIcon, CloseIcon, DocumentsIcon, DownloadIcon } from '@/components/icons'
+import { CheckIcon, CloseIcon, DocumentsIcon, DownloadIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
+import { readFileText } from '@/lib/readFileText'
 import { assertJobFormDataValid, jobValidation } from '@/services/jobValidation'
 import {
   SUPPORTED_CURRENCIES,
@@ -89,7 +90,11 @@ export interface ApplicationFormProps {
   saving?: boolean
   onSubmit?: (data: JobFormData) => void | Promise<void>
   onCancel?: () => void
-  onAutofill?: (url: string) => Promise<JobAutofillResult>
+  /**
+   * `html` supplied means "parse this, do not fetch" -- the page came from a
+   * browser the site trusts rather than from our server, which it may not.
+   */
+  onAutofill?: (url: string, html?: string) => Promise<JobAutofillResult>
   autofilling?: boolean
   /**
    * Reports whether the typed payload has diverged from what the form
@@ -187,6 +192,7 @@ export function ApplicationForm({
   const [notes, setNotes] = React.useState(job?.notes ?? '')
   const [resumeId, setResumeId] = React.useState(linkedResumeId ?? '')
   const [digestNote, setDigestNote] = React.useState('')
+  const pageFileInput = React.useRef<HTMLInputElement>(null)
   const [contactName, setContactName] = React.useState(job?.contact_name ?? '')
   const [contactEmail, setContactEmail] = React.useState(job?.contact_email ?? '')
   const [contactLinkedin, setContactLinkedin] = React.useState(job?.contact_linkedin ?? '')
@@ -249,7 +255,7 @@ export function ApplicationForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isDirty])
 
-  const handleAutofill = async () => {
+  const handleAutofill = async (html?: string) => {
     if (!onAutofill) return
     const normalized = normalizePostingUrl(url)
     if (!/^https?:\/\/.+/i.test(normalized)) {
@@ -257,7 +263,7 @@ export function ApplicationForm({
       return
     }
     try {
-      const result = await onAutofill(normalized)
+      const result = await onAutofill(normalized, html)
       const values = result.values
       // Only empty fields are filled. Silently overwriting something already
       // typed is how a scraped guess replaces a fact the user knew.
@@ -556,7 +562,7 @@ export function ApplicationForm({
             {onAutofill && (
               <Button
                 variant="secondary"
-                onClick={handleAutofill}
+                onClick={() => void handleAutofill()}
                 disabled={autofilling}
                 className="shrink-0"
               >
@@ -570,6 +576,53 @@ export function ApplicationForm({
             )}
           </div>
           {autofillNote && <p className="text-body-s text-text-muted">{autofillNote}</p>}
+
+          {onAutofill && (
+            <div className="flex flex-col gap-2 border-t border-border-subtle pt-3">
+              {/* THE PATH FOR THE SITES OUR SERVER CANNOT READ. JobStreet
+                  refuses datacenter traffic and Cloudstaff renders its
+                  postings with JavaScript, so a fetch from the deployment
+                  gets a challenge page or an empty shell. Your own browser
+                  gets the posting, because it is a browser. Saving that page
+                  and handing it over needs no browser on our side and no
+                  session of yours -- the file is HTML. */}
+              <p className="text-body-s text-text-muted">
+                Blocked, or the page came back empty? Open the posting in this browser,
+                save it (&#8984;S or Ctrl+S, &ldquo;Web Page, HTML Only&rdquo;), and upload
+                it here.
+              </p>
+              <input
+                ref={pageFileInput}
+                type="file"
+                accept=".html,.htm,text/html"
+                className="sr-only"
+                onChange={(event) => {
+                  const file = event.target.files?.[0]
+                  // Reset first so choosing the SAME file twice still fires a
+                  // change event -- otherwise a retry is a click that does
+                  // nothing.
+                  event.target.value = ''
+                  if (!file) return
+                  void readFileText(file)
+                    .then((html) => handleAutofill(html))
+                    // A read that fails must say so. The first version let the
+                    // rejection escape an async handler, which is silence.
+                    .catch(() => setAutofillNote('Could not read that file.'))
+                }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                size="s"
+                disabled={autofilling}
+                onClick={() => pageFileInput.current?.click()}
+                className="w-full sm:w-auto"
+              >
+                <UploadIcon size={16} aria-hidden className={iconMotion('lift')} />
+                Upload saved page
+              </Button>
+            </div>
+          )}
         </Field>
       </PanelSection>
 

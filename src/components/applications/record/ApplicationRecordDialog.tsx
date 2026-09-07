@@ -44,7 +44,7 @@ export interface ApplicationRecordDialogProps {
   onSubmit: (data: JobFormData) => void | Promise<void>
   onCancelEdit: () => void
   onDelete?: (job: Job) => void
-  onAutofill?: (url: string) => Promise<JobAutofillResult>
+  onAutofill?: (url: string, html?: string) => Promise<JobAutofillResult>
   autofilling?: boolean
   onDirtyChange?: (dirty: boolean) => void
   /** For the form's "CV submitted" field. See ApplicationForm. */

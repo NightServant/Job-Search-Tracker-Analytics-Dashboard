@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SettingsPage } from '../SettingsPage'
 import { ProfileImport, ProfileImportSteps } from '../ProfileImport'
@@ -291,5 +291,47 @@ describe('importing a LinkedIn export', () => {
     expect(screen.getByText('personal details')).toBeTruthy()
     expect(screen.getByText(/Bamban, Tarlac/)).toBeTruthy()
     expect(screen.getByText(/Born Mar 7/)).toBeTruthy()
+  })
+})
+
+describe('actually reading the export files', () => {
+  /**
+   * THE PATH NOTHING EXERCISED. Both upload controls called `File.text()`,
+   * which every current browser has and this project's jsdom does not -- so an
+   * `async` change handler rejected silently and the button did nothing. No
+   * test caught it because no test had ever read a file. `readFileText` falls
+   * back to FileReader; this is what proves the handler runs.
+   */
+  it('hands the file contents to the caller', async () => {
+    const onImport = vi.fn()
+    const { container } = render(<ProfileImport onImport={onImport} />)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+
+    fireEvent.change(input, {
+      target: { files: [new File(['First Name,Last Name\nGabe,Cervantes\n'], 'Profile.csv')] },
+    })
+
+    await waitFor(() => expect(onImport).toHaveBeenCalled())
+    const files = onImport.mock.calls[0][0]
+    expect(files[0].name).toBe('Profile.csv')
+    expect(files[0].text).toContain('Gabe,Cervantes')
+  })
+
+  it('reads every file when several are chosen at once', async () => {
+    const onImport = vi.fn()
+    const { container } = render(<ProfileImport onImport={onImport} />)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+
+    fireEvent.change(input, {
+      target: {
+        files: [
+          new File(['First Name,Last Name\nGabe,Cervantes\n'], 'Profile.csv'),
+          new File(['Name\nReact\n'], 'Skills.csv'),
+        ],
+      },
+    })
+
+    await waitFor(() => expect(onImport).toHaveBeenCalled())
+    expect(onImport.mock.calls[0][0]).toHaveLength(2)
   })
 })

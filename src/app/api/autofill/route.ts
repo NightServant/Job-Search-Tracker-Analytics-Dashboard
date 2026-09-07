@@ -54,6 +54,9 @@ function throttle(key: string): { allowed: boolean; retryAfterSeconds: number } 
   return { allowed: true, retryAfterSeconds: 0 }
 }
 
+/** A rendered page is large, but not unbounded. Matches the extractor's cap. */
+const MAX_SUPPLIED_HTML = 2_000_000
+
 export async function POST(request: Request) {
   // FIRST, and before the body is parsed. A route that reads a body and only
   // then 401s has already paid for the request it is rejecting.
@@ -77,7 +80,7 @@ export async function POST(request: Request) {
     )
   }
 
-  let body: { url?: unknown }
+  let body: { url?: unknown; html?: unknown }
   try {
     body = await request.json()
   } catch {
@@ -86,6 +89,17 @@ export async function POST(request: Request) {
 
   const reason = rejectReason(body?.url)
   if (reason) return NextResponse.json({ error: reason }, { status: 400 })
+
+  // HTML THE CALLER ALREADY HAS. The URL is still validated -- it is what the
+  // result is attributed to, and what the SSRF gate above just checked -- but
+  // no fetch happens for it. This is the path for the boards no server can
+  // read: JavaScript-rendered postings, and sites that refuse datacenter
+  // traffic. A browser that is already looking at the posting is not a
+  // scraper, and it needs no browser on our side.
+  const html =
+    typeof body.html === 'string' && body.html.trim()
+      ? body.html.slice(0, MAX_SUPPLIED_HTML)
+      : undefined
 
   const extractor = process.env.EXTRACTOR_URL
   if (!extractor) {
@@ -102,7 +116,10 @@ export async function POST(request: Request) {
     const response = await fetch(new URL('extract', extractor), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: normalizeTargetUrl(String(body.url)) }),
+      body: JSON.stringify({
+        url: normalizeTargetUrl(String(body.url)),
+        ...(html ? { html } : {}),
+      }),
     })
     const payload = await response.json()
     return NextResponse.json(payload, { status: response.status })

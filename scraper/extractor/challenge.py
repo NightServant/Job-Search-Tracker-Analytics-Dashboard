@@ -92,9 +92,12 @@ def autofill_from_url_alone(url: str) -> Envelope:
         confidence["source"] = 1.0
     warning = (
         f"{name} blocks automated reads, so the posting could not be fetched. "
-        "Paste the description in by hand."
+        "Open it in your browser, save the page, and upload it with "
+        "\u201cUpload saved page\u201d \u2014 or paste the description and use "
+        "\u201cTidy and summarise\u201d."
         if name
-        else "That page could not be read automatically. Paste the description in by hand."
+        else "That page could not be read automatically. Save it from your browser and "
+        "upload it, or paste the description and use \u201cTidy and summarise\u201d."
     )
     return {"values": values, "confidence": confidence, "warnings": [warning]}
 

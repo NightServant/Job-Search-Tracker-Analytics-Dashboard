@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApplicationForm, type PostingDigestResult } from '../ApplicationForm'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
@@ -102,5 +102,70 @@ describe('tidy and summarise', () => {
     await digestWith(RESULT({ fields: { salary_min: 1000, salary_currency: 'XYZ' as never } }))
     expect(await screen.findByDisplayValue('1000')).toBeInTheDocument()
     expect(screen.getByLabelText(/currency/i)).not.toHaveTextContent('XYZ')
+  })
+})
+
+/**
+ * THE PATH THAT MAKES PRODUCTION WORK. The deployed extractor cannot render
+ * JavaScript -- `playwright` installs on Vercel and its Chromium never does --
+ * so JobStreet answers a challenge and Cloudstaff an empty shell. The browser
+ * looking at the posting is a browser, so it can hand the page over. No
+ * credential changes hands: the file is HTML.
+ */
+describe('uploading a saved page for auto-fill', () => {
+  const AUTOFILL = { values: { company: 'Acme' }, confidence: {}, warnings: [] }
+
+  it('is offered whenever auto-fill is', () => {
+    render(<ApplicationForm defaultCurrency={CURRENCY} onAutofill={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /upload saved page/i })).toBeTruthy()
+  })
+
+  it('is absent when the caller offers no auto-fill at all', () => {
+    render(<ApplicationForm defaultCurrency={CURRENCY} />)
+    expect(screen.queryByRole('button', { name: /upload saved page/i })).toBeNull()
+  })
+
+  it('sends the file contents alongside the URL', async () => {
+    const onAutofill = vi.fn().mockResolvedValue(AUTOFILL)
+    const { container } = render(
+      <ApplicationForm defaultCurrency={CURRENCY} onAutofill={onAutofill} />
+    )
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/posting URL/i), 'https://ph.jobstreet.com/job/1')
+
+    // `fireEvent`, not `userEvent`: the input is `sr-only` and userEvent
+    // refuses to interact with it. That is correct for a real user too -- they
+    // never touch this input, they click the button, which calls `.click()`
+    // on it. The change event is what the handler actually listens for.
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, {
+      target: {
+        files: [
+          new File(['<html><body>the posting</body></html>'], 'job.html', {
+            type: 'text/html',
+          }),
+        ],
+      },
+    })
+
+    await waitFor(() =>
+      expect(onAutofill).toHaveBeenCalledWith(
+        'https://ph.jobstreet.com/job/1',
+        '<html><body>the posting</body></html>'
+      )
+    )
+  })
+
+  it('still needs a URL, because that is what the result is attributed to', async () => {
+    const onAutofill = vi.fn().mockResolvedValue(AUTOFILL)
+    const { container } = render(
+      <ApplicationForm defaultCurrency={CURRENCY} onAutofill={onAutofill} />
+    )
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    fireEvent.change(input, {
+      target: { files: [new File(['<html></html>'], 'job.html', { type: 'text/html' })] },
+    })
+    expect(await screen.findByText(/Enter a job posting URL first/i)).toBeInTheDocument()
+    expect(onAutofill).not.toHaveBeenCalled()
   })
 })
