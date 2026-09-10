@@ -756,9 +756,12 @@ def test_a_row_with_nothing_in_it_does_not_raise():
 
 
 def test_redacted_role_detail_is_reported_rather_than_left_to_be_noticed():
+    # Superseded by `test_missing_titles_and_missing_descriptions_are_reported
+    # _separately` below, which pins the wording that replaced this one after
+    # the first real runs showed titles going missing too.
     row = {"currentPositions": [{"company": "Acme", "title": "Engineer"}]}
     out = profile_from_apify(row, "x")
-    assert any("redacted the detail" in w for w in out["warnings"])
+    assert any("bullet text under each role" in w for w in out["warnings"])
 
 
 def test_the_bullet_text_under_a_role_keeps_its_line_breaks():
@@ -775,3 +778,66 @@ def test_the_bullet_text_under_a_role_keeps_its_line_breaks():
     assert out["experiences"][0]["description"] == "Did a thing.\n\nDid another."
     # Runs of blank lines collapse to one, so a scrape does not arrive ragged.
     assert out["summary"] == "First paragraph.\n\nSecond paragraph."
+
+
+def test_a_redacted_title_falls_back_to_the_actor_s_own_title_fields():
+    # MEASURED, NOT ASSUMED (2026-09-10). Bill Gates and Satya Nadella both
+    # came back from the real actor with every per-position `title` empty
+    # while company and dates mapped fine -- LinkedIn redacts the job title
+    # for signed-out visitors far more often than the README suggests. The
+    # actor exposes `currentTitle` and `allTitles` for exactly this.
+    one_current = {
+        "currentTitle": "Chairman and CEO",
+        "currentPositions": [{"company": "Microsoft", "startDate": "2014-02"}],
+    }
+    roles = profile_from_apify(one_current, "x")["profile"]["experiences"]
+    assert roles[0]["title"] == "Chairman and CEO"
+    assert roles[0]["period"] == "2014-02 – Present"
+
+
+def test_current_title_is_not_pinned_onto_a_role_it_may_not_belong_to():
+    # Three current positions and one `currentTitle`: which one is it? The
+    # actor does not say, and a title on the wrong employer is worse than a
+    # blank one.
+    three_current = {
+        "currentTitle": "Chair",
+        "currentPositions": [{"company": "A"}, {"company": "B"}, {"company": "C"}],
+    }
+    roles = profile_from_apify(three_current, "x")["profile"]["experiences"]
+    assert [r["title"] for r in roles] == ["", "", ""]
+
+
+def test_all_titles_fills_in_only_when_it_lines_up_one_to_one():
+    aligned = {
+        "allTitles": ["Engineer", "Intern"],
+        "currentPositions": [{"company": "A"}],
+        "pastPositions": [{"company": "B"}],
+    }
+    assert [r["title"] for r in profile_from_apify(aligned, "x")["profile"]["experiences"]] == [
+        "Engineer",
+        "Intern",
+    ]
+    # A shorter list means the correspondence is unknown. Indexing into it
+    # anyway would put a real title on the wrong employer.
+    ragged = {
+        "allTitles": ["Engineer"],
+        "currentPositions": [{"company": "A"}],
+        "pastPositions": [{"company": "B"}],
+    }
+    assert [r["title"] for r in profile_from_apify(ragged, "x")["profile"]["experiences"]] == ["", ""]
+
+
+def test_missing_titles_and_missing_descriptions_are_reported_separately():
+    # The first version of this warning asserted "the titles and dates came
+    # through, the bullet text did not" -- and on the first two real profiles
+    # the titles had NOT come through, so it was confidently wrong about the
+    # very thing the reader was looking at.
+    row = {"currentPositions": [{"company": "Acme"}]}
+    warnings = profile_from_apify(row, "x")["warnings"]
+    assert any("does not show job titles" in w for w in warnings)
+    assert any("bullet text under each role" in w for w in warnings)
+
+    titled = {"currentPositions": [{"company": "Acme", "title": "Engineer"}]}
+    warnings = profile_from_apify(titled, "x")["warnings"]
+    assert not any("does not show job titles" in w for w in warnings)
+    assert any("bullet text under each role" in w for w in warnings)

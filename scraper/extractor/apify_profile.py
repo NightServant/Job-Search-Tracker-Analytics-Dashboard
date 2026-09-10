@@ -109,29 +109,56 @@ def _experiences(row: dict[str, Any]) -> list[dict[str, Any]]:
     ORDER IS THE POINT of doing it in two passes rather than concatenating
     whatever came back: a CV reads most-recent-first, and the actor returns
     these as two separate lists precisely because it knows which is which.
+
+    THE TITLE FALLS BACK TO THE TOP-LEVEL FIELDS, and measured against two real
+    profiles (2026-09-10) that is not a nicety -- it is the difference between
+    a named role and a blank one. LinkedIn redacts the per-position job title
+    for signed-out visitors far more often than the actor's README suggests:
+    Bill Gates and Satya Nadella both came back with every `title` empty while
+    company and dates mapped fine. `currentTitle` and `allTitles` exist at the
+    top level precisely because of that, so they are used where the position's
+    own title is missing.
+
+    `allTitles` is indexed POSITIONALLY, which is a guess the actor does not
+    document -- so it is only trusted when it has exactly as many entries as
+    there are positions. A shorter or longer list means the correspondence is
+    unknown, and a title on the wrong employer is worse than none.
     """
-    out: list[dict[str, Any]] = []
+    positions: list[dict[str, Any]] = []
     for key in ("currentPositions", "pastPositions"):
-        for position in _listed(row.get(key)):
-            if not isinstance(position, dict):
-                continue
-            title = _pick(position, "title", "role", "position")
-            company = _pick(position, "company", "companyName", "organisation")
-            if not title and not company:
-                continue
-            out.append(
-                {
-                    "title": title or "",
-                    "company": company,
-                    "period": _period(position),
-                    "location": _pick(position, "location"),
-                    # THE FIELD THE WHOLE IMPORT EXISTS FOR, and the reason
-                    # this source is worth paying for: the bullet text under a
-                    # role is what a CV is written from, and the JSON-LD route
-                    # never carried it.
-                    "description": _pick_block(position, "description", "summary"),
-                }
-            )
+        positions.extend(p for p in _listed(row.get(key)) if isinstance(p, dict))
+
+    all_titles = [t for t in (_clean(x) for x in _listed(row.get("allTitles"))) if t]
+    aligned = all_titles if len(all_titles) == len(positions) else []
+    current_title = _pick(row, "currentTitle")
+    current_count = sum(1 for p in _listed(row.get("currentPositions")) if isinstance(p, dict))
+
+    out: list[dict[str, Any]] = []
+    for index, position in enumerate(positions):
+        title = _pick(position, "title", "role", "position")
+        if not title and aligned:
+            title = aligned[index]
+        # `currentTitle` names the CURRENT role, so it may only fill a current
+        # one -- and only when there is exactly one, or it would be put on an
+        # employer it does not belong to.
+        if not title and current_title and index == 0 and current_count == 1:
+            title = current_title
+        company = _pick(position, "company", "companyName", "organisation")
+        if not title and not company:
+            continue
+        out.append(
+            {
+                "title": title or "",
+                "company": company,
+                "period": _period(position),
+                "location": _pick(position, "location"),
+                # The bullet text under a role is what a CV is written from.
+                # LinkedIn does not serve it to a signed-out visitor, so this
+                # is usually None and the warning says so -- the export
+                # importer remains the only source that has it.
+                "description": _pick_block(position, "description", "summary"),
+            }
+        )
     return out
 
 
@@ -239,12 +266,24 @@ def profile_from_apify(row: dict[str, Any], requested_url: str) -> dict[str, Any
         "Skills and languages are not on a signed-out profile page, so they do "
         "not come through. Add them by hand, or import a LinkedIn data export."
     )
-    if not profile["experiences"]:
+    roles = profile["experiences"]
+    if not roles:
         warnings.append("No work history came back. Add your roles by hand.")
-    elif all(item["description"] is None for item in profile["experiences"]):
-        warnings.append(
-            "LinkedIn redacted the detail under each role for this profile — "
-            "the titles and dates came through, the bullet text did not."
-        )
+    else:
+        # THREE SEPARATE FACTS, said separately. The first version of this
+        # asserted "the titles and dates came through, the bullet text did
+        # not" -- and on the first two real profiles the titles had NOT come
+        # through, so the warning was confidently wrong about the very thing
+        # the reader was looking at.
+        if all(not item["title"] for item in roles):
+            warnings.append(
+                "LinkedIn does not show job titles to signed-out visitors on this "
+                "profile — the employers and dates came through, the roles did not."
+            )
+        if all(item["description"] is None for item in roles):
+            warnings.append(
+                "The bullet text under each role is not on a public profile page. "
+                "Write it in yourself, or import a LinkedIn data export."
+            )
 
     return {"profile": profile, "warnings": warnings}
