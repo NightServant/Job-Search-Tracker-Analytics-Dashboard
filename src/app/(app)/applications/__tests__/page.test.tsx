@@ -73,7 +73,11 @@ vi.mock('@/hooks/useCvText', () => ({ useCvText: () => ({ data: undefined }) }))
 
 // `?application=<id>` is how a desktop deep link off /applications/<id>
 // arrives. Returning no param is the ordinary case; one test overrides it.
-const searchParamMock = vi.hoisted(() => vi.fn(() => null as string | null))
+// KEY-AWARE, because this route now reads TWO parameters. `?application=<id>`
+// opens an existing record; `?add=<url>` opens the add wizard on a posting the
+// calendar's job feed handed over. A mock that answered the same value to both
+// opened both dialogs at once.
+const searchParamMock = vi.hoisted(() => vi.fn((_key: string) => null as string | null))
 vi.mock('next/navigation', () => ({
   useSearchParams: () => ({ get: searchParamMock }),
 }))
@@ -104,7 +108,7 @@ beforeEach(() => {
   useCreateJobsBulkMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
   useUserPreferencesMock.mockReturnValue({ data: null, isLoading: false, error: null })
   deleteJobMutate.mockReset().mockResolvedValue(undefined)
-  searchParamMock.mockReturnValue(null)
+  searchParamMock.mockImplementation(() => null)
 })
 
 afterEach(() => cleanup())
@@ -232,7 +236,7 @@ describe('Applications route wrapper', () => {
     // bottom sheet on this screen rather than a route of its own -- and it
     // arrives as `?application=<id>`. This is the half that makes the intent
     // survive the redirect.
-    searchParamMock.mockReturnValue('1')
+    searchParamMock.mockImplementation((key: string) => (key === 'application' ? '1' : null))
     const job = makeJob({ id: '1', status: 'applied', company: 'Initech', role: 'QA Lead' })
     useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
     render(<Page />)

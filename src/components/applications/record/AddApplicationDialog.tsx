@@ -134,6 +134,16 @@ export interface AddApplicationDialogProps {
    */
   onDigest?: (text: string) => Promise<PostingDigestResult>
   onDirtyChange?: (dirty: boolean) => void
+  /**
+   * A posting address to open on, filled into the first step.
+   *
+   * IT SEEDS, IT DOES NOT SKIP. The calendar's job feed hands a URL over with
+   * `track it`, and the temptation is to run the read immediately and drop the
+   * reader on the review step. That would spend a scrape and a model call on a
+   * link somebody may have clicked to look at rather than to track -- and it
+   * would hide the one screen where a wrong link can still be corrected.
+   */
+  initialUrl?: string | null
 }
 
 export function AddApplicationDialog({
@@ -148,6 +158,7 @@ export function AddApplicationDialog({
   autofilling = false,
   onDigest,
   onDirtyChange,
+  initialUrl = null,
 }: AddApplicationDialogProps) {
   const form = useRecordDraft(null, defaultCurrency, onDirtyChange)
   const { draft, set, replace, fillEmpty } = form
@@ -173,6 +184,16 @@ export function AddApplicationDialog({
     // `replace` is stable and `defaultCurrency` never changes mid-session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open])
+
+  // A link handed in from elsewhere fills the first step. Only when the field
+  // is still empty: a URL already typed is the one the person meant.
+  React.useEffect(() => {
+    if (!open || !initialUrl) return
+    set('url', initialUrl)
+    // Keyed on the incoming URL rather than on the draft, so re-rendering the
+    // parent never overwrites what has since been typed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialUrl])
 
   const goRead = async () => {
     setStep('fill')

@@ -990,3 +990,29 @@ describe('the insights band above the toolbar', () => {
     expect(screen.getByText(/no applications yet/i)).toBeTruthy()
   })
 })
+
+describe('a posting handed over from the calendar feed', () => {
+  it('opens the add wizard with the link already in it', async () => {
+    // `track it` on the calendar's feed is a deep link, not a write: nothing
+    // from a third-party feed reaches the database until the app has read the
+    // employer's own page.
+    render(<ApplicationsPage jobs={JOBS} initialAddUrl="https://jobicy.com/jobs/1" />)
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByLabelText(/posting url|link/i)).toHaveValue(
+      'https://jobicy.com/jobs/1'
+    )
+  })
+
+  it('stops at the first step rather than spending a scrape on a link nobody confirmed', async () => {
+    render(<ApplicationsPage jobs={JOBS} initialAddUrl="https://jobicy.com/jobs/1" />)
+    const dialog = await screen.findByRole('dialog')
+    // Still on `link`: the continue control is there, the save is not.
+    expect(within(dialog).getByRole('button', { name: /continue/i })).toBeTruthy()
+    expect(within(dialog).queryByRole('button', { name: /save application/i })).toBeNull()
+  })
+
+  it('opens nothing without the parameter', () => {
+    render(<ApplicationsPage jobs={JOBS} />)
+    expect(screen.queryByRole('dialog')).toBeNull()
+  })
+})

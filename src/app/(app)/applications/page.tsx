@@ -99,7 +99,11 @@ function ApplicationsRoute() {
 
   // A desktop visitor landing on `/applications/<id>` is redirected here with
   // the id in the query, because that route is the mobile surface now.
-  const openParam = useSearchParams().get('application')
+  const params = useSearchParams()
+  const openParam = params.get('application')
+  // `?add=<url>` is how the calendar's job feed hands a posting to the add
+  // wizard. It carries no id because there is no row yet.
+  const addParam = params.get('add')
 
   if (isLoading) {
     return <RouteSkeleton variant="table" />
@@ -275,6 +279,7 @@ function ApplicationsRoute() {
         record={record}
         onOpenJobChange={setOpenJob}
         initialOpenId={openParam}
+        initialAddUrl={addParam}
       />
       <ConfirmDialog
         open={pendingDelete !== null}

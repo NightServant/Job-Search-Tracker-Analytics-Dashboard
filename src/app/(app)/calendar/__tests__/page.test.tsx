@@ -25,6 +25,12 @@ vi.mock('@/hooks/usePublicHolidays', () => ({
   usePublicHolidays: useHolidaysMock,
   useHolidayCountries: useHolidayCountriesMock,
 }))
+// The remote-jobs feed under the month, same reasoning: a third-party host
+// (jobicy.com) must never be reached from a unit test.
+vi.mock('@/hooks/useJobFeed', () => ({
+  useJobFeed: () => ({ data: [], isLoading: false, error: null }),
+  useJobFeedIndustries: () => ({ data: [] }),
+}))
 
 import Page from '../page'
 

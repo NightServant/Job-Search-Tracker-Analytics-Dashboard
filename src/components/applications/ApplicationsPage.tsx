@@ -175,6 +175,15 @@ export interface ApplicationsPageProps {
    * the intent survives the redirect.
    */
   initialOpenId?: string | null
+  /**
+   * Opens the add wizard on mount, with this posting address already in it.
+   *
+   * Set from `?add=<url>`, which is how the calendar's job feed hands a
+   * posting over. A separate parameter from `?application=` because they are
+   * different intents -- one opens a record that exists, the other starts one
+   * that does not.
+   */
+  initialAddUrl?: string | null
 }
 
 export function ApplicationsPage({
@@ -195,6 +204,7 @@ export function ApplicationsPage({
   record,
   onOpenJobChange,
   initialOpenId = null,
+  initialAddUrl = null,
 }: ApplicationsPageProps) {
   // THE FIXED FRAME IS GONE, and it went because of what now sits above the
   // toolbar (Gabe, 2026-09-10: a chart and four statistics cards).
@@ -303,6 +313,17 @@ export function ApplicationsPage({
     // arrives before the list has loaded still opens once it has.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialOpenId, jobs])
+
+  // `?add=<url>` from the calendar's job feed. Once per URL, for the same
+  // reason `?application=` runs once per id: re-running on every render of
+  // `jobs` would reopen the wizard each time the list refetched, including
+  // immediately after somebody closed it.
+  const openedAdd = React.useRef<string | null>(null)
+  React.useEffect(() => {
+    if (!initialAddUrl || openedAdd.current === initialAddUrl) return
+    openedAdd.current = initialAddUrl
+    setAddOpen(true)
+  }, [initialAddUrl])
 
   // ORDERED BY `date_applied`, NEWEST FIRST, by default -- and by company or
   // position when the toolbar asks. This used to sort on `created_at`, which
@@ -513,6 +534,7 @@ export function ApplicationsPage({
         autofilling={autofilling}
         onDigest={onDigest}
         onDirtyChange={setFormDirty}
+        initialUrl={initialAddUrl}
       />
 
       <ConfirmDialog

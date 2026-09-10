@@ -3,9 +3,10 @@
 import * as React from 'react'
 import { useEvents } from '@/hooks/useEvents'
 import { useJobs } from '@/hooks/useJobs'
-import { usePublicHolidays, useHolidayCountries } from '@/hooks/usePublicHolidays'
-import { HOLIDAY_COUNTRY_KEY, resolveHolidayCountry } from '@/services/holidays'
+import { useCalendarExtras } from '@/hooks/useCalendarExtras'
 import { Calendar } from '@/components/calendar/Calendar'
+import { JobFeed } from '@/components/calendar/JobFeed'
+import { dayKey } from '@/lib/calendar'
 import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
 
@@ -46,41 +47,34 @@ export default function Page() {
   const { data: events = [], isLoading, error } = useEvents()
   const { data: jobs = [] } = useJobs()
 
-  // Which years the grid is showing. `Calendar` reports it, because the month
-  // cursor lives there and only it knows a December grid reaches into January.
-  const [years, setYears] = React.useState<number[]>(() => [new Date().getFullYear()])
-
-  // Null until the effect below runs: `localStorage` and `navigator` do not
-  // exist during the server render, and reading them in the initial state
-  // would be a hydration mismatch rather than a clever shortcut.
-  const [country, setCountry] = React.useState<string | null>(null)
-  React.useEffect(() => {
-    const stored = window.localStorage.getItem(HOLIDAY_COUNTRY_KEY)
-    if (stored) {
-      setCountry(stored)
-      return
-    }
-    const languages = navigator.languages?.length ? navigator.languages : [navigator.language]
-    setCountry(resolveHolidayCountry(languages))
-  }, [])
-
-  const chooseCountry = (code: string) => {
-    setCountry(code)
-    // Best-effort: a browser with storage blocked still gets holidays for this
-    // session, it just asks again next time.
-    try {
-      window.localStorage.setItem(HOLIDAY_COUNTRY_KEY, code)
-    } catch {
-      /* private mode, or storage disabled */
-    }
-  }
-
-  const { data: holidays = [] } = usePublicHolidays(years, country)
-  const { data: holidayCountries = [] } = useHolidayCountries()
+  // Holidays and the fresh-roles feed, plus the per-browser choices in front
+  // of them. Shared with /demo/calendar, which renders the same two panels
+  // over a fixture -- see useCalendarExtras for why they are not inlined here.
+  const extras = useCalendarExtras()
 
   const companyByJobId = React.useMemo(() => {
     const map: Record<string, string> = {}
     for (const job of jobs) map[job.id] = job.company
+    return map
+  }, [jobs])
+
+  /**
+   * Applications sent per calendar day, for the grid.
+   *
+   * `date_applied` is a bare DATE, so it is turned into a local `Date` by
+   * PARTS rather than by `new Date(string)` -- the latter reads it as UTC
+   * midnight, which is the previous day for anyone behind UTC and would file
+   * the whole month one cell to the left. Same rule `jobStats` follows.
+   */
+  const applicationsByDay = React.useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const job of jobs) {
+      if (!job.date_applied) continue
+      const parts = /^(\d{4})-(\d{2})-(\d{2})$/.exec(job.date_applied)
+      if (!parts) continue
+      const key = dayKey(new Date(+parts[1], +parts[2] - 1, +parts[3]))
+      map[key] = (map[key] ?? 0) + 1
+    }
     return map
   }, [jobs])
 
@@ -101,11 +95,9 @@ export default function Page() {
     <Calendar
       events={events}
       companyByJobId={companyByJobId}
-      holidays={holidays}
-      holidayCountry={country}
-      holidayCountries={holidayCountries}
-      onHolidayCountryChange={chooseCountry}
-      onVisibleYearsChange={setYears}
+      {...extras.calendar}
+      applicationsByDay={applicationsByDay}
+      feed={<JobFeed {...extras.feed} />}
     />
   )
 }

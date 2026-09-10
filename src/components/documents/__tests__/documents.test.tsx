@@ -6,6 +6,7 @@ import { formatTouchedDate } from '@/services/date'
 import { DocumentRow, DOCUMENT_GRID } from '../DocumentRow'
 import { VersionHistory } from '../VersionHistory'
 import { DocumentsPage } from '../DocumentsPage'
+import { chooseOption } from '@/test/select'
 
 afterEach(() => cleanup())
 
@@ -419,5 +420,70 @@ describe('column labels line up with the data under them', () => {
     const actions = container.querySelector('[data-row-actions]')!
     expect(actions.querySelectorAll('button')).toHaveLength(1)
     expect(actions.textContent).not.toMatch(/versions/i)
+  })
+})
+
+describe('narrowing and paging the document list', () => {
+  /** Eleven documents: one page of ten and one of one, seven Word, four LaTeX. */
+  const MANY: ResumeSummary[] = Array.from({ length: 11 }, (_, index) => ({
+    id: `doc-${index}`,
+    title: `CV ${index}`,
+    mode: index % 3 === 0 ? 'latex' : 'word',
+    updated_at: new Date(2026, 8, 1 + index).toISOString(),
+    sections: null,
+    version: 1,
+    hasVersions: false,
+  }))
+
+  it('shows one page at a time and pages to the rest', async () => {
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={MANY} />)
+    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(10)
+    expect(screen.getByText('1–10 of 11')).toBeTruthy()
+
+    // `role: 'button'` -- `PaginationLink` renders an anchor that carries an
+    // explicit button role, which is right for a control that pages in place
+    // rather than navigating.
+    await user.click(screen.getByRole('button', { name: '2' }))
+    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(1)
+    expect(screen.getByText('11–11 of 11')).toBeTruthy()
+  })
+
+  it('narrows to one format, and counts what is left', async () => {
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={MANY} />)
+    await chooseOption(user, screen.getByLabelText('Filter documents'), 'LaTeX only')
+    // 0, 3, 6, 9 -- four of the eleven.
+    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(4)
+    expect(screen.getByText('1–4 of 4')).toBeTruthy()
+  })
+
+  it('returns to the first page when the filter changes', async () => {
+    // Page 2 of "all" does not exist under "LaTeX only"; staying there would
+    // strand the reader on an empty page with no control that leads back.
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={MANY} />)
+    // `role: 'button'` -- `PaginationLink` renders an anchor that carries an
+    // explicit button role, which is right for a control that pages in place
+    // rather than navigating.
+    await user.click(screen.getByRole('button', { name: '2' }))
+    await chooseOption(user, screen.getByLabelText('Filter documents'), 'LaTeX only')
+    expect(screen.getByText('1–4 of 4')).toBeTruthy()
+  })
+
+  it('says a filter matched nothing rather than claiming the account is empty', async () => {
+    // "no CVs yet" is a claim about the account. A filter has no basis for it.
+    const user = userEvent.setup()
+    const { container } = render(
+      <DocumentsPage docs={[{ ...MANY[1], mode: 'word' }]} />
+    )
+    await chooseOption(user, screen.getByLabelText('Filter documents'), 'LaTeX only')
+    expect(container.querySelector('[data-documents-filter-empty]')).toBeTruthy()
+    expect(screen.queryByText(/no CVs yet/i)).toBeNull()
+  })
+
+  it('offers no filter at all on an empty account', () => {
+    render(<DocumentsPage docs={[]} />)
+    expect(screen.queryByLabelText('Filter documents')).toBeNull()
   })
 })

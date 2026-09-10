@@ -120,6 +120,23 @@ const SEEDS: Seed[] = [
   { ref: 'posthog', company: 'Beacon Analytics', role: 'Full Stack Engineer', status: 'wishlist', reached: 'wishlist', appliedDaysAgo: null, createdDaysAgo: 4, salaryMin: 170000, salaryMax: 225000, source: 'Company site', tags: ['analytics'], stack: ['React', 'Python'] },
   { ref: 'railway', company: 'Trackline Cloud', role: 'Platform Engineer', status: 'wishlist', reached: 'wishlist', appliedDaysAgo: null, createdDaysAgo: 3, salaryMin: 165000, salaryMax: 215000, source: 'JobStreet', tags: ['devtools'], stack: ['Go', 'Kubernetes'] },
   { ref: 'cursor', company: 'Glasswing AI', role: 'Software Engineer', status: 'wishlist', reached: 'wishlist', appliedDaysAgo: null, createdDaysAgo: 2, salaryMin: 210000, salaryMax: 280000, source: 'Referral', tags: ['ai'], stack: ['TypeScript', 'React'] },
+
+  // THE LAST FORTNIGHT, ADDED 2026-09-10, and it is the calendar that needed
+  // it. Every seed above was sent between 12 and 142 days ago, so the month
+  // grid -- which shows ONE month -- had nothing of the user's own on it and
+  // drew forty-two empty cells beside a busy applications list. These land
+  // inside the current month, which is also what gives `waiting on a reply`,
+  // `added in <month>` and the follow-up nudge something true to say.
+  //
+  // TWO ON THE SAME DAY, deliberately: a cell reading "2 sent" is the case a
+  // per-day count exists for, and a fixture where every day holds at most one
+  // would never show it.
+  { ref: 'aboitiz', company: 'Cordillera Power', role: 'Frontend Engineer', status: 'applied', reached: 'applied', appliedDaysAgo: 1, createdDaysAgo: 2, salaryMin: 95000, salaryMax: 135000, source: 'JobStreet', tags: ['energy'], stack: ['React', 'TypeScript'] },
+  { ref: 'unionbank', company: 'Rivermouth Bank', role: 'Software Engineer', status: 'applied', reached: 'applied', appliedDaysAgo: 2, createdDaysAgo: 3, salaryMin: 110000, salaryMax: 150000, source: 'LinkedIn', tags: ['fintech'], stack: ['TypeScript', 'Node.js'] },
+  { ref: 'globe', company: 'Skyline Telecom', role: 'Full Stack Engineer', status: 'applied', reached: 'applied', appliedDaysAgo: 4, createdDaysAgo: 5, salaryMin: 105000, salaryMax: 145000, source: 'Company site', tags: ['telco'], stack: ['React', 'Postgres'] },
+  { ref: 'smart', company: 'Northbend Comms', role: 'Web Engineer', status: 'applied', reached: 'applied', appliedDaysAgo: 4, createdDaysAgo: 6, salaryMin: 90000, salaryMax: 125000, source: 'LinkedIn', tags: ['telco'], stack: ['React', 'PHP'] },
+  { ref: 'cloudstaff', company: 'Ridgeway Outsourcing', role: 'Junior Developer', status: 'interviewing', reached: 'interviewing', appliedDaysAgo: 8, createdDaysAgo: 10, salaryMin: 70000, salaryMax: 95000, source: 'Kalibrr', tags: ['bpo'], stack: ['React', 'Node.js'], contact: { name: 'Rina Lopez', email: 'rina.lopez@example.com', notes: 'Talent partner' } },
+  { ref: 'penbrothers', company: 'Fairwind Talent', role: 'Frontend Engineer', status: 'applied', reached: 'applied', appliedDaysAgo: 9, createdDaysAgo: 11, salaryMin: 85000, salaryMax: 120000, source: 'JobStreet', tags: ['bpo'], stack: ['Vue', 'TypeScript'] },
 ]
 
 const jd = (role: string, stack: string[]) =>
@@ -190,29 +207,65 @@ function buildEvents(now: Date): CalendarEvent[] {
     { id: 'demo-ev-3', job_id: 'demo-vercel', user_id: DEMO_USER_ID, kind: 'interview', title: 'Hiring manager call', starts_at: at(4, 14), duration_minutes: 45, notes: null },
     { id: 'demo-ev-4', job_id: 'demo-stripe', user_id: DEMO_USER_ID, kind: 'deadline', title: 'Offer decision deadline', starts_at: at(6, 9), duration_minutes: null, notes: null },
     { id: 'demo-ev-5', job_id: 'demo-grab', user_id: DEMO_USER_ID, kind: 'follow_up', title: 'Follow up, no reply yet', starts_at: at(9, 11), duration_minutes: 15, notes: null },
+    // The record dialog's interview date reads the FIRST `kind: 'interview'`
+    // event on a job (see useApplicationRecord), so an interviewing row without
+    // one opens with an empty date field and nothing to demonstrate. Added
+    // 2026-09-10 alongside the recent applications above.
+    { id: 'demo-ev-6', job_id: 'demo-cloudstaff', user_id: DEMO_USER_ID, kind: 'interview', title: 'Interview — Ridgeway Outsourcing', starts_at: at(3, 15), duration_minutes: 45, notes: null },
   ]
 }
 
+/**
+ * The CVs, and why there are twelve of them.
+ *
+ * TWO WAS A DEMO OF NOTHING once the documents screen grew a format filter and
+ * a pager (2026-09-10). Two rows cannot show a filter narrowing anything, and
+ * ten-a-page over two documents renders a pager that is permanently on its
+ * first and only page -- so the two features Gabe had just asked for were
+ * invisible on the screen that has them.
+ *
+ * TWELVE IS NOT PADDING, it is what this app is for. Eight Word and four
+ * LaTeX, most of them named after the role they were tailored to, which is the
+ * product's own argument: you do not send one CV to thirty companies, you send
+ * a version. Eleven would have been enough for a second page; twelve keeps the
+ * count honest against the applications list, where four of these companies
+ * appear by name.
+ *
+ * Dates are spread so `modified` sorts to something readable rather than
+ * twelve rows of the same day.
+ */
 function buildResumes(now: Date): ResumeSummary[] {
+  const cv = (
+    id: string,
+    title: string,
+    mode: 'word' | 'latex',
+    daysAgo: number,
+    version: number
+  ): ResumeSummary => ({
+    id,
+    title,
+    mode,
+    updated_at: shift(now, daysAgo).toISOString(),
+    sections: null,
+    version,
+    // A version history exists once there is more than one version of it, which
+    // is the same rule the real `resumeService` applies.
+    hasVersions: version > 1,
+  })
+
   return [
-    {
-      id: 'demo-cv-word',
-      title: 'Software Engineer CV',
-      mode: 'word',
-      updated_at: shift(now, 3).toISOString(),
-      sections: null,
-      version: 4,
-      hasVersions: true,
-    },
-    {
-      id: 'demo-cv-latex',
-      title: 'Software Engineer CV (LaTeX)',
-      mode: 'latex',
-      updated_at: shift(now, 21).toISOString(),
-      sections: null,
-      version: 2,
-      hasVersions: true,
-    },
+    cv('demo-cv-word', 'Software Engineer CV', 'word', 3, 4),
+    cv('demo-cv-frontend', 'Frontend Engineer CV', 'word', 5, 3),
+    cv('demo-cv-meridian', 'Product Engineer — Meridian Labs', 'word', 8, 2),
+    cv('demo-cv-northwind', 'Software Engineer — Northwind Pay', 'word', 12, 5),
+    cv('demo-cv-fullstack', 'Full Stack Engineer CV', 'word', 16, 2),
+    cv('demo-cv-backend', 'Backend Engineer CV', 'word', 24, 1),
+    cv('demo-cv-junior', 'Junior Developer CV', 'word', 33, 1),
+    cv('demo-cv-ats', 'ATS-safe plain CV', 'word', 41, 2),
+    cv('demo-cv-latex', 'Software Engineer CV (LaTeX)', 'latex', 21, 2),
+    cv('demo-cv-latex-academic', 'Academic CV (LaTeX)', 'latex', 29, 3),
+    cv('demo-cv-latex-compact', 'Compact one-page CV (LaTeX)', 'latex', 47, 1),
+    cv('demo-cv-latex-halcyon', 'Frontend Engineer — Halcyon (LaTeX)', 'latex', 55, 2),
   ]
 }
 
@@ -348,8 +401,29 @@ export function buildDemoFixture(now: Date): DemoFixture {
 }
 
 /**
- * Built once at module load against the real clock. The routes import this;
- * tests that care about the date logic call `buildDemoFixture` with their own
- * `now` instead.
+ * Built once at module load against the real clock, FLOORED TO MIDNIGHT.
+ *
+ * THE FLOOR IS A HYDRATION FIX, not tidiness. This module runs twice for every
+ * demo page -- once on the server, once in the browser -- and each run called
+ * `new Date()` for itself, so every `updated_at` and `created_at` differed by
+ * however many milliseconds the response took. React compared the two and
+ * logged a hydration mismatch on `<time dateTime>` for every row on the
+ * screen; the visible text always agreed ("Sep 7" both times), which is why it
+ * survived unnoticed until the demo grew from two CVs to twelve and the error
+ * listed all of them.
+ *
+ * Local midnight rather than UTC midnight: every date the fixture derives is
+ * read on a wall calendar (`dayOf`, the trend buckets, the month grid), and
+ * flooring in UTC would put "today" on the wrong day for anyone far enough
+ * east or west. Both runs are the same machine in the same zone, so both floor
+ * to the same instant.
+ *
+ * The routes import this; tests that care about the date logic call
+ * `buildDemoFixture` with their own `now` instead.
  */
-export const DEMO: DemoFixture = buildDemoFixture(new Date())
+function startOfToday(): Date {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+export const DEMO: DemoFixture = buildDemoFixture(startOfToday())

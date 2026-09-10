@@ -31,6 +31,17 @@ vi.mock('next-themes', () => ({
 }))
 
 const pathname = vi.hoisted(() => ({ value: '/demo/dashboard' }))
+// The calendar's two live panels -- holidays and the remote-roles feed -- are
+// third-party reads behind react-query. Mocked so this suite neither stands up
+// a QueryClient nor depends on somebody else's uptime; the fixture is what
+// these tests are about.
+vi.mock('@/hooks/useCalendarExtras', () => ({
+  useCalendarExtras: () => ({
+    calendar: { holidays: [], holidayCountry: null, holidayCountries: [] },
+    feed: { jobs: [], loading: false, error: false, industries: [], industry: null },
+  }),
+}))
+
 vi.mock('next/navigation', () => ({
   usePathname: () => pathname.value,
   useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),

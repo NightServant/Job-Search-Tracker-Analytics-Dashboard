@@ -48,6 +48,17 @@ export interface MonthGridProps {
   events: CalendarEvent[]
   /** Public holidays for the years this grid covers. See services/holidays. */
   holidays?: PublicHoliday[]
+  /**
+   * How many applications went out on each day, keyed by `dayKey`.
+   *
+   * IT IS THE ONE THING THIS GRID SHOWS THAT THE USER PUT THERE. Interviews
+   * and deadlines are sparse by nature -- most people have none most weeks --
+   * so a month with nothing booked drew forty-two empty cells and said nothing
+   * about a search that was, in fact, busy. `date_applied` is already on every
+   * row; plotting it turns the calendar into a record of effort rather than a
+   * page waiting for an interview to happen.
+   */
+  applicationsByDay?: Record<string, number>
   today?: Date
   className?: string
 }
@@ -57,6 +68,7 @@ export function MonthGrid({
   month,
   events,
   holidays = [],
+  applicationsByDay = {},
   today = new Date(),
   className,
 }: MonthGridProps) {
@@ -98,6 +110,7 @@ export function MonthGrid({
         const key = dayKey(date)
         const dayEvents = grouped.get(key) ?? []
         const dayHolidays = publicHolidays.get(key) ?? []
+        const sent = applicationsByDay[key] ?? 0
         const inMonth = date.getMonth() === month
         const isToday = key === todayKey
 
@@ -166,6 +179,14 @@ export function MonthGrid({
               {dayEvents.length > MAX_TITLES_PER_CELL && (
                 <span className="text-caption text-text-muted">
                   +{dayEvents.length - MAX_TITLES_PER_CELL} more
+                </span>
+              )}
+              {/* LAST IN THE CELL, and muted. What was BOOKED on a day
+                  outranks what was sent on it -- an interview is somewhere to
+                  be, an application is something already done. */}
+              {sent > 0 && (
+                <span data-applications-sent className="tabular text-caption text-text-muted">
+                  {sent} sent
                 </span>
               )}
             </div>

@@ -70,6 +70,23 @@ export interface CalendarProps {
    * one fact it cannot work out on its own.
    */
   onVisibleYearsChange?: (years: number[]) => void
+  /**
+   * How many applications went out on each day, keyed by `dayKey`.
+   *
+   * Built at the route from the same `useJobs()` cache `companyByJobId` comes
+   * from, so the grid and the agenda agree without a second read.
+   */
+  applicationsByDay?: Record<string, number>
+  /**
+   * The fresh-postings panel, rendered under the month.
+   *
+   * A SLOT, NOT SIX PROPS. It needs a feed, a loading flag, an error flag, a
+   * taxonomy, the chosen filter and a change handler; threading all six
+   * through this component would make `Calendar` a pass-through for a panel it
+   * has no opinion about. The route builds it, the same way the settings
+   * screen takes its import control as a node.
+   */
+  feed?: React.ReactNode
 }
 
 export function Calendar({
@@ -80,6 +97,8 @@ export function Calendar({
   holidayCountries = [],
   onHolidayCountryChange,
   onVisibleYearsChange,
+  applicationsByDay = {},
+  feed,
 }: CalendarProps) {
   const today = React.useMemo(() => new Date(), [])
   const [cursor, setCursor] = React.useState(today)
@@ -115,39 +134,33 @@ export function Calendar({
 
   return (
     <div className="flex flex-col gap-6">
+      {/* NO CONTROLS IN THE PAGE HEADER (Gabe, 2026-09-10, calling the old
+          arrangement a regression). The month nav and the holiday picker sat
+          in `PageHeader`'s action slot, which is where a PAGE-level action
+          belongs -- `/applications`' add button, `/documents`' new CV. These
+          are not page actions: they steer one component further down, and
+          beside the title they read as the app's own navigation. They now sit
+          directly above the grid they move, which is the section they act on.
+
+          The header keeps the rule, so the page still opens the same way every
+          other screen does. */}
       <PageHeader
         title="calendar"
         description="interviews and follow-ups, laid out by month."
-        action={
-          <div className="flex flex-wrap items-center gap-3">
-            {/* THE COUNTRY IS PART OF THE ANSWER, so it is on screen rather
-                than buried in settings. A browser's language tag says what
-                language somebody reads, not where they live, so the detected
-                value is a guess -- and a calendar quietly showing the wrong
-                country's holidays is worse than one showing none. Visible at
-                every width, unlike the month nav beside it, because it is the
-                one control the mobile layout also depends on. */}
-            {holidayCountries.length > 0 && (
-              // THE WIDTH IS ON A WRAPPER, not on the Select. `Select`'s own
-              // root is `w-full` and only its trigger takes `className`, so a
-              // width passed in sizes the button inside a box that is still
-              // claiming the whole row -- which pushed the month controls onto
-              // a second line at every desktop width.
-              <div className="w-52 shrink-0 max-sm:w-full">
-                <Select
-                  id="holiday-country"
-                  icon="Globe"
-                  aria-label="Public holidays for"
-                  value={holidayCountry ?? ''}
-                  onValueChange={(next) => onHolidayCountryChange?.(next)}
-                  items={holidayCountries.map((country) => ({
-                    value: country.countryCode,
-                    label: `${country.name} holidays`,
-                  }))}
-                />
-              </div>
-            )}
-            <div className="hidden items-center gap-3 md:flex">
+        rule
+      />
+
+      {/* FIRST, ABOVE THE MONTH (Gabe, 2026-09-10). What is newly posted is
+          perishable in a way a month grid is not -- a role three days old is
+          most of the way through its shortlist, while an interview next
+          Tuesday is still next Tuesday. */}
+      {feed}
+
+      <section className="flex flex-col gap-3" data-calendar-block>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          {/* Hidden below `md` for the same reason it always was: nothing on
+              the mobile layout responds to the month cursor. */}
+          <div className="hidden items-center gap-3 md:flex">
             <p className="tabular text-body-m text-text-secondary">{monthLabel}</p>
             {/* Icons sit on the side the control moves you toward, so the
                 pair reads as one axis; `today` takes the calendar glyph
@@ -166,24 +179,49 @@ export function Calendar({
                 <ChevronRightIcon size={16} aria-hidden className="[&_svg]:size-4" />
               </Button>
             </div>
-            </div>
           </div>
-        }
-        rule
-      />
 
-      <MonthGrid
-        grid={grid}
-        month={cursor.getMonth()}
-        events={events}
-        holidays={holidays}
-        today={today}
-      />
+          {/* THE COUNTRY IS PART OF THE ANSWER, so it is on screen rather than
+              buried in settings. A browser's language tag says what language
+              somebody reads, not where they live, so the detected value is a
+              guess -- and a calendar quietly showing the wrong country's
+              holidays is worse than one showing none. Visible at every width,
+              unlike the month nav beside it, because the mobile layout marks
+              holidays too.
 
-      <div data-week-strip className="flex flex-col gap-6 md:hidden">
-        <WeekStrip days={week} holidays={holidays} today={today} />
-        <Agenda events={events} companyByJobId={companyByJobId} />
-      </div>
+              `ml-auto` so it stays on the trailing edge once the nav beside it
+              is hidden, rather than jumping to the left on a phone. */}
+          {holidayCountries.length > 0 && (
+            <div className="w-52 shrink-0 max-sm:w-full md:ml-auto">
+              <Select
+                id="holiday-country"
+                icon="Globe"
+                aria-label="Public holidays for"
+                value={holidayCountry ?? ''}
+                onValueChange={(next) => onHolidayCountryChange?.(next)}
+                items={holidayCountries.map((country) => ({
+                  value: country.countryCode,
+                  label: `${country.name} holidays`,
+                }))}
+              />
+            </div>
+          )}
+        </div>
+
+        <MonthGrid
+          grid={grid}
+          month={cursor.getMonth()}
+          events={events}
+          holidays={holidays}
+          applicationsByDay={applicationsByDay}
+          today={today}
+        />
+
+        <div data-week-strip className="mt-3 flex flex-col gap-6 md:hidden">
+          <WeekStrip days={week} holidays={holidays} today={today} />
+          <Agenda events={events} companyByJobId={companyByJobId} />
+        </div>
+      </section>
     </div>
   )
 }

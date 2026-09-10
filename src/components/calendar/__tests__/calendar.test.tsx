@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { render, screen, cleanup, within } from '@testing-library/react'
 import type { CalendarEvent } from '@/services/events'
 
 import { Calendar } from '../Calendar'
 import { Agenda } from '../Agenda'
 import { MonthGrid } from '../MonthGrid'
+import { JobFeed } from '../JobFeed'
 import { buildMonthGrid } from '@/lib/calendar'
 
 afterEach(() => cleanup())
@@ -213,5 +214,143 @@ describe('public holidays', () => {
     render(<Calendar events={[]} onVisibleYearsChange={(years) => seen.push(years)} />)
     expect(seen.length).toBeGreaterThan(0)
     expect(seen[seen.length - 1]).toContain(new Date().getFullYear())
+  })
+})
+
+describe('the fresh-roles feed', () => {
+  const role = (id: string, title: string, publishedAt: string) => ({
+    id,
+    title,
+    company: 'Vercel',
+    url: `https://jobicy.com/jobs/${id}`,
+    geo: 'APAC',
+    level: 'Any',
+    industry: 'Software Engineering',
+    publishedAt,
+    excerpt: null,
+    salaryMin: null,
+    salaryMax: null,
+    salaryCurrency: null,
+  })
+
+  it('links every row to the original posting, and credits the source', () => {
+    // Both are conditions of use, not decoration: the feed's own response asks
+    // that Jobicy be credited with a direct link and that application buttons
+    // redirect to the job URL it provided.
+    render(<JobFeed jobs={[role('1', 'Backend Engineer', new Date().toISOString())]} />)
+    const posting = screen.getByRole('link', { name: /Backend Engineer/ })
+    expect(posting.getAttribute('href')).toBe('https://jobicy.com/jobs/1')
+    expect(posting.getAttribute('rel')).toBe('noreferrer')
+    expect(screen.getByRole('link', { name: 'Jobicy' })).toBeTruthy()
+  })
+
+  it('hands the posting URL to the add flow rather than copying the row', () => {
+    render(<JobFeed jobs={[role('1', 'Backend Engineer', new Date().toISOString())]} />)
+    const track = screen.getByRole('link', { name: /track it/i })
+    expect(track.getAttribute('href')).toBe(
+      `/applications?add=${encodeURIComponent('https://jobicy.com/jobs/1')}`
+    )
+  })
+
+  it('dates every card by the day it went up', () => {
+    // The rail replaced a stack of day-grouped lists (Gabe, 2026-09-10), so
+    // the day label moved onto the card. It is still the local day: reading a
+    // `pubDate` as its UTC date would file an evening posting under yesterday
+    // for anyone ahead of UTC.
+    const today = new Date()
+    const earlier = new Date(today)
+    earlier.setDate(earlier.getDate() - 3)
+    const { container } = render(
+      <JobFeed
+        jobs={[role('2', 'New role', today.toISOString()), role('1', 'Older role', earlier.toISOString())]}
+      />
+    )
+    const cards = [...container.querySelectorAll('[data-feed-role]')]
+    expect(cards).toHaveLength(2)
+    expect(cards[0].textContent).toContain('today')
+    expect(cards[1].textContent).not.toContain('today')
+  })
+
+  it('keeps the whole panel to one card tall, however many roles came back', () => {
+    // Twenty-four roles stacked vertically pushed the month grid two screens
+    // down the page the grid is the subject of. A rail is why this is on top.
+    const now = new Date().toISOString()
+    const { container } = render(
+      <JobFeed jobs={Array.from({ length: 24 }, (_, i) => role(String(i), `Role ${i}`, now))} />
+    )
+    expect(container.querySelectorAll('[data-feed-role]')).toHaveLength(24)
+    // One track, not twenty-four rows.
+    expect(container.querySelectorAll('[data-slot="carousel-content"]')).toHaveLength(1)
+  })
+
+  it('says a failed fetch failed rather than claiming nothing was posted', () => {
+    // "nothing posted" is a claim about the job market. A network error has no
+    // basis for making it.
+    const { container } = render(<JobFeed error />)
+    expect(container.querySelector('[data-job-feed-state="error"]')).toBeTruthy()
+    expect(container.querySelector('[data-job-feed-state="empty"]')).toBeNull()
+  })
+
+  it('renders the calendar without a feed at all', () => {
+    // The feed is a third-party read and must never gate this screen.
+    const { container } = render(<Calendar events={[]} />)
+    expect(container.querySelector('[data-job-feed]')).toBeNull()
+    expect(container.querySelector('[data-month-grid]')).toBeTruthy()
+  })
+})
+
+describe('applications on the month grid', () => {
+  it('counts what was sent on each day', () => {
+    // The grid was forty-two empty cells for anyone with no interviews booked,
+    // while the account behind it was busy. `date_applied` is already there.
+    const { container } = render(
+      <MonthGrid
+        grid={buildMonthGrid(2026, 7)}
+        month={7}
+        events={[]}
+        applicationsByDay={{ '2026-08-12': 3 }}
+      />
+    )
+    const marks = container.querySelectorAll('[data-applications-sent]')
+    expect(marks).toHaveLength(1)
+    expect(marks[0].textContent).toBe('3 sent')
+  })
+
+  it('draws nothing on a day with none', () => {
+    const { container } = render(
+      <MonthGrid grid={buildMonthGrid(2026, 7)} month={7} events={[]} />
+    )
+    expect(container.querySelector('[data-applications-sent]')).toBeNull()
+  })
+})
+
+describe('where the calendar puts its own controls', () => {
+  it('keeps the month nav and the holiday picker out of the page header', () => {
+    // Gabe called the old arrangement a regression (2026-09-10): these steer
+    // one component further down the page, so beside the page title they read
+    // as the app's own navigation. `PageHeader`'s action slot is for
+    // page-level actions -- /applications' add, /documents' new CV.
+    const { container } = render(
+      <Calendar
+        events={[]}
+        holidayCountry="PH"
+        holidayCountries={[{ countryCode: 'PH', name: 'Philippines' }]}
+      />
+    )
+    const header = container.querySelector('[data-body-header]')!
+    expect(header.querySelector('#holiday-country')).toBeNull()
+    expect(within(header as HTMLElement).queryByRole('button', { name: /previous/i })).toBeNull()
+
+    // Present, just somewhere that makes sense: the block that holds the grid.
+    const block = container.querySelector('[data-calendar-block]')!
+    expect(block.querySelector('#holiday-country')).toBeTruthy()
+    expect(block.querySelector('[data-month-grid]')).toBeTruthy()
+  })
+
+  it('puts the fresh-roles panel above the month, not below it', () => {
+    const { container } = render(<Calendar events={[]} feed={<div data-test-feed />} />)
+    const feed = container.querySelector('[data-test-feed]')!
+    const block = container.querySelector('[data-calendar-block]')!
+    expect(feed.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })

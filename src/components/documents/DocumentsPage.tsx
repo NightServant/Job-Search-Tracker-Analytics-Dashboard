@@ -9,6 +9,15 @@ import { IconButton } from '@/components/ui/icon-button'
 import { PlusIcon, TrashIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Select } from '@/components/ui/select'
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from '@/components/ui/pagination'
 import { ModeChooser } from '@/components/cv/ModeChooser'
 import { DocumentRow, DOCUMENT_GRID } from './DocumentRow'
 import { TemplateGallery, type TemplateChoice } from './TemplateGallery'
@@ -27,6 +36,31 @@ import type { ResumeSummary } from '@/services/resumeService'
  * nothing else to sit behind it.
  */
 export const NEW_CV_HREF = '/cv?draft=new'
+
+/**
+ * Which kinds of document the list can be narrowed to (Gabe, 2026-09-10).
+ *
+ * `word` and `latex` ARE THE TWO KINDS, not a taxonomy that might grow:
+ * `ResumeSummary.mode` has exactly these values, the editor forks on them, and
+ * `DocumentRow` already labels every row with one. So the filter is a closed
+ * set rather than a search over a free-text field.
+ */
+const DOC_FILTERS = [
+  { value: 'all', label: 'all documents' },
+  { value: 'word', label: 'Word only' },
+  { value: 'latex', label: 'LaTeX only' },
+] as const
+
+type DocFilter = (typeof DOC_FILTERS)[number]['value']
+
+/**
+ * Ten a page, matching /applications.
+ *
+ * The same argument as there, and it is about DISCOVERABILITY rather than
+ * performance: at twenty, somebody with a dozen CVs never sees pagination and
+ * cannot tell the list is paged at all.
+ */
+const PAGE_SIZE = 10
 
 /**
  * The Documents screen, laid out the way Microsoft Word lays out its start
@@ -100,6 +134,23 @@ export function DocumentsPage({
   const [newCvOpen, setNewCvOpen] = React.useState(false)
   const fileInput = React.useRef<HTMLInputElement>(null)
   const hasDocs = docs.length > 0
+
+  const [filter, setFilter] = React.useState<DocFilter>('all')
+  const [page, setPage] = React.useState(1)
+
+  const filtered = filter === 'all' ? docs : docs.filter((doc) => doc.mode === filter)
+  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  // CLAMPED, NOT STORED. Deleting the last row of page 3, or narrowing to
+  // LaTeX when only page 1 has any, would otherwise strand the reader on an
+  // empty page with no control that leads anywhere.
+  const current = Math.min(page, pageCount)
+  const paged = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+
+  // The filter changes the result set, so the page index it was valid for is
+  // meaningless afterwards.
+  React.useEffect(() => {
+    setPage(1)
+  }, [filter])
 
   // ONE CTA, TWO BEHAVIOURS. Below `lg` it is a link to the Templates page;
   // on desktop it opens the mode chooser exactly as before. A link and a
@@ -193,8 +244,36 @@ export function DocumentsPage({
         />
       )}
 
-      <section className="flex flex-col gap-3">
-        <h2 className="text-heading-s text-text-primary">your documents</h2>
+      {/* `gap-5`, NOT `gap-3` (Gabe, 2026-09-10: "implement proper vertical
+          spacing for this section"). Three things stack here -- a heading row,
+          a table and a pager -- and at 12px the column labels sat against the
+          heading, so "your documents" read as a caption on the NAME column
+          rather than as the section's own title. The filter control made it
+          worse by raising that row to 40px while the heading stayed 20px. */}
+      <section className="flex flex-col gap-5">
+        {/* THE FILTER LIVES WITH THE LIST IT NARROWS, not in the page header
+            beside `new CV` and `import`. Those two are page-level actions; this
+            one only means anything next to the rows it hides. It is drawn only
+            when there are documents, for the same reason `new CV` leaves the
+            header on an empty screen -- a control over nothing. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-heading-s text-text-primary">your documents</h2>
+          {hasDocs && (
+            // Width on a wrapper, not on the Select: `Select`'s own root is
+            // `w-full` and only its trigger takes `className`. Same trap the
+            // calendar's country picker hit.
+            <div className="w-44 max-sm:w-full">
+              <Select
+                id="document-filter"
+                icon="Documents"
+                aria-label="Filter documents"
+                value={filter}
+                onValueChange={(next) => setFilter(next as DocFilter)}
+                items={DOC_FILTERS.map((option) => ({ ...option }))}
+              />
+            </div>
+          )}
+        </div>
 
         {hasDocs ? (
           <div>
@@ -202,7 +281,16 @@ export function DocumentsPage({
                 four columns and nothing said what any of them were. */}
             <div
               data-document-columns
-              className={cn('hidden border-b border-border-subtle pb-2 md:grid', DOCUMENT_GRID)}
+              className={cn(
+                // `pb-3` matches the rows' own `py-3`, so the label row sits
+                // on the same rhythm as the data under it instead of being
+                // pinched against the first one.
+                'hidden border-b border-border-subtle pb-3',
+                // No labels over nothing: a filter that matches no rows should
+                // not leave four column headings floating above its message.
+                filtered.length > 0 && 'md:grid',
+                DOCUMENT_GRID
+              )}
             >
               <span className="text-label-caps uppercase text-text-muted">name</span>
               <span className="text-label-caps uppercase text-text-muted">ATS</span>
@@ -212,7 +300,7 @@ export function DocumentsPage({
                   the same five tracks the data rows do. */}
               <span />
             </div>
-            {docs.map((doc) => (
+            {paged.map((doc) => (
               <DocumentRow
                 key={doc.id}
                 doc={doc}
@@ -235,6 +323,72 @@ export function DocumentsPage({
                 }
               />
             ))}
+
+            {/* A FILTER THAT MATCHES NOTHING IS NOT AN EMPTY ACCOUNT, and it
+                must not borrow the empty state's copy -- "no CVs yet" would be
+                a false claim about the account whenever somebody picks LaTeX
+                and owns only Word documents. */}
+            {filtered.length === 0 && (
+              <p className="py-8 text-body-m text-text-muted" data-documents-filter-empty>
+                no {filter === 'word' ? 'Word' : 'LaTeX'} documents. there
+                {docs.length === 1 ? ' is ' : ' are '}
+                {docs.length} in the other format.
+              </p>
+            )}
+
+            {filtered.length > 0 && (
+              // `pt-5` clears the last row's own hairline. At `pt-4` the
+              // count and the pager crowded a rule they are not part of.
+              <div className="flex flex-wrap items-center justify-between gap-4 pt-5">
+                <p className="text-body-s text-text-muted">
+                  {(current - 1) * PAGE_SIZE + 1}&ndash;
+                  {Math.min(current * PAGE_SIZE, filtered.length)} of {filtered.length}
+                </p>
+                <Pagination className="mx-0 w-auto justify-end">
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious
+                        href="#"
+                        aria-disabled={current === 1}
+                        className={current === 1 ? 'pointer-events-none opacity-50' : undefined}
+                        onClick={(event) => {
+                          event.preventDefault()
+                          setPage((value) => Math.max(1, value - 1))
+                        }}
+                      />
+                    </PaginationItem>
+                    {pageCount > 1 &&
+                      Array.from({ length: pageCount }, (_, index) => index + 1).map((number) => (
+                        <PaginationItem key={number}>
+                          <PaginationLink
+                            href="#"
+                            isActive={number === current}
+                            onClick={(event) => {
+                              event.preventDefault()
+                              setPage(number)
+                            }}
+                          >
+                            {number}
+                          </PaginationLink>
+                        </PaginationItem>
+                      ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        href="#"
+                        aria-disabled={current === pageCount}
+                        className={
+                          current === pageCount ? 'pointer-events-none opacity-50' : undefined
+                        }
+                        onClick={(event) => {
+                          event.preventDefault()
+                          setPage((value) => Math.min(pageCount, value + 1))
+                        }}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         ) : (
           <EmptyState
