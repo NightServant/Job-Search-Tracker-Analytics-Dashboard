@@ -28,16 +28,36 @@ export interface PageHeaderProps extends React.HTMLAttributes<HTMLDivElement> {
   /** One lowercase line saying what this screen is for. */
   description?: React.ReactNode
   action?: React.ReactNode
+  /**
+   * A 2px rule under the header, closing it off from the page.
+   *
+   * IT WAS THE OVERVIEW'S ALONE (Figma 20:68) and it is every screen's now
+   * (Gabe, 2026-09-10). That is the same argument this component was extracted
+   * on: the screens are meant to read as one screen wearing different data,
+   * and a rule under one page title out of six is exactly the kind of
+   * near-agreement that reads as an accident.
+   *
+   * `border-border-default`, not `border-subtle`: this is the page's own
+   * top-level division, and it has to be heavier than the hairlines dividing
+   * content inside it or it stops meaning anything.
+   *
+   * `mt-6` INSIDE A WRAPPER rather than as a sibling in the caller's column.
+   * Every screen that renders this sits in a `gap-8` stack; left as a sibling
+   * the rule would take that 32px and float midway between the title and the
+   * content instead of belonging to the title.
+   */
+  rule?: boolean
 }
 
 export function PageHeader({
   title,
   description,
   action,
+  rule = false,
   className,
   ...props
 }: PageHeaderProps) {
-  return (
+  const header = (
     // `min-w-0` on both boxes. A flex or grid item's automatic minimum size is
     // its content's, not zero, so this header refused to be narrower than the
     // `max-w-prose` description it contains -- 65ch, about 470px. On analytics,
@@ -60,7 +80,12 @@ export function PageHeader({
     // 4px before.
     <div
       data-body-header
-      className={cn('flex min-w-0 flex-col gap-2 sm:gap-1', className)}
+      // `className` lands on whichever element is OUTERMOST, because that is
+      // the one the caller is positioning. /analytics passes
+      // `xl:col-span-2` and is a grid item; with the rule on, the wrapper
+      // below is that item, so the span has to go there or the header
+      // silently becomes a one-column cell.
+      className={cn('flex min-w-0 flex-col gap-2 sm:gap-1', !rule && className)}
       {...props}
     >
       {/* ON A PHONE THE READING ORDER IS TITLE, DESCRIPTION, ACTION (Gabe,
@@ -94,6 +119,17 @@ export function PageHeader({
           {description}
         </p>
       ) : null}
+    </div>
+  )
+
+  if (!rule) return header
+  return (
+    // `min-w-0` for the same reason the header itself carries it: this is now
+    // the grid item on /analytics, and a grid item's automatic minimum size is
+    // its content's.
+    <div className={cn('min-w-0', className)}>
+      {header}
+      <hr data-header-rule className="mt-6 border-0 border-t-2 border-border-default" />
     </div>
   )
 }

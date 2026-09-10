@@ -177,6 +177,7 @@ export function DocumentsPage({
             </div>
           ) : undefined
         }
+        rule
       />
 
       {/* DESKTOP ONLY. Below `lg` the grid is a page of its own reached by

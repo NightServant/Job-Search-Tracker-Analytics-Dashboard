@@ -468,6 +468,7 @@ export function ApplicationsPage({
             add
           </Button>
         }
+        rule
       />
 
       <ApplicationRecordDialog

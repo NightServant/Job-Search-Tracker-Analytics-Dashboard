@@ -513,6 +513,7 @@ export function Analytics({
         title="analytics"
         description="how your applications actually move, how long each step takes, and what they pay."
         action={<RangePicker value={range} onChange={setRange} />}
+        rule
       />
 
       {layOut(specs).map(({ key, node, full }) => (

@@ -169,6 +169,7 @@ export function Calendar({
             </div>
           </div>
         }
+        rule
       />
 
       <MonthGrid

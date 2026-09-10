@@ -169,16 +169,17 @@ export function Dashboard({
 
   return (
     <div className="flex flex-col gap-8">
-      <div>
-        {/* PageHeader rather than a hand-rolled h1: this screen having its own
-            was why its title was 28px while five other screens were 20px. */}
-        <PageHeader
-          title="overview"
-          description="your search at a glance — what is moving, what has stalled, and what is next."
-          action={<p className="tabular text-body-s text-text-muted">{today}</p>}
-        />
-        <hr data-header-rule className="mt-6 border-0 border-t-2 border-border-default" />
-      </div>
+      {/* PageHeader rather than a hand-rolled h1: this screen having its own
+          was why its title was 28px while five other screens were 20px. The
+          2px rule under it was hand-rolled here too until 2026-09-10, when
+          Gabe asked for it on every screen -- it lives in `PageHeader` now,
+          behind `rule`, so the five cannot drift apart. */}
+      <PageHeader
+        title="overview"
+        description="your search at a glance — what is moving, what has stalled, and what is next."
+        action={<p className="tabular text-body-s text-text-muted">{today}</p>}
+        rule
+      />
 
       <HeadlineStats jobs={jobs} />
 

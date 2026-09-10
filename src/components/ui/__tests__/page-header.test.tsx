@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, cleanup } from '@testing-library/react'
 import { PageHeader } from '../page-header'
 
 describe('PageHeader', () => {
@@ -21,6 +21,41 @@ describe('PageHeader', () => {
   it('omits the action slot entirely when none is given', () => {
     const { container } = render(<PageHeader title="Dashboard" />)
     expect(container.querySelector('[data-body-header]')!.children).toHaveLength(1)
+  })
+})
+
+describe('the header rule', () => {
+  it('draws no rule unless the screen asks for one', () => {
+    const { container } = render(<PageHeader title="Dashboard" />)
+    expect(container.querySelector('[data-header-rule]')).toBeNull()
+  })
+
+  it('closes the header with a 2px rule when asked', () => {
+    // Gabe, 2026-09-10: the Overview's rule on every screen. 2px and
+    // `border-default` -- heavier than the hairlines dividing content, because
+    // this one divides the page from its title.
+    const { container } = render(<PageHeader title="Dashboard" rule />)
+    const rule = container.querySelector('[data-header-rule]') as HTMLElement
+    expect(rule).toBeTruthy()
+    expect(rule.className).toContain('border-t-2')
+    expect(rule.className).toContain('border-border-default')
+    // AFTER the header, not beside it.
+    const header = container.querySelector('[data-body-header]')!
+    expect(header.compareDocumentPosition(rule) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('puts the caller class on whichever element is outermost', () => {
+    // /analytics passes `xl:col-span-2` and is a grid item. With the rule on,
+    // the wrapper is that item -- a span left on the inner header would make
+    // the whole page header a one-column cell.
+    const plain = render(<PageHeader title="analytics" className="xl:col-span-2" />)
+    expect(plain.container.querySelector('[data-body-header]')!.className).toContain('xl:col-span-2')
+    cleanup()
+
+    const ruled = render(<PageHeader title="analytics" className="xl:col-span-2" rule />)
+    const outer = ruled.container.firstElementChild as HTMLElement
+    expect(outer.className).toContain('xl:col-span-2')
+    expect(outer.hasAttribute('data-body-header')).toBe(false)
   })
 })
 
@@ -46,4 +81,5 @@ describe('breathing room on a phone', () => {
     )!
     expect(actionSlot.className).toContain('max-sm:mt-2')
   })
+
 })
