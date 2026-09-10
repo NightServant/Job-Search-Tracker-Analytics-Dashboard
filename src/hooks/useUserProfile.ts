@@ -92,11 +92,15 @@ export function useImportProfileFromUrl() {
       })
       const payload = (await response.json()) as
         | { profile?: Partial<UserProfile>; warnings?: string[] }
-        | { error?: string }
+        | { error?: string; reason?: string }
       if (!response.ok) {
-        throw new Error(
-          ('error' in payload && payload.error) || 'Could not read that profile.'
-        )
+        const message = ('error' in payload && payload.error) || 'Could not read that profile.'
+        // THE RAW REASON RIDES ALONG. `/profile` distinguishes an exhausted
+        // quota from a sign-in wall from a refused host, and every one of them
+        // has a different fix -- collapsing them into one sentence is what
+        // sent Gabe to check a link that was fine (2026-09-10).
+        const reason = 'reason' in payload && payload.reason ? ` (${payload.reason})` : ''
+        throw new Error(`${message}${reason}`)
       }
       const fetched = ('profile' in payload && payload.profile) || {}
       const existing = await userProfileService.get(supabase)

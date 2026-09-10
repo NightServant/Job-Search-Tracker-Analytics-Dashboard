@@ -596,3 +596,67 @@ def test_a_missing_local_env_file_is_not_an_error(tmp_path):
     from app import _load_local_env
 
     _load_local_env(tmp_path / "nope.env")
+
+
+# --- Why a profile fetch failed, which is the whole answer for /profile ------
+
+import asyncio  # noqa: E402
+
+import httpx  # noqa: E402
+
+from app import _firecrawl_fetch  # noqa: E402
+
+
+def _fetch(monkeypatch, *, status=200, body=None, key="fc-test", raises=None):
+    """Runs `_firecrawl_fetch` against a stubbed transport."""
+    monkeypatch.setenv("FIRECRAWL_API_KEY", key)
+
+    async def post(self, *args, **kwargs):
+        if raises is not None:
+            raise raises
+        return httpx.Response(
+            status,
+            json=body if body is not None else {},
+            request=httpx.Request("POST", "https://api.firecrawl.dev/v2/scrape"),
+        )
+
+    monkeypatch.setattr(httpx.AsyncClient, "post", post)
+    return asyncio.run(_firecrawl_fetch("https://www.linkedin.com/in/example"))
+
+
+def test_a_working_fetch_reports_ok(monkeypatch):
+    html, reason = _fetch(
+        monkeypatch,
+        body={"success": True, "data": {"rawHtml": "<html>profile</html>"}},
+    )
+    assert html == "<html>profile</html>"
+    assert reason == "ok"
+
+
+def test_every_failure_names_itself(monkeypatch):
+    # WHY THIS MATTERS MORE HERE THAN ON /extract. That endpoint has an
+    # ordinary fetch and a browser behind it, so "it did not work" is enough.
+    # /profile has no fallback -- Firecrawl is the only route -- so the reason
+    # IS the answer the user gets. One generic sentence sent Gabe off to check
+    # a link that was fine (2026-09-10, first real test).
+    assert _fetch(monkeypatch, key="")[1] == "no-key"
+    assert _fetch(monkeypatch, status=401, body={"error": "Unauthorized"})[1].startswith(
+        "http-401"
+    )
+    assert _fetch(monkeypatch, status=402, body={"error": "Payment Required"})[1].startswith(
+        "http-402"
+    )
+    assert _fetch(monkeypatch, status=403, body={"error": "Forbidden"})[1].startswith("http-403")
+    assert _fetch(monkeypatch, status=429, body={"error": "Too Many"})[1].startswith("http-429")
+    # A 200 that carried no page is its own thing: LinkedIn answers some
+    # profiles with a sign-in wall that renders to nothing.
+    assert _fetch(monkeypatch, body={"success": True, "data": {}})[1] == "empty-body"
+    assert _fetch(monkeypatch, raises=httpx.TimeoutException("slow"))[1] == "timeout"
+    assert _fetch(monkeypatch, raises=httpx.ConnectError("down"))[1] == "unreachable"
+
+
+def test_the_upstream_error_text_survives_into_the_reason(monkeypatch):
+    # The distinguishing detail is usually in Firecrawl's own message -- "this
+    # site is not supported" reads very differently from "quota exceeded".
+    _, reason = _fetch(monkeypatch, status=403, body={"error": "domain not supported"})
+    assert "domain not supported" in reason

@@ -181,13 +181,26 @@ def firecrawl_html(payload: dict[str, Any]) -> tuple[str | None, str | None]:
             final if isinstance(final, str) else None)
 
 
-async def _fetch_via_firecrawl(
+async def _firecrawl_fetch(
     url: str, payload: dict[str, Any] | None = None
-) -> str | None:
-    """Fetch through Firecrawl, when a key is configured."""
+) -> tuple[str | None, str]:
+    """Fetch through Firecrawl. Returns `(html, reason)`.
+
+    `reason` IS THE POINT OF THIS SHAPE. Every failure here used to collapse
+    into `None`, which is fine for `/extract` -- it has an ordinary fetch and a
+    browser to fall back on, so the caller only needs to know it did not work.
+    `/profile` has no fallback: Firecrawl is the only route, so "it did not
+    work" is the entire answer the user gets, and "Could not read that profile
+    page. Check the link is public" sent Gabe off to check a link that was fine
+    (2026-09-10, first real test).
+
+    The reasons are distinguishable because the fixes are: an exhausted plan is
+    a billing page, a 401 is a wrong key, a refused host is Firecrawl declining
+    the site, and an empty body is a page that rendered to nothing.
+    """
     key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
     if not key:
-        return None
+        return None, "no-key"
     try:
         async with httpx.AsyncClient(timeout=FIRECRAWL_TIMEOUT_S) as client:
             response = await client.post(
@@ -195,16 +208,41 @@ async def _fetch_via_firecrawl(
                 headers={"Authorization": f"Bearer {key}"},
                 json=payload or firecrawl_payload(url),
             )
-        if response.status_code != 200:
-            # 402 is an exhausted plan and 429 a rate limit. Neither is worth a
-            # stack trace, and both fall through to whatever comes next.
-            return None
-        html, final = firecrawl_html(response.json())
-        if final and reject_reason(final):
-            return None
-        return html
+    except httpx.TimeoutException:
+        return None, "timeout"
     except Exception:
-        return None
+        return None, "unreachable"
+
+    if response.status_code != 200:
+        # 402 is an exhausted plan, 429 a rate limit, 401 a bad key, and 403
+        # is Firecrawl declining the site itself. None is worth a stack trace
+        # and all four are worth telling apart.
+        detail = ""
+        try:
+            body = response.json()
+            if isinstance(body, dict):
+                detail = str(body.get("error") or body.get("message") or "")[:200]
+        except Exception:
+            detail = response.text[:200]
+        return None, f"http-{response.status_code}" + (f": {detail}" if detail else "")
+
+    try:
+        html, final = firecrawl_html(response.json())
+    except Exception:
+        return None, "unreadable-response"
+    if final and reject_reason(final):
+        return None, "redirected-to-blocked-host"
+    if not html:
+        return None, "empty-body"
+    return html, "ok"
+
+
+async def _fetch_via_firecrawl(
+    url: str, payload: dict[str, Any] | None = None
+) -> str | None:
+    """The `/extract` path, which only needs to know whether it worked."""
+    html, _ = await _firecrawl_fetch(url, payload)
+    return html
 
 
 def _render(url: str) -> str | None:
@@ -285,10 +323,35 @@ async def profile_endpoint(body: ProfileRequest) -> JSONResponse:
             status_code=503,
         )
 
-    html = await _fetch_via_firecrawl(url, firecrawl_profile_payload(url))
+    html, reason = await _firecrawl_fetch(url, firecrawl_profile_payload(url))
     if not html:
+        # THE REASON REACHES THE USER, because there is no fallback route here
+        # and a generic message sends them to check a link that is fine.
+        friendly = {
+            "timeout": "The profile page took too long to load. Try again.",
+            "unreachable": "Could not reach the page reader. Try again shortly.",
+            "empty-body": (
+                "That page came back empty. LinkedIn shows a sign-in wall to "
+                "visitors for some profiles; only a public one can be read."
+            ),
+            "redirected-to-blocked-host": "That link redirected somewhere it should not.",
+            "unreadable-response": "The page reader returned something unexpected.",
+        }.get(reason)
+        if friendly is None and reason.startswith("http-402"):
+            friendly = "The page reader's monthly quota is used up."
+        if friendly is None and reason.startswith("http-401"):
+            friendly = "The page reader rejected our credentials."
+        if friendly is None and reason.startswith("http-403"):
+            friendly = "The page reader will not fetch that site."
+        if friendly is None and reason.startswith("http-429"):
+            friendly = "The page reader is rate limiting us. Try again in a minute."
         return JSONResponse(
-            {"error": "Could not read that profile page. Check the link is public."},
+            {
+                "error": friendly or "Could not read that profile page.",
+                # The raw reason, so a failure can be diagnosed from the
+                # response instead of from a log nobody kept.
+                "reason": reason,
+            },
             status_code=422,
         )
     if len(html.encode("utf-8", "ignore")) > MAX_HTML_BYTES:
