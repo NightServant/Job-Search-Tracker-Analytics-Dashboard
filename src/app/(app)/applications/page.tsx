@@ -25,6 +25,7 @@ import {
   usePinDocumentLink,
   useUnpinDocumentLink,
 } from '@/hooks/useDocumentLinks'
+import { useScheduleInterview } from '@/hooks/useJobEvents'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
 import type { Job, JobFormData } from '@/types'
 
@@ -94,6 +95,7 @@ function ApplicationsRoute() {
   const digest = usePostingDigest()
   const pinLink = usePinDocumentLink()
   const unpinLink = useUnpinDocumentLink()
+  const scheduleInterview = useScheduleInterview()
 
   // A desktop visitor landing on `/applications/<id>` is redirected here with
   // the id in the query, because that route is the mobile surface now.
@@ -153,11 +155,55 @@ function ApplicationsRoute() {
     }
   }
 
-  const handleCreate = async (data: JobFormData, resumeId?: string | null) => {
+  /**
+   * Puts the record's interview date on the calendar, after the application
+   * itself is saved.
+   *
+   * SAME SHAPE AS `linkResume`, ABOVE, AND FOR THE SAME THREE REASONS: it
+   * writes a different table (`events`), it needs a job id that does not
+   * exist until a create returns, and a failure here must not fail the save.
+   * The application is what the person was editing; losing it because a
+   * calendar row would not write is the wrong trade, and the toast says which
+   * half worked.
+   *
+   * `undefined` means the field was never touched -- see
+   * `ApplicationRecordView`'s `onSubmit`. Only an explicit `null` removes an
+   * interview, and only a real edit writes one at all, so an ordinary save
+   * makes no event request.
+   *
+   * `useScheduleInterview` invalidates `['events']` on success, which is the
+   * single cache entry both /calendar and the Overview's "upcoming events"
+   * card read -- so both move on their own the moment this lands.
+   */
+  const saveInterview = async (
+    jobId: string,
+    interviewAt: string | null | undefined,
+    job: { company: string }
+  ) => {
+    if (interviewAt === undefined) return
+    try {
+      await scheduleInterview.mutateAsync({
+        jobId,
+        startsAt: interviewAt,
+        title: `Interview — ${job.company}`,
+      })
+    } catch (err) {
+      showError('Saved, but the interview did not reach your calendar', message(err, 'Unknown error'))
+    }
+  }
+
+  const handleCreate = async (
+    data: JobFormData,
+    resumeId?: string | null,
+    interviewAt?: string | null
+  ) => {
     try {
       const created = await createJob.mutateAsync(data)
       success('Application added')
-      if (created?.id) await linkResume(created.id, resumeId)
+      if (created?.id) {
+        await linkResume(created.id, resumeId)
+        await saveInterview(created.id, interviewAt, data)
+      }
       return true
     } catch (err) {
       showError('Could not add the application', message(err, 'Unknown error'))
@@ -165,11 +211,17 @@ function ApplicationsRoute() {
     }
   }
 
-  const handleUpdate = async (id: string, data: JobFormData, resumeId?: string | null) => {
+  const handleUpdate = async (
+    id: string,
+    data: JobFormData,
+    resumeId?: string | null,
+    interviewAt?: string | null
+  ) => {
     try {
       await updateJob.mutateAsync({ id, data })
       success('Application updated')
       await linkResume(id, resumeId)
+      await saveInterview(id, interviewAt, data)
       return true
     } catch (err) {
       showError('Could not update the application', message(err, 'Unknown error'))

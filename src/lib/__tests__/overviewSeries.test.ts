@@ -4,6 +4,7 @@ import {
   statusBreakdown,
   sourceBreakdown,
   rankedSources,
+  jobStats,
 } from '../overviewSeries'
 import { makeJob } from '@/test/fixtures'
 import { STATUSES } from '@/components/ui/status-marker'
@@ -157,5 +158,73 @@ describe('rankedSources', () => {
 
   it('returns nothing at all rather than a zero row for an empty list', () => {
     expect(rankedSources([])).toEqual([])
+  })
+})
+
+describe('jobStats', () => {
+  // A fixed clock, so the month buckets and the wait below are the same every
+  // run rather than depending on which day the suite happens to execute.
+  const NOW = new Date(2026, 8, 10) // 10 September 2026, local
+
+  it('counts applications as things actually sent, not rows tracked', () => {
+    // The distinction the whole card row rests on: a wishlist entry was never
+    // sent, so counting it would make every rate under it wrong.
+    const stats = jobStats(
+      [
+        makeJob({ id: 'a', status: 'wishlist' }),
+        makeJob({ id: 'b', status: 'applied' }),
+        makeJob({ id: 'c', status: 'interviewing' }),
+        makeJob({ id: 'd', status: 'offer' }),
+        makeJob({ id: 'e', status: 'rejected' }),
+      ],
+      NOW
+    )
+    expect(stats.total).toBe(5)
+    expect(stats.wishlist).toBe(1)
+    expect(stats.sent).toBe(4)
+    expect(stats.interviewing).toBe(1)
+    expect(stats.offers).toBe(1)
+    expect(stats.rejected).toBe(1)
+    // Anything past a bare `applied` is a response: somebody looked at it.
+    expect(stats.responded).toBe(3)
+    expect(stats.responseRate).toBe(75)
+    expect(stats.awaitingReply).toBe(1)
+  })
+
+  it('reports a zero rate rather than dividing by nothing', () => {
+    expect(jobStats([makeJob({ id: 'a', status: 'wishlist' })], NOW).responseRate).toBe(0)
+    expect(jobStats([], NOW).responseRate).toBe(0)
+  })
+
+  it('measures the wait from the oldest unanswered application', () => {
+    const stats = jobStats(
+      [
+        makeJob({ id: 'a', status: 'applied', date_applied: '2026-09-01' }),
+        makeJob({ id: 'b', status: 'applied', date_applied: '2026-09-08' }),
+        // Answered, so it is not waiting on anything however old it is.
+        makeJob({ id: 'c', status: 'rejected', date_applied: '2026-01-01' }),
+      ],
+      NOW
+    )
+    expect(stats.awaitingReply).toBe(2)
+    expect(stats.oldestWaitDays).toBe(9)
+  })
+
+  it('has no wait to report when nothing is waiting', () => {
+    expect(jobStats([makeJob({ id: 'a', status: 'offer' })], NOW).oldestWaitDays).toBeNull()
+  })
+
+  it('buckets this month and last month on the local calendar', () => {
+    const stats = jobStats(
+      [
+        makeJob({ id: 'a', status: 'applied', ...at('2026-09-02T10:00:00.000Z') }),
+        makeJob({ id: 'b', status: 'applied', ...at('2026-09-09T10:00:00.000Z') }),
+        makeJob({ id: 'c', status: 'applied', ...at('2026-08-20T10:00:00.000Z') }),
+        makeJob({ id: 'd', status: 'applied', ...at('2026-05-20T10:00:00.000Z') }),
+      ],
+      NOW
+    )
+    expect(stats.thisMonth).toBe(2)
+    expect(stats.lastMonth).toBe(1)
   })
 })

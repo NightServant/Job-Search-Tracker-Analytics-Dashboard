@@ -14,7 +14,7 @@ import {
   CardContent,
 } from '@/components/ui/card'
 import { FollowUpNudge } from './FollowUpNudge'
-import { KpiStrip } from './KpiStrip'
+import { HeadlineStats, PipelineStats } from './OverviewStats'
 import { ApplicationsOverTime } from './ApplicationsOverTime'
 import { StatusDonut } from './StatusDonut'
 import { SourceMix } from './SourceMix'
@@ -96,11 +96,15 @@ const TREND_MONTHS = 6
  * component on this screen specifically. The rule the frame does specify --
  * the 2px one under the page title -- stays.
  *
- * Layout, top to bottom: header, rule, five-KPI strip with dividers,
- * follow-up nudge, then a TWO-COLUMN grid, then the recent-applications table
- * across the full width. The column order is Gabe's: `applications over time`
- * beside `by status`, then `upcoming events` beside `by source`, then the
- * table.
+ * Layout, top to bottom: header, rule, four headline stat CARDS, follow-up
+ * nudge, then a TWO-COLUMN grid, then the recent-applications table across the
+ * full width. The column order is Gabe's: `applications over time` beside `by
+ * status`, then `upcoming events` beside `by source`, then two more stat cards,
+ * then the table.
+ *
+ * THE STRIP BECAME CARDS on 2026-09-10, at Gabe's instruction, with the number
+ * as each card's hero. See `OverviewStats` for why four rather than five and
+ * how the four-column grid lines up with the two-column one under it.
  *
  * That replaces a 460/300/280 three-panel row plus a 2fr/1fr row. Six panels
  * at four different widths meant no two charts on the screen shared a scale,
@@ -176,7 +180,7 @@ export function Dashboard({
         <hr data-header-rule className="mt-6 border-0 border-t-2 border-border-default" />
       </div>
 
-      <KpiStrip jobs={jobs} />
+      <HeadlineStats jobs={jobs} />
 
       <FollowUpNudge stale={stale} />
 
@@ -255,6 +259,13 @@ export function Dashboard({
             <SourceMix data={sources} />
           </CardContent>
         </Card>
+
+        {/* TWO STAT CARDS, THEN THE TABLE (Gabe, 2026-09-10). They are inside
+            this grid rather than above it so they take exactly one column
+            each, which is the same width the charts beside them have -- a
+            second full-width strip here would have made the page read as two
+            headers with the charts sandwiched between them. */}
+        <PipelineStats jobs={jobs} />
 
         {/* Full width: four columns of table read badly at half a screen, and
             it is the end of the page rather than one of a pair. */}

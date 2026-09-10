@@ -340,6 +340,20 @@ describe('Analytics', () => {
     expect(grid.className).toContain('md:grid-cols-4')
   })
 
+  it('gives the overview figures the same hero size the Overview screen uses', () => {
+    // Gabe, 2026-09-10: "Analysis overview card must also have the emphasis in
+    // the statistics." `text-data-xl` is the one hero step in the scale, so
+    // this card and the dashboard's stat cards are the same loudness rather
+    // than two takes on "big".
+    render(<Analytics {...fullProps()} />)
+    const overview = screen
+      .getByRole('heading', { name: 'overview' })
+      .closest('[data-analytics-panel]')!
+    const values = overview.querySelectorAll('[data-overview-kpis] [data-kpi-value]')
+    expect(values).toHaveLength(4)
+    for (const value of values) expect(value.className).toContain('text-data-xl')
+  })
+
   it('wears the same accent band and banding as the applications table', () => {
     // The app's two densest tables, on its two densest screens. Leaving one
     // grey and accenting the other read as two unrelated decisions.

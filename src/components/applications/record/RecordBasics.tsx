@@ -79,7 +79,7 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
   const hiddenCount = Object.keys(filled).filter((key) => !filled[key]).length
 
   const text = (
-    field: Extract<DraftField, 'company' | 'role' | 'location' | 'source' | 'url' | 'tags' | 'techStack' | 'salaryMin' | 'salaryMax' | 'dateApplied'>,
+    field: Extract<DraftField, 'company' | 'role' | 'location' | 'source' | 'url' | 'tags' | 'techStack' | 'salaryMin' | 'salaryMax' | 'dateApplied' | 'interviewAt'>,
     props: {
       label: string
       id: string
@@ -120,6 +120,31 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
           items={STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
       </Field>
+
+      {/* THE INTERVIEW DATE APPEARS WITH THE STATUS THAT NEEDS IT (Gabe,
+          2026-09-10). It is the one field here whose relevance is conditional
+          on another field rather than on whether it is filled in: a wishlist
+          entry has no interview to book, and an offer's interview has already
+          happened.
+
+          `datetime-local`, not `date`. An interview is a time on a day -- "the
+          14th" is not something anyone can turn up to -- and this is what
+          `events.starts_at` stores. The native control is used rather than a
+          picker component for the reason the rest of this form uses native
+          date inputs: it is the one the phone's own wheel opens.
+
+          IT WRITES TO `events`, NOT TO `jobs` (see useRecordDraft's
+          `interviewAt`), and only when it CHANGES -- so moving an application
+          on to `offer` afterwards leaves the interview that happened sitting
+          on the calendar rather than quietly deleting it. */}
+      {draft.status === 'interviewing' &&
+        text('interviewAt', {
+          id: 'interview_at',
+          label: 'interview',
+          icon: 'Calendar',
+          type: 'datetime-local',
+          hint: 'goes on your calendar when you save.',
+        })}
 
       {shows('salary') && (
         <>

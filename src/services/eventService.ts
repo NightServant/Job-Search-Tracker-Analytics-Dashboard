@@ -61,6 +61,49 @@ export const eventService = {
     return (data ?? []) as CalendarEvent[]
   },
 
+  /**
+   * Puts one interview on the calendar for an application, or takes it off.
+   *
+   * THIS OWNS EVERY `kind: 'interview'` EVENT ON THE JOB, and saying so is
+   * what keeps the rule to one sentence. The record dialog offers a single
+   * "interview" datetime, so the model behind it is one interview per
+   * application: setting a date keeps the earliest existing interview event
+   * and moves it, clearing the date removes them all, and any duplicates a
+   * previous version of this left behind are cleaned up on the next write
+   * rather than accumulating.
+   *
+   * A DATE CHANGE IS AN UPDATE, NOT A DELETE-AND-INSERT. The event id is
+   * stable across a reschedule, which is what a future export or reminder
+   * would key on.
+   */
+  async scheduleInterview(
+    client: SupabaseClient,
+    jobId: string,
+    startsAt: string | null,
+    title: string
+  ): Promise<CalendarEvent | null> {
+    const existing = (await this.listForJob(client, jobId)).filter(
+      (event) => event.kind === 'interview'
+    )
+    const [earliest, ...duplicates] = existing
+
+    if (startsAt === null) {
+      for (const event of existing) await this.remove(client, event.id)
+      return null
+    }
+
+    for (const event of duplicates) await this.remove(client, event.id)
+    if (earliest) {
+      return this.update(client, earliest.id, { starts_at: startsAt, title })
+    }
+    return this.create(client, {
+      job_id: jobId,
+      kind: 'interview',
+      title,
+      starts_at: startsAt,
+    })
+  },
+
   /** Everything at or after `fromIso`, soonest first — the calendar and dashboard rail. */
   async listUpcoming(client: SupabaseClient, fromIso: string): Promise<CalendarEvent[]> {
     const { data, error } = await client

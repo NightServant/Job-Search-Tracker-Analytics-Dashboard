@@ -35,6 +35,16 @@ export interface ApplicationRecordData {
   history: JobStatusHistoryEntry[]
   links: DocumentLinkSummary[]
   nextEvent: CalendarEvent | null
+  /**
+   * The interview booked against this application, if one is.
+   *
+   * SEPARATE FROM `nextEvent`, which is whatever is soonest of ANY kind -- a
+   * deadline, a take-home, a follow-up. The record's interview field edits
+   * one specific row and has to seed itself from that row, not from whichever
+   * event happens to be next; and a past interview still has to appear in the
+   * box, which `nextEvent` (upcoming only) would never show.
+   */
+  interview: CalendarEvent | null
   match: KeywordMatch | null
   activityError?: boolean
   linksError?: boolean
@@ -63,5 +73,6 @@ export const EMPTY_RECORD_DATA: ApplicationRecordData = {
   history: [],
   links: [],
   nextEvent: null,
+  interview: null,
   match: null,
 }

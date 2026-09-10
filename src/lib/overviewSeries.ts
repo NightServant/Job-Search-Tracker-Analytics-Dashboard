@@ -184,3 +184,116 @@ export function rankedSources(jobs: Job[]): RankedSource[] {
 
   return ranked
 }
+
+export interface JobStats {
+  /** Every row being tracked, wishlist included. */
+  total: number
+  wishlist: number
+  /** Applications actually sent — everything that is not a wishlist entry. */
+  sent: number
+  interviewing: number
+  offers: number
+  rejected: number
+  /** Sent and moved past a bare `applied`: somebody looked at it. */
+  responded: number
+  /** `responded / sent` as a whole percentage, 0 when nothing has been sent. */
+  responseRate: number
+  /** Sent and still sitting at `applied`. */
+  awaitingReply: number
+  /** Days since the oldest unanswered application went out, or null if none. */
+  oldestWaitDays: number | null
+  /** Rows added this calendar month, and the one before it. */
+  thisMonth: number
+  lastMonth: number
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The start of the LOCAL calendar day a stored date falls on, or null.
+ *
+ * TWO SHAPES ARRIVE HERE AND THEY ARE NOT THE SAME KIND OF VALUE.
+ * `date_applied` is a bare `YYYY-MM-DD` (a Postgres DATE — a day on a wall
+ * calendar, with no instant behind it), while `created_at` is a TIMESTAMPTZ —
+ * an instant. `new Date('2026-09-01')` reads the first as UTC MIDNIGHT, which
+ * is a different day from the one written down for anybody behind UTC and a
+ * different number of hours from local midnight for everybody else.
+ *
+ * That is not pedantry: it is the eight-versus-nine the first version of the
+ * "oldest went out N days ago" line got wrong on this machine. Normalising
+ * both ends to a local day boundary makes the answer a count of calendar days
+ * — the thing the sentence claims to be — rather than a floor of an elapsed
+ * duration that happens to be near it.
+ */
+function localDayStart(raw: string): number | null {
+  const bare = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw)
+  const date = bare ? new Date(+bare[1], +bare[2] - 1, +bare[3]) : new Date(raw)
+  if (Number.isNaN(date.getTime())) return null
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+}
+
+/**
+ * Every headline number the Overview and the Applications screen put on a
+ * card, counted once.
+ *
+ * ONE FUNCTION BECAUSE TWO SCREENS SHOW THE SAME FIGURES. `KpiStrip` counted
+ * five of these inline and the applications toolbar would have counted four of
+ * them again a file away — which is how "applications" comes to mean
+ * `jobs.length` on one screen and `jobs.length - wishlist` on the other. It
+ * means the second here, on both: a wishlist entry was never sent, so counting
+ * it as an application makes every rate below it wrong.
+ *
+ * `oldestWaitDays` reads `date_applied` and falls back to `created_at`, the
+ * same precedence `sortJobs` and the analytics range use — a row imported from
+ * a CSV without a date still has to be somewhere on the clock rather than
+ * being silently dropped from the count it belongs to.
+ *
+ * `now` is injectable so the month buckets and the wait can be tested against
+ * a fixed clock instead of whatever day the suite runs on.
+ */
+export function jobStats(jobs: Job[], now: Date = new Date()): JobStats {
+  const count = (predicate: (job: Job) => boolean) => jobs.filter(predicate).length
+
+  const sent = count((job) => job.status !== 'wishlist')
+  const responded = count((job) => job.status !== 'wishlist' && job.status !== 'applied')
+
+  const thisKey = `${now.getFullYear()}-${now.getMonth()}`
+  const previous = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+  const lastKey = `${previous.getFullYear()}-${previous.getMonth()}`
+  let thisMonth = 0
+  let lastMonth = 0
+  for (const job of jobs) {
+    const created = new Date(job.created_at)
+    if (Number.isNaN(created.getTime())) continue
+    const key = `${created.getFullYear()}-${created.getMonth()}`
+    if (key === thisKey) thisMonth += 1
+    else if (key === lastKey) lastMonth += 1
+  }
+
+  let oldestSent: number | null = null
+  for (const job of jobs) {
+    if (job.status !== 'applied') continue
+    const at = localDayStart(job.date_applied ?? job.created_at)
+    if (at === null) continue
+    if (oldestSent === null || at < oldestSent) oldestSent = at
+  }
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+
+  return {
+    total: jobs.length,
+    wishlist: count((job) => job.status === 'wishlist'),
+    sent,
+    interviewing: count((job) => job.status === 'interviewing'),
+    offers: count((job) => job.status === 'offer'),
+    rejected: count((job) => job.status === 'rejected'),
+    responded,
+    responseRate: sent > 0 ? Math.round((responded / sent) * 100) : 0,
+    awaitingReply: count((job) => job.status === 'applied'),
+    // ROUND, NOT FLOOR: both ends are local midnights, and an hour of DST
+    // between them would otherwise turn 7 days into 6.
+    oldestWaitDays:
+      oldestSent === null ? null : Math.max(0, Math.round((todayStart - oldestSent) / DAY_MS)),
+    thisMonth,
+    lastMonth,
+  }
+}

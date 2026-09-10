@@ -159,3 +159,59 @@ describe('Agenda', () => {
     expect(timeLine).toBeTruthy()
   })
 })
+
+describe('public holidays', () => {
+  const HOLIDAY = {
+    date: '2026-08-21',
+    localName: 'Ninoy Aquino Day',
+    name: 'Ninoy Aquino Day',
+    countryCode: 'PH',
+    global: true,
+  }
+
+  it('names the holiday in the cell it falls on, and only that cell', () => {
+    // The date is a bare YYYY-MM-DD and the cell key comes from a local Date.
+    // They meet as strings on purpose -- parsing the holiday as an instant is
+    // what would move it a day for anyone behind UTC.
+    const { container } = render(
+      <MonthGrid grid={buildMonthGrid(2026, 7)} month={7} events={[]} holidays={[HOLIDAY]} />
+    )
+    const marks = container.querySelectorAll('[data-holiday]')
+    expect(marks).toHaveLength(1)
+    expect(marks[0].textContent).toBe('Ninoy Aquino Day')
+  })
+
+  it('draws no holiday at all when none was supplied', () => {
+    // A failed or unconfigured holiday fetch must leave a working calendar
+    // behind, not an empty row where the names would go.
+    const { container } = render(
+      <MonthGrid grid={buildMonthGrid(2026, 7)} month={7} events={[]} />
+    )
+    expect(container.querySelector('[data-holiday]')).toBeNull()
+    expect(container.querySelector('[data-month-grid]')).toBeTruthy()
+  })
+
+  it('offers the country picker only once there are countries to pick', () => {
+    const { container } = render(<Calendar events={[]} />)
+    expect(container.querySelector('#holiday-country')).toBeNull()
+
+    cleanup()
+    render(
+      <Calendar
+        events={[]}
+        holidayCountry="PH"
+        holidayCountries={[{ countryCode: 'PH', name: 'Philippines' }]}
+      />
+    )
+    expect(screen.getByLabelText('Public holidays for')).toBeTruthy()
+  })
+
+  it('reports the years its grid covers so the caller fetches exactly those', () => {
+    // A December grid pads into January of the next year. Reporting the years
+    // rather than assuming one is what keeps New Year's Day on the grid.
+    const seen: number[][] = []
+    render(<Calendar events={[]} onVisibleYearsChange={(years) => seen.push(years)} />)
+    expect(seen.length).toBeGreaterThan(0)
+    expect(seen[seen.length - 1]).toContain(new Date().getFullYear())
+  })
+})

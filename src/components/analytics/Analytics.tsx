@@ -227,13 +227,23 @@ function Overview({ data }: { data: ConversionMetrics | null }) {
     // labels -- "TOTAL APPLICATIONS", "TIME TO FIRST INTERVIEW",
     // "CONVERSION RATE" -- onto two lines, so four stats read as eight.
     <div data-overview-kpis className="grid grid-cols-1 gap-6 sm:grid-cols-2 md:grid-cols-4">
-      <KpiStat label="total applications" value={metrics.totalJobs} />
+      {/* `size="l"` -- the same hero step the Overview's stat cards use
+          (Gabe, 2026-09-10: "Analysis overview card must also have the
+          emphasis in the statistics"). This block IS the analytics screen's
+          headline; at the strip size it read as four captions under the card's
+          own description. */}
+      <KpiStat size="l" label="total applications" value={metrics.totalJobs} />
       <KpiStat
+        size="l"
         label="time to first interview"
         value={metrics.timeToFirstInterview === null ? '—' : `${metrics.timeToFirstInterview}d`}
       />
-      <KpiStat label="time to offer" value={metrics.timeToOffer === null ? '—' : `${metrics.timeToOffer}d`} />
-      <KpiStat label="conversion rate" value={`${Math.round(metrics.conversionRate)}%`} />
+      <KpiStat
+        size="l"
+        label="time to offer"
+        value={metrics.timeToOffer === null ? '—' : `${metrics.timeToOffer}d`}
+      />
+      <KpiStat size="l" label="conversion rate" value={`${Math.round(metrics.conversionRate)}%`} />
     </div>
   )
 }

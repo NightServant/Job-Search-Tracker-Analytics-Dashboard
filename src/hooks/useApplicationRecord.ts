@@ -58,6 +58,10 @@ export function useApplicationRecord(
   const cvText = cvTextQuery.data
 
   const nextEvent = events.find((event) => new Date(event.starts_at).getTime() >= Date.now()) ?? null
+  // The interview the record's own date field edits. `listForJob` orders by
+  // `starts_at`, so the first match is the earliest -- the same one
+  // `eventService.scheduleInterview` writes to.
+  const interview = events.find((event) => event.kind === 'interview') ?? null
   const match = description && cvText ? matchKeywords(cvText, description) : null
 
   return {
@@ -65,6 +69,7 @@ export function useApplicationRecord(
     history,
     links,
     nextEvent,
+    interview,
     match,
     activityError: !!activityQuery.error,
     linksError: !!linksQuery.error,

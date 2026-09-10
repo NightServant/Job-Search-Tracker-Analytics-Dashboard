@@ -10,10 +10,21 @@ import type { Job } from '@/types'
 // dashboard/__tests__/page.test.tsx uses for its one hook. Fix round 2
 // hoisted useJobs() out of the Calendar component and into this file, so
 // this is now where that hook's mock belongs.
+//
+// The public-holidays pair is mocked for the same reason and one more: they
+// are the only hooks in the app that talk to a THIRD-PARTY host
+// (date.nager.at). A unit test must not depend on somebody else's uptime, and
+// an unmocked one here would make the suite fail offline.
 const useEventsMock = vi.hoisted(() => vi.fn())
 const useJobsMock = vi.hoisted(() => vi.fn())
+const useHolidaysMock = vi.hoisted(() => vi.fn(() => ({ data: [] })))
+const useHolidayCountriesMock = vi.hoisted(() => vi.fn(() => ({ data: [] })))
 vi.mock('@/hooks/useEvents', () => ({ useEvents: useEventsMock }))
 vi.mock('@/hooks/useJobs', () => ({ useJobs: useJobsMock }))
+vi.mock('@/hooks/usePublicHolidays', () => ({
+  usePublicHolidays: useHolidaysMock,
+  useHolidayCountries: useHolidayCountriesMock,
+}))
 
 import Page from '../page'
 

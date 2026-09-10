@@ -8,6 +8,7 @@ import { Select } from '@/components/ui/select'
 import { CheckIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { assertJobFormDataValid } from '@/services/jobValidation'
+import { fromLocalDateTimeInput, toLocalDateTimeInput } from '@/services/date'
 import { cn } from '@/lib/utils'
 import { ApplicationPipeline } from './ApplicationPipeline'
 import { RecordAts } from './RecordAts'
@@ -60,7 +61,22 @@ export interface ApplicationRecordViewProps {
    * the values it opened with and every Escape from then on asks whether to
    * discard changes that are already stored.
    */
-  onSubmit: (data: JobFormData) => void | boolean | Promise<void | boolean>
+  onSubmit: (
+    data: JobFormData,
+    /**
+     * The interview, as an instant to store — `undefined` when the field was
+     * not touched, `null` when it was cleared.
+     *
+     * THREE STATES, NOT TWO, and the distinction is what stops this being
+     * destructive. It rides beside the payload rather than inside it because
+     * an interview is a row in `events`, not a column on `jobs` — the same
+     * seam `resumeId` already runs through. `undefined` is the common case:
+     * somebody fixing a salary must not have their calendar rewritten as a
+     * side effect, and moving an application on to `offer` must not delete
+     * the interview that got them there.
+     */
+    interviewAt?: string | null
+  ) => void | boolean | Promise<void | boolean>
   onDirtyChange?: (dirty: boolean) => void
   /** The CVs available to the "CV submitted" field. */
   resumes?: { id: string; title: string }[]
@@ -103,7 +119,10 @@ export function ApplicationRecordView({
   // The wizard owns a draft across four steps and hands it in; the dialog has
   // no step before this one, so it makes its own. Hooks are unconditional
   // either way -- the provided one simply wins.
-  const ownForm = useRecordDraft(job, defaultCurrency, onDirtyChange)
+  // What is already on the calendar, in the shape the control wants. The
+  // record seeds from it and compares against it; see `handleSubmit`.
+  const interviewSeed = data.interview ? toLocalDateTimeInput(data.interview.starts_at) : ''
+  const ownForm = useRecordDraft(job, defaultCurrency, onDirtyChange, interviewSeed)
   const form = providedForm ?? ownForm
   const { draft, set, payload, errors, attempt, commit, dirty } = form
 
@@ -138,7 +157,11 @@ export function ApplicationRecordView({
       setFormError(err instanceof Error ? err.message : 'This application could not be saved.')
       return
     }
-    const ok = await onSubmit(payload)
+    // UNCHANGED MEANS UNTOUCHED. Only a real edit to the field reaches the
+    // events table, so an ordinary save costs no event write at all.
+    const interviewAt =
+      draft.interviewAt === interviewSeed ? undefined : fromLocalDateTimeInput(draft.interviewAt)
+    const ok = await onSubmit(payload, interviewAt)
     // A REJECTED SAVE STAYS DIRTY, which is the point: the values are still
     // only in this dialog, so closing it must still ask before dropping them.
     if (ok !== false) commit()

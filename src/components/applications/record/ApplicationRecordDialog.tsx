@@ -38,8 +38,18 @@ export interface ApplicationRecordDialogProps {
   data?: ApplicationRecordData
   defaultCurrency: SupportedCurrency
   saving?: boolean
-  /** Resolves `false` on a rejected save. See ApplicationRecordView. */
-  onSubmit: (data: JobFormData) => void | boolean | Promise<void | boolean>
+  /**
+   * Resolves `false` on a rejected save. See ApplicationRecordView.
+   *
+   * `interviewAt` is the interview date the record's own field carries —
+   * `undefined` when it was not touched, `null` when it was cleared. It is a
+   * row in `events` rather than a column on `jobs`, so it cannot travel
+   * inside `JobFormData`.
+   */
+  onSubmit: (
+    data: JobFormData,
+    interviewAt?: string | null
+  ) => void | boolean | Promise<void | boolean>
   onDirtyChange?: (dirty: boolean) => void
   /** For the record's "CV submitted" field. */
   resumes?: { id: string; title: string }[]

@@ -132,3 +132,43 @@ export function formatSnapshotTime(timestamp: string): string {
     minute: '2-digit',
   })
 }
+
+/**
+ * A `TIMESTAMPTZ` instant as the value an `<input type="datetime-local">`
+ * wants: `YYYY-MM-DDTHH:mm` in the READER'S OWN zone.
+ *
+ * LOCAL, DELIBERATELY, and it is the opposite call from `formatShortDate`
+ * above -- for the opposite reason. That one formats a bare `DATE` and has to
+ * stay in UTC so a calendar day never shifts. This one carries a real instant
+ * into a control whose whole contract is wall-clock time where the person is
+ * sitting: an interview at 2pm in Manila must show 2pm to somebody in Manila.
+ *
+ * `toISOString().slice(0, 16)` would be the obvious one-liner and it is
+ * wrong -- it renders the UTC wall clock, so that same interview reads as
+ * 06:00 in the box.
+ */
+export function toLocalDateTimeInput(iso: string): string {
+  const at = new Date(iso)
+  if (Number.isNaN(at.getTime())) return ''
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return (
+    `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}` +
+    `T${pad(at.getHours())}:${pad(at.getMinutes())}`
+  )
+}
+
+/**
+ * The inverse: what the control holds, as an instant to store.
+ *
+ * `new Date('2026-09-20T14:00')` — no zone suffix — is parsed as LOCAL time by
+ * every engine, which is exactly what the control means, so this is a
+ * round-trip of `toLocalDateTimeInput` rather than a reinterpretation of it.
+ * Empty or unparseable becomes `null`: "no interview booked" is a real answer
+ * and must not be stored as the epoch.
+ */
+export function fromLocalDateTimeInput(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const at = new Date(trimmed)
+  return Number.isNaN(at.getTime()) ? null : at.toISOString()
+}

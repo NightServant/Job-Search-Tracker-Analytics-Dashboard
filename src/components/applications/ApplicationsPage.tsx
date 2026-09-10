@@ -7,6 +7,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { CloseIcon, PlusIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { ApplicationsToolbar } from './ApplicationsToolbar'
+import { ApplicationsInsights } from './ApplicationsInsights'
 import { ApplicationsTable } from './ApplicationsTable'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -25,7 +26,6 @@ import type { PostingDigestResult } from './record/digest'
 import { sortJobs, type JobSort } from '@/lib/jobSort'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
-import { useViewportFit } from '@/components/shell/viewportFit'
 import type { Job, JobAutofillResult, JobFormData } from '@/types'
 
 interface CsvImport {
@@ -119,9 +119,24 @@ export interface ApplicationsPageProps {
    * lives in `application_documents`, keyed on a job id that does not exist
    * yet when creating -- so only the caller, which has the insert's result,
    * can sequence the write.
+   *
+   * `interviewAt` rides along for exactly the same reason and with the same
+   * three states: an interview is a row in `events`, keyed on a job id, and
+   * `undefined` means the field was never touched. See
+   * `ApplicationRecordView`'s `onSubmit` for why untouched must not mean
+   * "clear it".
    */
-  onCreate?: (data: JobFormData, resumeId?: string | null) => Promise<boolean>
-  onUpdate?: (id: string, data: JobFormData, resumeId?: string | null) => Promise<boolean>
+  onCreate?: (
+    data: JobFormData,
+    resumeId?: string | null,
+    interviewAt?: string | null
+  ) => Promise<boolean>
+  onUpdate?: (
+    id: string,
+    data: JobFormData,
+    resumeId?: string | null,
+    interviewAt?: string | null
+  ) => Promise<boolean>
   /**
    * Tidies and summarises a fetched posting, inside the add wizard.
    *
@@ -181,14 +196,22 @@ export function ApplicationsPage({
   onOpenJobChange,
   initialOpenId = null,
 }: ApplicationsPageProps) {
-  // THE SCREEN OWNS ITS SCROLLING, from `sm` up. Everything except the table
-  // is a fixed frame, so the shell stops growing and the table takes what is
-  // left -- see components/shell/viewportFit.
+  // THE FIXED FRAME IS GONE, and it went because of what now sits above the
+  // toolbar (Gabe, 2026-09-10: a chart and four statistics cards).
   //
-  // NOT when there are no jobs: the empty state has nothing to scroll, and
-  // locking the viewport around it would strand a short paragraph at the top
-  // of a full-height frame.
-  useViewportFit(jobs.length > 0)
+  // `useViewportFit` locked the shell to the viewport so the title, tabs,
+  // toolbar and pagination held their place and only the table moved. Its own
+  // docblock states the premise: "/applications is a fixed frame around one
+  // scrolling list". The insights band is 280px of content that is not frame
+  // and not list, and inside the lock it came straight out of the table --
+  // measured on the demo at 1440x820, the table was left 156px, about three
+  // rows of a ten-row page.
+  //
+  // Unlocked, `ui/table`'s own 55svh fallback cap takes over (see its
+  // docblock: it exists for exactly the viewports the shell will not lock), so
+  // the table still scrolls inside itself, its header still stays clear of the
+  // top bar, and the page scrolls once for the band above it. 451px of table
+  // at that same 1440x820 rather than 156.
 
   const [search, setSearch] = React.useState('')
   // DEFAULT `applied`, which is the revision's whole point: both tables
@@ -403,13 +426,13 @@ export function ApplicationsPage({
    * and the row is derived from `jobs`, so the saved values appear as soon as
    * the refetch lands without anything here pushing them.
    */
-  const submit = async (data: JobFormData) => {
+  const submit = async (data: JobFormData, interviewAt?: string | null) => {
     const editingJob = openJob
     if (!editingJob) return
     // onUpdate resolves to false on a caught failure rather than throwing, so
     // a rejected save leaves the record open with every typed field intact
     // instead of discarding them behind a toast.
-    const ok = await onUpdate?.(editingJob.id, data, resumeChoice)
+    const ok = await onUpdate?.(editingJob.id, data, resumeChoice, interviewAt)
     // Returned, not swallowed: the record moves its own baseline on a save
     // that landed, and must not on one that did not.
     if (ok === false) return false
@@ -421,8 +444,8 @@ export function ApplicationsPage({
   }
 
   /** Saving the wizard's new application. It closes; there is nothing behind it. */
-  const submitNew = async (data: JobFormData) => {
-    const ok = await onCreate?.(data, resumeChoice)
+  const submitNew = async (data: JobFormData, interviewAt?: string | null) => {
+    const ok = await onCreate?.(data, resumeChoice, interviewAt)
     if (ok === false) return false
     setResumeChoice(undefined)
     setFormDirty(false)
@@ -431,11 +454,10 @@ export function ApplicationsPage({
   }
 
   return (
-    // THE FIXED FRAME. From `sm` up this column is exactly the viewport
-    // (AppShell grants that in response to useViewportFit above): the title,
-    // tabs, toolbar and pagination hold their place and only the table between
-    // them moves. Below `sm` it is an ordinary stack that grows and lets the
-    // page scroll, because the table is stacked into cards there.
+    // An ordinary document column now. `sm:min-h-0 sm:flex-1` stay: they are
+    // inert outside a bounded parent (see ui/table's docblock) and are what
+    // the table's scrollport needs the moment anything above it bounds this
+    // column again.
     <div className="flex flex-col gap-8 sm:min-h-0 sm:flex-1">
       <PageHeader
         title="applications"
@@ -505,6 +527,15 @@ export function ApplicationsPage({
           dismiss()
         }}
       />
+
+      {/* THE BAND ABOVE THE TOOLBAR (Gabe, 2026-09-10): a chart on the left
+          third, four numbers on the right two thirds.
+
+          ONLY ONCE THERE IS SOMETHING TO COUNT. On an empty account it would
+          be a chart of nothing over four zeros, sitting between the page title
+          and the "add your first application" call to action -- which is the
+          one screen where every pixel should be pointing at that button. */}
+      {jobs.length > 0 && <ApplicationsInsights jobs={jobs} />}
 
       <ApplicationsToolbar
         search={search}

@@ -963,3 +963,30 @@ describe('the open record follows the list', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
   })
 })
+
+describe('the insights band above the toolbar', () => {
+  it('sits above the search and import row, not below it', () => {
+    // Gabe, 2026-09-10: "before the row of search, filter dropdowns, and
+    // import CTAs".
+    const { container } = render(<ApplicationsPage jobs={JOBS} />)
+    const band = container.querySelector('[data-applications-insights]')!
+    const search = screen.getByPlaceholderText(/search company or role/i)
+    expect(band).toBeTruthy()
+    expect(band.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('pairs one chart with four statistics cards', () => {
+    const { container } = render(<ApplicationsPage jobs={JOBS} />)
+    const band = container.querySelector('[data-applications-insights]')!
+    expect(band.querySelector('[data-chart-sources-bars], [data-sources-empty]')).toBeTruthy()
+    expect(band.querySelectorAll('[data-stat-card]')).toHaveLength(4)
+  })
+
+  it('stays away entirely on an empty account', () => {
+    // A chart of nothing over four zeros, between the page title and "add your
+    // first application", would be pointing at itself instead of at the button.
+    const { container } = render(<ApplicationsPage jobs={[]} />)
+    expect(container.querySelector('[data-applications-insights]')).toBeNull()
+    expect(screen.getByText(/no applications yet/i)).toBeTruthy()
+  })
+})

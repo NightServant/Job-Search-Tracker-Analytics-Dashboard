@@ -75,7 +75,10 @@ describe('SettingsPage', () => {
     render(<SettingsPage prefs={null} />)
     const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
     expect(tabs).toEqual(['profile', 'general'])
-    expect(screen.getByRole('heading', { level: 2, name: 'profile' })).toBeTruthy()
+    // The panel's own heading is inside its card now (2026-09-10), and it is
+    // an h3 rather than an h2: the tab is the h2-level thing on this screen,
+    // and the card under it was repeating the tab's own word one level up.
+    expect(screen.getByRole('heading', { level: 3, name: 'profile' })).toBeTruthy()
   })
 
   it('keeps the general groups out of the DOM until their tab is opened', async () => {
@@ -175,9 +178,12 @@ describe('SettingsPage', () => {
     expect(onDeleteAccount).toHaveBeenCalledTimes(1)
   })
 
-  it('renders no shadow and no rounded card border on any of the three groups', async () => {
-    // Radius caps at 4px and separation is a hairline rule, not a card --
-    // the same visual grammar every other M5 screen holds to.
+  it('renders no shadow on any of the three groups', async () => {
+    // THE GROUPS ARE CARDS NOW (Gabe, 2026-09-10) -- the "separation is a
+    // hairline rule, never a card" half of this assertion is what he
+    // overruled, for settings and the overview both. The rest of the grammar
+    // is untouched and still worth pinning: no shadow anywhere, and the 4px
+    // radius cap that `shadcnHouseRules` enforces on `ui/card` itself.
     const { container } = await renderGeneral({ prefs: null })
     for (const group of container.querySelectorAll('[data-settings-group]')) {
       expect(group.innerHTML).not.toMatch(/shadow/)

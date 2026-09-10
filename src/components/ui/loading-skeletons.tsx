@@ -108,18 +108,24 @@ export function RouteSkeleton({ variant }: { variant: RouteSkeletonVariant }) {
           <>
             <HeaderBlock action={false} />
             <Bar className="h-0.5" />
-            {/* KpiStrip: two columns on a phone, five from md. */}
-            <div className="grid grid-cols-2 gap-6 md:grid-cols-5">
-              {Array.from({ length: 5 }, (_, i) => (
-                <Bar key={i} className="h-12" />
+            {/* Four headline stat cards: two columns on a phone, four from
+                xl, matching `OverviewStats` -- and matching its GAP too, so
+                the pairs land on the panels below rather than shifting when
+                the real thing arrives. */}
+            <div className="grid grid-cols-2 gap-section xl:grid-cols-4">
+              {Array.from({ length: 4 }, (_, i) => (
+                <Bar key={i} className="h-24" />
               ))}
             </div>
-            {/* The follow-up nudge, then four panels and a full-width table. */}
+            {/* The follow-up nudge, then four panels, two more stat cards and
+                a full-width table. */}
             <Bar className="h-14 w-full sm:w-72" />
             <div className="grid gap-section xl:grid-cols-2">
               {Array.from({ length: 4 }, (_, i) => (
                 <CardBlock key={i} />
               ))}
+              <Bar className="h-24" />
+              <Bar className="h-24" />
               <CardBlock className="xl:col-span-2" />
             </div>
           </>
@@ -128,6 +134,16 @@ export function RouteSkeleton({ variant }: { variant: RouteSkeletonVariant }) {
         {variant === 'table' && (
           <>
             <HeaderBlock />
+            {/* The insights band: a chart on the left third, four stat cards
+                two-up on the right two thirds. */}
+            <div className="grid gap-section xl:grid-cols-3">
+              <CardBlock />
+              <div className="grid gap-section sm:grid-cols-2 xl:col-span-2">
+                {Array.from({ length: 4 }, (_, i) => (
+                  <Bar key={i} className="h-24" />
+                ))}
+              </div>
+            </div>
             {/* Toolbar: search, then the two CSV controls. */}
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
               <Bar className="h-9 w-full sm:max-w-sm" />

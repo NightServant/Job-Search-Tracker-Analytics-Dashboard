@@ -37,6 +37,20 @@ export interface RecordDraft {
   techStack: string
   isReferral: boolean
   description: string
+  /**
+   * When the interview is, as an `<input type="datetime-local">` value —
+   * local wall-clock, `YYYY-MM-DDTHH:mm`, empty for "none booked".
+   *
+   * IT IS IN THE DRAFT BUT NOT IN THE PAYLOAD, which looks inconsistent and
+   * is not. There is no interview column on `jobs`: the date is a row in
+   * `events`, written through `eventService.scheduleInterview` after the
+   * application itself saves, exactly like the CV link. What it needs from
+   * the draft is the OTHER half of a field's behaviour — being counted as a
+   * change. `dirty` drives whether `Save application` is enabled at all
+   * (Worktrack Revisions 1.3), so an interview date living outside the draft
+   * would be typed into a form whose save button stayed greyed out.
+   */
+  interviewAt: string
 }
 
 export type DraftField = keyof RecordDraft
@@ -73,7 +87,11 @@ export function normalizePostingUrl(value: string): string {
   return trimmed
 }
 
-export function draftFromJob(job: Job | null, defaultCurrency: SupportedCurrency): RecordDraft {
+export function draftFromJob(
+  job: Job | null,
+  defaultCurrency: SupportedCurrency,
+  interviewAt = ''
+): RecordDraft {
   return {
     company: job?.company ?? '',
     role: job?.role ?? '',
@@ -96,7 +114,20 @@ export function draftFromJob(job: Job | null, defaultCurrency: SupportedCurrency
     techStack: (job?.tech_stack ?? []).join(', '),
     isReferral: job?.is_referral ?? false,
     description: job?.description ?? '',
+    interviewAt,
   }
+}
+
+/**
+ * What "unchanged" means, and it is deliberately wider than the payload.
+ *
+ * `toPayload` is what gets written to `jobs`; this is what the record
+ * compares against its baseline to decide whether there is anything to save.
+ * The interview date is in the second and not the first because it is saved —
+ * just to a different table.
+ */
+export function toBaseline(draft: RecordDraft): string {
+  return JSON.stringify({ ...toPayload(draft), interviewAt: draft.interviewAt })
 }
 
 export function toPayload(draft: RecordDraft): JobFormData {
@@ -149,13 +180,17 @@ export interface UseRecordDraftResult {
 export function useRecordDraft(
   job: Job | null,
   defaultCurrency: SupportedCurrency,
-  onDirtyChange?: (dirty: boolean) => void
+  onDirtyChange?: (dirty: boolean) => void,
+  /** The interview already on the calendar, as a datetime-local value. */
+  interviewAt = ''
 ): UseRecordDraftResult {
-  const [draft, setDraft] = React.useState<RecordDraft>(() => draftFromJob(job, defaultCurrency))
+  const [draft, setDraft] = React.useState<RecordDraft>(() =>
+    draftFromJob(job, defaultCurrency, interviewAt)
+  )
   const [touched, setTouched] = React.useState<Record<string, boolean>>({})
   const [attempted, setAttempted] = React.useState(false)
   const [baseline, setBaseline] = React.useState<string>(() =>
-    JSON.stringify(toPayload(draftFromJob(job, defaultCurrency)))
+    toBaseline(draftFromJob(job, defaultCurrency, interviewAt))
   )
 
   const set = React.useCallback(
@@ -192,7 +227,7 @@ export function useRecordDraft(
     if (!errors[issue.field]) errors[issue.field] = issue.message
   }
 
-  const serialised = JSON.stringify(payload)
+  const serialised = toBaseline(draft)
   const dirty = serialised !== baseline
 
   /**
@@ -213,11 +248,11 @@ export function useRecordDraft(
    * Keyed on the incoming row's own payload, so it fires when the DATA changes
    * rather than on every render of a parent.
    */
-  const incoming = JSON.stringify(toPayload(draftFromJob(job, defaultCurrency)))
+  const incoming = toBaseline(draftFromJob(job, defaultCurrency, interviewAt))
   React.useEffect(() => {
     if (incoming === baseline) return
     if (dirty) return
-    setDraft(draftFromJob(job, defaultCurrency))
+    setDraft(draftFromJob(job, defaultCurrency, interviewAt))
     setBaseline(incoming)
     // `job` and `defaultCurrency` are exactly what `incoming` is computed
     // from, and `dirty` is read rather than depended on -- re-running when the

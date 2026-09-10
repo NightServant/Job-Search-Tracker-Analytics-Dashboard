@@ -86,6 +86,39 @@ describe('Dashboard', () => {
     }
   })
 
+  it('leads with four stat cards whose hero is the number', () => {
+    // Gabe, 2026-09-10: four cards rather than five loose figures, with the
+    // statistic as each card's hero. `text-data-xl` is the largest step in the
+    // scale -- larger than the page title, deliberately, because a dashboard
+    // is read number-first.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const strip = container.querySelector('[data-kpi-strip]')!
+    const cards = strip.querySelectorAll('[data-stat-card]')
+    expect(cards).toHaveLength(4)
+    for (const card of cards) {
+      const value = card.querySelector('[data-kpi-value]')!
+      expect(value.className).toContain('text-data-xl')
+    }
+  })
+
+  it('puts two more stat cards between the charts and the recent-applications table', () => {
+    // "I highly recommend to add more two card components before recent
+    // applications table" -- and BEFORE is the part worth pinning: inside the
+    // grid, after the four panels, ahead of the full-width table.
+    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const grid = container.querySelector('.xl\\:grid-cols-2')!
+    const inGrid = [...grid.children]
+    const statCards = inGrid.filter((c) => c.hasAttribute('data-stat-card'))
+    expect(statCards).toHaveLength(2)
+    const table = inGrid.find((c) => c.querySelector('h2')?.textContent === 'recent applications')!
+    for (const card of statCards) {
+      expect(
+        card.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING,
+        'a stat card landed after the table'
+      ).toBeTruthy()
+    }
+  })
+
   it('shows KPI values with tabular figures', () => {
     const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
     for (const v of container.querySelectorAll('[data-kpi-value]')) {
@@ -145,6 +178,19 @@ describe('Dashboard', () => {
   })
 })
 
+/**
+ * The panel cards — the ones with a heading, a description and a link out.
+ *
+ * The Overview grew a second KIND of card on 2026-09-10: `StatCard`, which is
+ * a number and a label and deliberately has none of those three. Every
+ * assertion below is about panels, so they are selected rather than
+ * "every card on the page", which is what they used to mean when panels were
+ * the only cards there were.
+ */
+function panelCards(root: HTMLElement | Element): HTMLElement[] {
+  return [...root.querySelectorAll<HTMLElement>('[data-slot="card"]:not([data-stat-card])')]
+}
+
 describe('Overview layout and copy', () => {
   it('lays the panels out two-up in the order Gabe specified, table last and full width', () => {
     const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
@@ -172,7 +218,7 @@ describe('Overview layout and copy', () => {
     // to work out for themselves which one -- which is the work an overview
     // exists to have already done.
     const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
-    const cards = [...container.querySelectorAll('[data-slot="card"]')]
+    const cards = panelCards(container)
     const routes = new Map<string, string>()
     for (const card of cards) {
       const title = card.querySelector('h2')!.textContent!
@@ -192,7 +238,7 @@ describe('Overview layout and copy', () => {
     // heading's own name is unchanged -- which the assertion above relies on
     // to find these cards by their text at all.
     const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
-    for (const card of container.querySelectorAll('[data-slot="card"]')) {
+    for (const card of panelCards(container)) {
       const title = card.querySelector('[data-slot="card-title"]')!
       expect(title.querySelector('svg'), `${title.textContent} has no glyph`).toBeTruthy()
       expect(title.textContent).toBe(card.querySelector('h2')!.textContent)
@@ -202,8 +248,8 @@ describe('Overview layout and copy', () => {
   it('says what the page and each panel are for', () => {
     const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     expect(container.querySelector('[data-page-description]')!.textContent).toMatch(/at a glance/i)
-    // Every card carries one line, so none of them is a bare title.
-    const cards = [...container.querySelectorAll('[data-slot="card"]')]
+    // Every panel carries one line, so none of them is a bare title.
+    const cards = panelCards(container)
     expect(cards.length).toBeGreaterThan(0)
     for (const card of cards) {
       expect(card.querySelector('[data-slot="card-description"]')).toBeTruthy()
@@ -419,7 +465,7 @@ describe('source chart colours', () => {
 describe('panel links', () => {
   it('gives each panel exactly one link to its own destination', () => {
     const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
-    for (const card of container.querySelectorAll('[data-slot="card"]')) {
+    for (const card of panelCards(container)) {
       const title = card.querySelector('h2')!.textContent!
       const action = card.querySelector('[data-slot="card-action"] a')!
       const destination = action.getAttribute('href')!
@@ -432,7 +478,7 @@ describe('panel links', () => {
     // The empty state is where the duplicate was worst: two invitations to
     // open the calendar around one sentence already saying to.
     const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
-    const card = [...container.querySelectorAll('[data-slot="card"]')].find(
+    const card = panelCards(container).find(
       (c) => c.querySelector('h2')!.textContent === 'upcoming events'
     )!
     expect(card.querySelector('[data-events-empty]')).not.toBeNull()

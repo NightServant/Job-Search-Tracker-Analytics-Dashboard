@@ -1,6 +1,6 @@
 import * as React from 'react'
 import Link from 'next/link'
-import { PanelSection } from '@/components/ui/panel-section'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { TrashIcon } from '@/components/icons'
@@ -36,36 +36,43 @@ export function DangerZone({ onDeleteAccount, deleting = false }: DangerZoneProp
   const [confirmOpen, setConfirmOpen] = React.useState(false)
 
   return (
-    <div data-settings-group="danger">
-      <PanelSection title="danger zone" icon="AlertCircle" titleSize="m">
-        <SettingsRow
-          label="delete account"
-          description={
-            <>
-              permanently remove your account and everything tied to it. this cannot be
-              undone.{' '}
-              <Link
-                href="/privacy#deleting"
-                className="text-accent-default underline underline-offset-4"
+    <>
+      <Card data-settings-group="danger">
+        <CardHeader>
+          <CardTitle icon="AlertCircle">
+            <h2>danger zone</h2>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <SettingsRow
+            label="delete account"
+            description={
+              <>
+                permanently remove your account and everything tied to it. this cannot be
+                undone.{' '}
+                <Link
+                  href="/privacy#deleting"
+                  className="text-accent-default underline underline-offset-4"
+                >
+                  what this deletes
+                </Link>
+              </>
+            }
+            control={
+              <Button
+                variant="secondary"
+                size="s"
+                onClick={() => setConfirmOpen(true)}
+                disabled={deleting}
+                className="border-status-rejected-mark text-status-rejected-mark hover:bg-status-rejected-mark/10"
               >
-                what this deletes
-              </Link>
-            </>
-          }
-          control={
-            <Button
-              variant="secondary"
-              size="s"
-              onClick={() => setConfirmOpen(true)}
-              disabled={deleting}
-              className="border-status-rejected-mark text-status-rejected-mark hover:bg-status-rejected-mark/10"
-            >
-              <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
-              {deleting ? 'Deleting' : 'Delete account'}
-            </Button>
-          }
-        />
-      </PanelSection>
+                <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
+                {deleting ? 'Deleting' : 'Delete account'}
+              </Button>
+            }
+          />
+        </CardContent>
+      </Card>
       <ConfirmDialog
         open={confirmOpen}
         onOpenChange={setConfirmOpen}
@@ -78,6 +85,6 @@ export function DangerZone({ onDeleteAccount, deleting = false }: DangerZoneProp
           onDeleteAccount?.()
         }}
       />
-    </div>
+    </>
   )
 }

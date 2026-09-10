@@ -23,10 +23,16 @@ that stops someone re-investigating.
 | **`docx`** (npm, 9.7.1) | headless Word export | 2026-09-04 | **Integrated** — `src/services/integrations/docxExport.ts` |
 | **Scrapling** | job posting parsing | 2026-09-06 | **Integrated** — `scraper/`, deployed as a Vercel service |
 | **Firecrawl** | fetching the pages we cannot | 2026-09-07 | **Integrated, optional** — `scraper/app.py` |
+| **Apify** (`crawlerbros/linkedin-profile-scraper`) | LinkedIn profile, when Firecrawl cannot open it | 2026-09-10 | **Integrated** — `scraper/extractor/apify_profile.py` |
 | **LinkedIn data export** | your own profile | 2026-09-06 | **Integrated** — `src/services/linkedinExport.ts` |
+| **Nager.Date** | public holidays on the calendar | 2026-09-10 | **Integrated, keyless** — `src/services/holidays.ts` |
 
-That is the whole list. Seven working integrations. Anything
+That is the whole list. Nine working integrations. Anything
 not in this table is not in this application.
+
+(Apify had a section below and no row here until 2026-09-10 — a stale table is
+the one failure mode this file exists to prevent, so it was corrected while
+Nager.Date was being added.)
 
 ---
 
@@ -293,6 +299,56 @@ So a result counts **only when its title exactly equals the search term**. That
 is precisely the condition every usable row meets and every trap fails. The
 cost is recall; the alternative was teaching the scorer that "react calmly in
 stressful situations" satisfies a React requirement.
+
+---
+
+## Nager.Date — public holidays, and why there is no route for it
+
+<https://github.com/nager/nager.date> — MIT, no account, no key, no quota
+published. Added 2026-09-10 at Gabe's instruction, naming this repository.
+
+**The browser calls it directly** and there is deliberately no server route in
+front of it, which is the opposite of the decision made for Firecrawl and
+Apify. The difference is what a proxy would be *for*. Those two need a secret,
+so the request has to leave from somewhere that holds one. This one needs
+nothing, sends nothing about the user, and is already cached hard at the edge:
+
+```
+$ curl -sD- https://date.nager.at/api/v3/PublicHolidays/2026/PH -o /dev/null
+HTTP/2 200
+cache-control: public,max-age=604800
+cf-cache-status: HIT
+access-control-allow-origin: *          # with an Origin header
+```
+
+A week of edge caching and `access-control-allow-origin: *`. A route of ours in
+the middle would add a hop, a cold start and a second thing to keep alive, in
+exchange for nothing. Verified from the app's own origin on 2026-09-10: 18
+Philippine holidays for 2026, 204 countries in `/AvailableCountries`.
+
+**What is sent: a country code and a year.** No user data reaches this service,
+which is why it is not in the privacy page's third-party list beside Firecrawl
+and Apify — those receive a URL the user pasted; this receives `2026/PH`.
+
+**`date` is a wall-calendar day, never an instant.** `"2026-04-09"` with no
+zone, exactly like `jobs.date_applied`. `services/holidays.ts` never parses it
+into a `Date`: the calendar grid keys cells with `dayKey`, which produces the
+same `YYYY-MM-DD` from a local date, so the two meet as strings and no timezone
+can move a holiday a day.
+
+**The country is a guess the user can correct.** `navigator.language` is the
+language the browser's UI is in, not where the person is — Chrome reports
+`en-US` on plenty of machines in Manila — so detection alone would confidently
+show the wrong country's holidays, which is worse than showing none. The
+calendar carries a visible country picker and remembers the choice in
+`localStorage` under `worktrack.holiday-country`. **Per browser, not per
+account**: a second device asks again. `user_preferences` would mean a
+migration, a service method and a mutation for a display preference that costs
+one click to re-pick.
+
+**Failure is silent by design.** The query is supplementary and never gates the
+route — a calendar that will not draw because a third-party holiday API is down
+would be a worse screen than one drawn without holidays.
 
 ---
 

@@ -13,7 +13,7 @@ import { iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
 import { isSupportedCurrency } from '@/services/userPreferences'
 import { ApplicationRecordView } from './ApplicationRecordView'
-import { normalizePostingUrl, useRecordDraft, type RecordDraft } from './useRecordDraft'
+import { draftFromJob, normalizePostingUrl, useRecordDraft, type RecordDraft } from './useRecordDraft'
 import type { PostingDigestResult } from './digest'
 import type { SupportedCurrency } from '@/services/userPreferences'
 import type { JobAutofillResult, JobFormData, WorkMode } from '@/types'
@@ -117,7 +117,11 @@ export interface AddApplicationDialogProps {
   resumes?: { id: string; title: string }[]
   saving?: boolean
   /** Resolves `false` on a rejected save. See ApplicationRecordView. */
-  onSubmit: (data: JobFormData) => void | boolean | Promise<void | boolean>
+  /** `interviewAt` rides alongside, as in the record. See ApplicationRecordView. */
+  onSubmit: (
+    data: JobFormData,
+    interviewAt?: string | null
+  ) => void | boolean | Promise<void | boolean>
   onLinkedResumeChange?: (resumeId: string | null) => void
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   autofilling?: boolean
@@ -485,23 +489,15 @@ export function AddApplicationDialog({
   )
 }
 
-/** A blank draft, for resetting between openings. Mirrors `draftFromJob(null)`. */
+/**
+ * A blank draft, for resetting between openings.
+ *
+ * IT DELEGATES rather than restating the eighteen fields. This was a hand-kept
+ * copy of `draftFromJob(null, currency)` and it had already drifted once --
+ * `interviewAt` landed on `RecordDraft` and this literal did not know, which
+ * the compiler caught only because the type is exhaustive. One definition of
+ * "empty" is the point of `draftFromJob` taking a nullable job at all.
+ */
 function emptyDraft(currency: SupportedCurrency): RecordDraft {
-  return {
-    company: '',
-    role: '',
-    status: 'wishlist',
-    salaryMin: '',
-    salaryMax: '',
-    currency,
-    location: '',
-    workMode: '',
-    source: '',
-    dateApplied: '',
-    url: '',
-    tags: '',
-    techStack: '',
-    isReferral: false,
-    description: '',
-  }
+  return draftFromJob(null, currency)
 }

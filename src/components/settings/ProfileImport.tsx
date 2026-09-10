@@ -209,31 +209,38 @@ export function ProfileFetch({
 
   return (
     <div className="flex flex-col gap-3" data-profile-fetch>
-      <Field
-        id="profile-url"
-        label="LinkedIn profile URL"
-        hint="the public address of your profile — the one you would send to someone."
-      >
-        <Input
+      {/* A MEASURE, NOT THE WHOLE ROW (Gabe, 2026-09-10). A profile address is
+          about 50 characters and the box was running the full width of a
+          1400px card, so the field looked like it wanted an essay and the
+          caret sat alone in a quarter of a screen. `max-w-md` is roughly one
+          and a half times the longest address anyone will paste here. */}
+      <div className="max-w-md">
+        <Field
           id="profile-url"
-          type="url"
-          icon="Link"
-          value={url}
-          onChange={(event) => {
-            setUrl(event.target.value)
-            setError('')
-          }}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              submit()
-            }
-          }}
-          error={error || undefined}
-          placeholder="https://www.linkedin.com/in/your-name"
-          disabled={busy}
-        />
-      </Field>
+          label="LinkedIn profile URL"
+          hint="the public address of your profile — the one you would send to someone."
+        >
+          <Input
+            id="profile-url"
+            type="url"
+            icon="Link"
+            value={url}
+            onChange={(event) => {
+              setUrl(event.target.value)
+              setError('')
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                submit()
+              }
+            }}
+            error={error || undefined}
+            placeholder="https://www.linkedin.com/in/your-name"
+            disabled={busy}
+          />
+        </Field>
+      </div>
 
       {note && (
         <p className="text-body-s text-text-muted" data-profile-note>

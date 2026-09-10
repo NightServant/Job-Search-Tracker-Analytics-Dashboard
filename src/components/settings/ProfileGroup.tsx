@@ -1,7 +1,7 @@
 'use client'
 
 import * as React from 'react'
-import { PanelSection } from '@/components/ui/panel-section'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { icons, type IconName } from '@/components/icons'
@@ -26,9 +26,11 @@ import { EMPTY_PROFILE, hasProfileContent, type UserProfile } from '@/services/p
  *     There is no cover image to show and inventing one would be decoration,
  *     so the band is a flat accent-surface field -- the same token the tables
  *     and the calendar header wear. It is a place, not a picture.
- *   STACKED SECTIONS, one per kind of content, each with its own heading and
- *     count. LinkedIn stacks cards; this stacks hairline-separated blocks,
- *     which is the same rhythm in this system's vocabulary.
+ *   STACKED CARDS, one per kind of content, each with its own heading and
+ *     count -- which is what LinkedIn does too. These were hairline-separated
+ *     blocks until 2026-09-10; see `Section` below for why the box earns its
+ *     place on this particular screen and what stays unchanged (radius, no
+ *     shadow, hairline border).
  *   A SQUARE TILE LEADS EVERY ENTRY, where LinkedIn puts a company logo. We
  *     have no logos and will not fetch them, so it carries the organisation's
  *     initial. Square, not round: round is a person, square is an institution,
@@ -100,28 +102,25 @@ function OrgTile({ name, icon }: { name: string | null; icon: IconName }) {
   )
 }
 
-/** A section heading with its count, so a list never hides its own length. */
-function SectionHeading({
-  title,
-  count,
-  icon,
-}: {
-  title: string
-  count?: number
-  icon: IconName
-}) {
-  const Icon = icons[icon]
-  return (
-    <h3 className="flex items-center gap-2 text-heading-s text-text-primary">
-      <Icon size={16} aria-hidden className="shrink-0 text-text-muted" />
-      {title}
-      {count !== undefined && count > 0 && (
-        <span className="tabular text-body-s font-normal text-text-muted">({count})</span>
-      )}
-    </h3>
-  )
-}
-
+/**
+ * One section of the profile, as a card (Gabe, 2026-09-10).
+ *
+ * THE SECTIONS WERE HAIRLINE-SEPARATED BLOCKS and are now boxed. That is a
+ * deliberate departure from this system's default -- separation here is
+ * normally a rule, never a border -- and it is the same departure the
+ * Overview already runs on: Gabe asked for the card component on these
+ * screens specifically. What does NOT change is the rest of the grammar. The
+ * radius still caps at 4px, there is still no shadow anywhere, and the card
+ * carries a hairline border rather than a ring.
+ *
+ * WHY IT READS BETTER HERE. A profile is a list of unrelated lists -- four
+ * roles, then two degrees, then eight certificates -- and a rule between them
+ * says only "a new thing starts". A box says how far the thing extends, which
+ * is the question a reader scanning for their education actually has.
+ *
+ * The count rides in the title rather than under it, so a list never hides
+ * its own length.
+ */
 function Section({
   title,
   icon,
@@ -134,14 +133,17 @@ function Section({
   children: React.ReactNode
 }) {
   return (
-    <section
-      className="flex flex-col gap-4 border-t border-border-subtle pt-6"
-      aria-label={title}
-      data-profile-section={title}
-    >
-      <SectionHeading title={title} count={count} icon={icon} />
-      {children}
-    </section>
+    <Card aria-label={title} data-profile-section={title}>
+      <CardHeader>
+        <CardTitle icon={icon}>
+          <h3>{title}</h3>
+          {count !== undefined && count > 0 && (
+            <span className="tabular text-body-s font-normal text-text-muted">({count})</span>
+          )}
+        </CardTitle>
+      </CardHeader>
+      <CardContent>{children}</CardContent>
+    </Card>
   )
 }
 
@@ -297,10 +299,7 @@ function Bullets({ rows }: { rows: BulletRow[] }) {
 function Identity({ profile, action }: { profile: UserProfile; action?: React.ReactNode }) {
   const place = [profile.location, profile.industry].filter(Boolean).join(' · ')
   return (
-    <div
-      className="overflow-hidden rounded-md border border-border-subtle"
-      data-profile-banner
-    >
+    <Card className="gap-0 py-0" data-profile-banner>
       {/* A FLAT FIELD, NOT A PICTURE. There is no cover image in any source
           this app has, and generating one would be decoration pretending to be
           data. `accent-surface` is the token for a field of accent -- the same
@@ -336,23 +335,31 @@ function Identity({ profile, action }: { profile: UserProfile; action?: React.Re
 
         {action}
       </div>
-    </div>
+    </Card>
   )
 }
 
 function Loading() {
   return (
     <div className="flex flex-col gap-4" data-profile-state="loading">
-      <div className="overflow-hidden rounded-md border border-border-subtle">
+      <Card className="gap-0 py-0">
         <Skeleton className="h-16 w-full rounded-none sm:h-20" />
         <div className="flex flex-col gap-3 p-4 sm:p-5">
           <Skeleton className="-mt-10 size-16 rounded-full sm:-mt-12 sm:size-20" />
           <Skeleton className="h-4 w-40 max-w-full" />
           <Skeleton className="h-3 w-64 max-w-full" />
         </div>
-      </div>
-      <Skeleton className="h-24 w-full" />
-      <Skeleton className="h-24 w-full" />
+      </Card>
+      <Card>
+        <CardContent>
+          <Skeleton className="h-20 w-full" />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent>
+          <Skeleton className="h-20 w-full" />
+        </CardContent>
+      </Card>
     </div>
   )
 }
@@ -369,176 +376,184 @@ export function ProfileGroup({ state, source, steps }: ProfileGroupProps) {
     !!profile.birthDate
 
   return (
-    <div data-settings-group="profile">
-      <PanelSection title="profile" icon="UserRound" titleSize="m">
-        <div className="@container/profile">
-          {state.status === 'loading' && <Loading />}
+    <div data-settings-group="profile" className="@container/profile">
+      {state.status === 'loading' && <Loading />}
 
-          {state.status === 'empty' && (
-            <div className="flex flex-col gap-4" data-profile-state="empty">
-              <p className="max-w-prose text-body-m leading-[1.6] text-text-secondary">
-                {state.message}
-              </p>
-              {steps}
-              {source}
-            </div>
-          )}
+      {/* NO SECOND "profile" HEADING over the stack. The tab above already
+          says profile and the page above that says settings; a third one
+          between them named the same thing was a level of hierarchy with
+          nothing in it. Each card now carries its own heading, which is the
+          same shape the general tab has. */}
+      {state.status === 'empty' && (
+        <Card data-profile-state="empty">
+          <CardHeader>
+            <CardTitle icon="UserRound">
+              <h3>profile</h3>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <p className="max-w-prose text-body-m leading-[1.6] text-text-secondary">
+              {state.message}
+            </p>
+            {steps}
+            {source}
+          </CardContent>
+        </Card>
+      )}
 
-          {ready && (
-            <div className="flex flex-col gap-6" data-profile-state="ready">
-              <Identity profile={profile} action={source} />
+      {ready && (
+      <div className="flex flex-col gap-6" data-profile-state="ready">
+        <Identity profile={profile} action={source} />
 
-              {/* ABOUT IS ITS OWN SECTION, as it is on LinkedIn, rather than a
-                  paragraph welded to the identity block. It is prose about a
-                  person and it belongs with the other things they wrote, not
-                  with their name and their photo. */}
-              {profile.summary && (
-                <Section title="about" icon="Info">
-                  <p className="max-w-prose whitespace-pre-line text-body-m leading-[1.6] text-text-secondary">
-                    {profile.summary}
+        {/* ABOUT IS ITS OWN SECTION, as it is on LinkedIn, rather than a
+            paragraph welded to the identity block. It is prose about a
+            person and it belongs with the other things they wrote, not
+            with their name and their photo. */}
+        {profile.summary && (
+          <Section title="about" icon="Info">
+            <p className="max-w-prose whitespace-pre-line text-body-m leading-[1.6] text-text-secondary">
+              {profile.summary}
+            </p>
+          </Section>
+        )}
+
+        {profile.experiences.length > 0 && (
+          <Section title="experience" icon="Briefcase" count={profile.experiences.length}>
+            <Records
+              icon="Briefcase"
+              rows={profile.experiences.map((e) => ({
+                lead: e.title,
+                detail: e.company,
+                org: e.company,
+                period: e.period,
+                meta: e.location,
+                body: e.description,
+              }))}
+            />
+          </Section>
+        )}
+
+        {profile.education.length > 0 && (
+          <Section title="education" icon="Documents" count={profile.education.length}>
+            <Records
+              icon="Documents"
+              rows={profile.education.map((e) => ({
+                lead: e.school,
+                detail: e.degree,
+                org: e.school,
+                period: e.period,
+              }))}
+            />
+          </Section>
+        )}
+
+        {profile.certifications.length > 0 && (
+          <Section
+            title="licenses & certifications"
+            icon="ShieldCheck"
+            count={profile.certifications.length}
+          >
+            <Bullets
+              rows={profile.certifications.map((c) => ({
+                lead: c.name,
+                detail: c.authority,
+                period: c.period,
+              }))}
+            />
+          </Section>
+        )}
+
+        {profile.projects.length > 0 && (
+          <Section title="projects" icon="Code" count={profile.projects.length}>
+            <Bullets
+              rows={profile.projects.map((p) => ({
+                lead: p.title,
+                detail: null,
+                period: null,
+                body: p.description,
+                href: p.url,
+              }))}
+            />
+          </Section>
+        )}
+
+        {facets && (
+          <Section title="details" icon="Tag">
+            {/* THE SHORT LISTS SHARE A ROW once there is width for it.
+                Each is looked up rather than read, so four of them in
+                one column is three scrolls for four facts. */}
+            <div className="grid gap-5 @lg/profile:grid-cols-2 @3xl/profile:grid-cols-3">
+              {profile.skills.length > 0 && (
+                <Facet title="skills">
+                  {/* Comma-joined prose, not chips: the system forbids
+                      pills, and forty skills as forty boxes is a wall
+                      either way. */}
+                  <p className="text-body-s leading-[1.6] text-text-secondary">
+                    {profile.skills.join(', ')}
                   </p>
-                </Section>
+                </Facet>
               )}
-
-              {profile.experiences.length > 0 && (
-                <Section title="experience" icon="Briefcase" count={profile.experiences.length}>
-                  <Records
-                    icon="Briefcase"
-                    rows={profile.experiences.map((e) => ({
-                      lead: e.title,
-                      detail: e.company,
-                      org: e.company,
-                      period: e.period,
-                      meta: e.location,
-                      body: e.description,
-                    }))}
-                  />
-                </Section>
+              {profile.languages.length > 0 && (
+                <Facet title="languages">
+                  <p className="text-body-s text-text-secondary">
+                    {profile.languages.join(', ')}
+                  </p>
+                </Facet>
               )}
-
-              {profile.education.length > 0 && (
-                <Section title="education" icon="Documents" count={profile.education.length}>
-                  <Records
-                    icon="Documents"
-                    rows={profile.education.map((e) => ({
-                      lead: e.school,
-                      detail: e.degree,
-                      org: e.school,
-                      period: e.period,
-                    }))}
-                  />
-                </Section>
+              {profile.websites.length > 0 && (
+                <Facet title="websites">
+                  <ul className="flex flex-col gap-1">
+                    {profile.websites.map((site) => (
+                      <li key={site} className="min-w-0">
+                        <a
+                          href={site}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block break-all text-body-s text-accent-default underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
+                        >
+                          {site}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </Facet>
               )}
-
-              {profile.certifications.length > 0 && (
-                <Section
-                  title="licenses & certifications"
-                  icon="ShieldCheck"
-                  count={profile.certifications.length}
-                >
-                  <Bullets
-                    rows={profile.certifications.map((c) => ({
-                      lead: c.name,
-                      detail: c.authority,
-                      period: c.period,
-                    }))}
-                  />
-                </Section>
-              )}
-
-              {profile.projects.length > 0 && (
-                <Section title="projects" icon="Code" count={profile.projects.length}>
-                  <Bullets
-                    rows={profile.projects.map((p) => ({
-                      lead: p.title,
-                      detail: null,
-                      period: null,
-                      body: p.description,
-                      href: p.url,
-                    }))}
-                  />
-                </Section>
-              )}
-
-              {facets && (
-                <Section title="details" icon="Tag">
-                  {/* THE SHORT LISTS SHARE A ROW once there is width for it.
-                      Each is looked up rather than read, so four of them in
-                      one column is three scrolls for four facts. */}
-                  <div className="grid gap-5 @lg/profile:grid-cols-2 @3xl/profile:grid-cols-3">
-                    {profile.skills.length > 0 && (
-                      <Facet title="skills">
-                        {/* Comma-joined prose, not chips: the system forbids
-                            pills, and forty skills as forty boxes is a wall
-                            either way. */}
-                        <p className="text-body-s leading-[1.6] text-text-secondary">
-                          {profile.skills.join(', ')}
-                        </p>
-                      </Facet>
+              {/* LABELLED FOR WHAT IT IS. A home address and a birth date
+                  are a different category of fact from a job title, and
+                  a source hands them over whether or not anyone wanted
+                  them. Shown plainly, so a reader who does not want them
+                  stored knows to clear the profile. */}
+              {(profile.address || profile.birthDate) && (
+                <Facet title="personal details">
+                  <div className="flex flex-col gap-1">
+                    {profile.address && (
+                      <p className="text-body-s leading-[1.6] text-text-secondary">
+                        {profile.address}
+                      </p>
                     )}
-                    {profile.languages.length > 0 && (
-                      <Facet title="languages">
-                        <p className="text-body-s text-text-secondary">
-                          {profile.languages.join(', ')}
-                        </p>
-                      </Facet>
-                    )}
-                    {profile.websites.length > 0 && (
-                      <Facet title="websites">
-                        <ul className="flex flex-col gap-1">
-                          {profile.websites.map((site) => (
-                            <li key={site} className="min-w-0">
-                              <a
-                                href={site}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="block break-all text-body-s text-accent-default underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
-                              >
-                                {site}
-                              </a>
-                            </li>
-                          ))}
-                        </ul>
-                      </Facet>
-                    )}
-                    {/* LABELLED FOR WHAT IT IS. A home address and a birth date
-                        are a different category of fact from a job title, and
-                        a source hands them over whether or not anyone wanted
-                        them. Shown plainly, so a reader who does not want them
-                        stored knows to clear the profile. */}
-                    {(profile.address || profile.birthDate) && (
-                      <Facet title="personal details">
-                        <div className="flex flex-col gap-1">
-                          {profile.address && (
-                            <p className="text-body-s leading-[1.6] text-text-secondary">
-                              {profile.address}
-                            </p>
-                          )}
-                          {profile.birthDate && (
-                            <p className="text-body-s text-text-secondary">
-                              Born {profile.birthDate}
-                            </p>
-                          )}
-                        </div>
-                      </Facet>
+                    {profile.birthDate && (
+                      <p className="text-body-s text-text-secondary">
+                        Born {profile.birthDate}
+                      </p>
                     )}
                   </div>
-                </Section>
-              )}
-
-              {!hasProfileContent(profile) && (
-                <p className="text-body-s text-text-muted">This import came back empty.</p>
-              )}
-
-              {profile.fetchedAt && (
-                <p className="border-t border-border-subtle pt-4 text-caption text-text-muted">
-                  imported {new Date(profile.fetchedAt).toLocaleDateString()}
-                </p>
+                </Facet>
               )}
             </div>
-          )}
+          </Section>
+        )}
+
+        {!hasProfileContent(profile) && (
+          <p className="text-body-s text-text-muted">This import came back empty.</p>
+        )}
+
+        {profile.fetchedAt && (
+          <p className="text-caption text-text-muted">
+            imported {new Date(profile.fetchedAt).toLocaleDateString()}
+          </p>
+        )}
         </div>
-      </PanelSection>
+      )}
     </div>
   )
 }

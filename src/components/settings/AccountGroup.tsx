@@ -1,4 +1,4 @@
-import { PanelSection } from '@/components/ui/panel-section'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { LogOutIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
@@ -20,8 +20,13 @@ export interface AccountGroupProps {
 
 export function AccountGroup({ email = null, onSignOut, signingOut = false }: AccountGroupProps) {
   return (
-    <div data-settings-group="account">
-      <PanelSection title="account" icon="UserRound" titleSize="m">
+    <Card data-settings-group="account">
+      <CardHeader>
+        <CardTitle icon="UserRound">
+          <h2>account</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
         <div className="flex flex-col gap-4">
           <SettingsRow
             label="email"
@@ -48,7 +53,7 @@ export function AccountGroup({ email = null, onSignOut, signingOut = false }: Ac
             }
           />
         </div>
-      </PanelSection>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

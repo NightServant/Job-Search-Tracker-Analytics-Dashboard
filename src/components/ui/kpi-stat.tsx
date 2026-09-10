@@ -16,6 +16,18 @@ export interface KpiStatProps extends React.HTMLAttributes<HTMLDivElement> {
   label: string
   value: string | number
   delta?: { value: string; direction: 'up' | 'down' | 'flat' }
+  /**
+   * How loud the number is. `m` (24px at most) is the dense-strip default;
+   * `l` is `text-data-xl`, the same hero step `StatCard` uses.
+   *
+   * IT EXISTS BECAUSE ONE STRIP IS NOT A STRIP (Gabe, 2026-09-10). Analytics'
+   * `overview` block is a headline card in its own right -- four numbers and
+   * nothing else -- so it reads as a set of captions at the size that is
+   * correct for, say, a chart's own summary row. The two sizes are one
+   * component rather than two so the tabular figures, the label treatment and
+   * the delta rules cannot drift apart between them.
+   */
+  size?: 'm' | 'l'
 }
 
 const DELTA_TONE = {
@@ -26,11 +38,17 @@ const DELTA_TONE = {
 
 const DELTA_WORD = { up: 'up', down: 'down', flat: 'flat' } as const
 
-export function KpiStat({ label, value, delta, className, ...props }: KpiStatProps) {
+export function KpiStat({ label, value, delta, size = 'm', className, ...props }: KpiStatProps) {
   return (
     <div className={cn('flex flex-col gap-1', className)} {...props}>
       <span className="text-label-caps uppercase text-text-muted">{label}</span>
-      <span data-kpi-value className="tabular text-data-l text-text-primary">
+      <span
+        data-kpi-value
+        className={cn(
+          'tabular text-text-primary',
+          size === 'l' ? 'text-data-xl' : 'text-data-l'
+        )}
+      >
         {value}
       </span>
       {delta && (

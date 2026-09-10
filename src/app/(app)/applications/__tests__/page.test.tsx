@@ -62,7 +62,13 @@ vi.mock('@/hooks/useResumes', () => ({ useResumes: () => ({ data: [], isLoading:
 vi.mock('@/hooks/usePostingDigest', () => ({
   usePostingDigest: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
-vi.mock('@/hooks/useJobEvents', () => ({ useJobEvents: () => ({ data: [], isLoading: false }) }))
+vi.mock('@/hooks/useJobEvents', () => ({
+  useJobEvents: () => ({ data: [], isLoading: false }),
+  // The record's interview date writes through this one. Mocked rather than
+  // exercised here: the route only forwards to it, and the interview field's
+  // own behaviour is covered in components/applications/__tests__.
+  useScheduleInterview: () => ({ mutateAsync: vi.fn(), isPending: false }),
+}))
 vi.mock('@/hooks/useCvText', () => ({ useCvText: () => ({ data: undefined }) }))
 
 // `?application=<id>` is how a desktop deep link off /applications/<id>

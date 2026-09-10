@@ -1,4 +1,4 @@
-import { PanelSection } from '@/components/ui/panel-section'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { SettingsRow } from './SettingsRow'
 import { SegmentedControl } from '@/components/ui/segmented-control'
 import { SUPPORTED_CURRENCIES, type SupportedCurrency } from '@/services/userPreferences'
@@ -42,8 +42,13 @@ export function PreferencesGroup({
   saving = false,
 }: PreferencesGroupProps) {
   return (
-    <div data-settings-group="preferences">
-      <PanelSection title="preferences" icon="Settings" titleSize="m">
+    <Card data-settings-group="preferences">
+      <CardHeader>
+        <CardTitle icon="Settings">
+          <h2>preferences</h2>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
         {/* SettingsRow, not Field: this was the only settings group not using
             it, which is why it sat differently from account and danger zone.
             `wide` is the roadmap's 5.7 mobile rule -- the currency selector is
@@ -76,7 +81,7 @@ export function PreferencesGroup({
             </div>
           }
         />
-      </PanelSection>
-    </div>
+      </CardContent>
+    </Card>
   )
 }

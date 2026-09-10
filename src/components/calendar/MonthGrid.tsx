@@ -2,6 +2,7 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { dayKey } from '@/lib/calendar'
 import { groupEventsByDay } from '@/services/events'
+import { holidaysByDay, type PublicHoliday } from '@/services/holidays'
 import type { CalendarEvent } from '@/services/events'
 
 const WEEKDAY_HEADINGS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -45,12 +46,22 @@ export interface MonthGridProps {
   grid: Date[][]
   month: number
   events: CalendarEvent[]
+  /** Public holidays for the years this grid covers. See services/holidays. */
+  holidays?: PublicHoliday[]
   today?: Date
   className?: string
 }
 
-export function MonthGrid({ grid, month, events, today = new Date(), className }: MonthGridProps) {
+export function MonthGrid({
+  grid,
+  month,
+  events,
+  holidays = [],
+  today = new Date(),
+  className,
+}: MonthGridProps) {
   const grouped = groupEventsByDay(events)
+  const publicHolidays = holidaysByDay(holidays)
   const todayKey = dayKey(today)
 
   return (
@@ -86,6 +97,7 @@ export function MonthGrid({ grid, month, events, today = new Date(), className }
       {grid.flat().map((date) => {
         const key = dayKey(date)
         const dayEvents = grouped.get(key) ?? []
+        const dayHolidays = publicHolidays.get(key) ?? []
         const inMonth = date.getMonth() === month
         const isToday = key === todayKey
 
@@ -130,6 +142,22 @@ export function MonthGrid({ grid, month, events, today = new Date(), className }
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
+              {/* THE HOLIDAY LEADS THE CELL, above whatever is scheduled, and
+                  it is set in the muted tone rather than in a status colour:
+                  a public holiday is a property of the DAY, not an item on
+                  the list, and the five status hues mean one thing in this
+                  app. `title` carries the full name because a 47px-wide cell
+                  truncates "Araw ng Kagitingan" every time. */}
+              {dayHolidays.map((holiday) => (
+                <span
+                  key={holiday.date + holiday.name}
+                  data-holiday
+                  title={holiday.localName}
+                  className="truncate text-caption font-medium text-text-muted"
+                >
+                  {holiday.localName}
+                </span>
+              ))}
               {dayEvents.slice(0, MAX_TITLES_PER_CELL).map((event) => (
                 <span key={event.id} className="truncate text-caption text-text-secondary">
                   {event.title}
