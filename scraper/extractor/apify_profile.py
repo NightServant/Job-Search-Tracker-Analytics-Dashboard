@@ -236,6 +236,39 @@ def _websites(row: dict[str, Any]) -> list[str]:
     return out
 
 
+#: Phrases that only ever appear in LinkedIn's own SEO blurb, never in a
+#: person's About.
+#:
+#: MEASURED ON GABE'S OWN PROFILE (2026-09-10). The actor returned, as
+#: `summary`: "Experience: Dominican College of Tarlac · Education: Tarlac
+#: State University · Location: Bamban · 44 connections on LinkedIn. View
+#: Elijah Gabe Cervantes' profile on LinkedIn, a professional community of 1
+#: billion members." That is the `og:description` meta tag -- what LinkedIn
+#: shows a search engine when the About section is not public -- and storing it
+#: as his summary would put LinkedIn's marketing copy at the top of his CV.
+_SEO_BLURB_MARKERS = (
+    "profile on linkedin",
+    "connections on linkedin",
+    "professional community of",
+)
+
+
+def _real_summary(value: Any) -> str | None:
+    """The About section, or None if what came back is LinkedIn's own blurb.
+
+    NONE RATHER THAN THE BLURB, deliberately. An empty About is a fact the
+    panel can state; a paragraph of "View X's profile on LinkedIn" masquerading
+    as one is a fact nobody can correct without noticing it first.
+    """
+    text = _block(value)
+    if not text:
+        return None
+    lowered = text.lower()
+    if any(marker in lowered for marker in _SEO_BLURB_MARKERS):
+        return None
+    return text
+
+
 def profile_from_apify(row: dict[str, Any], requested_url: str) -> dict[str, Any]:
     """A `UserProfile`-shaped dict plus the warnings worth showing."""
     profile = dict(EMPTY_PROFILE)
@@ -244,7 +277,7 @@ def profile_from_apify(row: dict[str, Any], requested_url: str) -> dict[str, Any
     profile["name"] = _pick(row, "name", "fullName")
     profile["headline"] = _pick(row, "headline")
     profile["location"] = _pick(row, "location")
-    profile["summary"] = _pick_block(row, "summary", "about")
+    profile["summary"] = _real_summary(row.get("summary")) or _real_summary(row.get("about"))
     profile["pictureUrl"] = _pick(row, "profilePicture", "profilePic", "photo")
     profile["url"] = _pick(row, "profileUrl") or requested_url
 
@@ -266,6 +299,12 @@ def profile_from_apify(row: dict[str, Any], requested_url: str) -> dict[str, Any
         "Skills and languages are not on a signed-out profile page, so they do "
         "not come through. Add them by hand, or import a LinkedIn data export."
     )
+    if not profile["summary"]:
+        warnings.append(
+            "No About section came back — LinkedIn only shows one to signed-out "
+            "visitors when the profile owner has made it public."
+        )
+
     roles = profile["experiences"]
     if not roles:
         warnings.append("No work history came back. Add your roles by hand.")

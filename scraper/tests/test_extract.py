@@ -841,3 +841,30 @@ def test_missing_titles_and_missing_descriptions_are_reported_separately():
     warnings = profile_from_apify(titled, "x")["warnings"]
     assert not any("does not show job titles" in w for w in warnings)
     assert any("bullet text under each role" in w for w in warnings)
+
+
+def test_linkedins_own_seo_blurb_is_not_stored_as_an_about_section():
+    # MEASURED ON A REAL PROFILE (2026-09-10). The actor returned this as
+    # `summary`: it is the og:description meta tag, which LinkedIn serves a
+    # search engine when the About is not public. Storing it would put
+    # LinkedIn's marketing copy at the top of a CV.
+    row = {
+        "name": "Elijah Gabe Cervantes",
+        "summary": (
+            "Experience: Dominican College of Tarlac · Education: Tarlac State "
+            "University · Location: Bamban · 44 connections on LinkedIn. View "
+            "Elijah Gabe Cervantes’ profile on LinkedIn, a professional "
+            "community of 1 billion members."
+        ),
+    }
+    out = profile_from_apify(row, "x")
+    assert out["profile"]["summary"] is None
+    assert any("No About section" in w for w in out["warnings"])
+
+
+def test_a_real_about_section_survives():
+    # The guard must not eat a genuine About that happens to mention the word.
+    row = {"summary": "I build job-search tooling.\nCurrently learning Rust."}
+    out = profile_from_apify(row, "x")
+    assert out["profile"]["summary"] == "I build job-search tooling.\nCurrently learning Rust."
+    assert not any("No About section" in w for w in out["warnings"])

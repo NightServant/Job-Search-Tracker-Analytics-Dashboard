@@ -213,8 +213,10 @@ describe('the profile panel', () => {
     render(<SettingsPage prefs={null} profile={{ status: 'ready', profile: FILLED }} />)
     expect(screen.getByText('Elijah Gabe Cervantes')).toBeTruthy()
     expect(screen.getByText('Front-end developer')).toBeTruthy()
-    // Industry and location share the line under the headline.
-    expect(screen.getByText(/Software Development · Baguio, Philippines/)).toBeTruthy()
+    // Location leads the line under the headline, industry follows. That
+    // order is LinkedIn's -- a profile shows where you are and never shows an
+    // industry at all -- and this panel mimics it deliberately (2026-09-10).
+    expect(screen.getByText(/Baguio, Philippines · Software Development/)).toBeTruthy()
     expect(screen.getByText('Developer')).toBeTruthy()
     expect(screen.getByText('University')).toBeTruthy()
     expect(screen.getByText('React, TypeScript')).toBeTruthy()
@@ -254,6 +256,92 @@ describe('the profile panel', () => {
  * this supersedes -- it is still the only source that has ever carried the
  * bullet text under a role -- but nothing wires it into a screen any more.
  */
+/**
+ * THE PANEL MIMICS LINKEDIN'S OWN PROFILE (Gabe, 2026-09-10, with his profile
+ * open beside it). The data came from a LinkedIn profile and the person
+ * reading this screen is checking whether the import got it right -- every
+ * difference in shape between the two is one they have to hold in their head.
+ */
+describe('the profile panel’s layout', () => {
+  it('opens with a cover band and an overlapping avatar, as a profile does', () => {
+    const { container } = render(
+      <SettingsPage prefs={null} profile={{ status: 'ready', profile: FILLED }} />
+    )
+    const banner = container.querySelector('[data-profile-banner]')!
+    expect(banner).toBeTruthy()
+    // A FLAT FIELD, NOT A PICTURE. No source this app has carries a cover
+    // image, and generating one would be decoration pretending to be data.
+    expect(banner.innerHTML).toContain('bg-accent-surface')
+    // The overlap is the gesture that makes it read as a profile rather than
+    // a row with a picture beside it.
+    expect(banner.innerHTML).toMatch(/-mt-10/)
+  })
+
+  it('falls back to initials when the source carries no photo', () => {
+    // ONLY THE FALLBACK IS ASSERTABLE HERE, and that is a jsdom limit rather
+    // than a gap in the component: Base UI's Avatar mounts the <img> only once
+    // it has LOADED, and jsdom never loads one -- rendering an AvatarImage in
+    // this environment produces the fallback span and nothing else. The photo
+    // path was verified in a real browser instead (2026-09-10).
+    //
+    // The docblock here used to say "NO PHOTO -- the export is CSVs and
+    // carries no image", which stopped being true when the Apify route landed
+    // and started returning `profilePicture`.
+    render(<SettingsPage prefs={null} profile={{ status: 'ready', profile: FILLED }} />)
+    expect(screen.getByText('EG')).toBeTruthy()
+  })
+
+  it('leads each record with a tile for the ORGANISATION, not for the line above it', () => {
+    // Inferring the organisation from whichever of lead/detail was present put
+    // a "BC" tile beside Tarlac State University -- initials of "BS, Computer
+    // Science". On an experience the organisation is the subtitle; on an
+    // education it is the lead.
+    const { container } = render(
+      <SettingsPage prefs={null} profile={{ status: 'ready', profile: FILLED }} />
+    )
+    const tiles = [...container.querySelectorAll('[data-org-tile]')].map((t) => t.textContent)
+    expect(tiles).toEqual(['W', 'U'])
+  })
+
+  it('sets certifications and projects as real bulleted lists', () => {
+    // Gabe asked for bullets on exactly these two, and they earn it while the
+    // other two do not: a role and a degree are dated records with bodies; a
+    // certificate is one line. A real `list-disc` list, not a stack of rows
+    // with a glyph in front -- a screen reader announces "list, N items",
+    // which a div wearing a bullet character does not.
+    const withBoth = {
+      ...FILLED,
+      certifications: [{ name: 'Introduction to Networks', authority: 'Cisco', period: 'Jan 2024' }],
+      projects: [{ title: 'Worktrack', description: 'A tracker.', url: 'https://example.dev' }],
+    }
+    const { container } = render(
+      <SettingsPage prefs={null} profile={{ status: 'ready', profile: withBoth }} />
+    )
+    const bullets = [...container.querySelectorAll('[data-profile-bullet]')]
+    expect(bullets).toHaveLength(2)
+    for (const bullet of bullets) {
+      expect(bullet.tagName).toBe('LI')
+      expect(bullet.closest('ul')!.className).toContain('list-disc')
+    }
+    expect(screen.getByText(/Introduction to Networks/)).toBeTruthy()
+    expect(screen.getByRole('link', { name: 'Worktrack' })).toBeTruthy()
+  })
+
+  it('names every section it renders, and renders none it has nothing for', () => {
+    const { container } = render(
+      <SettingsPage prefs={null} profile={{ status: 'ready', profile: FILLED }} />
+    )
+    const sections = [...container.querySelectorAll('[data-profile-section]')].map((s) =>
+      s.getAttribute('data-profile-section')
+    )
+    expect(sections).toContain('about')
+    expect(sections).toContain('experience')
+    expect(sections).toContain('education')
+    // FILLED carries no projects, so there is no projects section to find.
+    expect(sections).not.toContain('projects')
+  })
+})
+
 describe('building a profile from a LinkedIn URL', () => {
   it('asks for an address and nothing else -- no file, no credential', () => {
     const { container } = render(<ProfileFetch onFetch={vi.fn()} />)
