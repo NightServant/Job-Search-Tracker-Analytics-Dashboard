@@ -30,6 +30,7 @@ from extractor.challenge import (
 )
 from extractor.core import extract
 from extractor.net import normalize_target_url, reject_reason
+from extractor.profile import extract_profile
 
 REQUEST_TIMEOUT_S = 12.0
 
@@ -114,6 +115,10 @@ _load_local_env()
 app = FastAPI(title="worktrack-extractor", docs_url=None, redoc_url=None)
 
 
+class ProfileRequest(BaseModel):
+    url: str
+
+
 class ExtractRequest(BaseModel):
     url: str
     #: HTML the CALLER already has, which skips the fetch entirely.
@@ -123,6 +128,24 @@ class ExtractRequest(BaseModel):
     #: anything whose operator refuses datacenter traffic. A browser that is
     #: already looking at the posting is not a scraper.
     html: str | None = None
+
+
+def firecrawl_profile_payload(url: str) -> dict[str, Any]:
+    """The profile fetch's body.
+
+    SAME SHAPE AS A POSTING'S, and for the same reason: `onlyMainContent` stays
+    False because the JSON-LD `ProfilePage` graph lives in `<head>`, which is
+    exactly what "main content" throws away. The wait is shorter -- a profile
+    is server-rendered for a logged-out visitor, so there is no posting body to
+    wait for.
+    """
+    return {
+        "url": url,
+        "formats": [{"type": "rawHtml"}],
+        "onlyMainContent": False,
+        "waitFor": 2000,
+        "timeout": RENDER_TIMEOUT_MS,
+    }
 
 
 def firecrawl_payload(url: str) -> dict[str, Any]:
@@ -158,7 +181,9 @@ def firecrawl_html(payload: dict[str, Any]) -> tuple[str | None, str | None]:
             final if isinstance(final, str) else None)
 
 
-async def _fetch_via_firecrawl(url: str) -> str | None:
+async def _fetch_via_firecrawl(
+    url: str, payload: dict[str, Any] | None = None
+) -> str | None:
     """Fetch through Firecrawl, when a key is configured."""
     key = os.environ.get("FIRECRAWL_API_KEY", "").strip()
     if not key:
@@ -168,7 +193,7 @@ async def _fetch_via_firecrawl(url: str) -> str | None:
             response = await client.post(
                 FIRECRAWL_ENDPOINT,
                 headers={"Authorization": f"Bearer {key}"},
-                json=firecrawl_payload(url),
+                json=payload or firecrawl_payload(url),
             )
         if response.status_code != 200:
             # 402 is an exhausted plan and 429 a rate limit. Neither is worth a
@@ -231,6 +256,45 @@ async def _fetch_rendered(url: str) -> str | None:
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/profile")
+async def profile_endpoint(body: ProfileRequest) -> JSONResponse:
+    """A public LinkedIn profile, read through Firecrawl.
+
+    FIRECRAWL IS THE ONLY ROUTE HERE, unlike `/extract` which tries an ordinary
+    fetch first. A plain GET of a LinkedIn profile from a datacenter address
+    gets an authentication wall or a 999, every time -- so the ordinary attempt
+    would be a guaranteed round trip to a page that cannot be parsed, and
+    falling back to a local headless browser would work on a laptop and never
+    in a deployment. One route that works, or a message saying why not.
+
+    The same SSRF gate as every other fetch in this service, and the landed URL
+    is re-checked because a hosted fetcher follows redirects on our behalf.
+    """
+    url = normalize_target_url(body.url)
+    reason = reject_reason(url)
+    if reason:
+        return JSONResponse({"error": reason}, status_code=400)
+
+    if not os.environ.get("FIRECRAWL_API_KEY", "").strip():
+        # 503, not 500: the deployment is missing a key, which is a
+        # configuration fact rather than a failure of this request.
+        return JSONResponse(
+            {"error": "Profile import is not configured for this deployment."},
+            status_code=503,
+        )
+
+    html = await _fetch_via_firecrawl(url, firecrawl_profile_payload(url))
+    if not html:
+        return JSONResponse(
+            {"error": "Could not read that profile page. Check the link is public."},
+            status_code=422,
+        )
+    if len(html.encode("utf-8", "ignore")) > MAX_HTML_BYTES:
+        return JSONResponse({"error": "Profile page is too large"}, status_code=422)
+
+    return JSONResponse(extract_profile(url, html), status_code=200)
 
 
 @app.post("/extract")

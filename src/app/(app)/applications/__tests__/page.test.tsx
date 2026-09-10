@@ -24,6 +24,10 @@ vi.mock('@/hooks/useJobs', () => ({
   useDeleteJob: () => ({ mutateAsync: deleteJobMutate, isPending: false }),
   useUpdateJobStatus: idleMutation,
   useAutofillJobFromUrl: idleMutation,
+  // `useApplicationRecord` reads the status history for the record's pipeline
+  // bar -- the one question the `jobs` row cannot answer, which is whether a
+  // rejected application ever reached interviewing.
+  useJobStatusHistory: () => ({ data: [], isLoading: false, error: null }),
 }))
 
 // The currency seam this route used to leave open: resolveDefaultCurrency
@@ -69,6 +73,24 @@ vi.mock('next/navigation', () => ({
 }))
 
 import Page from '../page'
+
+/**
+ * Adding an application is FOUR STEPS now, not a form (Worktrack Revisions
+ * item 5): a link, a status, the model reading the posting, then the review
+ * where it is corrected and saved. Every test that used to click `add` and
+ * type into a field has to walk that path first.
+ *
+ * `useAutofillJobFromUrl` is the idle mutation stub above, so the read step
+ * has nothing useful to call and falls through to the review with the fields
+ * empty -- which is the branch these tests want, since what they are about is
+ * what the ROUTE does with the save.
+ */
+async function addUpToReview(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'add' }))
+  await user.click(screen.getByRole('button', { name: /continue/i }))
+  await user.click(screen.getByRole('button', { name: /fill it in/i }))
+  return screen.findByRole('button', { name: /save application/i })
+}
 
 beforeEach(() => {
   useCreateJobMock.mockReturnValue({ mutateAsync: vi.fn(), isPending: false })
@@ -126,12 +148,13 @@ describe('Applications route wrapper', () => {
     const mutateAsync = vi.fn().mockRejectedValue(new Error('permission denied'))
     useCreateJobMock.mockReturnValue({ mutateAsync, isPending: false })
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    const user = userEvent.setup()
     render(<Page />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    const save = await addUpToReview(user)
     fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
-    fireEvent.click(screen.getByRole('button', { name: /add application/i }))
+    fireEvent.change(screen.getByLabelText(/^position/), { target: { value: 'Engineer' } })
+    fireEvent.click(save)
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
     expect(screen.getByRole('heading', { name: /new application/i })).toBeTruthy()
@@ -143,56 +166,73 @@ describe('Applications route wrapper', () => {
     useUpdateJobMock.mockReturnValue({ mutateAsync, isPending: false })
     const job = makeJob({ id: '1', status: 'applied', company: 'Initech' })
     useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
+    const user = userEvent.setup()
     render(<Page />)
 
-    fireEvent.click(screen.getAllByRole('button', { name: /^edit/i })[0])
+    // OPENED FROM THE ROW. The table's `edit` button is gone: the record shows
+    // and edits one surface, so there is no second mode to switch into.
+    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    // SOMETHING HAS TO CHANGE FIRST. Save is disabled on an untouched record
+    // (Gabe, 2026-09-10) -- there is nothing to write, and a live button over
+    // a no-op invites the click that teaches you it was one.
+    fireEvent.change(await screen.findByLabelText(/^company/), {
+      target: { value: 'Initech Two' },
+    })
     fireEvent.click(screen.getByRole('button', { name: /save application/i }))
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
-    // Still on the FORM, not bounced back to the record. The dialog's heading
-    // is now the role alone -- company and status moved into the header's own
-    // slots beside it -- so the check that it stayed open is the presence of a
-    // field carrying the typed value, which is the thing a rejected save must
-    // not throw away.
-    expect(screen.getByLabelText(/^company/)).toHaveValue('Initech')
+    // Still open, with the values intact. The dialog's heading is the role
+    // alone -- company and status moved into the header's own slots beside it
+    // -- so the check that it stayed open is the presence of a field carrying
+    // the value, which is the thing a rejected save must not throw away.
+    expect(screen.getByLabelText(/^company/)).toHaveValue('Initech Two')
     expect(screen.getByRole('button', { name: /save application/i })).toBeTruthy()
   })
 
-  it('returns to the record, not to the list, once an edit saves', async () => {
-    // The dialog is the whole record now. Closing it after a save would throw
-    // away the context the edit was made in, and the saved values are exactly
-    // what the person who just typed them wants to check.
+  it('stays on the record, not back to the list, once an edit saves', async () => {
+    // The dialog is the whole record. Closing it after a save would throw away
+    // the context the edit was made in, and the saved values are exactly what
+    // the person who just typed them wants to check.
+    //
+    // WHAT THIS USED TO ASSERT was that Save DISAPPEARED -- the dialog fell
+    // back from an edit mode to a read-only one. There are no modes now, so
+    // Save stays where it is and what proves the save landed is that the
+    // record no longer considers itself dirty (see the discard tests in
+    // components/applications/__tests__/applications.test.tsx).
     const mutateAsync = vi.fn().mockResolvedValue(undefined)
     useUpdateJobMock.mockReturnValue({ mutateAsync, isPending: false })
     const job = makeJob({ id: '1', status: 'applied', company: 'Initech', role: 'QA Lead' })
     useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
+    const user = userEvent.setup()
     render(<Page />)
 
-    fireEvent.click(screen.getAllByRole('button', { name: /^edit/i })[0])
+    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    fireEvent.change(await screen.findByLabelText(/^company/), {
+      target: { value: 'Initech Two' },
+    })
     fireEvent.click(screen.getByRole('button', { name: /save application/i }))
 
     await waitFor(() => expect(mutateAsync).toHaveBeenCalledTimes(1))
-    await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /save application/i })).toBeNull()
-    )
-    // The dialog is still open, showing the record it just saved.
+    // Still open, still on the record it just saved. Its heading names the
+    // SCREEN now -- company and position are editable fields inside it -- so
+    // what proves the right row is open is the field, not the title.
     expect(screen.getByRole('dialog')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'QA Lead' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'application overview' })).toBeTruthy()
+    expect(screen.getByLabelText(/^position/)).toHaveValue('QA Lead')
   })
 
-  it('opens the named record on mount when a desktop deep link redirected here', async () => {
-    // /applications/<id> is the mobile surface. A wide viewport landing there
-    // is replaced with /applications?application=<id>, and this is the half
-    // that makes the intent survive the redirect.
+  it('opens the named record on mount when a deep link redirected here', async () => {
+    // `/applications/<id>` is a redirect at every width now -- the record is a
+    // bottom sheet on this screen rather than a route of its own -- and it
+    // arrives as `?application=<id>`. This is the half that makes the intent
+    // survive the redirect.
     searchParamMock.mockReturnValue('1')
     const job = makeJob({ id: '1', status: 'applied', company: 'Initech', role: 'QA Lead' })
     useJobsMock.mockReturnValue({ data: [job], isLoading: false, error: null })
     render(<Page />)
 
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy())
-    expect(screen.getByRole('heading', { name: 'QA Lead' })).toBeTruthy()
-    // Viewing, not editing -- a deep link is a request to read the record.
-    expect(screen.queryByRole('button', { name: /save application/i })).toBeNull()
+    expect(screen.getByLabelText(/^position/)).toHaveValue('QA Lead')
   })
 
   it('resolves handleImport to false and keeps the parsed CSV summary when the bulk mutation rejects', async () => {
@@ -220,27 +260,29 @@ describe('Applications route wrapper', () => {
   // new application still opened at PHP. These two tests prove the read half
   // of that seam is actually wired, not just that resolveDefaultCurrency
   // itself works in isolation.
-  it('defaults a new application to PHP when the user has no stored preference', () => {
+  it('defaults a new application to PHP when the user has no stored preference', async () => {
     useUserPreferencesMock.mockReturnValue({ data: null, isLoading: false, error: null })
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    const user = userEvent.setup()
     render(<Page />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    await addUpToReview(user)
     // The control is a button now, not a <select>, so it has no `value` --
     // what it SHOWS is the assertion, which is what a user checks anyway.
     expect(selectedLabel(screen.getByLabelText(/^currency/))).toBe('PHP')
   })
 
-  it('defaults a new application to the stored preference instead of PHP', () => {
+  it('defaults a new application to the stored preference instead of PHP', async () => {
     useUserPreferencesMock.mockReturnValue({
       data: { user_id: 'user-1', default_currency: 'USD', created_at: 'x', updated_at: 'x' },
       isLoading: false,
       error: null,
     })
     useJobsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    const user = userEvent.setup()
     render(<Page />)
 
-    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    await addUpToReview(user)
     expect(selectedLabel(screen.getByLabelText(/^currency/))).toBe('USD')
   })
 

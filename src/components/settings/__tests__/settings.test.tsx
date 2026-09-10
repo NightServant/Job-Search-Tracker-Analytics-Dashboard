@@ -3,7 +3,12 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { SettingsPage } from '../SettingsPage'
-import { ProfileImport, ProfileImportSteps } from '../ProfileImport'
+import {
+  ProfileFetch,
+  ProfileFetchSteps,
+  ProfileImport,
+  ProfileImportSteps,
+} from '../ProfileImport'
 
 afterEach(() => cleanup())
 
@@ -40,28 +45,54 @@ const FILLED = {
 
 
 
+/**
+ * Renders the page and opens the `general` tab.
+ *
+ * IT IS NEEDED BECAUSE `TabsContent` UNMOUNTS THE HIDDEN PANEL. That is the
+ * behaviour worth having -- a second copy of every settings control in the
+ * accessibility tree is exactly what a `hidden` panel would give -- but it
+ * means account, preferences and the danger zone are genuinely absent from
+ * the DOM until somebody asks for them, and every test that used to reach
+ * them by rendering alone has to click first.
+ */
+async function renderGeneral(props: React.ComponentProps<typeof SettingsPage>) {
+  const user = userEvent.setup({ delay: null })
+  const result = render(<SettingsPage {...props} />)
+  await user.click(screen.getByRole('tab', { name: 'general' }))
+  await screen.findByRole('heading', { name: 'account' })
+  return result
+}
+
 describe('SettingsPage', () => {
-  it('has exactly four groups, in order: profile, account, preferences, danger zone', () => {
-    // PROFILE FIRST, and the tab bar that briefly split this page is gone:
-    // four short groups behind a two-way toggle hid half a page behind a
-    // click. Profile leads because it is the one a settings link is most
-    // often clicked to reach, not because the rest is secondary.
+  it('splits into a profile tab and a general tab, profile first', async () => {
+    // TABS ARE BACK (Gabe, Worktrack Revisions item 8), reversing the
+    // 2026-09-06 collapse to one column. The argument then was that three of
+    // the four groups are a handful of rows each; what settles it the other
+    // way is the profile, which is now a fetch with its own address field and
+    // several hundred pixels of work history under it -- a screen, not a
+    // group. Profile leads because it is the one a settings link is most
+    // often clicked to reach.
     render(<SettingsPage prefs={null} />)
-    const headings = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)
-    expect(headings).toEqual(['profile', 'account', 'preferences', 'danger zone'])
+    const tabs = screen.getAllByRole('tab').map((t) => t.textContent)
+    expect(tabs).toEqual(['profile', 'general'])
+    expect(screen.getByRole('heading', { level: 2, name: 'profile' })).toBeTruthy()
   })
 
-  it('shows every group at once, with no tabs to find them behind', () => {
+  it('keeps the general groups out of the DOM until their tab is opened', async () => {
+    // NOT `hidden`, UNMOUNTED. A display:none panel still puts a second copy
+    // of every control in the tree for a screen reader to walk past and for a
+    // `getByRole` to trip over.
+    const user = userEvent.setup({ delay: null })
     render(<SettingsPage prefs={null} />)
-    expect(screen.queryAllByRole('tab')).toHaveLength(0)
-    expect(screen.getByRole('heading', { name: 'account' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'danger zone' })).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'account' })).toBeNull()
+    await user.click(screen.getByRole('tab', { name: 'general' }))
+    expect(await screen.findByRole('heading', { name: 'danger zone' })).toBeTruthy()
   })
 
-  it('keeps the danger zone last among the data-settings-group containers', async () => {
-    const { container } = render(<SettingsPage prefs={null} />)
+  it('keeps the danger zone last among the general tab’s groups', async () => {
+    const { container } = await renderGeneral({ prefs: null })
     const groups = container.querySelectorAll('[data-settings-group]')
-    expect(groups).toHaveLength(4)
+    expect(groups).toHaveLength(3)
     expect(groups[groups.length - 1].getAttribute('data-settings-group')).toBe('danger')
   })
 
@@ -69,20 +100,20 @@ describe('SettingsPage', () => {
     // A second control over the same next-themes state would be a second
     // source of truth for one value. Paired with a positive assertion: this
     // must not pass merely because the page rendered nothing at all.
-    render(<SettingsPage prefs={null} />)
+    await renderGeneral({ prefs: null })
     expect(screen.queryByText(/appearance/i)).toBeNull()
     expect(screen.queryByRole('button', { name: /theme/i })).toBeNull()
     expect(screen.getByRole('heading', { name: 'account' })).toBeTruthy()
   })
 
   it('has no export control -- /applications owns CSV', async () => {
-    render(<SettingsPage prefs={null} />)
+    await renderGeneral({ prefs: null })
     expect(screen.queryByRole('button', { name: /export/i })).toBeNull()
     expect(screen.getByRole('heading', { name: 'preferences' })).toBeTruthy()
   })
 
   it('offers the six currencies from the CHECK constraint, PHP selected when there is no stored preference', async () => {
-    render(<SettingsPage prefs={null} />)
+    await renderGeneral({ prefs: null })
     const segments = screen.getAllByRole('radio')
     expect(segments.map((s) => s.getAttribute('value'))).toEqual([
       'PHP',
@@ -96,30 +127,28 @@ describe('SettingsPage', () => {
   })
 
   it('selects the stored preference instead of PHP once one exists', async () => {
-    render(
-      <SettingsPage
-        prefs={{ user_id: 'u1', default_currency: 'USD', created_at: 'x', updated_at: 'x' }}
-      />
-    )
+    await renderGeneral({
+      prefs: { user_id: 'u1', default_currency: 'USD', created_at: 'x', updated_at: 'x' },
+    })
     expect(screen.getByRole('radio', { name: 'USD' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('radio', { name: 'PHP' }).getAttribute('aria-checked')).toBe('false')
   })
 
   it('calls onDefaultCurrencyChange when a different currency segment is picked', async () => {
     const onDefaultCurrencyChange = vi.fn()
-    render(<SettingsPage prefs={null} onDefaultCurrencyChange={onDefaultCurrencyChange} />)
+    await renderGeneral({ prefs: null, onDefaultCurrencyChange })
     fireEvent.click(screen.getByRole('radio', { name: 'EUR' }))
     expect(onDefaultCurrencyChange).toHaveBeenCalledWith('EUR')
   })
 
   it('shows the signed-in email as a read-only value in the account group', async () => {
-    render(<SettingsPage prefs={null} email="gabe@example.com" />)
+    await renderGeneral({ prefs: null, email: 'gabe@example.com' })
     expect(screen.getByDisplayValue('gabe@example.com')).toBeTruthy()
   })
 
   it('calls onSignOut from the account group', async () => {
     const onSignOut = vi.fn()
-    render(<SettingsPage prefs={null} onSignOut={onSignOut} />)
+    await renderGeneral({ prefs: null, onSignOut })
     fireEvent.click(screen.getByRole('button', { name: /^sign out$/i }))
     expect(onSignOut).toHaveBeenCalledTimes(1)
   })
@@ -130,7 +159,7 @@ describe('SettingsPage', () => {
     // stubbing a global -- so this guard is now a ConfirmDialog instead.
     const onDeleteAccount = vi.fn()
     const user = userEvent.setup()
-    render(<SettingsPage prefs={null} onDeleteAccount={onDeleteAccount} />)
+    await renderGeneral({ prefs: null, onDeleteAccount })
     await user.click(screen.getByRole('button', { name: /delete account/i }))
     expect(screen.getByRole('alertdialog', { name: /delete your account/i })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'cancel' }))
@@ -140,7 +169,7 @@ describe('SettingsPage', () => {
   it('calls onDeleteAccount once the confirmation is accepted', async () => {
     const onDeleteAccount = vi.fn()
     const user = userEvent.setup()
-    render(<SettingsPage prefs={null} onDeleteAccount={onDeleteAccount} />)
+    await renderGeneral({ prefs: null, onDeleteAccount })
     await user.click(screen.getByRole('button', { name: /delete account/i }))
     await user.click(screen.getByRole('button', { name: 'delete account' }))
     expect(onDeleteAccount).toHaveBeenCalledTimes(1)
@@ -149,7 +178,7 @@ describe('SettingsPage', () => {
   it('renders no shadow and no rounded card border on any of the three groups', async () => {
     // Radius caps at 4px and separation is a hairline rule, not a card --
     // the same visual grammar every other M5 screen holds to.
-    const { container } = render(<SettingsPage prefs={null} />)
+    const { container } = await renderGeneral({ prefs: null })
     for (const group of container.querySelectorAll('[data-settings-group]')) {
       expect(group.innerHTML).not.toMatch(/shadow/)
     }
@@ -163,13 +192,7 @@ describe('SettingsPage', () => {
   // primitive in isolation.
   it('does not fire a second currency change from the keyboard while a write is already in flight', async () => {
     const onDefaultCurrencyChange = vi.fn()
-    render(
-      <SettingsPage
-        prefs={null}
-        savingCurrency
-        onDefaultCurrencyChange={onDefaultCurrencyChange}
-      />
-    )
+    await renderGeneral({ prefs: null, savingCurrency: true, onDefaultCurrencyChange })
     const selected = screen.getByRole('radio', { name: 'PHP' })
     fireEvent.keyDown(selected, { key: 'ArrowRight' })
     expect(onDefaultCurrencyChange).not.toHaveBeenCalled()
@@ -222,6 +245,86 @@ describe('the profile panel', () => {
   it('defaults to the empty state rather than a spinner that never resolves', () => {
     const { container } = render(<SettingsPage prefs={null} />)
     expect(container.querySelector('[data-profile-state="empty"]')).toBeTruthy()
+  })
+})
+
+/**
+ * THE CONTROL THE SETTINGS ROUTE ACTUALLY RENDERS since 2026-09-09. The CSV
+ * import below it is kept and covered on Gabe's instruction not to remove what
+ * this supersedes -- it is still the only source that has ever carried the
+ * bullet text under a role -- but nothing wires it into a screen any more.
+ */
+describe('building a profile from a LinkedIn URL', () => {
+  it('asks for an address and nothing else -- no file, no credential', () => {
+    const { container } = render(<ProfileFetch onFetch={vi.fn()} />)
+    expect(container.querySelector('input[type="file"]')).toBeNull()
+    expect(container.querySelector('input[type="password"]')).toBeNull()
+    expect(screen.getByLabelText(/linkedin profile url/i)).toBeTruthy()
+    expect(screen.getByRole('button', { name: /build my profile/i })).toBeTruthy()
+  })
+
+  it('refuses a bare word rather than sending it to be fetched', async () => {
+    // The route SSRF-checks this again and the extractor checks where the
+    // redirect landed, so this is a courtesy rather than the boundary -- but
+    // spending a Firecrawl credit on "linkedin" is a round trip nobody wanted.
+    const onFetch = vi.fn()
+    const user = userEvent.setup({ delay: null })
+    render(<ProfileFetch onFetch={onFetch} />)
+    await user.type(screen.getByLabelText(/linkedin profile url/i), 'linkedin')
+    await user.click(screen.getByRole('button', { name: /build my profile/i }))
+    expect(onFetch).not.toHaveBeenCalled()
+    expect(screen.getByText(/starting with https/i)).toBeTruthy()
+  })
+
+  it('hands the trimmed address up when it is a real one', async () => {
+    const onFetch = vi.fn()
+    const user = userEvent.setup({ delay: null })
+    render(<ProfileFetch onFetch={onFetch} />)
+    await user.type(
+      screen.getByLabelText(/linkedin profile url/i),
+      'https://www.linkedin.com/in/example  '
+    )
+    await user.click(screen.getByRole('button', { name: /build my profile/i }))
+    expect(onFetch).toHaveBeenCalledWith('https://www.linkedin.com/in/example')
+  })
+
+  it('offers a re-fetch and a removal once a profile exists, and pre-fills the address', () => {
+    // The stored `url` comes back so a re-fetch is one click rather than a
+    // trip to LinkedIn to copy the same address again.
+    render(
+      <ProfileFetch
+        onFetch={vi.fn()}
+        onClear={vi.fn()}
+        hasProfile
+        defaultUrl="https://www.linkedin.com/in/example"
+      />
+    )
+    expect(screen.getByRole('button', { name: /fetch again/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /remove profile/i })).toBeTruthy()
+    expect(screen.getByDisplayValue('https://www.linkedin.com/in/example')).toBeTruthy()
+  })
+
+  it('has nothing to remove before the first fetch', () => {
+    render(<ProfileFetch onFetch={vi.fn()} onClear={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /remove profile/i })).toBeNull()
+  })
+
+  it('passes the fetch note through -- including what the page could not carry', () => {
+    // A public profile does not render the paragraph under each role, and an
+    // import that quietly returns titles without them reads as a bug rather
+    // than a limit. See scraper/extractor/profile.py.
+    render(
+      <ProfileFetch
+        onFetch={vi.fn()}
+        note="The bullet text under each role is not on a public profile page."
+      />
+    )
+    expect(screen.getByText(/bullet text under each role/i)).toBeTruthy()
+  })
+
+  it('explains the fetch in its own steps, for the empty state', () => {
+    render(<ProfileFetchSteps />)
+    expect(screen.getByText(/copy the address from the browser bar/i)).toBeTruthy()
   })
 })
 

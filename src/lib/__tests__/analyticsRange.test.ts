@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { RANGE_OPTIONS, rangeLabel, rangeStartMonth, filterByMonth } from '../analyticsRange'
+import { RANGE_OPTIONS, rangeLabel, rangeStartMonth, rangeStartDate, filterByMonth } from '../analyticsRange'
 
 // `now` is fixed rather than `new Date()` so the boundary maths below is not
 // re-derived on whatever day the suite happens to run.
@@ -20,6 +20,32 @@ describe('rangeStartMonth', () => {
 
   it('crosses a year boundary for 12m', () => {
     expect(rangeStartMonth('12m', NOW)).toBe('2025-09')
+  })
+})
+
+// rangeStartDate is what actually reaches analyticsService now (2026-09-09):
+// the SERVICE scopes rows before aggregating, so this is the boundary that
+// determines what every panel sees, not just rangeStartMonth's month string.
+describe('rangeStartDate', () => {
+  it('has no start for "all" -- nothing is excluded', () => {
+    expect(rangeStartDate('all', NOW)).toBeNull()
+  })
+
+  it('is the first day of rangeStartMonth\'s month, not the day "now" falls on', () => {
+    // Whole months starting on the 1st, matching rangeStartMonth -- a window
+    // that started mid-month would silently exclude days 1-26 of its own
+    // first month.
+    expect(rangeStartDate('3m', NOW)).toBe('2026-06-01')
+  })
+
+  it('crosses a year boundary the same way rangeStartMonth does', () => {
+    expect(rangeStartDate('12m', NOW)).toBe('2025-09-01')
+  })
+
+  it('defaults `now` to the current date, the same fallback filterByMonth uses', () => {
+    // Not pinned to a specific value -- just proves the parameter is
+    // optional and the function does not throw without it.
+    expect(() => rangeStartDate('3m')).not.toThrow()
   })
 })
 

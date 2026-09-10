@@ -4,7 +4,9 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select } from '@/components/ui/select'
 import { CssSpinner } from '@/components/ui/css-spinner'
+import { JOB_SORTS, type JobSort } from '@/lib/jobSort'
 import { DownloadIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 
@@ -24,6 +26,13 @@ import { iconMotion } from '@/components/icons/motion'
 export interface ApplicationsToolbarProps {
   search: string
   onSearchChange: (value: string) => void
+  /**
+   * The order the table is read in. `applied` is the default and the only one
+   * that answers "what have I been doing lately"; the other two are the
+   * alphabetical filter Gabe asked this table for, on company and on position.
+   */
+  sort: JobSort
+  onSortChange: (value: JobSort) => void
   onCsvFile: (file: File) => void
   onExport: () => void
   importBusy?: boolean
@@ -34,6 +43,8 @@ export interface ApplicationsToolbarProps {
 export function ApplicationsToolbar({
   search,
   onSearchChange,
+  sort,
+  onSortChange,
   onCsvFile,
   onExport,
   importBusy = false,
@@ -58,6 +69,20 @@ export function ApplicationsToolbar({
           placeholder="search company or role"
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
+        />
+      </div>
+
+      {/* Sorting sits beside the search box rather than in the button
+          cluster: both narrow the list rather than acting on it, and the two
+          CSV controls are the only things on this row that leave the app. */}
+      <div className="w-full sm:w-52">
+        <Select
+          id="applications-sort"
+          icon="Applications"
+          aria-label="Sort applications"
+          value={sort}
+          onValueChange={(next) => onSortChange(next as JobSort)}
+          items={JOB_SORTS}
         />
       </div>
 

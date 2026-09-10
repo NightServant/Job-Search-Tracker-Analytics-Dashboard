@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
-import { Analytics } from '@/components/analytics/Analytics'
-import { DEMO } from '@/lib/demoFixture'
+import { DemoAnalytics } from './DemoAnalytics'
 
 export const metadata: Metadata = {
   title: 'Demo · Analytics',
@@ -9,24 +8,12 @@ export const metadata: Metadata = {
 
 
 /**
- * Analytics takes a MetricState per panel, mirroring what a react-query result
- * carries. The fixture supplies already-resolved ones: never loading, never
- * errored, always data. That is not a shortcut -- there is no query to be
- * loading, and a demo that flashes skeletons it will never replace would be
- * imitating latency it does not have.
+ * A server component with the metadata, over a client one with the picker.
+ *
+ * The range has to be state now -- picking a window recomputes the fixture's
+ * five aggregates from the rows inside it -- and state needs a client
+ * component, while `metadata` needs a server one. Two files, one screen.
  */
-const resolved = <T,>(data: T) => ({ data, isLoading: false, error: null })
-
 export default function Page() {
-  const { analytics } = DEMO
-  return (
-    <Analytics
-      timeInStage={resolved(analytics.timeInStage)}
-      conversionFunnel={resolved(analytics.conversionFunnel)}
-      statusTransitions={resolved(analytics.statusTransitions)}
-      cohortAnalysis={resolved(analytics.cohortAnalysis)}
-      conversionMetrics={resolved(analytics.conversionMetrics)}
-      jobs={DEMO.jobs}
-    />
-  )
+  return <DemoAnalytics />
 }

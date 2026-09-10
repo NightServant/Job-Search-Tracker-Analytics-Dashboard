@@ -3,39 +3,40 @@ import { authenticate } from '@/lib/apiAuth'
 import { rejectReason, normalizeTargetUrl } from '@/lib/jobUrl'
 
 /**
- * The public door to job-posting extraction.
+ * The public door to LinkedIn profile extraction.
  *
- * THE EXTRACTOR ITSELF HAS NO DOOR. It is a Vercel Service with no top-level
- * rewrite, so it is unroutable from the internet; this route reaches it over a
- * binding, which injects `EXTRACTOR_URL` at runtime. That arrangement is the
- * whole security design: a service that fetches an arbitrary URL on request IS
- * an open proxy running on our egress IP with our rate budget, and the only
- * thing that stops it being one is that nobody else can call it.
+ * IT IS `/api/autofill` FOR A PERSON INSTEAD OF A POSTING, and it is
+ * deliberately the same shape: the extractor service has no top-level rewrite,
+ * so it is unroutable from the internet, and this route reaches it over a
+ * binding that injects `EXTRACTOR_URL`. A service that fetches an arbitrary URL
+ * on request IS an open proxy running on our egress IP with our Firecrawl
+ * budget; the only thing that stops it being one is that nobody else can call
+ * it.
  *
  * So everything that decides WHETHER a fetch happens lives here:
  *
  *   1. Who is asking      -- `authenticate`, before the body is even read.
- *   2. How often          -- a per-caller throttle.
+ *   2. How often          -- a per-caller throttle, tighter than auto-fill's
+ *                            because every one of these costs a Firecrawl
+ *                            credit and nobody imports their own profile
+ *                            eight times a minute.
  *   3. Where they may point it -- the SSRF gate in lib/jobUrl.
  *
  * The extractor re-checks the URL a redirect lands on, because only the thing
- * performing the fetch can see that. Two copies, two different questions.
+ * performing the fetch can see that.
  *
- * `runtime = 'nodejs'`: this reads an arbitrary third-party page through the
- * service, which can take the better part of the 12s the extractor allows.
+ * `runtime = 'nodejs'`: this waits on a hosted browser rendering a third-party
+ * page, which is a poor fit for an edge budget.
  */
 export const runtime = 'nodejs'
 
 const RATE_LIMIT_WINDOW_MS = 60_000
-const RATE_LIMIT_MAX_REQUESTS = 8
+const RATE_LIMIT_MAX_REQUESTS = 3
 
 /**
- * An affordance, not a boundary -- the same words `lib/authRateLimit.ts` uses
- * about itself, and true for the same reason. It is per-instance memory, and
- * Fluid Compute reuses instances rather than guaranteeing one, so a determined
- * caller spread across instances gets more than eight. What it genuinely stops
- * is a stuck retry loop and a rage-clicked button, which is what the Deno
- * function's identical throttle was there for.
+ * An affordance, not a boundary -- per-instance memory, and Fluid Compute
+ * reuses instances rather than guaranteeing one. What it genuinely stops is a
+ * stuck retry loop and a rage-clicked button, which is the whole job.
  */
 const attempts = new Map<string, number[]>()
 
@@ -57,11 +58,6 @@ function throttle(key: string): { allowed: boolean; retryAfterSeconds: number } 
 export async function POST(request: Request) {
   // FIRST, and before the body is parsed. A route that reads a body and only
   // then 401s has already paid for the request it is rejecting.
-  //
-  // `routesAreGuarded.test.ts` asserts that ordering by comparing SOURCE
-  // OFFSETS, so it reads comments too -- naming the parse call in prose above
-  // this line is enough to fail it. That is the test being blunt rather than
-  // wrong, and the fix is to say it differently, not to loosen the guard.
   const auth = await authenticate(request)
   if (!auth.ok) {
     return NextResponse.json({ error: auth.message }, { status: auth.status })
@@ -87,20 +83,16 @@ export async function POST(request: Request) {
   const reason = rejectReason(body?.url)
   if (reason) return NextResponse.json({ error: reason }, { status: 400 })
 
-
   const extractor = process.env.EXTRACTOR_URL
   if (!extractor) {
-    // 503, not 500: the deployment is missing its binding, which is a
-    // configuration fact rather than a failure of this request. Retrying with
-    // a different URL will not help and the message says so.
     return NextResponse.json(
-      { error: 'Auto-fill is not configured for this deployment.' },
+      { error: 'Profile import is not configured for this deployment.' },
       { status: 503 }
     )
   }
 
   try {
-    const response = await fetch(new URL('extract', extractor), {
+    const response = await fetch(new URL('profile', extractor), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: normalizeTargetUrl(String(body.url)) }),
@@ -108,18 +100,14 @@ export async function POST(request: Request) {
     const payload = await response.json()
     return NextResponse.json(payload, { status: response.status })
   } catch {
-    // THE EXTRACTOR IS UNREACHABLE, which is not the same thing as a posting
-    // that cannot be read -- and saying the latter sends the reader off to
-    // blame a URL that is fine. It cost an afternoon on 2026-09-10: locally
-    // `npm run dev` starts Next and nothing else, so `EXTRACTOR_URL` points at
-    // a port with nothing listening on it and every auto-fill came back
-    // "Could not read that job posting".
+    // Unreachable, not unreadable. See /api/autofill for why the distinction
+    // is worth the two branches.
     return NextResponse.json(
       {
         error:
           process.env.NODE_ENV === 'development'
             ? 'The extractor is not running. Start it with `npm run dev:scraper`.'
-            : 'The posting reader is unavailable right now. Try again shortly.',
+            : 'The profile reader is unavailable right now. Try again shortly.',
       },
       { status: 502 }
     )

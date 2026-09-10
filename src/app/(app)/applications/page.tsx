@@ -209,7 +209,6 @@ function ApplicationsRoute() {
         jobs={jobs}
         defaultCurrency={resolveDefaultCurrency(prefs)}
         onDigest={(text) => digest.mutateAsync(text)}
-        digesting={digest.isPending}
         resumes={resumes.map((resume) => ({ id: resume.id, title: resume.title }))}
         linkedResumeId={openLinks[0]?.resume_id ?? null}
         onCreate={handleCreate}

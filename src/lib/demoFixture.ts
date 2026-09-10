@@ -224,7 +224,18 @@ function buildResumes(now: Date): ResumeSummary[] {
  * from the current status: a rejected row still got as far as it got, and
  * losing that would make Interviewing look emptier than the history was.
  */
-function buildAnalytics(jobs: Job[]): DemoFixture['analytics'] {
+/**
+ * EXPORTED so the demo's analytics screen can rebuild its numbers for a
+ * narrowed date range.
+ *
+ * The picker there used to move one table and leave five panels labelled "all
+ * time" -- the same dead-dropdown Gabe reported on the real screen. The real
+ * one is fixed at the service, which the demo has none of; recomputing from
+ * the filtered rows is the demo's equivalent, and it is honest for the same
+ * reason the fixture derives these from the jobs in the first place: numbers
+ * that contradict the applications list are a lie a reviewer will catch.
+ */
+export function buildAnalytics(jobs: Job[]): DemoFixture['analytics'] {
   const bySeed = new Map(SEEDS.map((s) => [`demo-${s.ref}`, s]))
   const seedOf = (job: Job) => bySeed.get(job.id)!
 

@@ -23,7 +23,7 @@ import { RangePicker } from './RangePicker'
 import { FunnelChart, normalizeFunnel } from './FunnelChart'
 import { TimeInStage } from './TimeInStage'
 import { CohortTable } from './CohortTable'
-import { filterByMonth, rangeLabel, type RangeOption } from '@/lib/analyticsRange'
+import { filterByMonth, rangeLabel, rangeStartDate, type RangeOption } from '@/lib/analyticsRange'
 import type {
   StatusTransition,
   TimeInStageMetric,
@@ -55,6 +55,17 @@ export interface AnalyticsProps {
    * than a new analyticsService query -- see `lib/salaryHistogram`.
    */
   jobs?: Job[]
+  /**
+   * The selected window, when the caller owns it.
+   *
+   * The route does, because the queries are keyed on it -- a picker whose
+   * value never leaves this component cannot make the fetch it implies. Left
+   * out, the component keeps its own state, which is what the demo wants:
+   * fixture data, no queries, and one shape (the cohort table) that can still
+   * be narrowed after the fact.
+   */
+  range?: RangeOption
+  onRangeChange?: (range: RangeOption) => void
 }
 
 /**
@@ -245,17 +256,23 @@ function Overview({ data }: { data: ConversionMetrics | null }) {
  * "still loading" and "loaded but genuinely empty" apart, which `error`
  * alone does not cover.
  *
- * The range picker only reaches two of five panels. Every `analyticsService`
- * method takes just `userId` -- no date range -- and of the five return
- * shapes only `SourceConversionTrend` (`month`) and `CohortAnalysis`
- * (`cohort`) carry a time dimension at all. `TimeInStageMetric`,
- * `ConversionFunnelMetric` and `ConversionMetrics` cannot be range-filtered,
- * even client-side, so their panels read "All time" instead of silently
- * ignoring a control that would otherwise appear to govern them. See the
- * pre-flight ruling in
- * `.superpowers/sdd/2026-08-25-m5-application-screens/progress.md` for why
- * this is the shipped shape rather than a placeholder -- adding a range
- * parameter to `analyticsService` is parked as M2 work.
+ * THE RANGE PICKER NOW REACHES EVERY PANEL. It used to reach one: five of the
+ * six read all-time data and printed the words "all time" in their own
+ * headers whatever was selected, because `analyticsService` took no date
+ * range. Gabe called it a dead dropdown, and from the outside it was one --
+ * picking "Last 3 months" changed a single table and left the rest insisting
+ * they were showing everything.
+ *
+ * The service takes a `since` now (see `analyticsService`), the hooks key on
+ * it, and this component labels every panel with the range that produced it.
+ * The window is defined once, over the APPLICATIONS -- `date_applied`, or
+ * `created_at` for a wishlist row that has no applied date -- so all six
+ * panels answer the same question about the same rows.
+ *
+ * `range` IS CONTROLLED FROM ABOVE when the caller passes it, because the
+ * route owns the queries and the queries need the value. It keeps its own
+ * state when nobody does, which is what a surface with fixture data behind it
+ * wants.
  */
 export function Analytics({
   timeInStage,
@@ -264,13 +281,39 @@ export function Analytics({
   cohortAnalysis,
   conversionMetrics,
   jobs = [],
+  range: controlledRange,
+  onRangeChange,
 }: AnalyticsProps) {
-  const [range, setRange] = React.useState<RangeOption>('all')
+  const [ownRange, setOwnRange] = React.useState<RangeOption>('all')
+  const range = controlledRange ?? ownRange
+  const setRange = (next: RangeOption) => {
+    setOwnRange(next)
+    onRangeChange?.(next)
+  }
 
+  // STILL FILTERED HERE AS WELL, and deliberately. The service has already
+  // scoped the rows, so this is a no-op on live data -- but the demo hands in
+  // a fixture computed once over everything, and a cohort table is the one
+  // shape that can be narrowed correctly after the fact from the `cohort`
+  // month it carries. Cheap, and it keeps the demo's picker honest.
   const filteredCohorts = React.useMemo(
     () => (cohortAnalysis.data ? filterByMonth(cohortAnalysis.data, (c) => c.cohort, range) : []),
     [cohortAnalysis.data, range]
   )
+
+  // SalaryInsights reads the job rows directly rather than a service
+  // aggregate, so its window is applied here against the same definition the
+  // service uses: the applied date, or the row's own date when there is none.
+  const rangedJobs = React.useMemo(() => {
+    const since = rangeStartDate(range)
+    if (!since) return jobs
+    // `?? ''` rather than a bare `created_at.slice`: the same reading as
+    // `analyticsService`'s `withinRange` -- a row with neither date cannot be
+    // shown to fall inside a narrowed window, so it is outside it. It also
+    // stops a partial fixture (a test's, or a row mid-migration) throwing on
+    // a screen that is only drawing a histogram.
+    return jobs.filter((job) => (job.date_applied ?? job.created_at ?? '').slice(0, 10) >= since)
+  }, [jobs, range])
 
   const funnelData = React.useMemo(
     () => normalizeFunnel(conversionFunnel.data ?? []),
@@ -305,7 +348,7 @@ export function Analytics({
           title="overview"
           icon="Overview"
         description="the headline numbers for everything you have tracked."
-          action={<Span>all time</Span>}
+          action={<Span>{rangeLabel(range)}</Span>}
           error={conversionMetrics.error ? errorMessage(conversionMetrics.error) : undefined}
         >
           <PanelBody state={conversionMetrics} empty={false} render={() => <Overview data={conversionMetrics.data} />} />
@@ -321,7 +364,7 @@ export function Analytics({
           title="conversion funnel"
           icon="Analytics"
         description="how far applications get, and how long each stage takes to reach."
-          action={<Span>all time</Span>}
+          action={<Span>{rangeLabel(range)}</Span>}
           error={conversionFunnel.error ? errorMessage(conversionFunnel.error) : undefined}
         >
           <PanelBody
@@ -341,7 +384,7 @@ export function Analytics({
           title="pipeline flow"
           icon="Applications"
         description="where applications actually went, stage to stage."
-          action={<Span>all time</Span>}
+          action={<Span>{rangeLabel(range)}</Span>}
           error={statusTransitions.error ? errorMessage(statusTransitions.error) : undefined}
         >
           <PanelBody
@@ -361,7 +404,7 @@ export function Analytics({
           title="time in stage"
           icon="Clock"
         description="the average days an application sits before it moves on."
-          action={<Span>all time</Span>}
+          action={<Span>{rangeLabel(range)}</Span>}
           error={timeInStage.error ? errorMessage(timeInStage.error) : undefined}
         >
           <PanelBody
@@ -384,9 +427,9 @@ export function Analytics({
           title="salary insights"
           icon="Briefcase"
           description="the bands companies posted, with each one’s average marked."
-          action={<Span>all time</Span>}
+          action={<Span>{rangeLabel(range)}</Span>}
         >
-          <SalaryInsights jobs={jobs} />
+          <SalaryInsights jobs={rangedJobs} />
         </AnalyticsPanel>
       ),
   })

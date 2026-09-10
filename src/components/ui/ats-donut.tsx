@@ -45,11 +45,26 @@ const CONFIG = {
   missing: { label: 'missing' },
 } satisfies ChartConfig
 
-/** The ring's filled arc, in the verdict's own colour. */
+/**
+ * The ring's filled arc, in the verdict's own colour.
+ *
+ * `--color-verdict-*` RATHER THAN THE STATUS HUES, since 2026-09-09. Two
+ * things were wrong with the old map. `review` named `--color-amber-600`,
+ * which this project has never defined -- it fell through to Tailwind's
+ * built-in #d97706, a few degrees off `accent-700`, so the middle verdict
+ * drew in what reads as the brand orange and carried no information at all.
+ * And every colour was a LIGHT-THEME value used in both themes, because the
+ * status hues are deliberately theme-invariant; a ring is a field of colour
+ * on the canvas, not a 2px rule, and it needs to step lighter on a dark one.
+ *
+ * The track is the same story: it was `border-subtle`, 1.5:1 against the
+ * canvas, so the "missing" half of the ring was invisible and a 55% score
+ * looked like an arc floating in nothing.
+ */
 const ARC: Record<AtsResult, string> = {
-  pass: 'var(--color-status-offer-mark)',
-  review: 'var(--color-amber-600)',
-  fail: 'var(--color-status-rejected-mark)',
+  pass: 'var(--color-verdict-pass)',
+  review: 'var(--color-verdict-review)',
+  fail: 'var(--color-verdict-fail)',
 }
 
 export interface AtsDonutProps {
@@ -68,7 +83,7 @@ export function AtsDonut({ score, matched, missing, verdict }: AtsDonutProps) {
   const slices = React.useMemo(
     () => [
       { key: 'matched', label: 'matched', count: matched, fill: ARC[verdict] },
-      { key: 'missing', label: 'missing', count: missing, fill: 'var(--color-border-subtle)' },
+      { key: 'missing', label: 'missing', count: missing, fill: 'var(--color-verdict-track)' },
     ],
     [matched, missing, verdict]
   )

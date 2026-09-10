@@ -33,6 +33,12 @@ vi.mock('@/hooks/useUserPreferences', () => ({
 // QueryClientProvider, and an unmocked useQuery throws before any of it runs.
 vi.mock('@/hooks/useUserProfile', () => ({
   useUserProfile: useUserProfileMock,
+  // The route builds a profile from a LinkedIn URL through Firecrawl since
+  // 2026-09-09. `useImportProfile` (the CSV-export parser) is still exported
+  // and deliberately unused, so it stays mocked here rather than being
+  // removed -- a mock that disappears is how the next person discovers the
+  // hook was deleted, one confusing failure at a time.
+  useImportProfileFromUrl: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useImportProfile: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useClearUserProfile: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }))
@@ -97,10 +103,28 @@ function setup({
   return { signOut, mutateAsync }
 }
 
+/**
+ * Renders the route and opens the `general` tab.
+ *
+ * Settings is two tabs since 2026-09-09 (Gabe, Worktrack Revisions item 8),
+ * and `TabsContent` UNMOUNTS the panel that is not showing -- which is the
+ * behaviour worth having, since a `hidden` panel would leave a second copy of
+ * every control in the accessibility tree. Everything this suite asserts on --
+ * the email, the currency segments, sign-out, the danger zone -- lives in
+ * `general`, so it has to be opened first.
+ */
+async function renderGeneral() {
+  const user = userEvent.setup({ delay: null })
+  const result = render(<Page />)
+  await user.click(screen.getByRole('tab', { name: 'general' }))
+  await screen.findByRole('heading', { name: 'account' })
+  return result
+}
+
 describe('Settings route wrapper', () => {
-  it('renders the signed-in user\'s email in the account group', () => {
+  it('renders the signed-in user\'s email in the account group', async () => {
     setup({ email: 'gabe@example.com' })
-    render(<Page />)
+    await renderGeneral()
     expect(screen.getByDisplayValue('gabe@example.com')).toBeTruthy()
   })
 
@@ -109,25 +133,25 @@ describe('Settings route wrapper', () => {
   // form. This proves the seam from the settings side -- a stored USD
   // preference has to reach this screen's currency control, not just exist
   // in the database.
-  it('selects the stored default currency rather than always falling back to PHP', () => {
+  it('selects the stored default currency rather than always falling back to PHP', async () => {
     setup({
       prefs: { user_id: 'u1', default_currency: 'USD', created_at: 'x', updated_at: 'x' },
     })
-    render(<Page />)
+    await renderGeneral()
     expect(screen.getByRole('radio', { name: 'USD' }).getAttribute('aria-checked')).toBe('true')
     expect(screen.getByRole('radio', { name: 'PHP' }).getAttribute('aria-checked')).toBe('false')
   })
 
-  it('writes a new default currency through useSetDefaultCurrency, not a raw service call', () => {
+  it('writes a new default currency through useSetDefaultCurrency, not a raw service call', async () => {
     const { mutateAsync } = setup()
-    render(<Page />)
+    await renderGeneral()
     fireEvent.click(screen.getByRole('radio', { name: 'EUR' }))
     expect(mutateAsync).toHaveBeenCalledWith('EUR')
   })
 
   it('signs out through useAuth when the account group\'s sign-out button is clicked', async () => {
     const { signOut } = setup()
-    render(<Page />)
+    await renderGeneral()
     fireEvent.click(screen.getByRole('button', { name: /^sign out$/i }))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
   })
@@ -144,7 +168,7 @@ describe('Settings route wrapper', () => {
         message: 'Signed out on this device. We could not reach the server.',
       }),
     })
-    render(<Page />)
+    await renderGeneral()
     fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
 
     await waitFor(() => expect(signOut).toHaveBeenCalled())
@@ -161,7 +185,7 @@ describe('Settings route wrapper', () => {
         message: 'Signed out on this device. We could not reach the server.',
       }),
     })
-    render(<Page />)
+    await renderGeneral()
     fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
     await waitFor(() => expect(showErrorMock).toHaveBeenCalled())
     expect(showErrorMock.mock.calls[0][0]).toMatch(/signed out here only/i)
@@ -169,7 +193,7 @@ describe('Settings route wrapper', () => {
 
   it('says nothing extra when the sign-out reached the server', async () => {
     setup()
-    render(<Page />)
+    await renderGeneral()
     fireEvent.click(screen.getByRole('button', { name: /sign out/i }))
     await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/'))
     expect(showErrorMock).not.toHaveBeenCalled()
@@ -186,7 +210,7 @@ describe('Settings route wrapper', () => {
     // later rejection it should make. It also drops every in-memory cache,
     // including the rows of the person who just left.
     const { signOut } = setup()
-    render(<Page />)
+    await renderGeneral()
     fireEvent.click(screen.getByRole('button', { name: /^sign out$/i }))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
     await waitFor(() => expect(assignMock).toHaveBeenCalledWith('/'))
@@ -196,7 +220,7 @@ describe('Settings route wrapper', () => {
   it('calls the delete_own_account RPC and signs out once account deletion is confirmed', async () => {
     const { signOut } = setup()
     rpcMock.mockResolvedValue({ error: null })
-    render(<Page />)
+    await renderGeneral()
     await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalledWith('delete_own_account'))
     await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1))
@@ -226,7 +250,7 @@ describe('Settings route wrapper', () => {
         hint: null,
       },
     })
-    render(<Page />)
+    await renderGeneral()
     await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalled())
     expect(showErrorMock).toHaveBeenCalledWith(
@@ -241,7 +265,7 @@ describe('Settings route wrapper', () => {
     rpcMock.mockResolvedValue({
       error: { message: 'boom', code: 'XX000', details: null, hint: null },
     })
-    render(<Page />)
+    await renderGeneral()
     await confirmDeleteAccount()
     await waitFor(() => expect(rpcMock).toHaveBeenCalled())
     expect(showErrorMock).toHaveBeenCalledWith('Could not delete account', 'boom')

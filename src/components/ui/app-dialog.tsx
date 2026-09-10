@@ -71,18 +71,41 @@ export interface AppDialogProps {
   /** Rendered opposite the title, clear of the built-in close button. */
   actions?: React.ReactNode
   /**
-   * `m` is 480px (the mode chooser); `l` is 720px (the standalone form); `xl`
-   * is 1040px (the whole application record, which carries a two-column body
-   * and would be a column of slivers at `l`).
+   * `m` is 480px (the mode chooser); `l` is 720px (the add wizard's first two
+   * steps); `xl` is 1400px -- the whole application record.
+   *
+   * `xl` WAS 1040px AND GABE ASKED FOR IT WIDER (2026-09-09, on seeing the
+   * three-column record: "widen the dialog is the solution"). The record's
+   * middle column is a textarea holding a job posting and its third is a
+   * keyword inventory; at 1040 minus gutters that is about 300px each, which
+   * is a column of slivers for the same reason `l` was for two.
+   *
+   * `sm:w-[calc(100%-2rem)]` below still caps it at the viewport, so this is a
+   * ceiling rather than a width -- a 1280px laptop gets 1248 and nothing
+   * overflows.
    */
   size?: 'm' | 'l' | 'xl'
+  /**
+   * Whether the dialog BODY owns the scrolling. Default true.
+   *
+   * `false` hands it to the child instead, which is what a dialog with fixed
+   * chrome inside it needs: the application record keeps its pipeline bar and
+   * its Save row still while only the three columns move, and it cannot do
+   * that if the body scrolls the lot.
+   *
+   * FROM `sm` UP ONLY. Below 640 this dialog is a bottom sheet and its content
+   * stacks -- the record's pipeline becomes a 299px column, and freezing that
+   * as chrome leaves a phone almost nothing to read the record in. There, the
+   * body goes back to scrolling the lot.
+   */
+  bodyScroll?: boolean
   children: React.ReactNode
 }
 
 const MAX_WIDTH = {
   m: 'sm:max-w-[480px]',
   l: 'sm:max-w-[720px]',
-  xl: 'sm:max-w-[1040px]',
+  xl: 'sm:max-w-[1400px]',
 } as const
 
 export function AppDialog({
@@ -94,6 +117,7 @@ export function AppDialog({
   eyebrow,
   actions,
   size = 'm',
+  bodyScroll = true,
   children,
 }: AppDialogProps) {
   const Icon = icon ? icons[icon] : null
@@ -119,7 +143,7 @@ export function AppDialog({
           MAX_WIDTH[size]
         )}
       >
-        <DialogHeader className="shrink-0 gap-0 p-gutter pb-4">
+        <DialogHeader className="shrink-0 gap-0 p-gutter pb-3">
           {eyebrow && <div className="mb-2 pr-8">{eyebrow}</div>}
           <div className="flex items-start justify-between gap-6">
             <div className="flex min-w-0 items-start gap-2.5">
@@ -131,7 +155,11 @@ export function AppDialog({
             {actions && <div className="shrink-0 pr-8">{actions}</div>}
           </div>
           {description && (
-            <DialogDescription className="text-body-s text-text-muted">
+            // `max-w-prose`, because `xl` is 1400px wide and a description is
+            // prose: unconstrained it runs a single 190-character line that
+            // the eye loses its place in on the way back. `mt-2` so it reads
+            // as the title's subtitle rather than as the next thing along.
+            <DialogDescription className="mt-2 max-w-prose text-body-s text-text-muted">
               {description}
             </DialogDescription>
           )}
@@ -145,7 +173,27 @@ export function AppDialog({
             is right at every height without arithmetic. `min-h-0` is what
             allows a flex child to shrink below its content and actually
             scroll. */}
-        <div className="min-h-0 flex-1 overflow-y-auto p-gutter">{children}</div>
+        {/* `pt-3` rather than the gutter's 32px, so the rule above sits EVENLY
+            between the header and the content: the header closes on `pb-3` and
+            this opens on the same 12px.
+            
+            TWELVE, NOT SIXTEEN, AND NOT THIRTY-TWO (Gabe, 2026-09-10, twice:
+            "padding is still there"). A divider is a hairline between two
+            blocks, not a band of its own -- the space around it only has to be
+            enough to stop the rule touching type, and a text block's own
+            descender already contributes a few pixels on the upper side. */}
+        <div
+          className={cn(
+            'min-h-0 flex-1 overflow-y-auto p-gutter pt-3',
+            // A CHILD THAT OWNS THE SCROLLING OWNS THE BOTTOM EDGE TOO. The
+            // record ends in an action bar that runs to the dialog's edge, and
+            // 32px of body padding under it is 32px of nothing between the
+            // button and the frame. The bar sets its own.
+            !bodyScroll && 'pb-0 sm:flex sm:flex-col sm:overflow-hidden'
+          )}
+        >
+          {children}
+        </div>
       </DialogContent>
     </Dialog>
   )

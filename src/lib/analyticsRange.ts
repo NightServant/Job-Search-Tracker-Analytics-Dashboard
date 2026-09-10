@@ -5,13 +5,17 @@
  * things break, and it is easier to pin the boundary in a unit test than a
  * rendered component.
  *
- * Ruling (pre-flight scan, Task 8): `analyticsService`'s five methods take
- * only `userId` -- no date range, in the database or in memory. Of the five
- * return shapes, only `SourceConversionTrend` (`month`) and `CohortAnalysis`
- * (`cohort`) carry a `YYYY-MM` field at all, so the picker can only ever
- * filter those two. `filterByMonth` below is the one filter both of them
- * share; `TimeInStageMetric`, `ConversionFunnelMetric` and `ConversionMetrics`
- * never call it and state "All time" instead, in `Analytics.tsx`.
+ * SUPERSEDED, 2026-09-09. The old ruling here was that `analyticsService`'s
+ * five methods took only `userId`, so the picker could only ever filter the
+ * two return shapes carrying a `YYYY-MM` field -- the other three panels said
+ * "All time" whatever was picked. That is exactly what Gabe reported as a
+ * "dead dropdown": choosing Last 3 months changed one table out of six and
+ * left every other card claiming all time.
+ *
+ * The range now reaches the SERVICE, which scopes the underlying rows before
+ * aggregating them, so every panel answers the same question. `rangeStartDate`
+ * is what it takes; `filterByMonth` stays for the shapes that are filtered
+ * after the fact.
  */
 
 export type RangeOption = '3m' | '6m' | '12m' | 'all'
@@ -63,6 +67,25 @@ export function filterByMonth<T>(
   const start = rangeStartMonth(range, now)
   if (start === null) return items
   return items.filter((item) => monthOf(item) >= start)
+}
+
+/**
+ * The first DAY included in `range`, as `YYYY-MM-DD`, or `null` for all time.
+ *
+ * The window is whole months and starts on the 1st, matching
+ * `rangeStartMonth`: "last 3 months" is three calendar months including the
+ * one in progress, which is how a person says it out loud and how the cohort
+ * table has always bucketed.
+ *
+ * A DATE STRING RATHER THAN A `Date`, because everything it is compared
+ * against is one: `jobs.date_applied` is a bare DATE column, and `created_at`
+ * is an ISO timestamp whose first ten characters are the same format. Both
+ * sort lexically the way they sort chronologically, so no parse is needed on
+ * either side -- and none of the timezone questions that come with one.
+ */
+export function rangeStartDate(range: RangeOption, now: Date = new Date()): string | null {
+  const month = rangeStartMonth(range, now)
+  return month === null ? null : `${month}-01`
 }
 
 export function rangeLabel(range: RangeOption): string {

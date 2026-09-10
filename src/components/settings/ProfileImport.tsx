@@ -2,11 +2,20 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
+import { CssSpinner } from '@/components/ui/css-spinner'
+import { Field } from '@/components/ui/field'
+import { Input } from '@/components/ui/input'
 import { readFileText } from '@/lib/readFileText'
-import { UploadIcon, TrashIcon } from '@/components/icons'
+import { DownloadIcon, UploadIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 
 /**
+ * SUPERSEDED BY `ProfileFetch` BELOW, and kept rather than deleted (Gabe,
+ * Worktrack Revisions item 8: "Do not remove the unused variables in the
+ * codebase"). It is still the only source that has ever carried the bullet
+ * text under a role, which is the part a CV is written from, so it is worth
+ * having when the fetch turns out not to be enough.
+ *
  * How a profile gets in: LinkedIn's own data export.
  *
  * WHAT THIS REPLACES, and why none of it survived. The first version asked for
@@ -134,6 +143,151 @@ export function ProfileImportSteps() {
         within minutes, sometimes up to a day.
       </li>
       <li>Unzip it and pick the CSVs here. Profile.csv alone is enough to start.</li>
+    </ol>
+  )
+}
+
+/**
+ * How a profile gets in NOW: its public address, read through Firecrawl.
+ *
+ * WHY A LINK AND NOT A FILE. The export is a good source and a bad ask -- it
+ * means opening LinkedIn's settings, requesting an archive, waiting for an
+ * email that can take a day, unzipping it and picking the right CSVs before
+ * this screen shows anything at all. A profile URL is one paste.
+ *
+ * WHY IT CAN WORK THIS TIME, given that a page scraper was built and removed
+ * on 2026-09-06: that one fetched the page from our own servers and got an
+ * authentication wall. Firecrawl runs the page and proxies it, so what comes
+ * back is the logged-out profile as a browser sees it -- including the JSON-LD
+ * graph in `<head>`, which carries the positions and schools as structured
+ * data rather than as text to be scraped off a rendering.
+ *
+ * WHAT IT STILL WILL NOT GET is said in the warnings the fetch returns rather
+ * than promised here: a public profile does not render the paragraph under
+ * each role. See `scraper/extractor/profile.py`.
+ */
+export interface ProfileFetchProps {
+  onFetch: (url: string) => void
+  onClear?: () => void
+  fetching?: boolean
+  clearing?: boolean
+  hasProfile?: boolean
+  /** What went wrong, or what landed, from the last attempt. */
+  note?: string | null
+  /** The address already stored, so a re-fetch does not need retyping. */
+  defaultUrl?: string | null
+}
+
+export function ProfileFetch({
+  onFetch,
+  onClear,
+  fetching = false,
+  clearing = false,
+  hasProfile = false,
+  note = null,
+  defaultUrl = null,
+}: ProfileFetchProps) {
+  const [url, setUrl] = React.useState(defaultUrl ?? '')
+  const [error, setError] = React.useState('')
+  const busy = fetching || clearing
+
+  // A stored profile arriving after first render should fill the box. Typing
+  // wins from then on -- the effect only runs when the stored value changes.
+  React.useEffect(() => {
+    if (defaultUrl) setUrl(defaultUrl)
+  }, [defaultUrl])
+
+  const submit = () => {
+    const trimmed = url.trim()
+    if (!/^https?:\/\/.+/i.test(trimmed)) {
+      setError('Paste the full address, starting with https://.')
+      return
+    }
+    setError('')
+    onFetch(trimmed)
+  }
+
+  return (
+    <div className="flex flex-col gap-3" data-profile-fetch>
+      <Field
+        id="profile-url"
+        label="LinkedIn profile URL"
+        hint="the public address of your profile — the one you would send to someone."
+      >
+        <Input
+          id="profile-url"
+          type="url"
+          icon="Link"
+          value={url}
+          onChange={(event) => {
+            setUrl(event.target.value)
+            setError('')
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.preventDefault()
+              submit()
+            }
+          }}
+          error={error || undefined}
+          placeholder="https://www.linkedin.com/in/your-name"
+          disabled={busy}
+        />
+      </Field>
+
+      {note && (
+        <p className="text-body-s text-text-muted" data-profile-note>
+          {note}
+        </p>
+      )}
+
+      {/* Full width on a narrow panel, natural once the card has room. The
+          query is on `@container/profile`, declared by ProfileGroup: these
+          live inside a card whose width has nothing to do with the window's. */}
+      <div className="flex flex-col gap-2 @sm/profile:flex-row @sm/profile:items-center">
+        <Button
+          type="button"
+          onClick={submit}
+          disabled={busy}
+          className="w-full @sm/profile:w-auto"
+        >
+          {fetching ? (
+            <CssSpinner size={14} />
+          ) : (
+            <DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />
+          )}
+          {fetching ? 'Reading' : hasProfile ? 'Fetch again' : 'Build my profile'}
+        </Button>
+        {hasProfile && onClear && (
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={() => onClear()}
+            disabled={busy}
+            className="w-full @sm/profile:w-auto"
+          >
+            <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
+            {clearing ? 'Removing' : 'Remove profile'}
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** What the fetch does, in one paragraph, for the empty state. */
+export function ProfileFetchSteps() {
+  return (
+    <ol
+      className="flex list-decimal flex-col gap-1 pl-5 text-body-s text-text-muted"
+      data-profile-steps
+    >
+      <li>Open your LinkedIn profile and copy the address from the browser bar.</li>
+      <li>Paste it above. Worktrack reads the public page and fills in what it finds.</li>
+      <li>
+        Anything the public page does not show — the detail under each role, usually — you
+        can write in yourself afterwards.
+      </li>
     </ol>
   )
 }

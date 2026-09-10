@@ -2,6 +2,8 @@
 
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { cn } from '@/lib/utils'
 import { AccountGroup } from './AccountGroup'
 import { PreferencesGroup } from './PreferencesGroup'
 import { DangerZone } from './DangerZone'
@@ -14,18 +16,23 @@ import { resolveDefaultCurrency, type SupportedCurrency, type UserPreferences } 
  * Next routing or react-query. `src/app/(app)/settings/page.tsx` owns the
  * reads and the writes.
  *
- * ONE COLUMN, NOT TABS (Gabe, 2026-09-06 -- reversing the two-tab split
- * added earlier the same day). Profile, Account, Preferences, Danger zone, in
- * that order.
+ * TWO TABS: PROFILE AND GENERAL (Gabe, Worktrack Revisions item 8 --
+ * reinstating the split that came out on 2026-09-06).
  *
- * WHY THE TABS CAME BACK OUT. Settings has four groups and three of them are a
- * handful of rows each; a tab bar over that hides half a short page behind a
- * click and makes the reader remember which half. Tabs earn their place when
- * each side is long enough to be its own screen, and this is not. The profile
- * is the tallest group by far, which is the argument for putting it FIRST --
- * not for hiding everything else behind it.
+ * The argument for one column was that three of the four groups are a handful
+ * of rows each, so a tab bar hid half a short page behind a click. What
+ * settles it the other way is the profile itself: it is now a fetch with its
+ * own address field, its own instructions and, once it lands, several hundred
+ * pixels of work history -- which is a screen, not a group. Everything else
+ * (account, preferences, danger zone) is short precisely because it is
+ * housekeeping, and housekeeping is what `general` means.
  *
- * The danger zone staying last is load-bearing rather than habit.
+ * The danger zone staying last inside `general` is load-bearing rather than
+ * habit.
+ *
+ * BOTH PANELS STAY MOUNTED is NOT what happens here: `TabsContent` unmounts
+ * the hidden one, which is what keeps a second copy of every settings control
+ * out of the accessibility tree and out of a test's `getByRole`.
  *
  * NO APPEARANCE GROUP. The theme control lives in the app shell, so a second
  * one here would be a second source of truth over the same `next-themes`
@@ -79,14 +86,64 @@ export function SettingsPage({
         title="settings"
         description="your profile, your account, how figures are displayed, and what happens to your data."
       />
-      <ProfileGroup state={profile} source={profileSource} steps={profileSteps} />
-      <AccountGroup email={email} onSignOut={onSignOut} signingOut={signingOut} />
-      <PreferencesGroup
-        defaultCurrency={resolveDefaultCurrency(prefs)}
-        onDefaultCurrencyChange={onDefaultCurrencyChange}
-        saving={savingCurrency}
-      />
-      <DangerZone onDeleteAccount={onDeleteAccount} deleting={deletingAccount} />
+
+      <Tabs defaultValue="profile">
+        {/* The applications screen's tab treatment, unchanged: `line`
+            variant, no pill, no capsule, and a 2px accent rule under whichever
+            is active -- the same vocabulary the status marker and the active
+            nav item use. Two tabs need no horizontal scroll, which is the one
+            thing StatusTabs has that this does not. */}
+        <TabsList
+          aria-label="Settings sections"
+          variant="line"
+          activateOnFocus
+          className={cn(
+            'w-full justify-start gap-1 rounded-none border-b border-border-subtle bg-transparent p-0',
+            'group-data-[orientation=horizontal]/tabs:h-auto'
+          )}
+        >
+          {(
+            [
+              ['profile', 'profile'],
+              ['general', 'general'],
+            ] as const
+          ).map(([value, label]) => (
+            <TabsTrigger
+              key={value}
+              id={`settings-tab-${value}`}
+              value={value}
+              className={cn(
+                'relative h-9 shrink-0 items-center justify-start rounded-none border-0 px-3 py-0',
+                'text-label-caps uppercase transition-colors duration-(--duration-fast)',
+                'text-text-muted hover:text-text-primary',
+                'data-active:bg-transparent data-active:text-text-primary data-active:shadow-none',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+                'after:hidden',
+                // The active rule, drawn on the trigger rather than by the
+                // variant, so it sits on the same hairline the list carries.
+                'data-active:after:absolute data-active:after:inset-x-0 data-active:after:bottom-0',
+                'data-active:after:block data-active:after:h-[2px] data-active:after:bg-accent-default'
+              )}
+            >
+              {label}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        <TabsContent value="profile" className="pt-8">
+          <ProfileGroup state={profile} source={profileSource} steps={profileSteps} />
+        </TabsContent>
+
+        <TabsContent value="general" className="flex flex-col gap-8 pt-8">
+          <AccountGroup email={email} onSignOut={onSignOut} signingOut={signingOut} />
+          <PreferencesGroup
+            defaultCurrency={resolveDefaultCurrency(prefs)}
+            onDefaultCurrencyChange={onDefaultCurrencyChange}
+            saving={savingCurrency}
+          />
+          <DangerZone onDeleteAccount={onDeleteAccount} deleting={deletingAccount} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }

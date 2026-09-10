@@ -2,6 +2,7 @@ import type { ActivityEntry } from '@/services/activityLog'
 import type { DocumentLinkSummary } from '@/services/applicationDocuments'
 import type { CalendarEvent } from '@/services/events'
 import type { KeywordMatch } from '@/services/atsMatch'
+import type { JobStatusHistoryEntry } from '@/types'
 
 /**
  * Everything the application record shows that does not live on the `jobs`
@@ -22,6 +23,16 @@ import type { KeywordMatch } from '@/services/atsMatch'
  */
 export interface ApplicationRecordData {
   activity: ActivityEntry[]
+  /**
+   * Every status this application has moved through.
+   *
+   * The pipeline bar needs it and nothing else does: a rejected application
+   * shows `wishlist -> applied -> interviewing -> rejected` only if it
+   * actually sat at interviewing, and current status alone cannot answer
+   * that. Empty is a real answer -- a CSV import has no history -- and the
+   * bar claims the shorter run when it gets one.
+   */
+  history: JobStatusHistoryEntry[]
   links: DocumentLinkSummary[]
   nextEvent: CalendarEvent | null
   match: KeywordMatch | null
@@ -49,6 +60,7 @@ export interface ApplicationRecordData {
  */
 export const EMPTY_RECORD_DATA: ApplicationRecordData = {
   activity: [],
+  history: [],
   links: [],
   nextEvent: null,
   match: null,

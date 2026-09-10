@@ -2,146 +2,104 @@
 
 import * as React from 'react'
 import { AppDialog } from '@/components/ui/app-dialog'
-import { Button } from '@/components/ui/button'
-import { StatusMarker, type Status } from '@/components/ui/status-marker'
-import { PencilIcon, TrashIcon } from '@/components/icons'
-import { iconMotion } from '@/components/icons/motion'
-import { ApplicationForm, type ApplicationFormProps } from '../ApplicationForm'
-import { ApplicationRecord } from './ApplicationRecord'
+import { ApplicationRecordView } from './ApplicationRecordView'
 import { EMPTY_RECORD_DATA, type ApplicationRecordData } from './recordData'
 import type { SupportedCurrency } from '@/services/userPreferences'
-import type { Job, JobAutofillResult, JobFormData } from '@/types'
+import type { Job, JobFormData } from '@/types'
 
 /**
- * The desktop surface for one application: the whole record in a single
- * dialog that both shows and edits it.
+ * One application, in a dialog: the record and its editor, which are now the
+ * same thing.
  *
- * IT REPLACES `/applications/[id]` ON DESKTOP. That route was a second full
- * screen whose only way to change anything was an `edit` button that sent you
- * back to the list to open a form -- three navigations to fix a typo, and two
- * screens to keep in step. Here the record and its form are the same surface
- * in two modes, so `edit` is a mode switch rather than a journey.
+ * WHAT CHANGED, and why the header is nearly empty (Worktrack Revisions items
+ * 2 and 3):
  *
- * MODE IS OWNED BY THE CALLER, not by this component. The list opens an
- * existing row in `view` and the Add button opens a new one in `edit`, and
- * both need to survive the dialog closing and reopening -- state kept in here
- * would reset on unmount and quietly send Add to a view of nothing.
+ * - NO `edit` BUTTON. There is no read-only mode left to leave -- every field
+ *   in the first two columns is a control. A button that switched between two
+ *   renderings of the same data was a mode that existed only because the form
+ *   used to live somewhere else.
+ * - NO `delete` BUTTON. Delete is a row-level action and it is on the row, in
+ *   the table, beside the row it destroys. Having it here as well meant the
+ *   confirm dialog sat on top of a record of something that no longer existed.
+ * - SAVE MOVED INSIDE, to the foot of the record. It is the only thing this
+ *   dialog commits, and it belongs at the end of what it commits.
  *
- * A NEW APPLICATION HAS NO RECORD TO VIEW, so `job === null` is edit-only: no
- * mode toggle, no delete, no status marker, and none of the four secondary
- * panels, which would all be reads against an id that does not exist yet.
+ * A BOTTOM SHEET BELOW 640, which is `AppDialog`'s own behaviour and is why
+ * the mobile surface is this dialog rather than a route now: the phone gets
+ * the same record, anchored to the edge a thumb can reach.
+ *
+ * A NEW APPLICATION DOES NOT COME HERE. It goes through `AddApplicationDialog`,
+ * which is four steps and a model, so `job` is never null.
  */
 export interface ApplicationRecordDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  /** `null` opens the form for a new application. */
   job: Job | null
-  mode: 'view' | 'edit'
-  onModeChange: (mode: 'view' | 'edit') => void
   data?: ApplicationRecordData
   defaultCurrency: SupportedCurrency
   saving?: boolean
-  onSubmit: (data: JobFormData) => void | Promise<void>
-  onCancelEdit: () => void
-  onDelete?: (job: Job) => void
-  onAutofill?: (url: string) => Promise<JobAutofillResult>
-  autofilling?: boolean
+  /** Resolves `false` on a rejected save. See ApplicationRecordView. */
+  onSubmit: (data: JobFormData) => void | boolean | Promise<void | boolean>
   onDirtyChange?: (dirty: boolean) => void
-  /** For the form's "CV submitted" field. See ApplicationForm. */
+  /** For the record's "CV submitted" field. */
   resumes?: { id: string; title: string }[]
   linkedResumeId?: string | null
   onLinkedResumeChange?: (resumeId: string | null) => void
-  /** Tidies and summarises the pasted description. See ApplicationForm. */
-  onDigest?: ApplicationFormProps['onDigest']
-  digesting?: boolean
 }
 
 export function ApplicationRecordDialog({
   open,
   onOpenChange,
   job,
-  mode,
-  onModeChange,
   data = EMPTY_RECORD_DATA,
   defaultCurrency,
   saving = false,
   onSubmit,
-  onCancelEdit,
-  onDelete,
-  onAutofill,
-  autofilling = false,
   onDirtyChange,
   resumes,
   linkedResumeId,
   onLinkedResumeChange,
-  onDigest,
-  digesting,
 }: ApplicationRecordDialogProps) {
-  const editing = job === null || mode === 'edit'
-
   return (
     <AppDialog
       open={open}
       onOpenChange={onOpenChange}
-      size={job ? 'xl' : 'l'}
-      title={job ? job.role : 'New application'}
+      size="xl"
+      // THE HEADING NAMES THE SCREEN, NOT THE ROW (Gabe, 2026-09-10). It was
+      // the job title, and above it an eyebrow repeating the company and the
+      // status -- all three of which the first column carries as editable
+      // fields a few lines below. So the widest type on the dialog was a
+      // duplicate of a field, the eyebrow was a duplicate of two more, and
+      // nothing on it said what the dialog actually was.
+      //
+      // Gabe removed the eyebrow on sight ("remove this header, its
+      // unnecessary"), which is the right call for the same reason: a record
+      // whose first column opens with COMPANY and POSITION does not need them
+      // printed twice, and the status marker is a read-only copy of a dropdown
+      // sitting under it.
+      // The record keeps its own chrome still and scrolls only its columns.
+      bodyScroll={false}
+      title="application overview"
       icon="Briefcase"
-      eyebrow={
-        job ? (
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-            <span className="text-body-m text-text-secondary">{job.company}</span>
-            <StatusMarker status={job.status as Status} className="w-24" />
-          </div>
-        ) : undefined
-      }
-      actions={
-        job && !editing ? (
-          <div className="flex items-center gap-2">
-            <Button size="s" onClick={() => onModeChange('edit')}>
-              <PencilIcon size={16} aria-hidden className={iconMotion('edit')} />
-              edit
-            </Button>
-            {onDelete && (
-              <Button
-                variant="ghost"
-                size="s"
-                onClick={() => onDelete(job)}
-                aria-label={`Delete ${job.role} at ${job.company}`}
-              >
-                <TrashIcon size={16} aria-hidden className={iconMotion('lid')} />
-                delete
-              </Button>
-            )}
-          </div>
-        ) : undefined
-      }
+      description="Everything Worktrack knows about this application, in one place. The bar below tracks how far it has got; the three columns hold what the job is, the posting itself, and how your CV reads against it. Anything in the first two columns can be changed here — edit what you need and press Save application."
     >
-      <div data-application-record={job ? 'view' : undefined} data-application-form>
-        {editing ? (
-          <ApplicationForm
-            // Keyed so switching rows without closing the dialog rebuilds the
-            // form against the new job rather than keeping the previous
-            // row's typed values in the same mounted component.
-            key={job?.id ?? 'new'}
-            layout="dialog"
-            defaultCurrency={defaultCurrency}
-            resumes={resumes}
-            linkedResumeId={linkedResumeId}
-            onLinkedResumeChange={onLinkedResumeChange}
-            onDigest={onDigest}
-            digesting={digesting}
-            job={job}
-            saving={saving}
-            onSubmit={onSubmit}
-            onCancel={onCancelEdit}
-            onAutofill={onAutofill}
-            autofilling={autofilling}
-            onDirtyChange={onDirtyChange}
-          />
-        ) : (
-          job && <ApplicationRecord job={job} data={data} layout="dialog" />
-        )}
-      </div>
+      {job && (
+        <ApplicationRecordView
+          // Keyed so switching rows without closing the dialog rebuilds the
+          // draft against the new job rather than keeping the previous row's
+          // typed values in the same mounted component.
+          key={job.id}
+          job={job}
+          data={data}
+          defaultCurrency={defaultCurrency}
+          saving={saving}
+          onSubmit={onSubmit}
+          onDirtyChange={onDirtyChange}
+          resumes={resumes}
+          linkedResumeId={linkedResumeId}
+          onLinkedResumeChange={onLinkedResumeChange}
+        />
+      )}
     </AppDialog>
   )
 }

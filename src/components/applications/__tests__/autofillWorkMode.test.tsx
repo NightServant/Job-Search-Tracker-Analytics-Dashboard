@@ -1,46 +1,88 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, afterEach } from 'vitest'
+import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ApplicationForm } from '../ApplicationForm'
+import { AddApplicationDialog } from '../record/AddApplicationDialog'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
 
+afterEach(() => cleanup())
+
 /**
- * Auto-fill applies `work_mode`.
+ * WHERE AUTO-FILL LIVES NOW. It used to be a button halfway down a
+ * nineteen-field form, next to the posting URL. `ApplicationForm` was deleted
+ * on 2026-09-09 and adding an application is four steps whose whole point is
+ * that the model does three of them, so every assertion below drives
+ * `AddApplicationDialog` to its review step instead. What is being tested --
+ * which values survive the trip from a scraped page into the record -- has
+ * not changed.
  *
- * IT NEVER DID, for as long as the feature has existed. The extractor computed
- * it -- from JSON-LD's `jobLocationType` and from the page text, with a
- * confidence score attached -- and `JobAutofillResult` did not declare the
- * field, so the form could not read it and dropped it every time. Nothing
- * failed; a select just never filled in. Found by M7's field-parity test
- * (scraper/tests/test_contract.py), which now makes the two sides unable to
- * disagree.
+ * Two tests are gone rather than moved: "does not overwrite a description
+ * already typed" and the tech-stack equivalent. In the wizard the fetch
+ * happens before there is anything to overwrite -- the only thing typed by
+ * then is the URL. The rule they guarded still holds and is still covered,
+ * on the digest, in postingDigest.test.tsx ("fills empty fields but never
+ * overwrites a typed one").
  */
+const fill = (values: Record<string, unknown>) =>
+  vi.fn().mockResolvedValue({ values, confidence: {}, warnings: [] })
+
+/**
+ * Opens the wizard, walks it to the review step, and returns the mock.
+ *
+ * `status` stays on its default (`wishlist`) throughout: nothing here is about
+ * the date or the CV, and choosing `applied` would add two controls every
+ * assertion would then have to step around.
+ */
+async function autofillWith(values: Record<string, unknown>) {
+  const onAutofill = fill(values)
+  render(
+    <AddApplicationDialog
+      open
+      onOpenChange={vi.fn()}
+      defaultCurrency={resolveDefaultCurrency(null)}
+      onSubmit={vi.fn()}
+      onAutofill={onAutofill}
+    />
+  )
+  const user = userEvent.setup()
+  await user.type(
+    screen.getByLabelText(/job posting url/i),
+    'https://careers.example.com/j/1'
+  )
+  await user.click(screen.getByRole('button', { name: /continue/i }))
+  await user.click(screen.getByRole('button', { name: /fill it in/i }))
+  // The review step is the one with a Save on it.
+  await screen.findByRole('button', { name: /save application/i })
+  return onAutofill
+}
+
 describe('auto-fill and work mode', () => {
-  const fill = (values: Record<string, unknown>) =>
-    vi.fn().mockResolvedValue({ values, confidence: {}, warnings: [] })
-
-  async function autofillWith(values: Record<string, unknown>) {
-    const onAutofill = fill(values)
-    render(
-      <ApplicationForm defaultCurrency={resolveDefaultCurrency(null)} onAutofill={onAutofill} />
-    )
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/posting URL/i), 'https://careers.example.com/j/1')
-    await user.click(screen.getByRole('button', { name: /auto-?fill/i }))
-    return onAutofill
-  }
-
+  /**
+   * IT NEVER DID, for as long as the feature existed. The extractor computed
+   * it -- from JSON-LD's `jobLocationType` and from the page text, with a
+   * confidence score attached -- and `JobAutofillResult` did not declare the
+   * field, so the form could not read it and dropped it every time. Nothing
+   * failed; a select just never filled in. Found by M7's field-parity test
+   * (scraper/tests/test_contract.py), which now makes the two sides unable to
+   * disagree.
+   */
   it('fills the work mode the extractor found', async () => {
     await autofillWith({ company: 'Acme', role: 'Engineer', work_mode: 'remote' })
-    expect(await screen.findByDisplayValue(/remote/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('work mode')).toHaveTextContent(/remote/i)
   })
 
-  it('ignores a work mode that is not one of the three the form knows', async () => {
+  it('ignores a work mode that is not one of the three the record knows', async () => {
     // It arrives from a remote page. An unrecognised string would put the
     // select into a state none of its options match, which renders as an empty
     // control the user cannot explain.
     await autofillWith({ company: 'Acme', role: 'Engineer', work_mode: 'from-the-moon' })
-    expect(screen.queryByDisplayValue(/from-the-moon/i)).toBeNull()
+    expect(screen.getByLabelText('work mode')).not.toHaveTextContent(/from-the-moon/i)
+    expect(screen.getByLabelText('work mode')).toHaveTextContent(/not set/i)
+  })
+
+  it('fills the company and role, which are the record’s only required fields', async () => {
+    await autofillWith({ company: 'Acme', role: 'Engineer' })
+    expect(screen.getByLabelText(/^company/i)).toHaveValue('Acme')
+    expect(screen.getByLabelText(/^position/i)).toHaveValue('Engineer')
   })
 })
 
@@ -59,24 +101,9 @@ describe('auto-fill and work mode', () => {
  * so both were working from an empty string.
  */
 describe('auto-fill, salary currency and the posting body', () => {
-  const fill = (values: Record<string, unknown>) =>
-    vi.fn().mockResolvedValue({ values, confidence: {}, warnings: [] })
-
-  async function autofillWith(values: Record<string, unknown>) {
-    render(
-      <ApplicationForm
-        defaultCurrency={resolveDefaultCurrency(null)}
-        onAutofill={fill(values)}
-      />
-    )
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/posting URL/i), 'https://careers.example.com/j/1')
-    await user.click(screen.getByRole('button', { name: /auto-?fill/i }))
-  }
-
   it('fills the currency the salary was quoted in', async () => {
     await autofillWith({ salary_min: 50000, salary_max: 70000, salary_currency: 'PHP' })
-    expect(await screen.findByDisplayValue('50000')).toBeInTheDocument()
+    expect(screen.getByLabelText(/min salary/i)).toHaveValue(50000)
     expect(screen.getByLabelText(/currency/i)).toHaveTextContent('PHP')
   })
 
@@ -84,82 +111,88 @@ describe('auto-fill, salary currency and the posting body', () => {
     // The whole point: a USD posting must not be stored as pesos because that
     // is what this user's default happens to be.
     await autofillWith({ salary_min: 120000, salary_max: 150000, salary_currency: 'USD' })
-    expect(await screen.findByDisplayValue('120000')).toBeInTheDocument()
+    expect(screen.getByLabelText(/min salary/i)).toHaveValue(120000)
     expect(screen.getByLabelText(/currency/i)).toHaveTextContent('USD')
   })
 
-  it('ignores a currency the form cannot store', async () => {
+  it('ignores a currency the record cannot store', async () => {
     // It arrives from a remote page, and an unrecognised code would fail the
     // jobs_salary_currency_check constraint at the insert rather than here.
     await autofillWith({ salary_min: 1000, salary_max: 2000, salary_currency: 'XYZ' })
-    expect(await screen.findByDisplayValue('1000')).toBeInTheDocument()
+    expect(screen.getByLabelText(/min salary/i)).toHaveValue(1000)
     expect(screen.getByLabelText(/currency/i)).not.toHaveTextContent('XYZ')
   })
 
   it('fills the posting body', async () => {
     await autofillWith({ description: 'Build things. React, TypeScript.' })
-    expect(await screen.findByDisplayValue(/Build things\./)).toBeInTheDocument()
-  })
-
-  it('does not overwrite a description already typed', async () => {
-    render(
-      <ApplicationForm
-        defaultCurrency={resolveDefaultCurrency(null)}
-        onAutofill={fill({ description: 'scraped body' })}
-      />
-    )
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/job description/i), 'my own notes')
-    await user.type(screen.getByLabelText(/posting URL/i), 'https://careers.example.com/j/1')
-    await user.click(screen.getByRole('button', { name: /auto-?fill/i }))
-    expect(screen.getByLabelText(/job description/i)).toHaveValue('my own notes')
+    expect(screen.getByText(/Build things\./)).toBeInTheDocument()
   })
 })
 
 describe('auto-fill, tech stack and tags', () => {
-  const fill = (values: Record<string, unknown>) =>
-    vi.fn().mockResolvedValue({ values, confidence: {}, warnings: [] })
-
-  async function autofillWith(values: Record<string, unknown>) {
-    render(
-      <ApplicationForm
-        defaultCurrency={resolveDefaultCurrency(null)}
-        onAutofill={fill(values)}
-      />
-    )
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/posting URL/i), 'https://careers.example.com/j/1')
-    await user.click(screen.getByRole('button', { name: /auto-?fill/i }))
-  }
-
   it('fills the tech stack as a comma list', async () => {
     // `tech_stack` is what the ATS keyword match reads, so an empty one scored
     // a CV against nothing.
     await autofillWith({ tech_stack: ['React', 'TypeScript', 'GraphQL'] })
-    expect(await screen.findByDisplayValue('React, TypeScript, GraphQL')).toBeInTheDocument()
+    expect(screen.getByLabelText(/tech stack/i)).toHaveValue('React, TypeScript, GraphQL')
   })
 
   it('fills the tags', async () => {
     await autofillWith({ tags: ['full-time', 'Software'] })
-    expect(await screen.findByDisplayValue('full-time, Software')).toBeInTheDocument()
-  })
-
-  it('does not overwrite a tech stack already typed', async () => {
-    render(
-      <ApplicationForm
-        defaultCurrency={resolveDefaultCurrency(null)}
-        onAutofill={fill({ tech_stack: ['Scraped'] })}
-      />
-    )
-    const user = userEvent.setup()
-    await user.type(screen.getByLabelText(/tech stack/i), 'my own list')
-    await user.type(screen.getByLabelText(/posting URL/i), 'https://careers.example.com/j/1')
-    await user.click(screen.getByRole('button', { name: /auto-?fill/i }))
-    expect(screen.getByLabelText(/tech stack/i)).toHaveValue('my own list')
+    expect(screen.getByLabelText(/^tags/i)).toHaveValue('full-time, Software')
   })
 
   it('ignores empty arrays rather than clearing the field', async () => {
     await autofillWith({ tech_stack: [], tags: [] })
     expect(screen.getByLabelText(/tech stack/i)).toHaveValue('')
+  })
+})
+
+describe('when the posting cannot be read at all', () => {
+  it('carries on to the review step and says why, rather than dead-ending', async () => {
+    // Several boards are JavaScript-rendered or refuse datacenter traffic, and
+    // no amount of retrying changes that. Blocking the whole flow on a fetch
+    // nobody controls would make the unreliable half the required half.
+    const onAutofill = vi.fn().mockRejectedValue(new Error('Could not fetch this URL'))
+    render(
+      <AddApplicationDialog
+        open
+        onOpenChange={vi.fn()}
+        defaultCurrency={resolveDefaultCurrency(null)}
+        onSubmit={vi.fn()}
+        onAutofill={onAutofill}
+      />
+    )
+    const user = userEvent.setup()
+    await user.type(
+      screen.getByLabelText(/job posting url/i),
+      'https://careers.example.com/j/1'
+    )
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+    await user.click(screen.getByRole('button', { name: /fill it in/i }))
+
+    expect(await screen.findByRole('button', { name: /save application/i })).toBeTruthy()
+    expect(screen.getByText(/Could not fetch this URL/)).toBeInTheDocument()
+    expect(screen.getByText(/tidy and summarise/i)).toBeInTheDocument()
+  })
+
+  it('does not call the extractor at all when no link was given', async () => {
+    const onAutofill = fill({})
+    render(
+      <AddApplicationDialog
+        open
+        onOpenChange={vi.fn()}
+        defaultCurrency={resolveDefaultCurrency(null)}
+        onSubmit={vi.fn()}
+        onAutofill={onAutofill}
+      />
+    )
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+    await user.click(screen.getByRole('button', { name: /fill it in/i }))
+
+    expect(await screen.findByRole('button', { name: /save application/i })).toBeTruthy()
+    expect(onAutofill).not.toHaveBeenCalled()
+    expect(screen.getByText(/No link to read/i)).toBeInTheDocument()
   })
 })

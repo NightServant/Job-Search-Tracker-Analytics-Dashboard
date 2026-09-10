@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query'
 import { authedFetch } from '@/lib/authedFetch'
-import type { PostingDigestResult } from '@/components/applications/ApplicationForm'
+import type { PostingDigestResult } from '@/components/applications/record/digest'
 
 /**
  * Tidies a pasted job posting and mines it for the form's fields.

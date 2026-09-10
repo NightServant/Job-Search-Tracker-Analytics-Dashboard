@@ -85,7 +85,7 @@ export function SectionIndex({ sections, activeId, overHero = false }: SectionIn
         // Its own plate over the hero, for the same reason the rail has one:
         // the footage behind it is video, and its brightness changes as the
         // clip plays.
-        overHero && 'bg-[rgba(5,5,7,0.32)] backdrop-blur-sm'
+        overHero && 'bg-ink-950/30 backdrop-blur-sm'
       )}
     >
       <div className="flex flex-col items-center gap-4 [writing-mode:vertical-rl] rotate-180">

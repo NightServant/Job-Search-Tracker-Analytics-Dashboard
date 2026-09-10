@@ -49,6 +49,46 @@ describe('the tailoring rails', () => {
     expect(screen.getByText(/missing keywords/i)).toBeTruthy()
   })
 
+  it('shows what the CV already covers under the missing list, not just what it lacks', async () => {
+    // Added 2026-09-09 "for positive reinforcement": the rail used to show
+    // only the missing terms, which is a list of failures beside a score with
+    // nothing saying which of the posting's requirements the CV had already
+    // earned. `AtsKeywords` renders it muted and second, same as `AtsPanel`
+    // gives the equivalent list -- the missing one is the work, this one is
+    // the reassurance.
+    const user = userEvent.setup({ delay: null })
+    render(<Harness cvText="React and TypeScript developer." />)
+
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
+    // Job j1's posting: "We need React, TypeScript and Postgres experience."
+    // Against this CV that is matched = [react, typescript], missing =
+    // [need, postgres] -- see src/services/atsMatch.ts's stopword list for
+    // why "need" survives as a requirement candidate and "experience" does not.
+    const missing = await screen.findByText(/missing keywords/i)
+    // BY ITS OWN ATTRIBUTE, not by the word. `AtsDonut`'s legend beside the
+    // ring also says "matched", so a text query finds two nodes and cannot
+    // say which one is the list -- which is the whole thing being asserted.
+    const matched = document.querySelector('[data-ats-keywords="matched"]')!
+    expect(matched).toBeTruthy()
+    expect(screen.getByText('react, typescript')).toBeTruthy()
+    // Under the missing list, not above it -- DOCUMENT_POSITION_FOLLOWING is
+    // true when `matched` comes after `missing` in source order.
+    expect(
+      missing.compareDocumentPosition(matched) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+  })
+
+  it('omits the matched list entirely rather than rendering it empty', async () => {
+    // AtsKeywords only renders when its own `matched.length > 0` check
+    // passes; a posting the CV misses completely should not draw a "matched"
+    // heading over nothing.
+    const user = userEvent.setup({ delay: null })
+    render(<Harness cvText="a project manager with no relevant background" />)
+    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
+    await screen.findByText(/missing keywords/i)
+    expect(document.querySelector('[data-ats-keywords="matched"]')).toBeNull()
+  })
+
   it('takes the posting from the application, with no second place to put one', async () => {
     // THE PASTE BOX IS GONE (Gabe, 2026-09-05). It was a second home for a
     // posting, and a second home is a fork: this test used to assert which of

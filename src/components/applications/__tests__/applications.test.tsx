@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, cleanup, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { ApplicationsPage } from '../ApplicationsPage'
-import { ApplicationForm } from '../ApplicationForm'
+import { ApplicationRecordView } from '../record/ApplicationRecordView'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from '../StatusTabs'
 import { ApplicationsTable } from '../ApplicationsTable'
 import { makeJob } from '@/test/fixtures'
@@ -27,13 +27,32 @@ const JOBS: Job[] = [
 
 afterEach(() => cleanup())
 
-describe('opening one application', () => {
-  // THE POINT OF THE WHOLE REFACTOR, and the part nothing else asserts: on
-  // desktop a row opens the record here, in a dialog, instead of navigating
-  // to a second screen. On a phone it still navigates, to the full-screen
-  // page that replaced that screen.
+/**
+ * Adding an application is FOUR STEPS now, not a form (Worktrack Revisions
+ * item 5): a link, a status, the model reading the posting, then the review
+ * where it is corrected and saved. Every test below that used to click `add`
+ * and type into a field has to walk that path first.
+ *
+ * No `onAutofill` is passed, so the read step has nothing to call and falls
+ * straight through to review -- which is the branch these tests want, since
+ * what they are about is the save, not the fetch. `autofillWorkMode.test.tsx`
+ * covers the fetch.
+ */
+async function addUpToReview(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole('button', { name: 'add' }))
+  await user.click(screen.getByRole('button', { name: /continue/i }))
+  await user.click(screen.getByRole('button', { name: /fill it in/i }))
+  return screen.findByRole('button', { name: /save application/i })
+}
 
-  it('opens the record in a dialog instead of navigating, on desktop', async () => {
+describe('opening one application', () => {
+  // THE POINT OF THE WHOLE REFACTOR, and the part nothing else asserts: a row
+  // opens the record here, in a dialog, instead of navigating to a second
+  // screen. AT EVERY WIDTH since 2026-09-09 -- the dialog is a bottom sheet
+  // below 640, so the phone gets the same record rather than a second edition
+  // of it, and `/applications/[id]` is a redirect into this.
+
+  it('opens the record in a dialog instead of navigating', async () => {
     useIsMobileMock.mockReturnValue(false)
     render(<ApplicationsPage jobs={JOBS} />)
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -41,10 +60,17 @@ describe('opening one application', () => {
     fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
 
     const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByRole('heading', { name: JOBS[0].role })).toBeTruthy()
-    // VIEWING, not editing. A click on a row is a request to read it.
-    expect(within(dialog).queryByRole('button', { name: /save application/i })).toBeNull()
-    expect(within(dialog).getByRole('button', { name: 'edit' })).toBeTruthy()
+    // THE HEADING NAMES THE SCREEN, not the row: company, position and status
+    // are editable fields a few lines below, so printing them in the header
+    // too was three duplicates and no explanation of what the dialog is.
+    expect(within(dialog).getByRole('heading', { name: 'application overview' })).toBeTruthy()
+    expect(within(dialog).queryByRole('heading', { name: JOBS[0].role })).toBeNull()
+    // ONE SURFACE. The record shows and edits at once, so Save is there from
+    // the moment it opens and there is no `edit` button to press first --
+    // disabled until something actually changes.
+    const save = within(dialog).getByRole('button', { name: /save application/i })
+    expect(save).toBeDisabled()
+    expect(within(dialog).getByLabelText(/^company/)).toHaveValue('Initech')
   })
 
   it('leaves the row a real link, so cmd-click still opens a new tab', () => {
@@ -60,28 +86,33 @@ describe('opening one application', () => {
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
-  it('navigates rather than opening a dialog, on a phone', () => {
-    // The mobile surface is a route, so back is back and the hardware gesture
-    // keeps working. A dialog at 375px takes that away.
+  it('opens the same dialog on a phone, rather than navigating away', async () => {
+    // IT USED TO NAVIGATE, to a full-screen route that was the mobile record.
+    // Gabe's revision collapsed the two ("View displays the bottom sheet
+    // version of the new view"): AppDialog anchors itself to the bottom edge
+    // below 640, which is the shape a phone wants, and one surface is one
+    // thing to keep correct instead of two.
     useIsMobileMock.mockReturnValue(true)
     render(<ApplicationsPage jobs={JOBS} />)
 
     fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
-    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(await screen.findByRole('dialog')).toBeTruthy()
   })
 
-  it('switches the same dialog from reading to editing, without a second screen', async () => {
-    // The old detail screen's `edit` was a link back to /applications, so
-    // fixing a typo took three navigations. It is a mode switch now.
-    useIsMobileMock.mockReturnValue(false)
-    render(<ApplicationsPage jobs={JOBS} />)
-    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
-
-    const dialog = await screen.findByRole('dialog')
-    fireEvent.click(within(dialog).getByRole('button', { name: 'edit' }))
-
-    expect(within(dialog).getByLabelText(/^company/)).toHaveValue('Initech')
-    expect(within(dialog).getByRole('button', { name: /save application/i })).toBeTruthy()
+  it('gives a phone its own view button beside delete, and hides it from a pointer', () => {
+    // "CTAs for the mobile must have the view and delete buttons only." On a
+    // stacked card there is no row to click; on a pointer the company cell is
+    // the affordance and a second one beside delete is noise. `sm:hidden`
+    // rather than a width hook, so display:none takes it out of the
+    // accessibility tree too.
+    render(<ApplicationsPage jobs={JOBS} onDelete={vi.fn()} />)
+    const view = screen.getByRole('button', {
+      name: `View ${JOBS[0].role} at Initech`,
+    })
+    expect(view.className).toContain('sm:hidden')
+    expect(screen.getByRole('button', { name: `Delete ${JOBS[0].role} at Initech` })).toBeTruthy()
+    // The edit button that used to sit beside them is gone.
+    expect(screen.queryByRole('button', { name: /^edit /i })).toBeNull()
   })
 
   it('tells the caller which row is open, so the route can read its history', async () => {
@@ -101,10 +132,10 @@ describe('opening one application', () => {
   })
 
   it('closes the record when the row it is showing is deleted out from under it', async () => {
-    // Delete is reachable from inside the dialog, and the confirm stacks on
-    // top of it -- so once the row is gone, what is left underneath is a
-    // record of something that no longer exists, carrying an edit button that
-    // would save it back.
+    // Once the row is gone from `jobs`, what is left underneath is a record
+    // of something that no longer exists, carrying a Save that would write it
+    // back. Keyed on the LIST rather than on the delete callback, so it also
+    // covers a row deleted in another tab and arriving through a refetch.
     useIsMobileMock.mockReturnValue(false)
     const { rerender } = render(<ApplicationsPage jobs={JOBS} />)
     fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
@@ -281,11 +312,12 @@ describe('ApplicationsPage', () => {
     // resolves to false on that same caught failure, and the panel has to
     // stay open with the field intact instead of discarding it.
     const onCreate = vi.fn().mockResolvedValue(false)
+    const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} onCreate={onCreate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    const save = await addUpToReview(user)
     fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
-    fireEvent.click(screen.getByRole('button', { name: /add application/i }))
+    fireEvent.change(screen.getByLabelText(/^position/), { target: { value: 'Engineer' } })
+    fireEvent.click(save)
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1))
     expect(screen.getByRole('heading', { name: /new application/i })).toBeTruthy()
     expect(screen.getByLabelText(/^company/)).toHaveValue('Acme')
@@ -293,11 +325,12 @@ describe('ApplicationsPage', () => {
 
   it('closes the form only once the save resolves successfully', async () => {
     const onCreate = vi.fn().mockResolvedValue(true)
+    const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} onCreate={onCreate} />)
-    fireEvent.click(screen.getByRole('button', { name: 'add' }))
+    const save = await addUpToReview(user)
     fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
-    fireEvent.click(screen.getByRole('button', { name: /add application/i }))
+    fireEvent.change(screen.getByLabelText(/^position/), { target: { value: 'Engineer' } })
+    fireEvent.click(save)
     await waitFor(() =>
       expect(screen.queryByRole('heading', { name: /new application/i })).toBeNull()
     )
@@ -334,25 +367,28 @@ describe('ApplicationsPage', () => {
     expect(screen.queryByText(/broken\.csv/i)).toBeNull()
   })
 
-  it('moves focus into the dialog and onto the first field on Edit, with no scroll compensation needed', async () => {
+  it('moves focus into the dialog and onto the first field, with no scroll compensation needed', async () => {
     // A card low on a five-column board used to be off-screen from where the
     // inline section opened, so ApplicationsPage carried its own
     // scrollIntoView + .focus() effect to compensate. A dialog is centred in
     // the viewport regardless of where its trigger sits, and Base UI's own
     // focus trap moves focus in on open -- so that compensation is gone, and
     // this pins the dialog's own behaviour rather than assuming it.
+    //
+    // OPENED FROM THE ROW, not from an `edit` button: that button is gone, and
+    // the record is editable the moment it opens.
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    await user.click(screen.getAllByRole('button', { name: /^edit/i })[0])
-    expect(screen.getByLabelText(/^company/)).toHaveFocus()
+    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    expect(await screen.findByLabelText(/^company/)).toHaveFocus()
   })
 
-  it('returns focus to the Edit trigger that opened the dialog once it closes', async () => {
+  it('returns focus to the row that opened the dialog once it closes', async () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    const trigger = screen.getAllByRole('button', { name: /^edit/i })[0]
+    const trigger = screen.getByRole('link', { name: 'Initech' })
     await user.click(trigger)
-    expect(screen.getByLabelText(/^company/)).toHaveFocus()
+    expect(await screen.findByLabelText(/^company/)).toHaveFocus()
     await user.keyboard('{Escape}')
     expect(trigger).toHaveFocus()
   })
@@ -360,7 +396,7 @@ describe('ApplicationsPage', () => {
   it('asks before discarding a dirty form on Escape, an overlay click or the header close button', async () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    await user.click(screen.getByRole('button', { name: 'add' }))
+    await addUpToReview(user)
     await user.type(screen.getByLabelText(/^company/), 'Acme')
 
     await user.keyboard('{Escape}')
@@ -378,27 +414,50 @@ describe('ApplicationsPage', () => {
     expect(screen.queryByLabelText(/^company/)).toBeNull()
   })
 
-  it('closes an untouched form immediately on Escape, with no discard prompt', async () => {
+  it('stops asking to discard once the save has landed', async () => {
+    // A save that worked moves the draft's baseline. Without that the record
+    // stays permanently dirty against the values it opened with, and every
+    // Escape from then on offers to discard changes that are already stored --
+    // which reads as "it did not save".
+    const user = userEvent.setup()
+    render(<ApplicationsPage jobs={JOBS} onUpdate={vi.fn().mockResolvedValue(true)} />)
+    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    await screen.findByRole('dialog')
+    await user.type(screen.getByLabelText(/^company/), '!')
+    await user.click(screen.getByRole('button', { name: /save application/i }))
+
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('alertdialog')).toBeNull()
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('still asks when the save was rejected, because the values are only here', async () => {
+    const user = userEvent.setup()
+    render(<ApplicationsPage jobs={JOBS} onUpdate={vi.fn().mockResolvedValue(false)} />)
+    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    await screen.findByRole('dialog')
+    await user.type(screen.getByLabelText(/^company/), '!')
+    await user.click(screen.getByRole('button', { name: /save application/i }))
+
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('alertdialog', { name: /discard/i })).toBeTruthy()
+  })
+
+  it('closes an untouched wizard immediately on Escape, with no discard prompt', async () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
     await user.click(screen.getByRole('button', { name: 'add' }))
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(screen.queryByLabelText(/^company/)).toBeNull()
+    expect(screen.queryByRole('heading', { name: /new application/i })).toBeNull()
   })
 
-  it('still lets Cancel close a dirty form immediately, the same as it always has', async () => {
-    // Cancel predates the dialog and was never a defect Gabe raised -- only
-    // the three dismiss paths a dialog adds (Escape, overlay, header close)
-    // get the discard prompt.
-    const user = userEvent.setup()
-    render(<ApplicationsPage jobs={JOBS} />)
-    await user.click(screen.getByRole('button', { name: 'add' }))
-    await user.type(screen.getByLabelText(/^company/), 'Acme')
-    await user.click(screen.getByRole('button', { name: 'cancel' }))
-    expect(screen.queryByRole('alertdialog')).toBeNull()
-    expect(screen.queryByLabelText(/^company/)).toBeNull()
-  })
+  // "STILL LETS CANCEL CLOSE A DIRTY FORM IMMEDIATELY" WAS HERE. There is no
+  // Cancel any more: the record shows and edits one surface, so there is
+  // nothing to cancel back to, and the wizard's footer offers `back` to the
+  // previous step instead of an abandon. Every remaining dismiss path is one
+  // a dialog adds -- Escape, the overlay, the header close -- and all three
+  // ask before discarding, which the test above this one pins.
 
   it('wires the list as a labelled tabpanel for the selected status tab', () => {
     render(<ApplicationsPage jobs={JOBS} />)
@@ -523,17 +582,41 @@ describe('StatusTabs', () => {
   })
 })
 
-describe('ApplicationForm', () => {
+/**
+ * `ApplicationForm` WAS TESTED HERE. It was deleted on 2026-09-09 -- the
+ * record shows and edits one surface, so a separate form in a separate dialog
+ * had nothing left to be. Every rule below is unchanged and now belongs to
+ * `ApplicationRecordView`; only the component under it moved.
+ *
+ * The submit reads `Save application` in both cases now. The old form said
+ * `Add application` for a new one, and the wizard's review step says Save
+ * because saving is what that step does.
+ */
+describe('the record’s fields and its one submit', () => {
+  // `showAll` so the optional fields are on screen without a click. The
+  // record hides the ones this application has never filled in -- that rule
+  // has its own test in detail.test.tsx.
+  const renderRecord = (props: Partial<React.ComponentProps<typeof ApplicationRecordView>> = {}) =>
+    render(
+      <ApplicationRecordView
+        job={null}
+        defaultCurrency="PHP"
+        onSubmit={vi.fn()}
+        layout="review"
+        {...props}
+      />
+    )
+
   it('starts a new application in the stored default currency', () => {
     // A PHP user typing a peso figure into a form defaulted to USD produces a
     // number that is wrong by a factor of 55 and looks plausible.
-    render(<ApplicationForm defaultCurrency="PHP" />)
+    renderRecord()
     // A button, not a <select>: what it SHOWS is the assertion.
     expect(selectedLabel(screen.getByLabelText('currency'))).toBe('PHP')
   })
 
   it('disables submit and shows a spinner while saving', () => {
-    render(<ApplicationForm defaultCurrency="PHP" saving />)
+    renderRecord({ saving: true })
     const submit = screen.getByRole('button', { name: /saving/i })
     expect(submit).toHaveProperty('disabled', true)
     expect(submit.querySelector('[role="status"]')).toBeTruthy()
@@ -543,15 +626,15 @@ describe('ApplicationForm', () => {
     // Re-defaulting an existing USD job to the account currency would relabel
     // a stored figure without changing it.
     const job = makeJob({ id: '9', status: 'applied', salary_currency: 'USD' })
-    render(<ApplicationForm defaultCurrency="PHP" job={job} />)
+    renderRecord({ job })
     expect(selectedLabel(screen.getByLabelText('currency'))).toBe('USD')
   })
 
   it('refuses to submit a job with no company and says why', () => {
     const onSubmit = vi.fn()
-    render(<ApplicationForm defaultCurrency="PHP" onSubmit={onSubmit} />)
-    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
-    fireEvent.click(screen.getByRole('button', { name: /add application/i }))
+    renderRecord({ onSubmit })
+    fireEvent.change(screen.getByLabelText(/^position/), { target: { value: 'Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: /save application/i }))
     expect(onSubmit).not.toHaveBeenCalled()
     expect(screen.getByText(/company is required/i)).toBeTruthy()
   })
@@ -559,11 +642,11 @@ describe('ApplicationForm', () => {
   it('submits the typed currency alongside the figures', async () => {
     const user = userEvent.setup({ delay: null })
     const onSubmit = vi.fn().mockResolvedValue(undefined)
-    render(<ApplicationForm defaultCurrency="PHP" onSubmit={onSubmit} />)
+    renderRecord({ onSubmit })
     fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme' } })
-    fireEvent.change(screen.getByLabelText(/^role/), { target: { value: 'Engineer' } })
+    fireEvent.change(screen.getByLabelText(/^position/), { target: { value: 'Engineer' } })
     await chooseOption(user, screen.getByLabelText('currency'), 'USD')
-    fireEvent.click(screen.getByRole('button', { name: /add application/i }))
+    fireEvent.click(screen.getByRole('button', { name: /save application/i }))
     expect(onSubmit).toHaveBeenCalledTimes(1)
     expect(onSubmit.mock.calls[0][0]).toMatchObject({
       company: 'Acme',
@@ -581,7 +664,7 @@ describe('ApplicationForm', () => {
     // What M5 was actually protecting against survives and is asserted here:
     // an ICON-ONLY save. A glyph beside a word is not the thing that was
     // eliminated; a glyph INSTEAD of the word was.
-    const { container } = render(<ApplicationForm defaultCurrency="PHP" />)
+    const { container } = renderRecord()
     const submit = container.querySelector('button[type="submit"]')!
     expect(submit.textContent!.trim().length).toBeGreaterThan(0)
     expect(submit.querySelectorAll('svg').length).toBe(1)
@@ -628,9 +711,19 @@ describe('ApplicationsTable accent header', () => {
  * pinning, because it is invisible in the source -- it lives across nineteen
  * separate `icon=` props and one person adding a field will not know it.
  */
-describe('naming the form\'s fields with glyphs', () => {
+describe('naming the record\'s fields with glyphs', () => {
   function renderForm() {
-    return render(<ApplicationForm defaultCurrency="PHP" onSubmit={vi.fn()} />)
+    // `layout="review"` opens every optional field, which is what makes this
+    // an all-or-nothing check over the whole set rather than over whichever
+    // fields one fixture happened to fill in.
+    return render(
+      <ApplicationRecordView
+        job={null}
+        defaultCurrency="PHP"
+        onSubmit={vi.fn()}
+        layout="review"
+      />
+    )
   }
 
   /** The glyph a control carries, if any. */
@@ -642,9 +735,12 @@ describe('naming the form\'s fields with glyphs', () => {
   }
 
   it('names every field in a section that holds more than one', () => {
-    // The nine-field job-information grid and the four-field contact grid.
-    // Half a grid with glyphs reads as a rendering fault rather than a
-    // system, so this is all-or-nothing per group.
+    // The whole first column, plus the CV field under it. Half a column with
+    // glyphs reads as a rendering fault rather than a system, so this is
+    // all-or-nothing.
+    //
+    // `contact_*` is absent: notes and contact left the record entirely
+    // (Worktrack Revisions item 4).
     renderForm()
     for (const id of [
       'company',
@@ -656,22 +752,21 @@ describe('naming the form\'s fields with glyphs', () => {
       'location',
       'work_mode',
       'source',
+      'url',
       'tags',
       'tech_stack',
-      'contact_name',
-      'contact_email',
-      'contact_linkedin',
-      'contact_notes',
+      'resume_id',
     ]) {
       expect(glyphFor(id), `${id} has no glyph`).toBeTruthy()
     }
   })
 
-  it('lets the heading carry it where a section holds exactly one field', () => {
-    // Saying it twice, three lines apart. The section heading above each of
-    // these already names it.
+  it('lets the heading carry it where the column already names the field', () => {
+    // Saying it twice, three lines apart. `date_applied` draws the browser's
+    // own calendar (see below) and `description` sits under a heading that
+    // already carries the document glyph.
     renderForm()
-    for (const id of ['url', 'date_applied', 'description', 'notes']) {
+    for (const id of ['date_applied', 'description']) {
       expect(glyphFor(id), `${id} repeats its section's glyph`).toBeNull()
     }
   })
@@ -686,16 +781,24 @@ describe('naming the form\'s fields with glyphs', () => {
     expect(date.parentElement!.querySelectorAll('svg').length).toBe(0)
   })
 
-  it('gives the submit and cancel controls a glyph too', () => {
+  it('gives the submit control a glyph too', () => {
     renderForm()
-    const submit = screen.getByRole('button', { name: /add application/i })
+    const submit = screen.getByRole('button', { name: /save application/i })
     expect(submit.querySelector('svg')).toBeTruthy()
   })
 
   it('drops the submit glyph while saving, so the spinner stands alone', () => {
     // Button renders its spinner in the same leading slot. Two marks where the
     // control has one thing to say.
-    render(<ApplicationForm defaultCurrency="PHP" saving onSubmit={vi.fn()} />)
+    render(
+      <ApplicationRecordView
+        job={null}
+        defaultCurrency="PHP"
+        saving
+        onSubmit={vi.fn()}
+        layout="review"
+      />
+    )
     const busy = screen.getByRole('button', { name: /saving/i })
     expect(busy.querySelectorAll('svg').length).toBe(0)
     expect(busy.querySelector('[role="status"], .animate-spin, [data-spinner]')).toBeTruthy()
@@ -832,7 +935,9 @@ describe('the open record follows the list', () => {
     const after = [makeJob({ id: '1', status: 'applied', company: 'Initech', location: 'Pasig City' })]
     rerender(<ApplicationsPage jobs={after} />)
 
-    expect(await screen.findByText('Pasig City')).toBeInTheDocument()
+    // A VALUE IN A FIELD now, not text in a grid: the record shows and edits
+    // one surface, so "the view moved" means the input moved.
+    await waitFor(() => expect(screen.getByLabelText('location')).toHaveValue('Pasig City'))
   })
 
   it('follows a company rename without being told', async () => {
@@ -840,8 +945,10 @@ describe('the open record follows the list', () => {
     expect(await screen.findByRole('dialog')).toBeTruthy()
 
     rerender(<ApplicationsPage jobs={[makeJob({ id: '1', status: 'applied', company: 'Initrode' })]} />)
+    // IN THE FIELD, which is the only place the company appears in the record
+    // now -- the header that used to repeat it was removed on 2026-09-10.
     await waitFor(() => {
-      expect(within(screen.getByRole('dialog')).getByText('Initrode')).toBeInTheDocument()
+      expect(within(screen.getByRole('dialog')).getByLabelText(/^company/)).toHaveValue('Initrode')
     })
   })
 

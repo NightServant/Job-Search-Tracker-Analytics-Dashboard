@@ -80,7 +80,7 @@ import { scrollToSection } from '@/lib/scrollToSection'
  * screen.
  *
  * The over-hero treatment uses Tailwind's `white/NN` opacity modifiers rather
- * than arbitrary `bg-[rgba(250,250,250,0.35)]` values. The arbitrary form was
+ * than arbitrary `bg-[rgba(...)]` values. The arbitrary form was
  * in the DOM but did not always have a rule behind it, so the dots kept their
  * themed colour while the markup claimed otherwise -- a class that lies is
  * worse than one that is merely wrong, because the DOM looks correct while
@@ -136,7 +136,7 @@ export function SectionRail({
         // of video are not visible, and they drift in and out of legibility as
         // the clip plays -- worse than being consistently wrong, because it
         // looks like a flicker.
-        overHero && 'bg-[rgba(5,5,7,0.32)] backdrop-blur-sm'
+        overHero && 'bg-ink-950/30 backdrop-blur-sm'
       )}
     >
       <ol className="relative flex flex-col gap-6">

@@ -1,4 +1,5 @@
 import { useActivity } from '@/hooks/useActivity'
+import { useJobStatusHistory } from '@/hooks/useJobs'
 import { useDocumentLinks } from '@/hooks/useDocumentLinks'
 import { useJobEvents } from '@/hooks/useJobEvents'
 import { useCvText } from '@/hooks/useCvText'
@@ -36,10 +37,15 @@ export function useApplicationRecord(
   const activityQuery = useActivity(jobId)
   const linksQuery = useDocumentLinks(jobId)
   const eventsQuery = useJobEvents(jobId)
+  // For the pipeline bar only, and it is the one read that answers a question
+  // the `jobs` row cannot: whether a rejected application ever reached
+  // interviewing. Same `enabled: !!jobId` gate as the rest.
+  const historyQuery = useJobStatusHistory(jobId)
 
   const activity = activityQuery.data ?? []
   const links = linksQuery.data ?? []
   const events = eventsQuery.data ?? []
+  const history = historyQuery.data ?? []
 
   // Newest link first, then read that one CV. Sorted on a copy: `links` is
   // react-query's cached array, and sorting it in place would mutate the
@@ -56,6 +62,7 @@ export function useApplicationRecord(
 
   return {
     activity,
+    history,
     links,
     nextEvent,
     match,
@@ -67,6 +74,7 @@ export function useApplicationRecord(
       activityQuery.isLoading ||
       linksQuery.isLoading ||
       eventsQuery.isLoading ||
+      historyQuery.isLoading ||
       cvTextQuery.isLoading,
   }
 }

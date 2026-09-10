@@ -7,9 +7,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useUserPreferences, useSetDefaultCurrency } from '@/hooks/useUserPreferences'
 import { SettingsPage } from '@/components/settings/SettingsPage'
-import { ProfileImport, ProfileImportSteps } from '@/components/settings/ProfileImport'
+import { ProfileFetch, ProfileFetchSteps } from '@/components/settings/ProfileImport'
 import type { ProfileState } from '@/components/settings/ProfileGroup'
-import { useUserProfile, useImportProfile, useClearUserProfile } from '@/hooks/useUserProfile'
+import {
+  useUserProfile,
+  useImportProfileFromUrl,
+  useClearUserProfile,
+} from '@/hooks/useUserProfile'
 import { toError } from '@/services/supabaseHelpers'
 import type { SupportedCurrency } from '@/services/userPreferences'
 
@@ -39,11 +43,11 @@ export default function Page() {
   const { user, signOut } = useAuth()
   const { data: prefs = null } = useUserPreferences()
   const { data: stored, isPending: profileLoading } = useUserProfile()
-  const importProfile = useImportProfile()
+  const fetchProfile = useImportProfileFromUrl()
   const clearProfile = useClearUserProfile()
-  // What the last import did, kept here rather than read off the mutation: a
-  // file set that matched no known header resolves SUCCESSFULLY with nothing
-  // recognised, so `mutation.error` is empty on exactly the case worth saying
+  // What the last fetch did, kept here rather than read off the mutation: a
+  // page that returned only a name and a headline resolves SUCCESSFULLY with
+  // warnings, so `mutation.error` is empty on exactly the case worth saying
   // something about.
   const [profileNote, setProfileNote] = React.useState<string | null>(null)
   const setDefaultCurrency = useSetDefaultCurrency()
@@ -126,25 +130,18 @@ export default function Page() {
 
 
 
-  const handleImportProfile = async (files: { name: string; text: string }[]) => {
+  const handleFetchProfile = async (url: string) => {
     setProfileNote(null)
     try {
-      const result = await importProfile.mutateAsync(files)
-      if (!result.recognised.length) {
-        // Naming the files is the whole message: "nothing was recognised" on
-        // its own leaves someone guessing which of six CSVs was wrong.
-        setProfileNote(
-          `Could not recognise ${result.unrecognised.join(', ')}. ` +
-            'Pick the CSVs from your LinkedIn export, such as Profile.csv.'
-        )
-        return
-      }
-      success(`Imported ${result.recognised.join(', ')}`)
-      if (result.unrecognised.length) {
-        setProfileNote(`Skipped ${result.unrecognised.join(', ')} — not a table this reads.`)
-      }
+      const result = await fetchProfile.mutateAsync(url)
+      success('Profile updated')
+      // WHAT THE PAGE DID NOT CARRY IS SAID OUT LOUD. A public profile does
+      // not render the paragraph under each role, and an import that quietly
+      // returns titles without them looks like a bug rather than a limit --
+      // see scraper/extractor/profile.py.
+      if (result.warnings.length) setProfileNote(result.warnings.join(' '))
     } catch (err) {
-      setProfileNote(err instanceof Error ? err.message : 'Could not read those files.')
+      setProfileNote(err instanceof Error ? err.message : 'Could not read that profile.')
     }
   }
 
@@ -165,9 +162,9 @@ export default function Page() {
       : {
           status: 'empty',
           message:
-            'No profile yet. Import your LinkedIn data export and everything in it — ' +
-            'headline, summary, roles and their descriptions, education, skills — appears here ' +
-            'and feeds CV tailoring.',
+            'No profile yet. Paste your LinkedIn profile address and Worktrack reads the ' +
+            'public page — headline, summary, roles, education — into a profile that feeds ' +
+            'CV tailoring.',
         }
 
   return (
@@ -175,16 +172,17 @@ export default function Page() {
       prefs={prefs}
       profile={profileState}
       profileSource={
-        <ProfileImport
-          onImport={(files) => void handleImportProfile(files)}
+        <ProfileFetch
+          onFetch={(url) => void handleFetchProfile(url)}
           onClear={() => void handleClearProfile()}
-          importing={importProfile.isPending}
+          fetching={fetchProfile.isPending}
           clearing={clearProfile.isPending}
           hasProfile={!!stored?.profile}
           note={profileNote}
+          defaultUrl={stored?.profile?.url ?? null}
         />
       }
-      profileSteps={<ProfileImportSteps />}
+      profileSteps={<ProfileFetchSteps />}
       email={user?.email ?? null}
       onDefaultCurrencyChange={(code) => void handleDefaultCurrencyChange(code)}
       savingCurrency={setDefaultCurrency.isPending}

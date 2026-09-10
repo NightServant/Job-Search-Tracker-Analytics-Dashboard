@@ -21,7 +21,7 @@ import { NAV_LINKS } from './content'
  * sections with no navigation at all.
  *
  * Why two treatments rather than one bar: the hero is DARK IN BOTH THEMES -- a
- * background video under a scrim from rgba(5,5,7,0.92) to rgba(5,5,7,0.3),
+ * background video under a scrim from ink-950/90 to ink-950/30,
  * with an eyebrow in accent-400 rather than accent-700 because accent-700 on
  * near-black fails contrast. Social proof is an ordinary bg-canvas surface. A
  * bar that blends into the first is illegible on the second. The swap is not
@@ -122,7 +122,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
         // default, and the redundant class would make a "has no bottom border"
         // assertion pass on the substring while meaning nothing.
         overHero
-          ? 'bg-transparent text-[#fafafa]'
+          ? 'bg-transparent text-ink-50'
           : 'border-b border-border-subtle bg-bg-canvas text-text-primary'
       )}
     >
@@ -133,7 +133,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
         <div
           data-nav-scrim
           aria-hidden
-          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[120%] bg-gradient-to-b from-[rgba(5,5,7,0.55)] to-transparent"
+          className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[120%] bg-gradient-to-b from-ink-950/55 to-transparent"
         />
       )}
 
@@ -142,7 +142,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
           Over the hero the lockup renders its DARK-MODE colours whatever the
           page theme is, because the hero is dark in both. Two halves to that:
 
-          `text-[#fafafa]` carries the wordmark and BrandMark's three static
+          `text-ink-50` carries the wordmark and BrandMark's three static
           cells, which are `currentColor`.
 
           The accent cell is `fill="var(--color-accent-default)"`, which
@@ -153,8 +153,8 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
           being forked or given a variant prop, which is what BrandMark's own
           docblock asks callers to do.
 
-          `[&>svg]:text-[#fafafa]` is NOT redundant with the container's
-          `text-[#fafafa]`, and leaving it out is a bug that only shows in the
+          `[&>svg]:text-ink-50` is NOT redundant with the container's
+          `text-ink-50`, and leaving it out is a bug that only shows in the
           light theme. BrandMark sets `text-text-primary` on its OWN <svg>, so
           the inherited colour never reaches the three currentColor cells --
           the svg re-declares it. In dark mode text-text-primary is near-white
@@ -166,7 +166,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
         <BrandLockup
           className={cn(
             overHero &&
-              'text-[#fafafa] [&>svg]:text-[#fafafa] [--color-accent-default:var(--color-accent-400)]'
+              'text-ink-50 [&>svg]:text-ink-50 [--color-accent-default:var(--color-accent-400)]'
           )}
         />
       </Link>
@@ -187,7 +187,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
             className={cn(
               'text-body-s transition-colors',
               overHero
-                ? 'text-[rgba(250,250,250,0.82)] hover:text-[#fafafa]'
+                ? 'text-ink-50/85 hover:text-ink-50'
                 : 'text-text-secondary hover:text-text-primary'
             )}
           >
@@ -204,7 +204,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
         phone visitor with no way to change the theme anywhere on the page.
       */}
       <div data-nav-toggle>
-        <ThemeToggle size={32} className={cn(overHero && 'text-[#fafafa]')} />
+        <ThemeToggle size={32} className={cn(overHero && 'text-ink-50')} />
       </div>
 
       {/*
@@ -229,7 +229,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
         className={cn(
           'grid h-10 w-10 place-items-center rounded-md md:hidden',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
-          overHero ? 'text-[#fafafa]' : 'text-text-primary'
+          overHero ? 'text-ink-50' : 'text-text-primary'
         )}
       >
         {menuOpen ? <CloseIcon size={20} /> : <MenuIcon size={20} />}
@@ -247,13 +247,13 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
             // which read as a different application appearing on top of the
             // page rather than as the bar opening.
             //
-            // OPAQUE IN BOTH STATES, and that part is unchanged: `#050507` is
+            // OPAQUE IN BOTH STATES, and that part is unchanged: `ink-950` is
             // the hero's own base colour, the one its scrim runs from. The
             // note that used to sit here argued against a TRANSLUCENT panel
             // over video -- links that stop being readable -- and that
             // argument still holds. This swaps the ground, not the opacity.
             overHero
-              ? 'border-white/10 bg-[#050507] text-[#fafafa]'
+              ? 'border-white/10 bg-ink-950 text-ink-50'
               : 'border-border-subtle bg-bg-canvas text-text-primary'
           )}
         >
@@ -272,7 +272,7 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
                   // reached by a thumb and nothing else.
                   'flex min-h-11 items-center gap-3 rounded-md px-2 py-3 text-body-l',
                   overHero
-                    ? 'text-[#fafafa] hover:bg-white/10'
+                    ? 'text-ink-50 hover:bg-white/10'
                     : 'text-text-primary hover:bg-bg-inset'
                 )}
               >

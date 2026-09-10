@@ -10,10 +10,18 @@ import { HERO } from './content'
 
 /**
  * Section 1. Dark in both themes, because HeroMedia lays a scrim over the
- * background -- which is why every colour here is a literal rather than a
- * token, and why the eyebrow is accent-400 (#fb923c) and not accent-default:
- * accent-700 on near-black fails contrast, and the frame already made that
- * choice. Transcribed from Figma 39:369.
+ * background -- which is why the colours here name PRIMITIVES (`ink-950`,
+ * `ink-50`, `accent-400`) rather than semantic tokens: a semantic token flips
+ * with the theme and this section does not.
+ *
+ * THEY USED TO BE RAW LITERALS -- `#050507`, `#fafafa`, `rgba(5,5,7,0.92)` --
+ * and that is what made the dark-mode refactor (2026-09-09) a hunt through
+ * five files. `ink-*` is the same warm ramp the dark theme now runs on, so the
+ * hero and dark mode cannot drift apart again.
+ *
+ * The eyebrow is accent-400 and not accent-default because accent-700 on
+ * near-black fails contrast, and the frame already made that choice.
+ * Transcribed from Figma 39:369.
  *
  * ONE call to action: "read the source", and it is PRIMARY. Gabe removed the
  * demo and create-account buttons on 2026-09-02 and promoted the survivor.
@@ -71,9 +79,9 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
       <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-7">
         <p className="text-label-caps uppercase text-accent-400">{HERO.eyebrow}</p>
 
-        <h1 className="max-w-4xl text-display-xl text-[#fafafa]">{HERO.headline}</h1>
+        <h1 className="max-w-4xl text-display-xl text-ink-50">{HERO.headline}</h1>
 
-        <p className="max-w-[720px] text-body-l text-[rgba(250,250,250,0.82)]">{HERO.body}</p>
+        <p className="max-w-[720px] text-body-l text-ink-50/85">{HERO.body}</p>
 
         <div>
           {/*

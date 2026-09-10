@@ -153,12 +153,26 @@ describe('the privacy page', () => {
     )
   })
 
-  it('states whether AI is involved', () => {
+  it('states whether AI is involved, and where', () => {
     // "Does this thing feed my CV to a model" is the first question a
-    // reasonable person asks of a CV tool. Currently the answer is no, and an
-    // unanswered question reads as a yes.
+    // reasonable person asks of a CV tool, and an unanswered question reads as
+    // a yes.
+    //
+    // THE ANSWER CHANGED ON 2026-09-09 and this test changed with it. The page
+    // used to say "No AI is used anywhere", which stopped being true the
+    // moment a deployment configured TAILORING_API_KEY -- CV tailoring and the
+    // posting digest both call a model -- and the revision that made adding an
+    // application an AI-filled flow put the claim in front of every user on
+    // their first application. A policy that denies a feature the product
+    // advertises is worse than one that never mentioned it.
     render(<Privacy />)
-    expect(document.body.textContent).toMatch(/No AI is used/i)
+    const text = document.body.textContent ?? ''
+    expect(text, 'the policy still denies using AI at all').not.toMatch(/No AI is used/i)
+    expect(text).toMatch(/language model/i)
+    // The three places, named. A vague "we may use AI" is the shape of a
+    // disclosure written to cover a lawyer rather than to inform a reader.
+    expect(text).toMatch(/tailoring a CV/i)
+    expect(text).toMatch(/filling in a new application/i)
   })
 
   it('does not invent a region, a retention period or a third party', () => {

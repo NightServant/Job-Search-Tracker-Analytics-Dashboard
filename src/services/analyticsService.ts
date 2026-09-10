@@ -69,6 +69,50 @@ export interface StatusTransition {
   count: number
 }
 
+/**
+ * A row's place in time, for the range picker.
+ *
+ * `date_applied` FIRST, `created_at` as the fallback. The applied date is when
+ * the application actually went out and is the date every screen in this app
+ * shows; `created_at` is when the row was typed in, and it is the only date a
+ * wishlist row has. Comparing `YYYY-MM-DD` strings rather than parsing: both
+ * sides sort lexically the way they sort chronologically, and a parse here
+ * would reintroduce every timezone question a bare DATE column exists to
+ * avoid.
+ */
+function withinRange(
+  job: { date_applied?: string | null; created_at?: string | null },
+  since: string | null
+): boolean {
+  if (!since) return true
+  const day = job.date_applied ?? job.created_at?.slice(0, 10)
+  return !!day && day >= since
+}
+
+/**
+ * The ids of the applications inside the window, or `null` for all time.
+ *
+ * WHY AN ID SET AND NOT A DATE FILTER ON EACH QUERY. Three of these metrics
+ * are computed from `job_status_history`, whose rows are dated by when the
+ * STATUS changed, not by when the application went out. Filtering those on
+ * `changed_at` would answer a different question -- "what moved recently"
+ * rather than "how did the applications from this window do" -- and the two
+ * disagree for exactly the rows a job seeker cares about: an application sent
+ * in June that got its offer in September.
+ *
+ * One definition of the window, applied to the applications, and the history
+ * follows the applications it belongs to.
+ */
+async function inRangeJobIds(userId: string, since: string | null): Promise<Set<string> | null> {
+  if (!since) return null
+  const { data, error } = await supabase
+    .from('jobs')
+    .select('id, date_applied, created_at')
+    .eq('user_id', userId)
+  if (error) throw error
+  return new Set((data ?? []).filter((job) => withinRange(job, since)).map((job) => job.id))
+}
+
 export const analyticsService = {
   /**
    * Compute time-in-stage metrics for a user's job applications
@@ -91,13 +135,18 @@ export const analyticsService = {
    * journey, which is the question being asked, and the footnote keeps that
    * honest rather than silent.
    */
-  async getStatusTransitions(userId: string): Promise<StatusTransition[]> {
+  async getStatusTransitions(
+    userId: string,
+    since: string | null = null
+  ): Promise<StatusTransition[]> {
     const ORDER: JobStatus[] = ['wishlist', 'applied', 'interviewing', 'offer', 'rejected']
     const rank = (s: string) => ORDER.indexOf(s as JobStatus)
 
+    const allowed = await inRangeJobIds(userId, since)
+
     const { data, error } = await supabase
       .from('job_status_history')
-      .select('from_status, to_status')
+      .select('job_id, from_status, to_status')
       .eq('user_id', userId)
 
     if (error) throw error
@@ -105,6 +154,7 @@ export const analyticsService = {
 
     const counts = new Map<string, number>()
     for (const row of data) {
+      if (allowed && !allowed.has(row.job_id)) continue
       const from = row.from_status as JobStatus
       const to = row.to_status as JobStatus
       if (from === to) continue
@@ -125,7 +175,10 @@ export const analyticsService = {
     })
   },
 
-  async getTimeInStageMetrics(userId: string): Promise<TimeInStageMetric[]> {
+  async getTimeInStageMetrics(
+    userId: string,
+    since: string | null = null
+  ): Promise<TimeInStageMetric[]> {
     try {
       Sentry.addBreadcrumb({
         category: 'analytics.timeInStage',
@@ -135,13 +188,22 @@ export const analyticsService = {
       })
 
       // Get all status changes for user's jobs
-      const { data: statusHistory, error: historyError } = await supabase
+      const allowed = await inRangeJobIds(userId, since)
+      const { data: allHistory, error: historyError } = await supabase
         .from('job_status_history')
         .select('*')
         .eq('user_id', userId)
         .order('changed_at', { ascending: true })
 
       if (historyError) throw historyError
+
+      // Narrowed to the applications in the window, BEFORE the "find the next
+      // change" scan below -- which searches this same array, so filtering
+      // afterwards would leave durations measured against rows that are not
+      // in the result.
+      const statusHistory = allowed
+        ? (allHistory ?? []).filter((row) => allowed.has(row.job_id))
+        : (allHistory ?? [])
 
       // Compute duration in each status
       const stageMetrics = new Map<JobStatus, number[]>()
@@ -226,7 +288,10 @@ export const analyticsService = {
    * inferred. (Gabe's ruling, Task 8 fix round 2 -- supersedes the more
    * conservative Wishlist-only fallback fix round 1 shipped.)
    */
-  async getConversionFunnel(userId: string): Promise<ConversionFunnelMetric[]> {
+  async getConversionFunnel(
+    userId: string,
+    since: string | null = null
+  ): Promise<ConversionFunnelMetric[]> {
     try {
       Sentry.addBreadcrumb({
         category: 'analytics.conversionFunnel',
@@ -237,12 +302,13 @@ export const analyticsService = {
 
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
-        .select('id, status')
+        .select('id, status, date_applied, created_at')
         .eq('user_id', userId)
 
       if (jobsError) throw jobsError
 
-      const jobList = jobs ?? []
+      const jobList = (jobs ?? []).filter((job) => withinRange(job, since))
+      const allowed = since ? new Set(jobList.map((job) => job.id)) : null
       const totalJobs = jobList.length
 
       // "Ever reached stage X" can only come from history -- current status
@@ -263,6 +329,7 @@ export const analyticsService = {
       // not progress along the chain.
       const maxIndexByJob = new Map<string, number>()
       for (const change of history ?? []) {
+        if (allowed && !allowed.has(change.job_id)) continue
         const idx = pipelineIndex(change.to_status)
         if (idx < 0) continue
         const seen = maxIndexByJob.get(change.job_id)
@@ -303,10 +370,10 @@ export const analyticsService = {
       // Compute time to each stage independently -- these must NOT share a
       // value; Applied and Interviewing previously both read
       // timeToInterviewMs, so they always rendered the identical number.
-      const timeToAppliedMs = await this._computeTimeToStatus(userId, 'applied')
-      const timeToInterviewMs = await this._computeTimeToStatus(userId, 'interviewing')
-      const timeToOfferMs = await this._computeTimeToStatus(userId, 'offer')
-      const timeToRejectedMs = await this._computeTimeToStatus(userId, 'rejected')
+      const timeToAppliedMs = await this._computeTimeToStatus(userId, 'applied', allowed)
+      const timeToInterviewMs = await this._computeTimeToStatus(userId, 'interviewing', allowed)
+      const timeToOfferMs = await this._computeTimeToStatus(userId, 'offer', allowed)
+      const timeToRejectedMs = await this._computeTimeToStatus(userId, 'rejected', allowed)
 
       const toDays = (ms: number | null): number => (ms ? Math.round(ms / (1000 * 60 * 60 * 24)) : 0)
       const percentOf = (count: number): number => (totalJobs > 0 ? (count / totalJobs) * 100 : 0)
@@ -371,7 +438,10 @@ export const analyticsService = {
    * Get source-based conversion trends over time
    * Shows how many applications, interviews, and offers per source per month
    */
-  async getSourceConversionTrends(userId: string): Promise<SourceConversionTrend[]> {
+  async getSourceConversionTrends(
+    userId: string,
+    since: string | null = null
+  ): Promise<SourceConversionTrend[]> {
     try {
       Sentry.addBreadcrumb({
         category: 'analytics.sourceConversionTrends',
@@ -382,7 +452,7 @@ export const analyticsService = {
 
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
-        .select('id, source, status, created_at')
+        .select('id, source, status, created_at, date_applied')
         .eq('user_id', userId)
 
       if (jobsError) throw jobsError
@@ -390,7 +460,7 @@ export const analyticsService = {
       // Group by source and month
       const trendMap = new Map<string, Map<string, any>>()
 
-      for (const job of jobs ?? []) {
+      for (const job of (jobs ?? []).filter((row) => withinRange(row, since))) {
         const source = job.source || 'Direct'
         const month = new Date(job.created_at).toISOString().slice(0, 7) // YYYY-MM
 
@@ -458,7 +528,10 @@ export const analyticsService = {
    * Cohort analysis: group applications by month applied, track progression
    * Shows retention and conversion over time for each cohort
    */
-  async getCohortAnalysis(userId: string): Promise<CohortAnalysis[]> {
+  async getCohortAnalysis(
+    userId: string,
+    since: string | null = null
+  ): Promise<CohortAnalysis[]> {
     try {
       Sentry.addBreadcrumb({
         category: 'analytics.cohortAnalysis',
@@ -477,7 +550,7 @@ export const analyticsService = {
       // Group by cohort (month of first application)
       const cohortMap = new Map<string, any>()
 
-      for (const job of jobs ?? []) {
+      for (const job of (jobs ?? []).filter((row) => withinRange(row, since))) {
         // Use date_applied if available, otherwise created_at
         const appliedDate = job.date_applied ? new Date(job.date_applied) : new Date(job.created_at)
         const cohort = appliedDate.toISOString().slice(0, 7) // YYYY-MM
@@ -545,19 +618,23 @@ export const analyticsService = {
   /**
    * Get overall conversion metrics
    */
-  async getConversionMetrics(userId: string): Promise<ConversionMetrics> {
+  async getConversionMetrics(
+    userId: string,
+    since: string | null = null
+  ): Promise<ConversionMetrics> {
     try {
       const { data: jobs, error: jobsError } = await supabase
         .from('jobs')
-        .select('id, status, source')
+        .select('id, status, source, date_applied, created_at')
         .eq('user_id', userId)
 
       if (jobsError) throw jobsError
 
-      const jobList = jobs ?? []
+      const jobList = (jobs ?? []).filter((job) => withinRange(job, since))
+      const allowed = since ? new Set(jobList.map((job) => job.id)) : null
       const offeredJobs = jobList.filter((j) => j.status === 'offer')
-      const timeToFirstInterview = await this._computeTimeToStatus(userId, 'interviewing')
-      const timeToOffer = await this._computeTimeToStatus(userId, 'offer')
+      const timeToFirstInterview = await this._computeTimeToStatus(userId, 'interviewing', allowed)
+      const timeToOffer = await this._computeTimeToStatus(userId, 'offer', allowed)
 
       // Count by source
       const conversionBySource: Record<string, number> = {}
@@ -591,14 +668,23 @@ export const analyticsService = {
   /**
    * Helper: Compute average time from creation to reaching a specific status
    */
-  async _computeTimeToStatus(userId: string, targetStatus: JobStatus): Promise<number | null> {
-    const { data: statusHistory, error } = await supabase
+  async _computeTimeToStatus(
+    userId: string,
+    targetStatus: JobStatus,
+    allowed: Set<string> | null = null
+  ): Promise<number | null> {
+    const { data: rows, error } = await supabase
       .from('job_status_history')
       .select('job_id, changed_at')
       .eq('user_id', userId)
       .eq('to_status', targetStatus)
 
-    if (error || !statusHistory || statusHistory.length === 0) return null
+    if (error || !rows || rows.length === 0) return null
+
+    // The caller has already worked out which applications are in the window;
+    // this only has to respect it.
+    const statusHistory = allowed ? rows.filter((row) => allowed.has(row.job_id)) : rows
+    if (statusHistory.length === 0) return null
 
     // Get job creation times
     const { data: jobs } = await supabase.from('jobs').select('id, created_at').eq('user_id', userId)

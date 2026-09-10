@@ -151,6 +151,41 @@ local file.
 Free tier is 1,000 scrapes a month. **Every posting URL auto-filled is sent to
 Firecrawl**, which is why `/privacy` names them.
 
+### The second thing it fetches: a LinkedIn profile (2026-09-09)
+
+`POST /profile` on the same service, behind `/api/profile` in Next, reads a
+public LinkedIn profile and turns it into the `UserProfile` the Settings screen
+renders. It is Gabe's revision item 8, reversing the 2026-09-06 removal of the
+profile-page scraper.
+
+**Firecrawl is the ONLY route here**, unlike `/extract`, which tries an
+ordinary fetch first. A plain GET of a LinkedIn profile from a datacenter
+address gets an authentication wall or a `999`, every time — so the ordinary
+attempt would be a guaranteed wasted round trip, and the local-browser fallback
+works on a laptop and never in a deployment. With no key configured the
+endpoint answers `503` and says so, rather than pretending the profile is
+private.
+
+The payload differs from a posting's in one value: `waitFor` is 2s rather than
+6s. A logged-out profile is server-rendered, so there is no posting body to wait
+for. `onlyMainContent` stays `false` for the same reason as before — the JSON-LD
+`ProfilePage` graph is in `<head>`.
+
+**What it gets:** name, headline, summary, location, picture, `worksFor` →
+experience (title, company, period), `alumniOf` → education, `knowsLanguage`,
+`sameAs` → websites. **What it does not get, and will not:** the paragraph
+under each role. A logged-out profile does not render it and the JSON-LD does
+not carry it. `scraper/extractor/profile.py` returns that as a WARNING rather
+than leaving the reader to conclude the import is broken.
+
+The CSV-export parser (`src/services/linkedinExport.ts`, `ProfileImport`) is
+kept and unused, on Gabe's instruction. It is still the only source that has
+ever carried the bullet text.
+
+**Rate limit:** three profile fetches per user per minute in
+`src/app/api/profile/route.ts`, tighter than auto-fill's eight — each one costs
+a Firecrawl credit and nobody imports their own profile eight times a minute.
+
 ---
 
 ## FormaTeX — LaTeX → PDF

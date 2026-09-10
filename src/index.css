@@ -4,6 +4,19 @@
    v4 has no config, so the variant has to be declared here. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Base UI writes `data-orientation` on Separator, Tabs, Toolbar and friends,
+   and shadcn's classes address it as `data-horizontal:` / `data-vertical:`.
+   Tailwind v4 has no such variant built in -- the bare `data-*` form only
+   matches VALUELESS attributes -- so until these two lines existed, every
+   `data-horizontal:h-px` in the codebase emitted no CSS at all and every
+   `<Separator />` in the app was a zero-height div.
+
+   Found on 2026-09-10 from Gabe asking for separators between the record
+   dialog's description, its pipeline and its columns. Two of the three were
+   already in the markup and had never painted a pixel. */
+@custom-variant data-horizontal (&[data-orientation="horizontal"]);
+@custom-variant data-vertical (&[data-orientation="vertical"]);
+
 /* The Figma design system, read from si641ecd9VS70DJPLvtPfo on 2026-08-25.
    Raw capture: docs/superpowers/notes/2026-08-25-figma-tokens.md
 
@@ -31,6 +44,26 @@
   --color-neutral-800: #27272a;
   --color-neutral-900: #18181b;
   --color-neutral-950: #09090b;
+
+  /* Warm dark ramp. THE DARK THEME'S OWN NEUTRALS, and the reason it has any:
+     dark mode ran on zinc (`neutral-950` #09090b down), which is the default
+     palette of every framework starter and every generated dashboard -- Gabe's
+     note was that the theme "is very familiar to the specific kind of users",
+     and he is right, it looked like a template. These are the same steps at
+     the same lightness, turned a few degrees warm and lifted off pure black,
+     so the ground belongs to the orange rather than merely tolerating it.
+
+     Chroma is deliberately tiny. One step further and a dark UI reads sepia;
+     this reads as charcoal that happens to be warm, which is the point. */
+  --color-ink-50: #faf7f4;
+  --color-ink-200: #e9e3dd;
+  --color-ink-300: #d6cec5;
+  --color-ink-400: #a89e94;
+  --color-ink-600: #5c5148;
+  --color-ink-700: #443b33;
+  --color-ink-800: #2e2721;
+  --color-ink-900: #211b16;
+  --color-ink-950: #17120e;
 
   --color-accent-50: #fff7ed;
   --color-accent-100: #ffedd5;
@@ -60,6 +93,25 @@
   --color-status-offer-tint: #ecfdf5;
   --color-status-rejected-solid: #dc2626;
   --color-status-rejected-tint: #fef2f2;
+
+  /* THE ATS RING'S OWN THREE COLOURS, and its track.
+     Not part of the five-status vocabulary above: pass/review/fail is a
+     VERDICT about a CV, not a stage an application is at, and it needs to
+     shift between themes in a way the status hues deliberately do not.
+
+     `review` used to be `var(--color-amber-600)` -- a token this project has
+     never defined, which fell through to Tailwind's built-in #d97706. That is
+     within a few degrees of `accent-700` #c2410c, so the middle verdict
+     rendered in what reads as the brand orange and said nothing (Gabe, on the
+     document editor: "not rendering the color properly").
+
+     The track is the missing arc. It was `border-subtle` (#e4e4e7), which is
+     1.5:1 against the canvas -- the "empty" half of the ring was effectively
+     invisible, so a 55% score drew as an orange arc floating in nothing. */
+  --color-verdict-pass: var(--color-status-offer-solid);
+  --color-verdict-review: #b45309;
+  --color-verdict-fail: var(--color-status-rejected-solid);
+  --color-verdict-track: var(--color-neutral-300);
 
   /* 02 Semantic (light) -- the only colour names components may use */
   --color-bg-canvas: var(--color-base-white);
@@ -310,20 +362,20 @@
 /* Dark mode redefines the semantic layer only. Primitives never change --
    if a value here names a hex rather than a primitive, that is a bug. */
 .dark {
-  --color-bg-canvas: var(--color-neutral-950);
-  --color-bg-surface: var(--color-neutral-900);
-  --color-bg-inset: var(--color-neutral-800);
-  --color-text-primary: var(--color-neutral-50);
-  --color-text-secondary: var(--color-neutral-300);
-  --color-text-muted: var(--color-neutral-400);
-  --color-text-inverse: var(--color-neutral-950);
-  --color-border-subtle: var(--color-neutral-800);
-  --color-border-default: var(--color-neutral-700);
-  --color-border-strong: var(--color-neutral-200);
+  --color-bg-canvas: var(--color-ink-950);
+  --color-bg-surface: var(--color-ink-900);
+  --color-bg-inset: var(--color-ink-800);
+  --color-text-primary: var(--color-ink-50);
+  --color-text-secondary: var(--color-ink-300);
+  --color-text-muted: var(--color-ink-400);
+  --color-text-inverse: var(--color-ink-950);
+  --color-border-subtle: var(--color-ink-800);
+  --color-border-default: var(--color-ink-700);
+  --color-border-strong: var(--color-ink-200);
   --color-accent-default: var(--color-accent-400);
   --color-accent-hover: var(--color-accent-300);
-  --color-accent-subtle: var(--color-neutral-900);
-  --color-accent-on-accent: var(--color-neutral-950);
+  --color-accent-subtle: var(--color-ink-900);
+  --color-accent-on-accent: var(--color-ink-950);
   /* Deep, not bright: accent-900 is the darkest step, so a full-width band
      reads as a tinted surface rather than a slab of signal colour. */
   --color-accent-surface: var(--color-accent-900);
@@ -334,11 +386,19 @@
   --color-chart-2: var(--color-accent-500);
   --color-chart-3: var(--color-accent-700);
 
-  --color-status-wishlist-fill: var(--color-neutral-800);
-  --color-status-applied-fill: var(--color-neutral-800);
-  --color-status-interviewing-fill: var(--color-neutral-800);
-  --color-status-offer-fill: var(--color-neutral-800);
-  --color-status-rejected-fill: var(--color-neutral-800);
+  --color-status-wishlist-fill: var(--color-ink-800);
+  --color-status-applied-fill: var(--color-ink-800);
+  --color-status-interviewing-fill: var(--color-ink-800);
+  --color-status-offer-fill: var(--color-ink-800);
+  --color-status-rejected-fill: var(--color-ink-800);
+
+  /* The ring reads on a dark ground the way it does on a light one: the two
+     signal arcs step lighter, and the track steps lighter still than the
+     surface so the missing half is visibly there. */
+  --color-verdict-pass: #34d399;
+  --color-verdict-review: #fbbf24;
+  --color-verdict-fail: #f87171;
+  --color-verdict-track: var(--color-ink-600);
 }
 
 /* Helvetica has proportional digits. The Figma Data/* styles were meant to be a

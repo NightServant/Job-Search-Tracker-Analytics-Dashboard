@@ -2,11 +2,12 @@
 
 import * as React from 'react'
 import Link from 'next/link'
-import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { AnalyticsIcon, CheckIcon, MenuIcon } from '@/components/icons'
+import { AnalyticsIcon, CheckIcon, ChevronLeftIcon, MenuIcon } from '@/components/icons'
+import { buttonVariants } from '@/components/ui/button-variants'
+import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { useDocumentFocus } from '@/components/shell/documentFocus'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { cn } from '@/lib/utils'
@@ -393,13 +394,30 @@ export function DocumentWorkspace({
       )}
       data-document-workspace
     >
-      <Breadcrumb
-        items={[
-          { label: 'documents', href: documentsHref },
-          { label: kindLabel, href: documentsHref },
-          { label: displayTitle },
-        ]}
-      />
+      {/* A BACK BUTTON, NOT A BREADCRUMB (Gabe, Worktrack Revisions item 7).
+          The trail read `documents / word / <name>` and its middle crumb was a
+          lie: `word` and `latex` are not places, and both crumbs pointed at
+          the same `/documents` page -- so the path claimed a hierarchy the app
+          does not have and offered two links to one destination.
+
+          What a person wants from the top-left of a full-screen editor is the
+          way out, said once and plainly. `kindLabel` survives as the label
+          beside the title, where it is a FACT about this document rather than
+          a step in a path nobody walked. */}
+      <div className="flex items-center gap-3">
+        <Link
+          href={documentsHref}
+          className={cn(
+            ICON_MOTION_GROUP,
+            buttonVariants({ variant: 'ghost', size: 's' }),
+            '-ml-2'
+          )}
+        >
+          <ChevronLeftIcon size={16} aria-hidden className={iconMotion('back')} />
+          back to documents
+        </Link>
+        <span className="text-label-caps uppercase text-text-muted">{kindLabel}</span>
+      </div>
 
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between lg:gap-10">
         <div className="flex min-w-0 flex-col gap-1">

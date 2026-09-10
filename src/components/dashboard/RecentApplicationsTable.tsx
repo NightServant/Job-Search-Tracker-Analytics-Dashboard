@@ -14,6 +14,7 @@ import {
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { EmptyState } from '@/components/ui/empty-state'
 import { cn } from '@/lib/utils'
+import { sortJobs } from '@/lib/jobSort'
 import { formatAppliedDate } from '@/services/date'
 import type { Job } from '@/types'
 
@@ -48,7 +49,12 @@ export interface RecentApplicationsTableProps {
  */
 export function RecentApplicationsTable({ jobs, limit = 5 }: RecentApplicationsTableProps) {
   const appHref = useAppHref()
-  const rows = jobs.slice(0, limit)
+  // ORDERED HERE, not taken from the query. `jobService.getJobs` returns
+  // `created_at` descending -- when the ROW was added, which is a different
+  // fact from when the application went out. This block claims to be "the
+  // five most recent" and the column it prints is `applied on`, so those five
+  // have to be the five most recently APPLIED. See lib/jobSort.
+  const rows = React.useMemo(() => sortJobs(jobs, 'applied').slice(0, limit), [jobs, limit])
 
   if (rows.length === 0) {
     return (

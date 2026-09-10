@@ -40,7 +40,11 @@ vi.mock('@/hooks/useJobs', () => ({
   useJobs: () => ({ data: [], isLoading: false, error: null }),
 }))
 
-// The editor's command row shows which applications this CV was sent to.
+// The "sent to N applications" dropdown was removed from WordResumeEditor
+// (Gabe, Worktrack Revisions item 6), and with it the only call to
+// useResumeLinks in this route's tree. The mock is kept rather than deleted
+// -- nothing in this file breaks without it -- but it is dead: no component
+// under test imports useDocumentLinks any more.
 vi.mock('@/hooks/useDocumentLinks', () => ({
   useResumeLinks: () => ({ data: [], isLoading: false }),
 }))
@@ -343,13 +347,19 @@ describe('the editor chrome', () => {
   })
 
   it('leaves the drafts list reachable from the editor', () => {
-    // Now the breadcrumb rather than a lone `back` link -- and it matters
-    // MORE than it did, because the sidebar is hidden while a document is
-    // open, so this is the only way out of the editor other than the browser.
+    // THE BREADCRUMB IS GONE (Gabe, Worktrack Revisions item 7, 2026-09-09).
+    // `documents / word / <name>` claimed a hierarchy the app does not have --
+    // both `documents` and `word` pointed at the same destination -- so it is
+    // a plain "back to documents" link now, with kindLabel beside it as a
+    // fact about the document rather than a step in a path nobody walked.
+    // This still matters MORE than it looks: the sidebar is hidden while a
+    // document is open, so this is the only way out other than the browser.
     params('cv-1')
     resolved(wordDraft())
     render(<Page />)
-    expect(screen.getByRole('link', { name: 'documents' }).getAttribute('href')).toBe('/documents')
+    expect(screen.getByRole('link', { name: 'back to documents' }).getAttribute('href')).toBe(
+      '/documents'
+    )
   })
 
   it('gives the LaTeX editor the same chrome as the Word one', () => {
@@ -373,9 +383,9 @@ describe('the editor chrome', () => {
     const heading = screen.getByRole('heading', { level: 1 })
     expect(heading.querySelector('input')).toBeTruthy()
     expect((screen.getByLabelText(/cv title/i) as HTMLInputElement).value).toBe('LaTeX CV')
-    // The category is a crumb on the trail, and the trail is the way back now
-    // that the sidebar is hidden.
-    expect(screen.getByRole('link', { name: 'documents' })).toBeTruthy()
+    // The category is a plain label beside the back link now, not a crumb on
+    // a trail -- see the "leaves the drafts list reachable" test above.
+    expect(screen.getByRole('link', { name: 'back to documents' })).toBeTruthy()
     expect(screen.getByText('latex')).toBeTruthy()
     // ONE RAIL, BOTH PANELS (Gabe, 2026-09-05). Asserted as a shared ancestor
     // rather than as mere presence: the change was moving the analysis OUT of

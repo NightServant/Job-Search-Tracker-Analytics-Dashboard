@@ -1,25 +1,60 @@
 import { describe, it, expect, afterEach } from 'vitest'
 import { render, cleanup, screen } from '@testing-library/react'
-import { ApplicationForm } from '@/components/applications/ApplicationForm'
+import { ApplicationRecordView } from '@/components/applications/record/ApplicationRecordView'
 import { AppDialog } from '@/components/ui/app-dialog'
+import type { Job } from '@/types'
 
-// ApplicationForm needs no hook mocks: it is a pure component over props, and
-// the auto-fill mutation the old JobForm reached for directly now arrives as a
-// callback the route supplies. That is why this file no longer mocks
-// @/hooks/useJobs -- there is nothing left here to mock.
+// The record needs no hook mocks: it is a pure component over props, and every
+// mutation it can start arrives as a callback the route supplies. That is why
+// this file mocks nothing -- there is nothing here to mock.
+//
+// IT RENDERS `ApplicationRecordView`, not the `ApplicationForm` it used to.
+// That component was deleted on 2026-09-09: the record shows and edits the
+// same surface now, so a separate form in a separate dialog no longer exists
+// to check. The controls being checked are the same controls.
+
+const JOB: Job = {
+  id: 'j1',
+  user_id: 'u1',
+  company: 'Acme',
+  role: 'Frontend Engineer',
+  salary_min: 60000,
+  salary_max: 90000,
+  salary_currency: 'PHP',
+  url: 'https://careers.acme.com/1',
+  description: 'We need React and TypeScript.',
+  status: 'applied',
+  date_applied: '2026-08-25',
+  notes: null,
+  contact_name: null,
+  contact_email: null,
+  contact_linkedin: null,
+  contact_notes: null,
+  location: 'Manila',
+  work_mode: 'remote',
+  source: 'LinkedIn',
+  is_referral: false,
+  tags: ['fintech'],
+  tech_stack: ['react'],
+  created_at: '2026-08-20T00:00:00.000Z',
+  updated_at: '2026-08-25T00:00:00.000Z',
+}
 
 describe('accessibility checks', () => {
   afterEach(() => cleanup())
 
-  it('ApplicationForm basic accessibility checks (labels, button names)', () => {
-    // Task 4 (M5.5) moved ApplicationForm into a dialog and deleted its own
-    // internal <h2> -- the AppDialog it always renders inside of now supplies
-    // that name, the same way a CardContent does not duplicate its
-    // CardHeader's heading. Wrapping it here tests what the app actually
-    // renders rather than the form in an isolation it no longer ships in.
+  it('the application record: labels, button names, and one heading per column', () => {
+    // Wrapped in the AppDialog it actually ships inside. The record has no
+    // heading of its own -- the dialog supplies the accessible name, the same
+    // way a CardContent does not duplicate its CardHeader's heading -- so
+    // rendering it bare would test an isolation it never appears in.
     render(
-      <AppDialog open onOpenChange={() => {}} title="New application" size="l">
-        <ApplicationForm defaultCurrency="PHP" onSubmit={async () => {}} />
+      <AppDialog open onOpenChange={() => {}} title="Frontend Engineer" size="xl">
+        <ApplicationRecordView
+          job={JOB}
+          defaultCurrency="PHP"
+          onSubmit={async () => {}}
+        />
       </AppDialog>
     )
 
@@ -50,26 +85,16 @@ describe('accessibility checks', () => {
       expect(name.trim().length, 'Buttons should have accessible names').toBeGreaterThan(0)
     }
 
-    // Sanity: the form names itself, and every group inside it names itself
-    // too. It went from one heading to nine when the flat fourteen-field grid
-    // was split into the record's own sections -- so this asserts the group
-    // names rather than a count, which would be a number nobody could read a
-    // reason into.
-    const headings = screen
-      .getAllByRole('heading', { level: 2 })
-      .map((h) => h.textContent?.trim())
-    expect(headings).toContain('New application')
-    for (const group of [
-      'job information',
-      'posting url',
-      'tags and tech stack',
-      'referral',
-      'date applied',
-      'job description',
-      'notes',
-      'contact',
-    ]) {
-      expect(headings).toContain(group)
+    // The dialog names itself, and the two columns that are not a run of
+    // fields name themselves too. Asserted by name rather than by count: a
+    // number is something nobody can read a reason into.
+    expect(screen.getByRole('heading', { level: 2, name: 'Frontend Engineer' })).toBeTruthy()
+    for (const column of ['job description', 'ATS match']) {
+      expect(screen.getByRole('heading', { name: column })).toBeTruthy()
     }
+
+    // The pipeline bar is an ordered list with a name, not a row of coloured
+    // rules a screen reader walks past in silence.
+    expect(screen.getByLabelText('Application progress')).toBeTruthy()
   })
 })

@@ -3,7 +3,6 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { useAppHref } from '@/components/shell/routeBase'
-import { useIsMobile } from '@/hooks/use-mobile'
 import {
   Table,
   TableBody,
@@ -15,7 +14,7 @@ import {
 import { IconButton } from '@/components/ui/icon-button'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { EmptyState } from '@/components/ui/empty-state'
-import { TrashIcon } from '@/components/icons'
+import { EyeIcon, TrashIcon } from '@/components/icons'
 import { formatAppliedDate } from '@/services/date'
 import { formatSalaryRange } from '@/services/salary'
 import { cn } from '@/lib/utils'
@@ -25,13 +24,18 @@ import type { Job } from '@/types'
 export interface ApplicationsTableProps {
   jobs: Job[]
   /**
-   * Opens the record on THIS screen, in the given mode.
+   * Opens the record on THIS screen.
+   *
+   * ONE MODE, because there is only one now: the record dialog shows and
+   * edits the same surface, so the separate edit dialog -- and the `edit`
+   * button in this table that opened it -- are gone (Gabe, Worktrack
+   * Revisions: "remove the edit button and preserve the danger icon").
    *
    * When it is absent the company cell stays an ordinary link to
    * `/applications/<id>` and the whole row falls back to navigation, which is
-   * what the mobile surface wants and what a no-JS render does anyway.
+   * what a no-JS render does anyway.
    */
-  onOpen?: (job: Job, mode: 'view' | 'edit') => void
+  onOpen?: (job: Job) => void
   onDelete?: (job: Job) => void
   emptyMessage?: string
   id?: string
@@ -75,11 +79,6 @@ export function ApplicationsTable({
   'aria-labelledby': ariaLabelledBy,
 }: ApplicationsTableProps) {
   const appHref = useAppHref()
-  // Read at CLICK time, not at render time. `useIsMobile` reports false until
-  // its effect has run, and a click cannot happen before hydration -- so the
-  // first-render value never reaches a decision, and there is no need to gate
-  // the whole table on a width the server cannot know.
-  const isMobile = useIsMobile()
   if (jobs.length === 0) {
     return (
       <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy}>
@@ -186,10 +185,15 @@ export function ApplicationsTable({
                 <Link
                   href={appHref(`/applications/${job.id}`)}
                   onClick={(e) => {
-                    if (isMobile || !onOpen) return
+                    // AT EVERY WIDTH NOW. This used to fall through to
+                    // navigation on a phone, because `/applications/<id>` was
+                    // the mobile record. The record is a bottom sheet below
+                    // 640 instead, so the same click opens the same surface
+                    // everywhere and that route is a redirect.
+                    if (!onOpen) return
                     if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
                     e.preventDefault()
-                    onOpen(job, 'view')
+                    onOpen(job)
                   }}
                   className="rounded-md hover:text-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
                 >
@@ -215,13 +219,21 @@ export function ApplicationsTable({
               {(onOpen || onDelete) && (
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
+                    {/* VIEW IS A PHONE CONTROL ONLY. On a pointer the company
+                        cell is the affordance and a second one beside delete
+                        is noise; on a stacked card there is no row to click
+                        and the two things you can do to an application are a
+                        pair of thumb targets. `sm:hidden` rather than a
+                        width hook: display:none takes it out of the
+                        accessibility tree too, so a desktop test never finds
+                        two ways to open the same record. */}
                     {onOpen && (
                       <IconButton
-                        aria-label={`Edit ${job.role} at ${job.company}`}
-                        onClick={() => onOpen(job, 'edit')}
-                        className="text-label-caps uppercase"
+                        aria-label={`View ${job.role} at ${job.company}`}
+                        onClick={() => onOpen(job)}
+                        className="sm:hidden"
                       >
-                        edit
+                        <EyeIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('none')}`} />
                       </IconButton>
                     )}
                     {onDelete && (

@@ -117,6 +117,43 @@ describe('the installed component set', () => {
     }
   })
 
+  it('declares the orientation variants the vendored components address', () => {
+    // THE BUG THIS EXISTS FOR, 2026-09-10. Base UI writes `data-orientation`
+    // with a VALUE -- `data-orientation="horizontal"` -- and shadcn's copied
+    // classes address it as `data-horizontal:h-px`. Tailwind v4's bare `data-*`
+    // variant only matches VALUELESS attributes, so those classes emitted no
+    // CSS at all and every `<Separator />` in the app was a zero-height div.
+    // Nothing failed; a hairline just never appeared, in six files, for as
+    // long as the component had existed.
+    //
+    // NOT GENERALISED to every `data-x:` in the tree, and that is deliberate:
+    // the other two dozen (`data-open`, `data-checked`, `data-highlighted`
+    // ...) ARE valueless attributes and work natively, and source alone cannot
+    // tell the two kinds apart -- the attribute is written at runtime. So this
+    // pins the pair that is known to be a value-of-another-attribute alias.
+    //
+    // Grepping the CSS rather than the rendered output because that is where
+    // the declaration has to be: jsdom does not run Tailwind, so a component
+    // test cannot tell a variant that emits nothing from one that does.
+    const css = readFileSync('src/index.css', 'utf8')
+    const used = new Set<string>()
+    for (const file of uiFiles()) {
+      for (const match of read(file).matchAll(/data-(horizontal|vertical):/g)) {
+        used.add(match[1])
+      }
+    }
+    // Guards the guard: if nothing addresses these any more the assertions
+    // below are vacuous, and the variants can go.
+    expect(used.size, 'no component addresses data-horizontal/vertical any more').toBe(2)
+    for (const variant of used) {
+      expect(
+        css,
+        `data-${variant}: is a VALUE of data-orientation, not an attribute — it needs an ` +
+          '@custom-variant in src/index.css or it emits no CSS at all'
+      ).toContain(`@custom-variant data-${variant} `)
+    }
+  })
+
   it('respects the 4px radius cap', () => {
     // Tailwind v4 derives rounded-lg/xl/2xl from --radius-lg/-xl/-2xl, NOT
     // from --radius. Those were never overridden, so rounded-lg resolved to

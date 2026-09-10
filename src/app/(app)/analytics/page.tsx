@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   useTimeInStage,
@@ -12,6 +13,7 @@ import { useJobs } from '@/hooks/useJobs'
 import { Analytics, type MetricState } from '@/components/analytics/Analytics'
 import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
+import { rangeStartDate, type RangeOption } from '@/lib/analyticsRange'
 
 function toState<T>(query: { data?: T; isLoading: boolean; error: unknown }): MetricState<T> {
   return { data: query.data ?? null, isLoading: query.isLoading, error: query.error }
@@ -43,11 +45,18 @@ export default function Page() {
   const { user } = useAuth()
   const userId = user?.id
 
-  const timeInStage = useTimeInStage(userId)
-  const conversionFunnel = useConversionFunnel(userId)
-  const statusTransitions = useStatusTransitions(userId)
-  const cohortAnalysis = useCohortAnalysis(userId)
-  const conversionMetrics = useConversionMetrics(userId)
+  // THE RANGE LIVES HERE, not in `Analytics`, because it is part of every
+  // query key below. Held inside the component it could only ever filter what
+  // had already been fetched -- which is exactly how the picker came to look
+  // dead: it moved one client-side filter and nothing else.
+  const [range, setRange] = React.useState<RangeOption>('all')
+  const since = React.useMemo(() => rangeStartDate(range), [range])
+
+  const timeInStage = useTimeInStage(userId, since)
+  const conversionFunnel = useConversionFunnel(userId, since)
+  const statusTransitions = useStatusTransitions(userId, since)
+  const cohortAnalysis = useCohortAnalysis(userId, since)
+  const conversionMetrics = useConversionMetrics(userId, since)
   // Salary insights derives its distribution from the jobs themselves: no
   // analyticsService method returns one, and the rows already carry
   // salary_min/salary_max/salary_currency. Deliberately outside this route's
@@ -56,7 +65,12 @@ export default function Page() {
 
   const queries = [timeInStage, conversionFunnel, statusTransitions, cohortAnalysis, conversionMetrics]
 
-  if (queries.every((q) => q.isLoading)) {
+  // ONLY ON THE FIRST LOAD. Changing the range gives every query a new key,
+  // so they all report `isLoading` again -- and blanking the whole screen to
+  // a skeleton on every change of the dropdown would be a worse answer than
+  // the dead one. `isFetching` on already-cached panels is left to each
+  // panel's own state.
+  if (queries.every((q) => q.isLoading) && range === 'all') {
     return <RouteSkeleton variant="analytics" />
   }
 
@@ -78,6 +92,8 @@ export default function Page() {
       statusTransitions={toState(statusTransitions)}
       cohortAnalysis={toState(cohortAnalysis)}
       conversionMetrics={toState(conversionMetrics)}
+      range={range}
+      onRangeChange={setRange}
     />
   )
 }

@@ -239,6 +239,18 @@ export function TailoringAnalysisRail({
               // a document, not a panel someone opened to study.
               limit={12}
             />
+            {/* THE OTHER HALF OF THE SPLIT, absent from this rail until
+                2026-09-09. It showed only what the CV lacked -- a list of
+                failures beside a score, with nothing saying which of the
+                posting's terms the CV had already earned. Gabe asked for the
+                matched list "for positive reinforcement".
+
+                Muted and second, the same treatment `AtsPanel` gives it: the
+                missing list is the work, this one is the reassurance, and
+                two lists at equal weight in a 320px rail is a wall. */}
+            {match.matched.length > 0 && (
+              <AtsKeywords label="matched" terms={match.matched} limit={12} muted />
+            )}
           </div>
         )}
       </PanelSection>

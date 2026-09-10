@@ -1,5 +1,5 @@
-import { describe, it, expect, afterEach } from 'vitest'
-import { render, screen, cleanup } from '@testing-library/react'
+import { describe, it, expect, afterEach, vi } from 'vitest'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { Job } from '@/types'
 import { AtsPanel } from '../AtsPanel'
@@ -7,7 +7,7 @@ import { NextEvent } from '../NextEvent'
 import { JobDescription } from '../JobDescription'
 import { ActivityTimeline } from '../ActivityTimeline'
 import { LinkedCv } from '../LinkedCv'
-import { ApplicationRecord } from '../../record/ApplicationRecord'
+import { ApplicationRecordView } from '../../record/ApplicationRecordView'
 import { EMPTY_RECORD_DATA } from '../../record/recordData'
 
 afterEach(() => cleanup())
@@ -198,78 +198,152 @@ describe('LinkedCv', () => {
   })
 })
 
-describe.each(['dialog', 'page'] as const)('ApplicationRecord (%s layout)', (layout) => {
-  // BOTH LAYOUTS, from one table. The whole reason the record is one
-  // component with a layout prop is that the desktop dialog and the mobile
-  // page must not drift; a suite that only ever rendered one of them would
-  // let exactly that happen while staying green.
-
-  it('renders every panel with sensible defaults when there is nothing to show', () => {
-    render(<ApplicationRecord job={JOB} data={EMPTY_RECORD_DATA} layout={layout} />)
-    expect(screen.getByText(/no activity logged for this application yet/i)).toBeTruthy()
-    expect(screen.getByText(/no cv linked/i)).toBeTruthy()
-    expect(screen.getByText(/nothing scheduled/i)).toBeTruthy()
-  })
-
-  it('passes each panel its own error flag without blanking the other panels', () => {
+/**
+ * THE RECORD ITSELF, which replaced `ApplicationRecord` on 2026-09-09.
+ *
+ * WHAT WENT, and why the old table of two layouts went with it. There used to
+ * be two surfaces for one application -- a desktop dialog and a mobile page --
+ * and this suite ran every assertion against both so they could not drift.
+ * There is one now: the dialog is a bottom sheet below 640, so the phone gets
+ * the same component rather than a second edition of it, and `/applications/
+ * [id]` is a redirect into it. One surface needs no layout matrix.
+ *
+ * THE PANELS THIS USED TO ASSERT ON -- activity, next event, linked CV, notes,
+ * contact -- are not on the record any more either. Gabe's revision specified
+ * the record as three columns (basic information, the posting, the ATS match)
+ * and removed notes and contact by name. `ActivityTimeline`, `NextEvent` and
+ * `LinkedCv` still exist and are still covered directly, above.
+ */
+describe('ApplicationRecordView', () => {
+  it('shows the three columns the record is specified to carry', () => {
     render(
-      <ApplicationRecord
+      <ApplicationRecordView
         job={JOB}
-        data={{
-          ...EMPTY_RECORD_DATA,
-          activityError: true,
-          linksError: true,
-          nextEventError: true,
-          atsError: true,
-        }}
-        layout={layout}
+        data={EMPTY_RECORD_DATA}
+        defaultCurrency="PHP"
+        onSubmit={() => {}}
       />
     )
-    expect(screen.getByText(/could not load activity/i)).toBeTruthy()
-    expect(screen.getByText(/could not load the linked cv/i)).toBeTruthy()
-    expect(screen.getByText(/could not load the next event/i)).toBeTruthy()
-    expect(screen.getByText(/could not load your cv/i)).toBeTruthy()
-    // None of the four failures should print the empty-state copy instead.
-    expect(screen.queryByText(/no activity logged/i)).toBeNull()
-    expect(screen.queryByText(/no cv linked/i)).toBeNull()
-    expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
-    expect(screen.queryByText(/see how closely they match/i)).toBeNull()
-    // The fields off the jobs row still render -- a secondary-read failure
-    // never blanks the whole record.
-    expect(screen.getByText('posting url')).toBeTruthy()
+    // Column 1 is fields, not headings -- it is the record's identity, typed
+    // in place -- so it is asserted by its two required labels.
+    expect(screen.getByLabelText('company *')).toBeTruthy()
+    expect(screen.getByLabelText('position *')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'job description' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'ATS match' })).toBeTruthy()
   })
 
-  it('shows every section the record is specified to carry', () => {
-    render(<ApplicationRecord job={JOB} data={EMPTY_RECORD_DATA} layout={layout} />)
-    for (const heading of [
-      'job description',
-      'activity',
-      'next event',
-      'linked CV',
-      'ATS match',
-      'notes',
-    ]) {
-      expect(screen.getByRole('heading', { name: heading })).toBeTruthy()
-    }
-  })
-
-  it('says which fields are unset rather than leaving them blank', () => {
-    // A blank value in a grid reads as something that failed to load. Asserted
-    // on work mode specifically because JOB leaves it null.
-    render(<ApplicationRecord job={JOB} data={EMPTY_RECORD_DATA} layout={layout} />)
-    const workMode = screen.getByText('work mode').closest('div')
-    expect(workMode?.textContent).toMatch(/not set/i)
-  })
-
-  it('holds back only the four secondary panels while their reads are in flight', () => {
-    // The fields off the jobs row came with the list and are shown at once;
-    // blanking them too would make opening a record feel like a page load.
+  it('carries no notes or contact section', () => {
+    // Removed by name in the revision (item 4). The four `contact_*` columns
+    // and `notes` still exist on `jobs` and the CSV importer still writes
+    // them; nothing stored is destroyed, and `toPayload` leaves them out so an
+    // edit here never blanks a value this UI cannot show.
     render(
-      <ApplicationRecord job={JOB} data={{ ...EMPTY_RECORD_DATA, loading: true }} layout={layout} />
+      <ApplicationRecordView
+        job={JOB}
+        data={EMPTY_RECORD_DATA}
+        defaultCurrency="PHP"
+        onSubmit={() => {}}
+      />
     )
-    expect(screen.getByText('posting url')).toBeTruthy()
-    expect(screen.queryByText(/no activity logged/i)).toBeNull()
-    expect(screen.getByText(/loading this application/i)).toBeTruthy()
+    expect(screen.queryByRole('heading', { name: 'notes' })).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'contact' })).toBeNull()
+  })
+
+  it('keeps a failed ATS read distinct from having nothing to compare', () => {
+    render(
+      <ApplicationRecordView
+        job={JOB}
+        data={{ ...EMPTY_RECORD_DATA, atsError: true }}
+        defaultCurrency="PHP"
+        onSubmit={() => {}}
+      />
+    )
+    expect(screen.getByText(/could not load your cv/i)).toBeTruthy()
+    expect(screen.queryByText(/see how closely they match/i)).toBeNull()
+  })
+
+  it('leads with the pipeline bar, and marks the stages already reached', () => {
+    const { container } = render(
+      <ApplicationRecordView
+        job={{ ...JOB, status: 'interviewing' }}
+        data={EMPTY_RECORD_DATA}
+        defaultCurrency="PHP"
+        onSubmit={() => {}}
+      />
+    )
+    const bar = container.querySelector('[data-application-pipeline]')!
+    expect(bar.getAttribute('data-application-pipeline')).toBe('interviewing')
+    const reached = [...bar.querySelectorAll('[data-step]')].map((li) => [
+      li.getAttribute('data-step'),
+      li.getAttribute('data-reached'),
+    ])
+    expect(reached).toEqual([
+      ['wishlist', 'true'],
+      ['applied', 'true'],
+      ['interviewing', 'true'],
+      ['offer', 'false'],
+    ])
+    // AND WHICH ONE YOU ARE AT, which "reached" alone cannot say -- three of
+    // the four are reached. The rule carries it: 3px in the status colour for
+    // the current step, 2px for the ones behind it, 1px grey for the ones
+    // ahead. Before that hierarchy existed the bar answered "how far" and left
+    // "where now" to be inferred from type weights.
+    const current = [...bar.querySelectorAll('[data-step]')].filter(
+      (li) => li.getAttribute('data-current') === 'true'
+    )
+    expect(current).toHaveLength(1)
+    expect(current[0].getAttribute('data-step')).toBe('interviewing')
+    expect(current[0].querySelector('span[aria-hidden]')!.className).toContain('h-[3px]')
+  })
+
+  it('hides the fields this application has never filled in, behind one control', () => {
+    // "Do not display placeholder with NULL value (no input)" -- the old
+    // summary printed nine rows of `not set` / `none` / `no` under a record
+    // that had a salary and a location. They are one click away rather than
+    // gone: a field you cannot reach is a value you can never add.
+    render(
+      <ApplicationRecordView
+        job={JOB}
+        data={EMPTY_RECORD_DATA}
+        defaultCurrency="PHP"
+        onSubmit={() => {}}
+      />
+    )
+    // JOB leaves work_mode null.
+    expect(screen.queryByLabelText('work mode')).toBeNull()
+    expect(screen.queryByText(/not set/i)).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /add more details/i }))
+    expect(screen.getByLabelText('work mode')).toBeTruthy()
+  })
+
+  it('commits through one Save, at the foot of the record', () => {
+    // The header's edit and delete buttons are gone: editing is what this
+    // surface does, and delete is on the row in the table.
+    const onSubmit = vi.fn()
+    render(
+      <ApplicationRecordView
+        job={JOB}
+        data={EMPTY_RECORD_DATA}
+        defaultCurrency="PHP"
+        onSubmit={onSubmit}
+      />
+    )
+    expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
+    // The one `edit` left is the job description's own toggle, which turns
+    // that column back into a field -- not a mode switch over the whole
+    // record. It is identifiable by the `aria-expanded` the old one never had.
+    expect(screen.getByRole('button', { name: /^edit$/i }).getAttribute('aria-expanded')).toBe(
+      'false'
+    )
+    // DISABLED UNTIL SOMETHING CHANGES. An untouched record has nothing to
+    // save, and a live button over a no-op invites the click that teaches you
+    // it was one.
+    const save = screen.getByRole('button', { name: /save application/i })
+    expect(save).toBeDisabled()
+    fireEvent.change(screen.getByLabelText(/^company/), { target: { value: 'Acme Two' } })
+    fireEvent.click(save)
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+    expect(onSubmit.mock.calls[0][0]).toMatchObject({ company: 'Acme Two', role: JOB.role })
   })
 })
 

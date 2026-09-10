@@ -43,14 +43,15 @@ describe('the brand lockup over the hero', () => {
     const bar = renderNav(true)
     const lockup = bar.querySelector('svg')?.parentElement
     expect(lockup).not.toBeNull()
-    // The wordmark.
-    expect(lockup!.className).toContain('text-[#fafafa]')
+    // The wordmark. `ink-50` now, not the raw `#fafafa` literal it replaced
+    // (2026-09-09) -- see Hero.tsx's docblock on the warm ink-* primitive scale.
+    expect(lockup!.className).toContain('text-ink-50')
     // And the three currentColor cells, which need their OWN override:
     // BrandMark declares text-text-primary on its <svg>, so the container's
     // colour never reaches them. Without this the mark is invisible against
     // the hero in the light theme and correct-by-accident in the dark one --
     // which is exactly how it shipped broken the first time.
-    expect(lockup!.className).toContain('[&>svg]:text-[#fafafa]')
+    expect(lockup!.className).toContain('[&>svg]:text-ink-50')
     // The accent cell, which is fill="var(--color-accent-default)". The token
     // is redefined for the subtree rather than the component being forked.
     expect(lockup!.className).toContain('[--color-accent-default:var(--color-accent-400)]')
@@ -61,7 +62,7 @@ describe('the brand lockup over the hero', () => {
     // treatment and is not simply always on, which would break light mode.
     const bar = renderNav(false)
     const lockup = bar.querySelector('svg')?.parentElement
-    expect(lockup!.className).not.toContain('text-[#fafafa]')
+    expect(lockup!.className).not.toContain('text-ink-50')
     expect(lockup!.className).not.toContain('--color-accent-default')
   })
 })

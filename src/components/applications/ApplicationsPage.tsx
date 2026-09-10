@@ -18,11 +18,11 @@ import {
   PaginationPrevious,
 } from '@/components/ui/pagination'
 import { StatusTabs, STATUS_TABS, type StatusTabValue } from './StatusTabs'
-import {
-  ApplicationRecordDialog,
-  type ApplicationRecordDialogProps,
-} from './record/ApplicationRecordDialog'
+import { ApplicationRecordDialog } from './record/ApplicationRecordDialog'
+import { AddApplicationDialog } from './record/AddApplicationDialog'
 import type { ApplicationRecordData } from './record/recordData'
+import type { PostingDigestResult } from './record/digest'
+import { sortJobs, type JobSort } from '@/lib/jobSort'
 import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
 import { useViewportFit } from '@/components/shell/viewportFit'
@@ -37,8 +37,7 @@ interface CsvImport {
 }
 
 /**
- * What the record dialog is showing. `id: null` is a new application, which
- * exists only in `edit` -- there is nothing to view until it is saved.
+ * Which application the record dialog is showing.
  *
  * AN ID, NOT THE ROW. It used to hold the whole `Job`, which made the dialog a
  * SNAPSHOT taken when it opened: saving an edit invalidated the query, fresh
@@ -50,8 +49,12 @@ interface CsvImport {
  * Holding only the id means the row is derived on every render, so any change
  * to `jobs` -- a save here, a refetch, an edit in another tab -- reaches the
  * open dialog without anyone having to remember to push it there.
+ *
+ * NO `mode`. The record shows and edits the same surface now, so there is
+ * nothing to switch between; and a NEW application never appears here at all
+ * -- it goes through `AddApplicationDialog`, which is its own four-step flow.
  */
-type RecordState = { id: string | null; mode: 'view' | 'edit' } | null
+type RecordState = { id: string } | null
 
 /**
  * M5 Task 4's removed pagination was 20 a page. Ten instead: at twenty, an
@@ -119,9 +122,15 @@ export interface ApplicationsPageProps {
    */
   onCreate?: (data: JobFormData, resumeId?: string | null) => Promise<boolean>
   onUpdate?: (id: string, data: JobFormData, resumeId?: string | null) => Promise<boolean>
-  /** Tidies and summarises the pasted description. See ApplicationForm. */
-  onDigest?: ApplicationRecordDialogProps['onDigest']
-  digesting?: boolean
+  /**
+   * Tidies and summarises a fetched posting, inside the add wizard.
+   *
+   * NOT ON THE RECORD any more: the `tidy and summarise` button is gone (Gabe,
+   * 2026-09-10, "the model auto-summarizes the job description"), so the only
+   * caller is `AddApplicationDialog`'s read step -- which is what does the
+   * auto-summarising that sentence refers to.
+   */
+  onDigest?: (text: string) => Promise<PostingDigestResult>
   /** The CVs available to the "CV submitted" field. */
   resumes?: { id: string; title: string }[]
   /** The CV already linked to whichever row is open, if any. */
@@ -159,7 +168,6 @@ export function ApplicationsPage({
   onCreate,
   onUpdate,
   onDigest,
-  digesting,
   resumes = [],
   linkedResumeId = null,
   onDelete,
@@ -183,9 +191,14 @@ export function ApplicationsPage({
   useViewportFit(jobs.length > 0)
 
   const [search, setSearch] = React.useState('')
+  // DEFAULT `applied`, which is the revision's whole point: both tables
+  // ordered by the date the application actually went out, newest first, not
+  // by when the row happened to be typed into Worktrack.
+  const [sort, setSort] = React.useState<JobSort>('applied')
   const [tab, setTab] = React.useState<StatusTabValue>('all')
   const [page, setPage] = React.useState(1)
   const [open, setOpen] = React.useState<RecordState>(null)
+  const [addOpen, setAddOpen] = React.useState(false)
   const [formDirty, setFormDirty] = React.useState(false)
   // `undefined` means the field was never touched, which is different from
   // `null` (explicitly "no CV"). Only the second should unpin an existing link.
@@ -198,10 +211,10 @@ export function ApplicationsPage({
   // DERIVED, never stored. See RecordState for what storing it cost.
   const openJob = open?.id ? (jobs.find((candidate) => candidate.id === open.id) ?? null) : null
 
-  const openRecord = (job: Job | null, mode: 'view' | 'edit') => {
-    setOpen({ id: job?.id ?? null, mode })
-    // Told, not derived. The route runs the record's four reads against this
-    // id, and it can only do that if it is informed the moment the selection
+  const openRecord = (job: Job) => {
+    setOpen({ id: job.id })
+    // Told, not derived. The route runs the record's reads against this id,
+    // and it can only do that if it is informed the moment the selection
     // changes rather than by watching a prop it does not own.
     onOpenJobChange?.(job)
   }
@@ -261,21 +274,19 @@ export function ApplicationsPage({
     const job = jobs.find((candidate) => candidate.id === initialOpenId)
     if (!job) return
     openedInitial.current = initialOpenId
-    setOpen({ id: job.id, mode: 'view' })
+    setOpen({ id: job.id })
     onOpenJobChange?.(job)
     // `jobs` is the only other value read, and it is here so a deep link that
     // arrives before the list has loaded still opens once it has.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialOpenId, jobs])
 
-  // Sorted most-recently-created first. This predates Task 5 and Task 5 does
-  // not change it, but it is worth naming now that a single status renders as
-  // a flat list where order is the only structure left: `created_at` is when
-  // the row was added to Worktrack, which is not the same field as
-  // `date_applied` (when the application itself went out) -- "most recently
-  // applied first" is what a user reading this list would expect, and this
-  // is "most recently added" instead. A date-sort toggle was dropped in M5
-  // and Gabe still wants it back; that is its own task, not folded in here.
+  // ORDERED BY `date_applied`, NEWEST FIRST, by default -- and by company or
+  // position when the toolbar asks. This used to sort on `created_at`, which
+  // is when the ROW was added to Worktrack rather than when the application
+  // went out; the column the table prints is `applied on`, so the two
+  // disagreed on screen. See lib/jobSort for how a wishlist row with no
+  // applied date is placed.
   const searched = React.useMemo(() => {
     const needle = search.trim().toLowerCase()
     const matched = needle
@@ -285,10 +296,8 @@ export function ApplicationsPage({
             job.role.toLowerCase().includes(needle)
         )
       : jobs
-    return matched
-      .slice()
-      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-  }, [jobs, search])
+    return sortJobs(matched, sort)
+  }, [jobs, search, sort])
 
   const counts = React.useMemo(() => {
     const result = Object.fromEntries(
@@ -314,7 +323,7 @@ export function ApplicationsPage({
   // valid for is meaningless afterwards.
   React.useEffect(() => {
     setPage(1)
-  }, [search, tab])
+  }, [search, tab, sort])
 
   // A status tab at zero is a real, expected state (nobody has an offer on
   // day one), not a search yielding nothing -- so it gets its own sentence
@@ -386,37 +395,39 @@ export function ApplicationsPage({
     if (ok !== false) setCsv(null)
   }
 
+  /**
+   * Saving an edit made in the record dialog.
+   *
+   * IT STAYS OPEN. The dialog is the whole record and its own editor, so
+   * closing after a save would throw away the context the edit was made in --
+   * and the row is derived from `jobs`, so the saved values appear as soon as
+   * the refetch lands without anything here pushing them.
+   */
   const submit = async (data: JobFormData) => {
-    // onCreate/onUpdate resolve to false on a caught failure rather than
-    // throwing, so a rejected save leaves the panel open with every typed
-    // field intact instead of discarding them behind a toast.
     const editingJob = openJob
-    const ok = editingJob
-      ? await onUpdate?.(editingJob.id, data, resumeChoice)
-      : await onCreate?.(data, resumeChoice)
-    if (ok === false) return
+    if (!editingJob) return
+    // onUpdate resolves to false on a caught failure rather than throwing, so
+    // a rejected save leaves the record open with every typed field intact
+    // instead of discarding them behind a toast.
+    const ok = await onUpdate?.(editingJob.id, data, resumeChoice)
+    // Returned, not swallowed: the record moves its own baseline on a save
+    // that landed, and must not on one that did not.
+    if (ok === false) return false
     // Consumed. Leaving it set would re-apply the same link to the NEXT row
     // opened in this session, which is a link the person never asked for.
     setResumeChoice(undefined)
-
     setFormDirty(false)
-    if (editingJob) {
-      // An EDIT returns to the record it just changed rather than closing.
-      // The dialog is the whole record now, so shutting it after a save would
-      // throw away the context the edit was made in -- and the saved values
-      // are exactly what the reader wants to check.
-      //
-      // It re-reads `job` from the incoming `jobs` prop rather than keeping
-      // the stale row it opened with: the mutation has already invalidated
-      // that cache, so the fresh row is on its way down through props.
-      // Just the mode. The row itself is derived from `jobs`, so the saved
-      // values appear the moment the refetch lands -- which is the whole
-      // reason this state holds an id rather than a copy of the row.
-      setOpen({ id: editingJob.id, mode: 'view' })
-      return
-    }
-    // A NEW application has no record to fall back to, so it closes.
-    dismiss()
+    return true
+  }
+
+  /** Saving the wizard's new application. It closes; there is nothing behind it. */
+  const submitNew = async (data: JobFormData) => {
+    const ok = await onCreate?.(data, resumeChoice)
+    if (ok === false) return false
+    setResumeChoice(undefined)
+    setFormDirty(false)
+    setAddOpen(false)
+    return true
   }
 
   return (
@@ -430,7 +441,7 @@ export function ApplicationsPage({
         title="applications"
         description="every role you are tracking, from wishlist through to an offer."
         action={
-          <Button size="s" className="max-sm:w-full" onClick={() => openRecord(null, 'edit')}>
+          <Button size="s" className="max-sm:w-full" onClick={() => setAddOpen(true)}>
             <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
             add
           </Button>
@@ -443,29 +454,41 @@ export function ApplicationsPage({
           if (!next) closeRecord()
         }}
         job={openJob}
-        mode={open?.mode ?? 'view'}
-        onModeChange={(mode) => setOpen((prev) => (prev ? { ...prev, mode } : prev))}
         data={record}
         defaultCurrency={defaultCurrency}
         saving={saving}
-        onDigest={onDigest}
-        digesting={digesting}
         resumes={resumes}
         linkedResumeId={linkedResumeId}
         onLinkedResumeChange={setResumeChoice}
         onSubmit={submit}
-        // Cancel on an EXISTING record goes back to viewing it; on a new one
-        // there is nothing behind the form, so it closes. Either way it is
-        // the explicit "abandon this" action and never raises the discard
-        // prompt, exactly as it behaved before the dialog existed.
-        onCancelEdit={() => {
-          setFormDirty(false)
-          if (open?.id) setOpen({ id: open.id, mode: 'view' })
-          else dismiss()
+        onDirtyChange={setFormDirty}
+      />
+
+      <AddApplicationDialog
+        open={addOpen}
+        onOpenChange={(next) => {
+          if (next) {
+            setAddOpen(true)
+            return
+          }
+          // The same discard guard the record gets: a wizard three steps in
+          // holds a model-filled application nobody wants to lose to a stray
+          // Escape.
+          if (formDirty) {
+            setDiscardOpen(true)
+            return
+          }
+          setAddOpen(false)
+          setResumeChoice(undefined)
         }}
-        onDelete={onDelete}
+        defaultCurrency={defaultCurrency}
+        resumes={resumes}
+        saving={saving}
+        onSubmit={submitNew}
+        onLinkedResumeChange={setResumeChoice}
         onAutofill={onAutofill}
         autofilling={autofilling}
+        onDigest={onDigest}
         onDirtyChange={setFormDirty}
       />
 
@@ -478,6 +501,7 @@ export function ApplicationsPage({
         destructive
         onConfirm={() => {
           setDiscardOpen(false)
+          setAddOpen(false)
           dismiss()
         }}
       />
@@ -485,6 +509,8 @@ export function ApplicationsPage({
       <ApplicationsToolbar
         search={search}
         onSearchChange={setSearch}
+        sort={sort}
+        onSortChange={setSort}
         onCsvFile={handleCsvFile}
         onExport={() => downloadCsv('worktrack-applications.csv', buildJobsCsvText(jobs))}
         importBusy={importing || parsingCsv}
@@ -531,7 +557,7 @@ export function ApplicationsPage({
             Add the first one by hand, or import the spreadsheet you have been keeping
             instead. Company and role are the only columns an import needs.
           </p>
-          <Button onClick={() => openRecord(null, 'edit')}>
+          <Button onClick={() => setAddOpen(true)}>
             <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
             add your first application
           </Button>

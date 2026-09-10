@@ -86,7 +86,7 @@ export function HeroMedia({ posterSrc, videoSrc, paused = false }: HeroMediaProp
     // THE colour. Desaturating leaves the footage doing what footage should do
     // here (texture and depth) and leaves orange as the only chroma on the
     // page. It is also why the eyebrow reads at all against it.
-    <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden bg-[#050507]">
+    <div aria-hidden className="absolute inset-0 -z-10 overflow-hidden bg-ink-950">
       {wantsVideo ? (
         <video
           ref={videoRef}
@@ -127,7 +127,7 @@ export function HeroMedia({ posterSrc, videoSrc, paused = false }: HeroMediaProp
       )}
       {/*
         The scrim, transcribed from the frame: a left-to-right gradient from
-        rgba(5,5,7,0.92) through 0.72 at 45% to 0.3. It is what makes the hero
+        ink-950/90 through 0.72 at 45% to 0.3. It is what makes the hero
         dark in BOTH themes, and therefore what forces the navbar's two
         treatments -- see LandingNavbar.
 
@@ -136,7 +136,7 @@ export function HeroMedia({ posterSrc, videoSrc, paused = false }: HeroMediaProp
         horizontal edge against bg-canvas, which at this height reads as two
         stacked blocks rather than one page.
       */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[rgba(5,5,7,0.92)] via-[rgba(5,5,7,0.72)] via-[45%] to-[rgba(5,5,7,0.3)]" />
+      <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/70 via-[45%] to-ink-950/30" />
       <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-bg-canvas" />
     </div>
   )

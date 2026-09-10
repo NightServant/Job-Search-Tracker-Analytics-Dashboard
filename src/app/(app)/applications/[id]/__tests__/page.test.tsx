@@ -1,280 +1,110 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { makeJob } from '@/test/fixtures'
+import { render, screen, cleanup, waitFor } from '@testing-library/react'
 
 /**
- * This route is the MOBILE surface for one application now. On a wide
- * viewport it redirects to the list, which opens the same record in a dialog;
- * on a narrow one it renders the full-screen page, which -- unlike the
- * read-only screen it replaces -- can also edit and delete.
+ * This route stopped being a screen. `ApplicationRecordScreen` -- the
+ * full-width record it used to render on a phone, while desktop got a
+ * redirect to a dialog on the list -- is deleted. `AppDialog` is a bottom
+ * sheet below 640 on its own, so the phone now gets the exact same dialog the
+ * desktop does, and there is nothing left for a route at this address to
+ * render that the list screen does not render better.
  *
- * Every read and write is mocked at the hook module rather than stood up
- * through react-query, AuthProvider and Next's router, the same way the sister
- * route's tests do it.
+ * WHAT THIS ROUTE IS NOW, at every width: `router.replace` to
+ * `/applications?application=<id>`, and a skeleton while that happens. No
+ * `useJob`, no secondary reads, no width check -- the component reads only
+ * `useParams` and `useRouter`, so that is all this suite mocks.
+ *
+ * WHAT USED TO BE HERE, and why it did not migrate rather than shrink:
+ *
+ * - the wide-viewport-redirects / narrow-viewport-renders split, and the two
+ *   tests that ran the transition through the real `useIsMobile` hook --
+ *   removed: there is no width branch left to guard against regressing, the
+ *   route no longer reads viewport at all.
+ * - a breadcrumb back to the list -- removed: there is no screen here to put
+ *   a breadcrumb on.
+ * - a not-found panel for a bad id -- removed: this route never fetches the
+ *   job any more, so it can no longer be the one to notice it is missing.
+ * - a loading skeleton gated on `useJob`'s `isLoading` -- removed along with
+ *   `useJob`: the skeleton below is unconditional now, not a loading state.
+ * - the ATS-match-once-resolved, edit-in-place, and ask-before-delete tests
+ *   -- removed: all of it lived in the record UI that moved into
+ *   `record/ApplicationRecordDialog`, and is covered where that now renders,
+ *   not on a route that no longer renders it.
  */
 const useParamsMock = vi.hoisted(() => vi.fn())
 const replaceMock = vi.hoisted(() => vi.fn())
-const useJobMock = vi.hoisted(() => vi.fn())
-const useActivityMock = vi.hoisted(() => vi.fn())
-const useDocumentLinksMock = vi.hoisted(() => vi.fn())
-const useJobEventsMock = vi.hoisted(() => vi.fn())
-const useCvTextMock = vi.hoisted(() => vi.fn())
-const useIsMobileMock = vi.hoisted(() => vi.fn())
-const updateMutate = vi.hoisted(() => vi.fn())
-const deleteMutate = vi.hoisted(() => vi.fn())
+const pushMock = vi.hoisted(() => vi.fn())
 
 vi.mock('next/navigation', () => ({
   useParams: useParamsMock,
-  useRouter: () => ({ replace: replaceMock, push: vi.fn() }),
-}))
-vi.mock('@/hooks/useJobs', () => ({
-  useJob: useJobMock,
-  useUpdateJob: () => ({ mutateAsync: updateMutate, isPending: false }),
-  useDeleteJob: () => ({ mutateAsync: deleteMutate, isPending: false }),
-  useAutofillJobFromUrl: () => ({ mutateAsync: vi.fn(), isPending: false }),
-}))
-vi.mock('@/hooks/useActivity', () => ({ useActivity: useActivityMock }))
-vi.mock('@/hooks/useDocumentLinks', () => ({ useDocumentLinks: useDocumentLinksMock }))
-vi.mock('@/hooks/useJobEvents', () => ({ useJobEvents: useJobEventsMock }))
-vi.mock('@/hooks/useCvText', () => ({ useCvText: useCvTextMock }))
-vi.mock('@/hooks/use-mobile', () => ({ useIsMobile: useIsMobileMock }))
-vi.mock('@/hooks/useUserPreferences', () => ({
-  useUserPreferences: () => ({ data: null, isLoading: false, error: null }),
-}))
-vi.mock('@/contexts/ToastContext', () => ({
-  useToast: () => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }),
+  useRouter: () => ({ replace: replaceMock, push: pushMock }),
 }))
 
 import Page from '../page'
-
-const JOB = makeJob({ id: 'job-1', company: 'Acme', role: 'Staff Engineer', status: 'applied' })
-
-/** The settled, empty version of the four secondary reads. */
-function settleReads() {
-  useActivityMock.mockReturnValue({ data: [], isLoading: false, error: null })
-  useDocumentLinksMock.mockReturnValue({ data: [], isLoading: false, error: null })
-  useJobEventsMock.mockReturnValue({ data: [], isLoading: false, error: null })
-  useCvTextMock.mockReturnValue({ data: undefined, isLoading: false, error: null })
-}
+import DemoPage from '@/app/demo/applications/[id]/page'
 
 beforeEach(() => {
   vi.clearAllMocks()
   useParamsMock.mockReturnValue({ id: 'job-1' })
-  useIsMobileMock.mockReturnValue(true)
-  useJobMock.mockReturnValue({ data: JOB, isLoading: false, error: null })
-  settleReads()
-  updateMutate.mockResolvedValue(undefined)
-  deleteMutate.mockResolvedValue(undefined)
 })
 
 afterEach(() => cleanup())
 
-describe('the application record route, on a wide viewport', () => {
-  it('redirects to the list carrying the id, rather than rendering a second detail screen', async () => {
-    // The desktop detail page is gone. Every link that used to point at one
-    // -- the dashboard's recent table, the follow-up nudge, the applications
-    // table's company cell -- lands in the list's dialog instead, without any
-    // of them having to know that.
-    useIsMobileMock.mockReturnValue(false)
+describe('the application record route', () => {
+  it('replaces to the list, carrying the id as `?application=<id>`', async () => {
     render(<Page />)
-
     await waitFor(() =>
       expect(replaceMock).toHaveBeenCalledWith('/applications?application=job-1')
     )
-    expect(screen.queryByRole('heading', { name: 'Staff Engineer' })).toBeNull()
   })
 
   it('replaces rather than pushes, so Back does not bounce through this route', async () => {
-    useIsMobileMock.mockReturnValue(false)
     render(<Page />)
-    await waitFor(() => expect(replaceMock).toHaveBeenCalled())
-    // A push would leave this route in the history stack, and going Back from
-    // the list would land on it and be redirected forward again.
-    expect(replaceMock).toHaveBeenCalledTimes(1)
-  })
-})
-
-describe('deciding which surface to show, with the real width hook', () => {
-  // THE ONE TEST THAT DOES NOT STUB `useIsMobile`, and the only kind that
-  // could have caught what it is guarding.
-  //
-  // The real hook reports `false` until its own effect has measured the
-  // window -- it cannot know a viewport during render, and the server has
-  // none. Every other test here pins it to a constant, so none of them ever
-  // ran the false-then-true transition, and the first version of this route
-  // sent EVERY PHONE to the desktop surface: a second piece of state fed by
-  // an effect keyed on `isMobile` still held the stale `false` on the commit
-  // where the hook corrected itself, and the redirect fired on it.
-  //
-  // Found by loading the page at 375px, not by the suite. This is the suite
-  // catching up.
-  const originalWidth = window.innerWidth
-
-  afterEach(() => {
-    window.innerWidth = originalWidth
+    await waitFor(() => expect(replaceMock).toHaveBeenCalledTimes(1))
+    // A push would leave this route in the history stack, and going Back
+    // from the list would land on it and be redirected forward again.
+    expect(pushMock).not.toHaveBeenCalled()
   })
 
-  it('renders the page and never redirects, on a narrow window', async () => {
-    const actual = await vi.importActual<typeof import('@/hooks/use-mobile')>(
-      '@/hooks/use-mobile'
+  it('encodes the id into the query string', async () => {
+    // Not load-bearing for `job-1`, but the id is a free-text value someone
+    // could have typed into a URL bar, and `?application=` is built with
+    // string interpolation right next to it.
+    useParamsMock.mockReturnValue({ id: 'a b/c' })
+    render(<Page />)
+    await waitFor(() =>
+      expect(replaceMock).toHaveBeenCalledWith(
+        `/applications?application=${encodeURIComponent('a b/c')}`
+      )
     )
-    useIsMobileMock.mockImplementation(actual.useIsMobile)
-    window.innerWidth = 375
+  })
 
+  it('does not redirect before an id is available', () => {
+    // `useParams` can report an empty id for a moment before Next resolves
+    // the route; redirecting to `?application=` with nothing after the `=`
+    // would open the list on a param that names no application.
+    useParamsMock.mockReturnValue({ id: undefined })
     render(<Page />)
-
-    expect(await screen.findByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
-    // Not "not yet" -- never. A redirect that fires and is then corrected has
-    // already changed the URL and lost the surface.
     expect(replaceMock).not.toHaveBeenCalled()
   })
 
-  it('still redirects on a wide window, with the same real hook', async () => {
-    // The companion. Without it, "never redirects" would also pass if the
-    // redirect were deleted outright.
-    const actual = await vi.importActual<typeof import('@/hooks/use-mobile')>(
-      '@/hooks/use-mobile'
-    )
-    useIsMobileMock.mockImplementation(actual.useIsMobile)
-    window.innerWidth = 1280
-
+  it('renders only the redirect skeleton -- there is no record left to show here', async () => {
     render(<Page />)
-
-    await waitFor(() =>
-      expect(replaceMock).toHaveBeenCalledWith('/applications?application=job-1')
-    )
+    // `findBy`, not `getBy`: the skeleton sits behind a 200ms gate (see
+    // ui/loading-skeletons) so a warm navigation never flashes it for one
+    // frame, which means nothing is in the DOM at t=0 by design.
+    expect(await screen.findByRole('status')).toHaveAttribute('data-route-skeleton', 'detail')
+    expect(screen.queryByRole('heading')).toBeNull()
+    expect(screen.queryByRole('dialog')).toBeNull()
   })
 })
 
-describe('the application record route, on a phone', () => {
-  it('renders the full-screen record rather than redirecting', async () => {
-    render(<Page />)
-    expect(await screen.findByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
-    expect(screen.getByText('Acme')).toBeTruthy()
-    expect(replaceMock).not.toHaveBeenCalled()
-  })
-
-  it('offers a way back to the list, which a modal would have taken away', async () => {
-    // A BREADCRUMB SINCE 2026-09-05, not a "< applications" link, so the
-    // accessible name is the crumb's own word rather than a sentence. The
-    // trail is scoped so this cannot match the not-found panel's button
-    // below, which is a different control saying a different thing.
-    render(<Page />)
-    const trail = await screen.findByRole('navigation', { name: /breadcrumb/i })
-    expect(within(trail).getByRole('link', { name: 'applications' })).toHaveAttribute(
-      'href',
-      '/applications'
-    )
-    expect(within(trail).getByText('Staff Engineer')).toHaveAttribute('aria-current', 'page')
-  })
-
-  it('shows a not-found panel instead of a broken shell when the job errors', async () => {
-    // A bad id and someone else's job are indistinguishable at the query --
-    // RLS made them so -- and neither is fixed by reloading, so the recovery
-    // offered is the list, not a retry.
-    useJobMock.mockReturnValue({ data: undefined, isLoading: false, error: new Error('Not found') })
-    render(<Page />)
-    expect(await screen.findByText(/could not find that application/i)).toBeTruthy()
-    expect(screen.getByRole('link', { name: /back to applications/i })).toBeTruthy()
-  })
-
-  it('shows a route skeleton while the job itself is loading', async () => {
-    useJobMock.mockReturnValue({ data: undefined, isLoading: true, error: null })
-    render(<Page />)
-    // `findBy`, not `queryBy`: the route skeleton sits behind a 200ms gate
-    // (see ui/loading-skeletons) so a warm navigation never flashes a fake
-    // page for one frame. Nothing is in the DOM at t=0 BY DESIGN, and an
-    // immediate assertion was testing the absence of that gate.
-    expect(await screen.findByRole('status')).toBeTruthy()
-  })
-
-  it('never flashes a panel empty state while its read is still in flight', async () => {
-    // Five independent network reads. The header and the fields come off the
-    // jobs row and show at once; only the four panels wait, and while they
-    // wait they must not print the copy that means "there is nothing here".
-    useActivityMock.mockReturnValue({ data: [], isLoading: true, error: null })
-    render(<Page />)
-
-    expect(await screen.findByRole('heading', { name: 'Staff Engineer' })).toBeTruthy()
-    expect(screen.queryByText(/no activity logged/i)).toBeNull()
-    expect(screen.queryByText(/nothing scheduled/i)).toBeNull()
-  })
-
-  it('marks one failed read as failed without claiming the others are empty', async () => {
-    useActivityMock.mockReturnValue({ data: [], isLoading: false, error: new Error('boom') })
-    render(<Page />)
-
-    expect(await screen.findByText(/could not load activity/i)).toBeTruthy()
-    expect(screen.queryByText(/no activity logged/i)).toBeNull()
-    // The other three read fine and still say so.
-    expect(screen.getByText(/nothing scheduled/i)).toBeTruthy()
-    expect(screen.getByText(/no cv linked/i)).toBeTruthy()
-  })
-
-  it('scores the CV against the posting once both have resolved', async () => {
-    useJobMock.mockReturnValue({
-      data: { ...JOB, description: 'We need React and Postgres experience.' },
-      isLoading: false,
-      error: null,
-    })
-    useDocumentLinksMock.mockReturnValue({
-      data: [{ resume_id: 'cv-1', sent_at: '2026-01-01T00:00:00.000Z' }],
-      isLoading: false,
-      error: null,
-    })
-    useCvTextMock.mockReturnValue({
-      data: 'React developer with Postgres experience.',
-      isLoading: false,
-      error: null,
-    })
-    render(<Page />)
-
-    // A real percentage, not the "nothing to score" copy.
-    //
-    // Matched against the panel's TEXT summary rather than the ring: the ring
-    // draws its number as an SVG tspan, which is not text a reader -- or a
-    // screen reader -- can pick up. The summary exists for exactly that.
-    expect(await screen.findByText(/\d+% match\./)).toBeTruthy()
-    expect(screen.queryByText(/see how closely they match/i)).toBeNull()
-  })
-
-  it('edits in place instead of sending the reader back to the list', async () => {
-    // The old screen's `edit` was a link to /applications, so fixing a typo
-    // took three navigations. It is a mode switch on this screen now, and it
-    // saves through the same useUpdateJob mutation the list screen uses.
-    const user = userEvent.setup({ delay: null })
-    render(<Page />)
-
-    await user.click(await screen.findByRole('button', { name: 'edit' }))
-    expect(screen.getByLabelText(/^company/)).toHaveValue('Acme')
-
-    await user.clear(screen.getByLabelText(/^company/))
-    await user.type(screen.getByLabelText(/^company/), 'Initech')
-    await user.click(screen.getByRole('button', { name: /save application/i }))
-
-    await waitFor(() => expect(updateMutate).toHaveBeenCalledTimes(1))
-    expect(updateMutate.mock.calls[0][0]).toMatchObject({
-      id: 'job-1',
-      data: expect.objectContaining({ company: 'Initech' }),
-    })
-    // Back to reading it, not out of the screen.
+describe('the demo route, same redirect', () => {
+  it('replaces to the demo list, carrying the id the same way', async () => {
+    render(<DemoPage />)
     await waitFor(() =>
-      expect(screen.queryByRole('button', { name: /save application/i })).toBeNull()
+      expect(replaceMock).toHaveBeenCalledWith('/demo/applications?application=job-1')
     )
-  })
-
-  it('asks before deleting, and leaves the screen only once the delete resolves', async () => {
-    const user = userEvent.setup({ delay: null })
-    render(<Page />)
-
-    await user.click(await screen.findByRole('button', { name: /delete staff engineer at acme/i }))
-    expect(screen.getByText(/cannot be undone/i)).toBeTruthy()
-    expect(deleteMutate).not.toHaveBeenCalled()
-
-    await user.click(screen.getByRole('button', { name: /^delete$/i }))
-    await waitFor(() => expect(deleteMutate).toHaveBeenCalledWith('job-1'))
-    // The record it was showing no longer exists, so the screen cannot stay.
-    await waitFor(() => expect(replaceMock).toHaveBeenCalledWith('/applications'))
+    expect(pushMock).not.toHaveBeenCalled()
   })
 })

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { ApplicationForm } from '../ApplicationForm'
-import { LinkedApplications } from '@/components/cv/LinkedApplications'
+import { ApplicationRecordView } from '../record/ApplicationRecordView'
 import { resolveDefaultCurrency } from '@/services/userPreferences'
 
 vi.mock('next/navigation', () => ({
@@ -27,7 +26,7 @@ const RESUMES = [
  */
 describe('the "CV submitted" field on an application', () => {
   it('offers every CV the user has written', async () => {
-    render(<ApplicationForm defaultCurrency={CURRENCY} resumes={RESUMES} />)
+    render(<ApplicationRecordView job={null} onSubmit={vi.fn()} defaultCurrency={CURRENCY} resumes={RESUMES} />)
     await userEvent.click(screen.getByLabelText(/cv submitted/i))
     expect(await screen.findByRole('option', { name: 'frontend cv' })).toBeTruthy()
     expect(screen.getByRole('option', { name: 'backend cv' })).toBeTruthy()
@@ -38,7 +37,9 @@ describe('the "CV submitted" field on an application', () => {
     // job id that does not exist yet when creating one.
     const onLinkedResumeChange = vi.fn()
     render(
-      <ApplicationForm
+      <ApplicationRecordView
+        job={null}
+        onSubmit={vi.fn()}
         defaultCurrency={CURRENCY}
         resumes={RESUMES}
         onLinkedResumeChange={onLinkedResumeChange}
@@ -54,7 +55,9 @@ describe('the "CV submitted" field on an application', () => {
     // alone". An empty string would be neither.
     const onLinkedResumeChange = vi.fn()
     render(
-      <ApplicationForm
+      <ApplicationRecordView
+        job={null}
+        onSubmit={vi.fn()}
         defaultCurrency={CURRENCY}
         resumes={RESUMES}
         linkedResumeId="r1"
@@ -68,14 +71,27 @@ describe('the "CV submitted" field on an application', () => {
 
   it('starts on the CV already linked to this application', () => {
     render(
-      <ApplicationForm defaultCurrency={CURRENCY} resumes={RESUMES} linkedResumeId="r2" />
+      <ApplicationRecordView
+        job={null}
+        onSubmit={vi.fn()}
+        defaultCurrency={CURRENCY}
+        resumes={RESUMES}
+        linkedResumeId="r2"
+      />
     )
     expect(screen.getByLabelText(/cv submitted/i)).toHaveTextContent('backend cv')
   })
 
   it('says so, rather than offering an empty dropdown, before any CV exists', () => {
     // Somebody tracking their first application has not written a CV yet.
-    render(<ApplicationForm defaultCurrency={CURRENCY} resumes={[]} />)
+    render(
+      <ApplicationRecordView
+        job={null}
+        onSubmit={vi.fn()}
+        defaultCurrency={CURRENCY}
+        resumes={[]}
+      />
+    )
     const field = screen.getByLabelText(/cv submitted/i)
     expect(field).toBeDisabled()
     // Deliberately said twice: once as the field's hint, once as the only
@@ -88,7 +104,8 @@ describe('the "CV submitted" field on an application', () => {
     // straight into jobService.createJob.
     const onSubmit = vi.fn()
     render(
-      <ApplicationForm
+      <ApplicationRecordView
+        job={null}
         defaultCurrency={CURRENCY}
         resumes={RESUMES}
         onSubmit={onSubmit}
@@ -96,54 +113,27 @@ describe('the "CV submitted" field on an application', () => {
       />
     )
     await userEvent.type(screen.getByLabelText(/^company/i), 'Acme')
-    await userEvent.type(screen.getByLabelText(/^role/i), 'Engineer')
+    await userEvent.type(screen.getByLabelText(/^position/i), 'Engineer')
     await userEvent.click(screen.getByLabelText(/cv submitted/i))
     await userEvent.click(await screen.findByRole('option', { name: 'frontend cv' }))
-    await userEvent.click(screen.getByRole('button', { name: /save|add/i }))
+    // The record's one commit, named exactly: `add more details` in the first
+    // column also matches a loose /save|add/.
+    await userEvent.click(screen.getByRole('button', { name: /save application/i }))
 
     expect(onSubmit).toHaveBeenCalled()
     expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('resume_id')
   })
 })
 
-describe('the applications dropdown in the document editor', () => {
-  const LINKS = [
-    { job_id: 'j1', company: 'Acme', role: 'Engineer', status: 'applied', sent_at: '2026-09-01' },
-    { job_id: 'j2', company: 'Globex', role: 'Developer', status: 'interviewing', sent_at: '2026-08-20' },
-  ]
-
-  it('counts the applications this CV went to', () => {
-    render(<LinkedApplications links={LINKS} />)
-    expect(screen.getByText('sent to 2 applications')).toBeTruthy()
-  })
-
-  it('uses the singular for one', () => {
-    render(<LinkedApplications links={[LINKS[0]]} />)
-    expect(screen.getByText('sent to 1 application')).toBeTruthy()
-  })
-
-  it('links each entry to its application record', async () => {
-    render(<LinkedApplications links={LINKS} />)
-    await userEvent.click(screen.getByRole('button', { name: /applications this CV was sent to/i }))
-    // Queried through the text and its anchor: Base UI sets role="menuitem"
-    // on the element it renders, which overrides the <a>'s implicit link role.
-    const entry = await screen.findByText(/Engineer · Acme/)
-    expect(entry.closest('a')).toHaveAttribute('href', '/applications/j1')
-  })
-
-  it('stays inside /demo when the demo renders it', async () => {
-    render(<LinkedApplications links={LINKS} basePath="/demo/applications" />)
-    await userEvent.click(screen.getByRole('button', { name: /applications this CV was sent to/i }))
-    const entry = await screen.findByText(/Engineer · Acme/)
-    expect(entry.closest('a')).toHaveAttribute('href', '/demo/applications/j1')
-  })
-
-  it('says where the link is made when there are none', async () => {
-    // Not an empty menu: the control that creates the link is on another
-    // screen entirely, so the empty state has to name it.
-    render(<LinkedApplications links={[]} />)
-    expect(screen.getByText('not sent yet')).toBeTruthy()
-    await userEvent.click(screen.getByRole('button', { name: /has not been sent/i }))
-    expect(await screen.findByText(/record it in an application/i)).toBeTruthy()
-  })
-})
+/**
+ * THE `sent to N applications` DROPDOWN WAS TESTED HERE, and it is gone
+ * (Gabe, Worktrack Revisions item 6). It listed every application a CV had
+ * been pinned to, which on an account that pins one CV to everything is a
+ * dropdown of every job in the tracker sitting in the editor's toolbar --
+ * "it displays all the job positions".
+ *
+ * The relationship is still readable from the other end, on the record's `cv
+ * submitted` field above, which is where somebody asks the question that way
+ * round. `LinkedApplications` and `useResumeLinks` still exist and are
+ * deliberately unused.
+ */
