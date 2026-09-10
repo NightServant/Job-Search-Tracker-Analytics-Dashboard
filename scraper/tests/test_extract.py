@@ -660,3 +660,118 @@ def test_the_upstream_error_text_survives_into_the_reason(monkeypatch):
     # site is not supported" reads very differently from "quota exceeded".
     _, reason = _fetch(monkeypatch, status=403, body={"error": "domain not supported"})
     assert "domain not supported" in reason
+
+
+# --- Apify's profile rows, the source that actually gets a page -------------
+
+from extractor.apify_profile import profile_from_apify  # noqa: E402
+
+ROW = {
+    "name": "Satya Nadella",
+    "headline": "Chairman and CEO at Microsoft",
+    "location": "Redmond, Washington",
+    "summary": "As chairman and CEO of Microsoft, I define my mission...",
+    "profileUrl": "https://www.linkedin.com/in/satyanadella",
+    "profilePicture": "https://media.licdn.com/dms/image/x",
+    "currentCompany": {"name": "Microsoft", "industry": "Software Development"},
+    "currentPositions": [
+        {
+            "company": "Microsoft",
+            "title": "Chairman and CEO",
+            "startDate": "2014",
+            "location": "Redmond",
+            "description": "Define the mission.\nShip the software.",
+        }
+    ],
+    "pastPositions": [
+        {"company": "Sun Microsystems", "title": "Engineer", "startDate": "1990", "endDate": "1992"}
+    ],
+    "education": [
+        {"school": "University of Chicago", "degree": "MBA", "fieldOfStudy": "Business", "startDate": "1994", "endDate": "1996"}
+    ],
+    "certifications": [{"name": "Some Cert", "issuer": "An Authority", "issueDate": "Mar 2020"}],
+    "projects": [{"title": "A project", "description": "What it did", "url": "https://example.dev"}],
+    "websites": [{"label": "Portfolio", "url": "https://example.dev"}, "https://second.example"],
+}
+
+
+def test_an_apify_row_maps_onto_the_profile_the_app_stores():
+    out = profile_from_apify(ROW, "satyanadella")
+    p = out["profile"]
+    assert p["name"] == "Satya Nadella"
+    assert p["headline"] == "Chairman and CEO at Microsoft"
+    assert p["location"] == "Redmond, Washington"
+    assert p["pictureUrl"] == "https://media.licdn.com/dms/image/x"
+    assert p["url"] == "https://www.linkedin.com/in/satyanadella"
+    # `industry` is the one field worth taking off the company object.
+    assert p["industry"] == "Software Development"
+    assert p["websites"] == ["https://example.dev", "https://second.example"]
+
+
+def test_current_roles_come_before_past_ones():
+    # A CV reads most-recent-first, and the actor hands these back as two
+    # lists precisely because it knows which is which -- concatenating in
+    # whatever order they arrived would throw that away.
+    roles = profile_from_apify(ROW, "x")["profile"]["experiences"]
+    assert [r["company"] for r in roles] == ["Microsoft", "Sun Microsystems"]
+    assert roles[0]["period"] == "2014 – Present"
+    assert roles[1]["period"] == "1990 – 1992"
+    # THE FIELD THE IMPORT EXISTS FOR. The JSON-LD route never carried it.
+    assert roles[0]["description"] == "Define the mission.\nShip the software."
+
+
+def test_a_degree_and_its_field_read_as_one_line():
+    edu = profile_from_apify(ROW, "x")["profile"]["education"][0]
+    assert edu == {"school": "University of Chicago", "degree": "MBA, Business", "period": "1994 – 1996"}
+
+
+def test_certifications_and_projects_survive():
+    p = profile_from_apify(ROW, "x")["profile"]
+    assert p["certifications"] == [
+        {"name": "Some Cert", "authority": "An Authority", "period": "Mar 2020"}
+    ]
+    assert p["projects"] == [
+        {"title": "A project", "description": "What it did", "url": "https://example.dev"}
+    ]
+
+
+def test_what_a_signed_out_profile_cannot_carry_is_said_out_loud():
+    # LinkedIn does not publish skills or languages to a guest, so no scraper
+    # of one can return them. A profile that imports with an empty skills list
+    # looks like a broken import rather than a limit of the source.
+    out = profile_from_apify(ROW, "x")
+    assert out["profile"]["skills"] == []
+    assert out["profile"]["languages"] == []
+    assert any("Skills and languages" in w for w in out["warnings"])
+
+
+def test_a_row_with_nothing_in_it_does_not_raise():
+    # The actor omits a field entirely rather than returning null, so every
+    # read has to tolerate absence -- a crash here loses the whole import.
+    out = profile_from_apify({}, "https://www.linkedin.com/in/nobody")
+    assert out["profile"]["name"] is None
+    assert out["profile"]["experiences"] == []
+    assert out["profile"]["url"] == "https://www.linkedin.com/in/nobody"
+    assert any("No work history" in w for w in out["warnings"])
+
+
+def test_redacted_role_detail_is_reported_rather_than_left_to_be_noticed():
+    row = {"currentPositions": [{"company": "Acme", "title": "Engineer"}]}
+    out = profile_from_apify(row, "x")
+    assert any("redacted the detail" in w for w in out["warnings"])
+
+
+def test_the_bullet_text_under_a_role_keeps_its_line_breaks():
+    # `_clean` collapses newlines, which is right for a name and wrong here:
+    # it turned four bullets into one run-on sentence and destroyed the only
+    # structure the field has. The app renders this `whitespace-pre-wrap`.
+    row = {
+        "summary": "First paragraph.\n\n\nSecond paragraph.",
+        "currentPositions": [
+            {"company": "Acme", "title": "Engineer", "description": "  Did a thing.  \n\n  Did another.  "}
+        ],
+    }
+    out = profile_from_apify(row, "x")["profile"]
+    assert out["experiences"][0]["description"] == "Did a thing.\n\nDid another."
+    # Runs of blank lines collapse to one, so a scrape does not arrive ragged.
+    assert out["summary"] == "First paragraph.\n\nSecond paragraph."

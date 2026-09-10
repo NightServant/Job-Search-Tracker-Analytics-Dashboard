@@ -30,6 +30,7 @@ from extractor.challenge import (
 )
 from extractor.core import extract
 from extractor.net import normalize_target_url, reject_reason
+from extractor.apify_profile import profile_from_apify
 from extractor.profile import extract_profile
 
 REQUEST_TIMEOUT_S = 12.0
@@ -54,6 +55,27 @@ RENDER_TIMEOUT_MS = 45_000
 #: article body without the `<head>` -- and `<head>` is where the JSON-LD
 #: JobPosting lives, which is the single best source this parser has. Asking
 #: for "the main content" would quietly throw away the good half.
+#: Apify: the profile route that actually gets a page.
+#:
+#: FIRECRAWL COULD NOT DO THIS ONE. It is a fetcher, and LinkedIn answers a
+#: signed-out profile request with an anti-bot challenge rather than a page --
+#: so the JSON-LD parser in `extractor/profile.py` had nothing to parse (Gabe's
+#: first real test, 2026-09-10). This actor solves the challenge server-side
+#: and returns structured JSON.
+#:
+#: `run-sync-get-dataset-items` runs the actor and returns the rows in one
+#: call, which is right for one profile and wrong for a hundred. Per-profile
+#: latency is 30-90s of real challenge-solving, so the timeout is generous.
+#:
+#: MEMORY IS PINNED, and it is a cost decision rather than a performance one.
+#: The actor bills $0.50 per GIGABYTE at start (minimum one event), and its own
+#: default is 4096MB -- so an unpinned run is $2.00 to read one profile. At
+#: 1024MB it is $0.50 plus $0.01 for the result.
+APIFY_PROFILE_ACTOR = "crawlerbros~linkedin-profile-scraper"
+APIFY_ENDPOINT = "https://api.apify.com/v2/acts/{actor}/run-sync-get-dataset-items"
+APIFY_TIMEOUT_S = 180.0
+APIFY_MEMORY_MB = 1024
+
 FIRECRAWL_ENDPOINT = "https://api.firecrawl.dev/v2/scrape"
 FIRECRAWL_TIMEOUT_S = 60.0
 MAX_HTML_BYTES = 2_000_000
@@ -296,34 +318,154 @@ def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _apify_message(reason: str) -> str:
+    """One sentence per thing the reader can actually do about it."""
+    if reason.startswith("http-401") or reason.startswith("http-403"):
+        return "The profile reader rejected our credentials."
+    if reason.startswith("http-402"):
+        return "The profile reader's credit is used up."
+    if reason.startswith("http-429"):
+        return "The profile reader is rate limiting us. Try again in a minute."
+    return {
+        "no-token": "Profile import is not configured for this deployment.",
+        "timeout": "That profile took too long to read. Try again.",
+        "unreachable": "Could not reach the profile reader. Try again shortly.",
+        "no-rows": (
+            "The reader could not open that profile. Check the address is a "
+            "public LinkedIn profile — a private one cannot be read."
+        ),
+        "empty-row": "That profile came back empty.",
+        "unreadable-response": "The profile reader returned something unexpected.",
+    }.get(reason, "Could not read that profile page.")
+
+
+async def _apify_profile(url: str) -> tuple[dict[str, Any] | None, str]:
+    """One profile through the Apify actor. Returns `(row, reason)`.
+
+    The reason is the same contract as `_firecrawl_fetch`'s, and for the same
+    reason: this endpoint has no fallback worth the name, so why it failed IS
+    the answer the user gets. An exhausted credit balance, a rejected token and
+    a profile the actor could not read are three different things to do.
+    """
+    token = os.environ.get("APIFY_TOKEN", "").strip()
+    if not token:
+        return None, "no-token"
+
+    actor = os.environ.get("APIFY_PROFILE_ACTOR", "").strip() or APIFY_PROFILE_ACTOR
+    endpoint = APIFY_ENDPOINT.format(actor=actor)
+    try:
+        async with httpx.AsyncClient(timeout=APIFY_TIMEOUT_S) as client:
+            response = await client.post(
+                endpoint,
+                headers={"Authorization": f"Bearer {token}"},
+                params={"memory": APIFY_MEMORY_MB, "timeout": int(APIFY_TIMEOUT_S)},
+                json={
+                    "profileUrls": [url],
+                    # OFF. It fetches the current employer's own company page
+                    # for headcount and industry -- 30-90 seconds more, for
+                    # facts a CV does not carry. `industry` is the only one
+                    # mapped, and it is not worth doubling the wait.
+                    "enrichCompany": False,
+                },
+            )
+    except httpx.TimeoutException:
+        return None, "timeout"
+    except Exception:
+        return None, "unreachable"
+
+    if response.status_code not in (200, 201):
+        detail = ""
+        try:
+            body = response.json()
+            if isinstance(body, dict):
+                error = body.get("error")
+                if isinstance(error, dict):
+                    detail = str(error.get("message") or "")[:200]
+                else:
+                    detail = str(error or body.get("message") or "")[:200]
+        except Exception:
+            detail = response.text[:200]
+        return None, f"http-{response.status_code}" + (f": {detail}" if detail else "")
+
+    try:
+        rows = response.json()
+    except Exception:
+        return None, "unreadable-response"
+    if not isinstance(rows, list) or not rows:
+        # The actor ran and found nothing. A private profile, a handle that
+        # does not exist, or a challenge it could not get past.
+        return None, "no-rows"
+    row = rows[0]
+    if not isinstance(row, dict) or not row:
+        return None, "empty-row"
+    return row, "ok"
+
+
 @app.post("/profile")
 async def profile_endpoint(body: ProfileRequest) -> JSONResponse:
-    """A public LinkedIn profile, read through Firecrawl.
+    """A public LinkedIn profile, read through Apify, then Firecrawl.
 
-    FIRECRAWL IS THE ONLY ROUTE HERE, unlike `/extract` which tries an ordinary
-    fetch first. A plain GET of a LinkedIn profile from a datacenter address
-    gets an authentication wall or a 999, every time -- so the ordinary attempt
-    would be a guaranteed round trip to a page that cannot be parsed, and
-    falling back to a local headless browser would work on a laptop and never
-    in a deployment. One route that works, or a message saying why not.
+    NO ORDINARY FETCH, unlike `/extract`. A plain GET of a LinkedIn profile
+    from a datacenter address gets an authentication wall or a 999, every time
+    -- so the ordinary attempt would be a guaranteed round trip to a page that
+    cannot be parsed, and a local headless browser would work on a laptop and
+    never in a deployment.
 
-    The same SSRF gate as every other fetch in this service, and the landed URL
-    is re-checked because a hosted fetcher follows redirects on our behalf.
+    APIFY FIRST SINCE 2026-09-10. Firecrawl shipped as the only route and did
+    not get a page on the first real test: it is a fetcher, and what LinkedIn
+    serves a signed-out visitor is an anti-bot challenge. The Apify actor
+    solves that server-side and returns structured JSON, which is also richer
+    than the JSON-LD -- certifications, projects, websites, and the bullet text
+    under each role that the whole import exists for.
+
+    Firecrawl stays behind it rather than being deleted. It costs a fraction as
+    much, it is already configured, and on a profile it CAN read it produces
+    the same fields -- so when the Apify credit runs out this is the difference
+    between a partial import and none.
+
+    The same SSRF gate as every other fetch in this service, and Firecrawl's
+    landed URL is re-checked because a hosted fetcher follows redirects on our
+    behalf.
     """
     url = normalize_target_url(body.url)
     reason = reject_reason(url)
     if reason:
         return JSONResponse({"error": reason}, status_code=400)
 
-    if not os.environ.get("FIRECRAWL_API_KEY", "").strip():
-        # 503, not 500: the deployment is missing a key, which is a
+    has_apify = bool(os.environ.get("APIFY_TOKEN", "").strip())
+    has_firecrawl = bool(os.environ.get("FIRECRAWL_API_KEY", "").strip())
+    if not has_apify and not has_firecrawl:
+        # 503, not 500: the deployment is missing both keys, which is a
         # configuration fact rather than a failure of this request.
         return JSONResponse(
             {"error": "Profile import is not configured for this deployment."},
             status_code=503,
         )
 
+    # APIFY FIRST, because it is the one that gets a page. Firecrawl stays as
+    # the fallback rather than being deleted: it is already paid for, it costs
+    # a fraction as much, and on a profile it CAN read it produces the same
+    # fields from the JSON-LD. When Apify is unavailable this is the difference
+    # between a partial import and none.
+    reasons: dict[str, str] = {}
+    if has_apify:
+        row, reason = await _apify_profile(url)
+        reasons["apify"] = reason
+        if row is not None:
+            payload = profile_from_apify(row, url)
+            return JSONResponse({**payload, "source": "apify"}, status_code=200)
+
+    if not has_firecrawl:
+        return JSONResponse(
+            {
+                "error": _apify_message(reasons.get("apify", "")),
+                "reason": reasons.get("apify", ""),
+            },
+            status_code=422,
+        )
+
     html, reason = await _firecrawl_fetch(url, firecrawl_profile_payload(url))
+    reasons["firecrawl"] = reason
     if not html:
         # THE REASON REACHES THE USER, because there is no fallback route here
         # and a generic message sends them to check a link that is fine.
@@ -348,16 +490,18 @@ async def profile_endpoint(body: ProfileRequest) -> JSONResponse:
         return JSONResponse(
             {
                 "error": friendly or "Could not read that profile page.",
-                # The raw reason, so a failure can be diagnosed from the
-                # response instead of from a log nobody kept.
-                "reason": reason,
+                # The raw reasons, so a failure can be diagnosed from the
+                # response instead of from a log nobody kept. Both routes are
+                # named: "apify said no-token, firecrawl said http-402" is a
+                # complete answer and neither half alone is.
+                "reason": ", ".join(f"{k}: {v}" for k, v in reasons.items()) or reason,
             },
             status_code=422,
         )
     if len(html.encode("utf-8", "ignore")) > MAX_HTML_BYTES:
         return JSONResponse({"error": "Profile page is too large"}, status_code=422)
 
-    return JSONResponse(extract_profile(url, html), status_code=200)
+    return JSONResponse({**extract_profile(url, html), "source": "firecrawl"}, status_code=200)
 
 
 @app.post("/extract")

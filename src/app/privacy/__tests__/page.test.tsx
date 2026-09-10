@@ -175,6 +175,21 @@ describe('the privacy page', () => {
     expect(text).toMatch(/filling in a new application/i)
   })
 
+  it('names every third party that receives an address you paste', () => {
+    // TWO OF THEM SINCE 2026-09-10. Firecrawl fetches job postings; Apify
+    // reads the public LinkedIn profile the Settings screen builds from.
+    // Naming one and not the other is the shape of a policy that was written
+    // once and not maintained -- and the profile one is the more personal of
+    // the two.
+    render(<Privacy />)
+    const text = document.body.textContent ?? ''
+    expect(text).toMatch(/Firecrawl/)
+    expect(text).toMatch(/Apify/)
+    expect(text, 'the policy still says what they receive').toMatch(
+      /and nothing else/i
+    )
+  })
+
   it('does not invent a region, a retention period or a third party', () => {
     // The plan's instruction was explicit: name the region if it is known at
     // write time, do not guess it. It is not known here, so the page says

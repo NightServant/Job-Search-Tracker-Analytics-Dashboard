@@ -184,7 +184,58 @@ ever carried the bullet text.
 
 **Rate limit:** three profile fetches per user per minute in
 `src/app/api/profile/route.ts`, tighter than auto-fill's eight — each one costs
-a Firecrawl credit and nobody imports their own profile eight times a minute.
+a credit and nobody imports their own profile eight times a minute.
+
+**It did not work.** On the first real test (2026-09-10) Firecrawl returned no
+page at all. It is a fetcher, and what LinkedIn serves a signed-out visitor is
+an anti-bot challenge — so the JSON-LD parser had nothing to parse. It is kept
+as the fallback, because it is already configured, costs a fraction as much,
+and does produce the same fields on the minority of profiles served without a
+challenge. The primary route is Apify, below.
+
+---
+
+## Apify — the profile route that gets a page
+
+**Integrated 2026-09-10, optional.** Actor
+[`crawlerbros/linkedin-profile-scraper`](https://apify.com/crawlerbros/linkedin-profile-scraper),
+called from `scraper/app.py` through
+`POST /v2/acts/{actor}/run-sync-get-dataset-items` — one call that runs the
+actor and returns the rows, which is right for one profile and wrong for a
+hundred.
+
+It solves LinkedIn's guest challenge server-side and returns **structured
+JSON**, so there is no HTML to parse: `extractor/apify_profile.py` maps its
+field names onto `UserProfile` and nothing else. That mapping is pure and
+tested against a saved row, so it costs nothing to verify.
+
+**It is richer than the JSON-LD ever was.** Certifications, projects, volunteer
+work, personal websites — and the bullet text under each role, which is the
+part a CV is written from and the part the removed page-scraper never
+recovered.
+
+**What it still cannot give:** skills and languages. LinkedIn does not publish
+those to a signed-out visitor, so no scraper of a guest profile can return
+them. The mapping says so in a warning rather than leaving an empty list to be
+read as a bug — and the LinkedIn CSV export (kept, in
+`src/services/linkedinExport.ts`) remains the only source that has them.
+
+**What it costs, and why the memory is pinned.** Pay-per-event: **$0.50 per
+gigabyte of memory at start** (minimum one event) plus **$0.01 per result**.
+The actor's own default is 4096MB, so an unpinned run is **$2.00 to read one
+profile**. `APIFY_MEMORY_MB = 1024` in `app.py` brings that to about $0.51.
+Apify's free tier is $5 of monthly credit, roughly nine imports.
+
+**Latency is 30–90 seconds per profile** and that is real challenge-solving
+time, not a slow client. `APIFY_TIMEOUT_S` is 180.
+
+`enrichCompany` is **off**. It fetches the current employer's own company page
+for headcount, size and industry — 30–90 seconds more, for facts a CV does not
+carry. `industry` is the only one mapped and it is not worth doubling the wait.
+
+**Where the key goes:** `APIFY_TOKEN`, in `scraper/.env` locally and as a
+Vercel project variable in a deployment — the same placement trap as Firecrawl,
+since only the Python process reads it.
 
 ---
 

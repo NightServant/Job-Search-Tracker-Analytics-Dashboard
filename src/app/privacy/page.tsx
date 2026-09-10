@@ -269,11 +269,10 @@ export default function Page() {
               <p className="text-body-m font-normal text-text-secondary">
                 One further service is involved{' '}
                 <strong className="font-bold text-text-primary">
-                  only when you add an application or build your profile
+                  only when you add an application
                 </strong>
-                . Some job boards will not serve their postings to a server, and
-                LinkedIn will not serve a profile page to one at all, so the
-                address you paste is sent to{' '}
+                . Some job boards will not serve their postings to a server, so
+                the address you paste is sent to{' '}
                 <Link
                   href="https://firecrawl.dev"
                   target="_blank"
@@ -283,11 +282,28 @@ export default function Page() {
                   Firecrawl
                 </Link>
                 , which fetches that public page and returns it to be read. They
-                receive the web address you pasted — a job posting, or your own
-                LinkedIn profile — and nothing else: not your account, not your
-                CV, and nothing about your other applications. If you never add
-                an application from a link and never build a profile from one,
-                they are never contacted.
+                receive the posting&rsquo;s web address and nothing else — not
+                your account, not your CV, and nothing about your other
+                applications. If you never add an application from a link, they
+                are never contacted.
+              </p>
+              <p className="text-body-m font-normal text-text-secondary">
+                Building your profile in Settings works the same way, through a
+                different company.{' '}
+                <Link
+                  href="https://apify.com"
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="text-accent-default underline underline-offset-4"
+                >
+                  Apify
+                </Link>{' '}
+                reads the public LinkedIn profile whose address you paste and
+                returns what is on it. They receive that address and nothing
+                else. Only the public page is read — the same page anyone not
+                signed in to LinkedIn would see — and only when you press the
+                button. If you never build a profile, they are never
+                contacted.
               </p>
               <p className="text-body-m font-normal text-text-secondary">
                 AI is used in exactly three places, and nowhere else: tidying and
