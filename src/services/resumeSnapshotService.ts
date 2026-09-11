@@ -30,7 +30,22 @@ export type ResumeSnapshotMeta = {
   version?: number | null
 }
 
-const MAX_SNAPSHOTS_PER_RESUME = 10
+/**
+ * How many AUTOSAVE snapshots a CV keeps. Raised from 10 on 2026-09-11.
+ *
+ * TEN WAS SIZED FOR ONE JOB and stopped being enough when a CV started being
+ * tailored per application. With `SNAPSHOT_FLOOR_MS` at five minutes, ten
+ * snapshots cover roughly fifty minutes of editing, which is fine as a
+ * crash-recovery window and useless as a record of what was sent where -- and
+ * the same table holds both.
+ *
+ * SIXTY, because the number that matters is the application count, not a
+ * storage budget. Gabe's own case is a CV sent to forty-five; sixty leaves
+ * room above that and still bounds a single CV's history. It is a soft
+ * ceiling anyway now: see `deleteOldSnapshots`, where pinned snapshots are
+ * exempt, so this governs churn rather than evidence.
+ */
+const MAX_SNAPSHOTS_PER_RESUME = 60
 
 /** Postgres `unique_violation`. The one error here that is worth retrying. */
 const UNIQUE_VIOLATION = '23505'
@@ -270,10 +285,28 @@ export async function getSnapshot(snapshotId: string, userId: string): Promise<R
 }
 
 /**
- * Delete old snapshots beyond MAX_SNAPSHOTS_PER_RESUME for a resume
+ * Prune autosave history past the cap, NEVER touching a pinned snapshot.
+ *
+ * THE EXEMPTION IS THE POINT OF THIS FUNCTION NOW, and raising the cap without
+ * it would not have fixed anything. `application_documents.snapshot_id` pins
+ * the exact version of a CV that was sent to a job -- that is what the column
+ * is for, in the migration's own words. A pinned snapshot is EVIDENCE, not a
+ * backup: it answers "what did Stripe actually receive", and no amount of
+ * subsequent typing should be able to delete the answer.
+ *
+ * IT WOULD HAVE FAILED SILENTLY, which is why this is worth the extra query.
+ * The foreign key is `ON DELETE SET NULL`, so pruning a pinned snapshot does
+ * not error and does not remove the link row -- it just quietly nulls the
+ * version, and `/documents` starts saying "Unnumbered" about a CV somebody
+ * sent to a company six months ago. Nothing would have pointed at the cause.
+ *
+ * PINNED ROWS DO NOT COUNT TOWARD THE CAP either, rather than being kept but
+ * counted. Counting them would let forty-five tailored versions squeeze the
+ * autosave window down to nothing, which is the crash-recovery case this cap
+ * exists to serve in the first place. The two kinds of snapshot are doing
+ * different jobs and are now budgeted separately.
  */
 export async function deleteOldSnapshots(resumeId: string, userId: string): Promise<void> {
-  // Get all snapshots for this resume, ordered by created_at descending
   const { data, error: selectError } = await supabase
     .from('resume_snapshots')
     .select('id')
@@ -283,14 +316,39 @@ export async function deleteOldSnapshots(resumeId: string, userId: string): Prom
 
   if (selectError) throw new Error(`Failed to query snapshots: ${selectError.message}`)
 
-  // If we have more than max snapshots, delete the oldest ones
-  if ((data ?? []).length > MAX_SNAPSHOTS_PER_RESUME) {
-    const idsToDelete = data!.slice(MAX_SNAPSHOTS_PER_RESUME).map((row) => row.id)
+  const all = data ?? []
+  if (all.length <= MAX_SNAPSHOTS_PER_RESUME) return
 
-    const { error: deleteError } = await supabase.from('resume_snapshots').delete().in('id', idsToDelete)
+  // Which of these a job still points at. Scoped by user as well as resume:
+  // RLS would filter it anyway, and a query that relies on RLS alone for
+  // correctness is one that breaks the day it runs somewhere else.
+  const { data: pinnedRows, error: pinnedError } = await supabase
+    .from('application_documents')
+    .select('snapshot_id')
+    .eq('resume_id', resumeId)
+    .eq('user_id', userId)
+    .not('snapshot_id', 'is', null)
 
-    if (deleteError) throw new Error(`Failed to delete old snapshots: ${deleteError.message}`)
+  if (pinnedError) {
+    // Refuse to prune rather than prune blind. Keeping too much history is a
+    // storage cost; deleting a sent version is unrecoverable.
+    throw new Error(`Failed to check pinned snapshots: ${pinnedError.message}`)
   }
+
+  const pinned = new Set(
+    (pinnedRows ?? []).map((row) => (row as { snapshot_id: string }).snapshot_id)
+  )
+
+  const prunable = all.filter((row) => !pinned.has(row.id))
+  if (prunable.length <= MAX_SNAPSHOTS_PER_RESUME) return
+
+  const idsToDelete = prunable.slice(MAX_SNAPSHOTS_PER_RESUME).map((row) => row.id)
+  const { error: deleteError } = await supabase
+    .from('resume_snapshots')
+    .delete()
+    .in('id', idsToDelete)
+
+  if (deleteError) throw new Error(`Failed to delete old snapshots: ${deleteError.message}`)
 }
 
 /**

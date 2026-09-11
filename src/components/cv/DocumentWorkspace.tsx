@@ -513,7 +513,14 @@ export function DocumentWorkspace({
           )}
         >
           {leftRail && <aside className="min-w-0 xl:order-1">{leftRail}</aside>}
-          <div className="min-w-0 overflow-x-auto bg-bg-inset p-4 md:p-8 xl:order-2">
+          {/* `id` IS LOAD-BEARING: the formatting ribbon points at this region
+              with `aria-controls`, which is what tells a screen reader that a
+              toolbar in the chrome above formats the document down here. A
+              dangling reference would be worse than none. */}
+          <div
+            id="document-sheet"
+            className="min-w-0 overflow-x-auto bg-bg-inset p-4 md:p-8 xl:order-2"
+          >
             {children}
           </div>
           {rightRail && <aside className="min-w-0 xl:order-3">{rightRail}</aside>}

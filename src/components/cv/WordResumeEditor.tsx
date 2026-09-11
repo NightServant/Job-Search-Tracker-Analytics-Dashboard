@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import type { JSONContent } from '@tiptap/core'
-import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { CheckIcon, DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { CssSpinner } from '@/components/ui/css-spinner'
@@ -17,6 +16,7 @@ import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
 import { useCvTailoring } from './CvTailoring'
 import { DocumentRailTabs } from './DocumentRail'
+import { DocumentToolbar } from './DocumentToolbar'
 import { DocumentRailPane } from './DocumentRailPane'
 import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './documentTabs'
 import { useProofread } from './useProofread'
@@ -26,39 +26,6 @@ import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './co
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
 import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeService'
 import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
-
-const TOOLBAR =
-  'h-8 rounded-md border px-3 text-body-s transition-colors duration-(--duration-fast) ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default'
-
-function ToolbarButton({
-  onClick,
-  active,
-  disabled,
-  children,
-}: {
-  onClick: () => void
-  active?: boolean
-  disabled?: boolean
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      aria-pressed={active}
-      className={cn(
-        TOOLBAR,
-        active
-          ? 'border-accent-default bg-accent-default text-accent-on-accent'
-          : 'border-border-default bg-bg-canvas text-text-secondary hover:bg-bg-inset'
-      )}
-      onClick={onClick}
-      disabled={disabled}
-    >
-      {children}
-    </button>
-  )
-}
 
 /**
  * The document-style CV editor: Tiptap, autosave, snapshots and PDF export.
@@ -489,45 +456,7 @@ export function WordResumeEditor({
           delete
         </Button>
       }
-      tools={
-        <>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBold().run()}
-            active={!!editor?.isActive('bold')}
-            disabled={!editor}
-          >
-            bold
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleItalic().run()}
-            active={!!editor?.isActive('italic')}
-            disabled={!editor}
-          >
-            italic
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleBulletList().run()}
-            active={!!editor?.isActive('bulletList')}
-            disabled={!editor}
-          >
-            bullets
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleHeading({ level: 1 }).run()}
-            active={!!editor?.isActive('heading', { level: 1 })}
-            disabled={!editor}
-          >
-            H1
-          </ToolbarButton>
-          <ToolbarButton
-            onClick={() => editor?.chain().focus().toggleHeading({ level: 2 }).run()}
-            active={!!editor?.isActive('heading', { level: 2 })}
-            disabled={!editor}
-          >
-            H2
-          </ToolbarButton>
-        </>
-      }
+      tools={<DocumentToolbar editor={editor} />}
       leftRail={
         <DocumentRailTabs
           active={tab}

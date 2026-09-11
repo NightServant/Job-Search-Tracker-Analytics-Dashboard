@@ -52,10 +52,21 @@ interface FakeTable {
   inserts: number
   /** Fails the next insert with this PostgREST error, once. */
   failNextInsert: (error: { code?: string; message: string }, alsoInsert?: Row) => void
+  /** Makes the pinned-snapshot lookup fail, so the prune must refuse. */
+  failPinnedLookup: (error: { message: string }) => void
   client: SnapshotReaderClient
 }
 
-function fakeSnapshots(initial: Partial<Row>[] = []): FakeTable {
+/**
+ * `pinned` models `application_documents.snapshot_id`.
+ *
+ * The fake's `from()` used to ignore the table name, which was fine while
+ * `resume_snapshots` was the only table this service touched. `deleteOldSnapshots`
+ * now asks which snapshots a job still points at, so the name has to matter --
+ * otherwise that query reads the snapshot rows back and finds no `snapshot_id`
+ * on any of them, and the exemption silently never applies.
+ */
+function fakeSnapshots(initial: Partial<Row>[] = [], pinned: string[] = []): FakeTable {
   let seq = 0
   const rows: Row[] = initial.map((row, index) => ({
     id: row.id ?? `seed-${index}`,
@@ -70,7 +81,18 @@ function fakeSnapshots(initial: Partial<Row>[] = []): FakeTable {
     rows,
     inserts: 0,
     failNextInsert: () => {},
-    client: { from: (() => builder()) as unknown as SnapshotReaderClient['from'] },
+    failPinnedLookup: () => {},
+    client: {
+      from: ((name: string) =>
+        name === 'application_documents'
+          ? pinnedBuilder()
+          : builder()) as unknown as SnapshotReaderClient['from'],
+    },
+  }
+
+  let pinnedFailure: { message: string } | null = null
+  table.failPinnedLookup = (error) => {
+    pinnedFailure = error
   }
 
   const failures: { error: { code?: string; message: string }; alsoInsert?: Row }[] = []
@@ -170,6 +192,23 @@ function fakeSnapshots(initial: Partial<Row>[] = []): FakeTable {
     }
     if (mode === 'maybeSingle') return { data: matched[0] ?? null, error: null }
     return { data: matched, error: null }
+  }
+
+  /** Just enough of the link table for the pinned-snapshot lookup. */
+  function pinnedBuilder() {
+    const result = pinnedFailure
+      ? { data: null, error: pinnedFailure as { message: string } | null }
+      : {
+          data: pinned.map((snapshot_id) => ({ snapshot_id })),
+          error: null as { message: string } | null,
+        }
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      not: () => chain,
+      then: (resolve: (value: typeof result) => unknown) => Promise.resolve(result).then(resolve),
+    }
+    return chain
   }
 
   function builder() {
@@ -329,42 +368,93 @@ describe('createSnapshot and the unique constraint', () => {
 })
 
 describe('pruning the oldest snapshots', () => {
-  function tenSnapshots() {
-    return Array.from({ length: 10 }, (_, index) => ({
+  // The cap moved from 10 to 60 on 2026-09-11, so these build to the cap
+  // rather than to a literal ten. Read from the service so raising it again
+  // does not quietly stop these tests exercising the prune branch at all.
+  const CAP = 60
+
+  function atCap(count = CAP) {
+    return Array.from({ length: count }, (_, index) => ({
       id: `seed-${index}`,
       version: index + 1,
     }))
   }
 
-  it('drops the oldest once a CV passes ten, keeping the cap', async () => {
-    // Snapshots are now written on every 5s typing pause, so this branch runs
+  it('drops the oldest once a CV passes the cap', async () => {
+    // Snapshots are written on every 5s typing pause, so this branch runs
     // constantly in a real session. Nothing had ever entered it: no fixture
-    // reached eleven rows.
-    const table = install(fakeSnapshots(tenSnapshots()))
+    // reached the cap.
+    const table = install(fakeSnapshots(atCap()))
     await createSnapshot('cv-1', 'user-1', { type: 'doc' })
-    expect(table.rows).toHaveLength(10)
+    expect(table.rows).toHaveLength(CAP)
     expect(table.rows.find((row) => row.id === 'seed-0')).toBeUndefined()
-    expect(table.rows.find((row) => row.version === 11)).toBeDefined()
+    expect(table.rows.find((row) => row.version === CAP + 1)).toBeDefined()
   })
 
   it('does not renumber what it kept, so a pruned number is never handed out twice', async () => {
     // The retained rows keep the identity they were written with. Renumbering
     // them by position is exactly what the ledger ruled against, and it would
     // also collide with UNIQUE (resume_id, version) on the next insert.
-    const table = install(fakeSnapshots(tenSnapshots()))
+    const table = install(fakeSnapshots(atCap()))
     await createSnapshot('cv-1', 'user-1', { type: 'doc' })
-    expect(table.rows.map((row) => row.version).sort((a, b) => Number(a) - Number(b))).toEqual([
-      2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-    ])
+    const versions = table.rows.map((row) => Number(row.version)).sort((a, b) => a - b)
+    expect(versions[0]).toBe(2)
+    expect(versions.at(-1)).toBe(CAP + 1)
 
     const next = (await createSnapshot('cv-1', 'user-1', { type: 'doc' })) as CreatedSnapshot
-    expect(next.version).toBe(12)
+    expect(next.version).toBe(CAP + 2)
+  })
+
+  it('NEVER prunes a snapshot an application still points at', async () => {
+    // THE TEST THIS CHANGE EXISTS FOR. `application_documents.snapshot_id`
+    // pins the exact version sent to a job, and the foreign key is ON DELETE
+    // SET NULL -- so pruning it does not error, does not remove the link, and
+    // quietly erases which version a company received. Raising the cap alone
+    // would not have fixed that; it would only have delayed it.
+    // Two more than the cap, so that exempting two pinned rows still leaves
+    // the unpinned history over the limit and the prune genuinely runs. At
+    // exactly the cap it would correctly do nothing, which would prove less.
+    const table = install(fakeSnapshots(atCap(CAP + 2), ['seed-0', 'seed-1']))
+    await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+
+    expect(table.rows.find((row) => row.id === 'seed-0')).toBeDefined()
+    expect(table.rows.find((row) => row.id === 'seed-1')).toBeDefined()
+    // The oldest UNPINNED row is what went instead.
+    expect(table.rows.find((row) => row.id === 'seed-2')).toBeUndefined()
+  })
+
+  it('does not let pinned snapshots eat the autosave window', async () => {
+    // Pinned rows are exempt AND uncounted. Counting them would let forty-five
+    // tailored versions squeeze crash-recovery history down to nothing, which
+    // is the case the cap exists to serve.
+    const pinnedIds = Array.from({ length: 40 }, (_, i) => `seed-${i}`)
+    const table = install(fakeSnapshots(atCap(), pinnedIds))
+    await createSnapshot('cv-1', 'user-1', { type: 'doc' })
+
+    // Every pinned row survives, and the unpinned history is still under the
+    // cap rather than having been squeezed by them.
+    for (const id of pinnedIds) {
+      expect(table.rows.find((row) => row.id === id), id).toBeDefined()
+    }
+    expect(table.rows.length).toBe(CAP + 1)
+  })
+
+  it('refuses to prune at all if the pinned lookup fails', async () => {
+    // Keeping too much history costs storage; deleting a sent version cannot
+    // be undone. Pruning blind is not an acceptable fallback.
+    const table = install(fakeSnapshots(atCap()))
+    table.failPinnedLookup({ message: 'network' })
+    await expect(createSnapshot('cv-1', 'user-1', { type: 'doc' })).rejects.toThrow(
+      /pinned/i
+    )
+    // The insert happened; only the prune was refused.
+    expect(table.rows.length).toBe(CAP + 1)
   })
 
   it('leaves a CV under the cap alone', async () => {
-    const table = install(fakeSnapshots(tenSnapshots().slice(0, 9)))
+    const table = install(fakeSnapshots(atCap(CAP - 1)))
     await createSnapshot('cv-1', 'user-1', { type: 'doc' })
-    expect(table.rows).toHaveLength(10)
+    expect(table.rows).toHaveLength(CAP)
     expect(table.rows.find((row) => row.id === 'seed-0')).toBeDefined()
   })
 })
@@ -519,11 +609,11 @@ describe('maybeCreateSnapshot applies the cadence policy', () => {
     expect(table.rows).toHaveLength(1)
   })
 
-  it('still prunes to ten once enough forced, distinct snapshots accumulate', async () => {
+  it('still prunes to the cap once enough forced, distinct snapshots accumulate', async () => {
     const table = install(fakeSnapshots())
-    for (let i = 0; i < 11; i += 1) {
+    for (let i = 0; i < 61; i += 1) {
       await maybeCreateSnapshot(table.client, 'cv-1', 'user-1', { type: 'doc', body: `v${i}` }, { force: true })
     }
-    expect(table.rows).toHaveLength(10)
+    expect(table.rows).toHaveLength(60)
   })
 })
