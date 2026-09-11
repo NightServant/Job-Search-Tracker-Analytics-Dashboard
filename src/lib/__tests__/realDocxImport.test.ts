@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import JSZip from 'jszip'
-import { readPageGeometry, textColumnInches } from '../pageGeometry'
+import { readPageGeometry, readTypography, textColumnInches } from '../pageGeometry'
 import { sectionsFrom } from '@/services/integrations/docxExport'
 
 /**
@@ -47,6 +47,26 @@ describe.skipIf(!present)('a real .docx from Word', () => {
     const column = textColumnInches(readPageGeometry(await load()))
     expect(column).toBeGreaterThan(0)
     expect(column).toBeLessThan(readPageGeometry(await load()).width)
+  })
+
+  it('reads the type the document is actually set in', async () => {
+    // The half of the bug that survived fixing the margins: mammoth drops
+    // every run property, so the CV rendered in the editor's stylesheet
+    // instead of its author's face. On the reported file this is Garamond
+    // 11pt against sans-serif 15px.
+    const zip = await JSZip.loadAsync(readFileSync(FILE!))
+    const documentXml = await zip.file('word/document.xml')!.async('string')
+    const stylesXml = (await zip.file('word/styles.xml')?.async('string')) ?? ''
+    const t = readTypography(documentXml, stylesXml)
+
+    expect(t.fontFamily).toBeTruthy()
+    expect(t.fontSize).toBeGreaterThan(5)
+    expect(t.fontSize).toBeLessThan(30)
+    // Whatever the face is, it must come from the RUNS. On this file
+    // docDefaults says Times New Roman and no run uses it.
+    const runFaces = [...documentXml.matchAll(/<w:rFonts\b[^>]*w:ascii="([^"]+)"/g)].map((m) => m[1])
+    expect(runFaces.length).toBeGreaterThan(0)
+    expect(t.fontFamily).toContain(runFaces[0])
   })
 
   it('exports back at its own page, not at the editor default', async () => {

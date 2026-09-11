@@ -1,5 +1,12 @@
 import type { ResumeContent, ResumeMode } from '@/services/resumeService'
-import { DEFAULT_GEOMETRY, readPageGeometry, type PageGeometry } from './pageGeometry'
+import {
+  DEFAULT_GEOMETRY,
+  NO_TYPOGRAPHY,
+  readPageGeometry,
+  readTypography,
+  type DocumentTypography,
+  type PageGeometry,
+} from './pageGeometry'
 
 export interface ImportedDocument {
   mode: ResumeMode
@@ -191,7 +198,7 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
   // have to come out of the package directly -- and without them every import
   // renders at the editor's hard-coded 0.8in, which is what "the format
   // breaks" meant. See `pageGeometry`.
-  const geometry = await readGeometryFromDocx(arrayBuffer)
+  const setup = await readSetupFromDocx(arrayBuffer)
 
   const { value: html } = await mammoth.convertToHtml(
     { arrayBuffer },
@@ -208,7 +215,7 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
     }
   )
 
-  return withGeometry(htmlToWordContent(html), geometry)
+  return withSetup(htmlToWordContent(html), setup)
 }
 
 /**
@@ -220,14 +227,23 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
  * import over page margins, which would turn a cosmetic problem into a
  * blocking one.
  */
-async function readGeometryFromDocx(arrayBuffer: ArrayBuffer): Promise<PageGeometry> {
+async function readSetupFromDocx(
+  arrayBuffer: ArrayBuffer
+): Promise<{ geometry: PageGeometry; typography: DocumentTypography }> {
   try {
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(arrayBuffer)
-    const xml = await zip.file('word/document.xml')?.async('string')
-    return xml ? readPageGeometry(xml) : DEFAULT_GEOMETRY
+    const documentXml = await zip.file('word/document.xml')?.async('string')
+    // `styles.xml` is optional and only supplies the fallback face, so a
+    // package without one still reads its geometry and its run fonts.
+    const stylesXml = (await zip.file('word/styles.xml')?.async('string')) ?? ''
+    if (!documentXml) return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY }
+    return {
+      geometry: readPageGeometry(documentXml),
+      typography: readTypography(documentXml, stylesXml),
+    }
   } catch {
-    return DEFAULT_GEOMETRY
+    return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY }
   }
 }
 
@@ -240,10 +256,17 @@ async function readGeometryFromDocx(arrayBuffer: ArrayBuffer): Promise<PageGeome
  * in and saved. A sibling key beside `type: 'doc'` would be dropped the first
  * time the editor re-serialised.
  */
-function withGeometry(content: ResumeContent, geometry: PageGeometry): ResumeContent {
+function withSetup(
+  content: ResumeContent,
+  setup: { geometry: PageGeometry; typography: DocumentTypography }
+): ResumeContent {
   return {
     ...(content as object),
-    attrs: { ...((content as { attrs?: object }).attrs ?? {}), pageGeometry: geometry },
+    attrs: {
+      ...((content as { attrs?: object }).attrs ?? {}),
+      pageGeometry: setup.geometry,
+      documentTypography: setup.typography,
+    },
   } as ResumeContent
 }
 

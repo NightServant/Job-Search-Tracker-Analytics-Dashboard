@@ -124,3 +124,110 @@ export function normalizeGeometry(raw: unknown): PageGeometry {
 export function textColumnInches(geometry: PageGeometry): number {
   return Math.max(0, geometry.width - geometry.margin.left - geometry.margin.right)
 }
+
+/**
+ * The type a .docx was set in: face, size, line height, paragraph spacing.
+ *
+ * THE SECOND HALF OF THE SAME BUG. Fixing the margins made the page right and
+ * left the CONTENT wrong, because mammoth converts a document to semantic HTML
+ * -- p, strong, em, ul -- and discards every run property on the way. So an
+ * imported CV rendered in whatever the editor's stylesheet said rather than
+ * what its author chose. Measured on the reported file:
+ *
+ *   the document   Garamond, 11pt, paragraph spacing 2-8pt
+ *   the editor     its own sans-serif, 15px, 8px after every paragraph
+ *
+ * Nothing about that is subtle on screen, and it is the whole of "no borders,
+ * font, spacing are not rendered properly".
+ *
+ * THE DOMINANT RUN WINS, not the document default, and the difference matters
+ * on this very file: `docDefaults` says Times New Roman and not one run uses
+ * it -- all 109 are Garamond. Word writes the default and then overrides it
+ * everywhere, so reading `docDefaults` alone gets the answer exactly wrong.
+ * Counting what the runs actually say gets it right.
+ *
+ * ONE FACE FOR THE WHOLE SHEET, which is a real simplification and is stated
+ * rather than hidden. Per-run fidelity would mean walking `document.xml`
+ * instead of using mammoth at all. A CV is set in one family -- this one has
+ * a single face across every run -- so the dominant face applied to the sheet
+ * is right for the documents this editor is for, and wrong only for a document
+ * that mixes families deliberately.
+ */
+export interface DocumentTypography {
+  /** CSS font-family stack, already quoted where it needs to be. */
+  fontFamily: string | null
+  /** Points. */
+  fontSize: number | null
+  /** Unitless line-height multiplier. */
+  lineHeight: number | null
+  /** Points of space after a paragraph. */
+  paragraphSpacing: number | null
+}
+
+export const NO_TYPOGRAPHY: DocumentTypography = {
+  fontFamily: null,
+  fontSize: null,
+  lineHeight: null,
+  paragraphSpacing: null,
+}
+
+/** The value that appears most often, or null when there are none. */
+function dominant(values: string[]): string | null {
+  if (values.length === 0) return null
+  const counts = new Map<string, number>()
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1)
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0][0]
+}
+
+/** Median, so one 16pt heading does not drag the body size up. */
+function median(values: number[]): number | null {
+  if (values.length === 0) return null
+  const sorted = [...values].sort((a, b) => a - b)
+  return sorted[Math.floor(sorted.length / 2)]
+}
+
+export function readTypography(documentXml: string, stylesXml = ''): DocumentTypography {
+  const faces = [...documentXml.matchAll(/<w:rFonts\b[^>]*w:ascii="([^"]+)"/g)].map((m) => m[1])
+  const face =
+    dominant(faces) ??
+    // Only if no run says anything: the document default, which on the
+    // reported file is a face nothing actually uses.
+    stylesXml.match(/<w:rPrDefault>[\s\S]*?<w:rFonts\b[^>]*w:ascii="([^"]+)"/)?.[1] ??
+    null
+
+  // `w:sz` is HALF-points, so 22 is 11pt.
+  const sizes = [...documentXml.matchAll(/<w:sz w:val="(\d+)"\/>/g)]
+    .map((m) => Number.parseInt(m[1], 10) / 2)
+    .filter((n) => Number.isFinite(n) && n > 0 && n < 100)
+
+  // `w:line` with `lineRule="auto"` is 240ths of a line, so 235 is 0.98.
+  const line = documentXml.match(/<w:spacing[^>]*w:line="(\d+)"[^>]*w:lineRule="auto"/)?.[1]
+    ?? stylesXml.match(/<w:pPrDefault>[\s\S]*?<w:spacing[^>]*w:line="(\d+)"/)?.[1]
+  const lineHeight = line ? Number.parseInt(line, 10) / 240 : null
+
+  // `w:after` is twips; 20 to the point.
+  const afters = [...documentXml.matchAll(/<w:spacing[^>]*w:after="(\d+)"/g)]
+    .map((m) => Number.parseInt(m[1], 10) / 20)
+    .filter((n) => Number.isFinite(n) && n >= 0 && n < 100)
+
+  return {
+    fontFamily: face ? `"${face}", Georgia, serif` : null,
+    fontSize: median(sizes),
+    lineHeight: lineHeight && lineHeight > 0.5 && lineHeight < 4 ? lineHeight : null,
+    paragraphSpacing: median(afters),
+  }
+}
+
+/** Anything unusable becomes "use the editor's own styles". */
+export function normalizeTypography(raw: unknown): DocumentTypography {
+  if (!raw || typeof raw !== 'object') return NO_TYPOGRAPHY
+  const t = raw as Partial<DocumentTypography>
+  const num = (v: unknown, lo: number, hi: number) =>
+    typeof v === 'number' && Number.isFinite(v) && v > lo && v < hi ? v : null
+  return {
+    fontFamily: typeof t.fontFamily === 'string' && t.fontFamily.trim() ? t.fontFamily : null,
+    fontSize: num(t.fontSize, 3, 100),
+    lineHeight: num(t.lineHeight, 0.5, 4),
+    paragraphSpacing: num(t.paragraphSpacing, -1, 100),
+  }
+}

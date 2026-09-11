@@ -58,6 +58,12 @@ const DocumentWithPage = Document.extend({
         renderHTML: () => ({}),
         parseHTML: () => null,
       },
+      /** The face, size and spacing the document was set in. Same reasoning. */
+      documentTypography: {
+        default: null,
+        renderHTML: () => ({}),
+        parseHTML: () => null,
+      },
     }
   },
 })

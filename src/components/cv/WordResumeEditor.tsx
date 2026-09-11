@@ -23,7 +23,8 @@ import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './docum
 import { useProofread } from './useProofread'
 import { useThesaurus } from './useThesaurus'
 import { useFitToWidth } from './useFitToWidth'
-import { normalizeGeometry } from '@/lib/pageGeometry'
+import { normalizeGeometry, normalizeTypography } from '@/lib/pageGeometry'
+import { Pagination } from './pagination'
 import { useResumeExport } from './useResumeExport'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
@@ -70,6 +71,14 @@ export interface WordResumeEditorProps {
     content: ResumeContent
   ) => Promise<ResumeDraft>
 }
+
+/**
+ * The gap Word leaves between two pages in Print Layout.
+ *
+ * A quarter inch reads as a seam between sheets without spending a visible
+ * fraction of the scroll on nothing, which a full inch does on a three-page CV.
+ */
+const PAGE_GAP_IN = 0.25
 
 export function WordResumeEditor({
   draft,
@@ -123,6 +132,16 @@ export function WordResumeEditor({
   const autosaveTimerRef = useRef<number | null>(null)
   const snapshotTimerRef = useRef<number | null>(null)
 
+  const docAttrs = (
+    normalizeWordContent(draft.content) as {
+      attrs?: { pageGeometry?: unknown; documentTypography?: unknown }
+    }
+  ).attrs
+  const geometry = normalizeGeometry(docAttrs?.pageGeometry)
+  // The face, size and spacing the document was set in. Null members mean
+  // "the editor's own styles", which is what a CV typed here gets.
+  const type = normalizeTypography(docAttrs?.documentTypography)
+
   /**
    * The extension list lives in `editorExtensions` so the ribbon's tests build
    * the same editor this does -- see that file for why.
@@ -134,10 +153,22 @@ export function WordResumeEditor({
    * compact.
    */
   const editor = useEditor({
-    extensions: WORD_EDITOR_EXTENSIONS,
+    extensions: [
+      ...WORD_EDITOR_EXTENSIONS,
+      // PAGE HEIGHT IN CSS PIXELS: the page less both margins, at 96dpi,
+      // which is what `1in` resolves to in CSS.
+      Pagination.configure({
+        pageHeight:
+          (geometry.height - geometry.margin.top - geometry.margin.bottom) * 96,
+        gap: PAGE_GAP_IN * 96,
+      }),
+    ],
     content: normalizeWordContent(draft.content),
     editorProps: {
-      attributes: { class: 'focus:outline-none min-h-[10in] text-[15px] leading-7 text-zinc-900' },
+      // No `text-[15px] leading-7` here any more: an imported document sets
+      // its own size and leading on the wrapper, and a class on the editable
+      // element would win over it.
+      attributes: { class: 'focus:outline-none min-h-[10in] text-zinc-900' },
     },
     // Tiptap v3 renders eagerly by default, including on the server. This
     // component is 'use client', but App Router still server-renders a
@@ -292,10 +323,6 @@ export function WordResumeEditor({
   // own size and margins on the doc node; anything else gets Word's default.
   // Hard-coding 0.8in here is what made an imported ATS CV reflow -- see
   // lib/pageGeometry.
-  const geometry = normalizeGeometry(
-    (normalizeWordContent(draft.content) as { attrs?: { pageGeometry?: unknown } }).attrs
-      ?.pageGeometry
-  )
   const fit = useFitToWidth(geometry.width * 96)
 
   /**
@@ -460,16 +487,13 @@ export function WordResumeEditor({
           zoom: fit.scale,
           width: `${geometry.width}in`,
           minHeight: `${geometry.height}in`,
-          // PAGE BOUNDARIES, which the sheet had none of (Gabe, 2026-09-11:
-          // "page break does not apply"). A CV that runs to two pages was one
-          // continuous white block, so there was no way to see where the
-          // first page ended -- which is the single thing a print proof is
-          // for. A repeating gradient draws a rule at every page height, so
-          // the break appears wherever the content actually crosses it rather
-          // than where a manual break was typed. Word paginates by flow too;
-          // this document has zero explicit breaks and still prints on two.
-          backgroundImage:
-            `repeating-linear-gradient(to bottom, transparent 0, transparent calc(${geometry.height}in - 1px), var(--color-border-default) calc(${geometry.height}in - 1px), var(--color-border-default) ${geometry.height}in)`,
+          // NO PAINTED PAGE EDGE HERE ANY MORE. Two versions of it were
+          // drawn as a background -- a hairline, then a band of the well's
+          // colour -- and both sat BEHIND the text, so a break falling
+          // mid-paragraph struck a stripe through a line of it. Nothing about
+          // a background can avoid that; the content flows over it regardless.
+          // `Pagination` pushes the content past the edge instead, which is
+          // what Word does. See components/cv/pagination.
         }}
       >
         <EditorContent
@@ -481,12 +505,25 @@ export function WordResumeEditor({
             // number is wrong by a third of an inch and on Legal by three,
             // so the editable region either fell short of the page or ran
             // past it -- both of which look like the sheet is the wrong size.
+            '--page-margin-left': `${geometry.margin.left}in`,
+            '--page-margin-right': `${geometry.margin.right}in`,
             '--page-body-height': `${Math.max(
               1,
               geometry.height - geometry.margin.top - geometry.margin.bottom
             )}in`,
+            // THE DOCUMENT'S OWN TYPE, where it had any. mammoth converts a
+            // .docx to semantic HTML and drops every run property, so without
+            // this an imported CV renders in the editor's stylesheet rather
+            // than the face its author chose -- Garamond 11pt arriving as
+            // sans-serif 15px on the file that reported this.
+            ...(type.fontFamily ? { fontFamily: type.fontFamily } : {}),
+            ...(type.fontSize ? { fontSize: `${type.fontSize}pt` } : {}),
+            ...(type.lineHeight ? { lineHeight: type.lineHeight } : {}),
+            ...(type.paragraphSpacing !== null
+              ? { '--doc-para-space': `${type.paragraphSpacing}pt` }
+              : {}),
           } as React.CSSProperties}
-          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
+          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
         />
       </div>
       </div>
