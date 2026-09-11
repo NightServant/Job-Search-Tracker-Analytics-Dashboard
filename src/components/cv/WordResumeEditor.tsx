@@ -16,6 +16,7 @@ import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
 import { useCvTailoring } from './CvTailoring'
 import { DocumentRailTabs } from './DocumentRail'
+import { DocumentNavigator } from './DocumentNavigator'
 import { DocumentToolbar } from './DocumentToolbar'
 import { DocumentRailPane } from './DocumentRailPane'
 import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './documentTabs'
@@ -395,6 +396,7 @@ export function WordResumeEditor({
       }
       tools={<DocumentToolbar editor={editor} />}
       leftRail={
+        <div className="flex flex-col gap-6">
         <DocumentRailTabs
           active={tab}
           onSelect={selectTab}
@@ -407,6 +409,11 @@ export function WordResumeEditor({
               : null,
           }}
         />
+        {/* WORD'S NAVIGATION PANE AND WORD COUNT, under the tabs. The rail
+            was two buttons and a column of nothing; these are the two things
+            Word puts there, and both read straight off the editor. */}
+        <DocumentNavigator editor={editor} />
+        </div>
       }
       rightRail={
         <DocumentRailPane

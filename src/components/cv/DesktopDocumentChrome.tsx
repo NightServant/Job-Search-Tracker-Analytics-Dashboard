@@ -50,7 +50,16 @@ export function DesktopDocumentChrome({
       // to reach is a formatting bar you stop using. `dvh` rather than `vh`
       // because mobile browsers change the viewport as their chrome hides, and
       // `vh` would leave the foot of the document under the address bar.
-      className="flex h-[100dvh] w-full flex-col overflow-hidden"
+      // THE LOCKED FRAME IS `xl` AND UP ONLY, and that is a fix rather than a
+      // caveat. Below xl the grid collapses to one column and the rails stack
+      // around the document -- three auto rows inside a fixed height, which
+      // CSS Grid SQUEEZES rather than overflows. Measured at 900x600: the left
+      // rail rendered 154px tall instead of its natural 500, so the layout was
+      // three crushed strips each with its own scrollbar and a document about
+      // 160px tall. Below xl the page scrolls, which is the only sane
+      // behaviour for a stacked layout; from xl the frame locks and only the
+      // document moves, which is what was asked for.
+      className="flex w-full flex-col xl:h-[100dvh] xl:overflow-hidden"
       data-document-workspace
     >
       {/*
@@ -140,7 +149,7 @@ export function DesktopDocumentChrome({
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex flex-col xl:min-h-0 xl:flex-1">
         {/*
           THE RIBBON SITS ON ITS OWN GROUND (Gabe, 2026-09-11: "there is no
           real dividers between components"). A hairline alone was not enough
@@ -224,7 +233,7 @@ export function DesktopDocumentChrome({
             whole layout exists to fix. Each region then scrolls itself. */}
         <div
           className={cn(
-            'grid min-h-0 flex-1 gap-0',
+            'grid gap-0 xl:min-h-0 xl:flex-1',
             /*
               TWO SETS OF WIDTHS, AND THE SECOND BREAKPOINT IS 1700, NOT 2xl.
               The right rail carries the most now -- ATS score, keywords,
@@ -239,23 +248,28 @@ export function DesktopDocumentChrome({
                 rails 320+460  ->  page fits from ~1700
 
               Putting the wider pair on `2xl` (1536) would therefore BREAK the
-              page at exactly the width where it starts fitting -- 692px of
-              column for an 816px page, 124 short, so the document would scroll
-              sideways to be read. `min-[1700px]` is where the wide rails
-              actually have room to be wide.
+              page at exactly the width where it starts fitting, so
+              `min-[1700px]` is where the wide rails actually have room to be
+              wide -- at 1700 a 300/500 pair leaves 836 for an 816px page.
+
+              THE RIGHT RAIL IS THE WIDER OF THE TWO and grows the most,
+              because it carries the most: an ATS ring, two keyword lists, the
+              tailoring rewrites and the thesaurus. Gabe reported the scoring
+              as cramped; the left rail holds an outline and a table of counts,
+              which are narrow by nature.
 
               Below 1536 the page already scrolls horizontally in three
               columns; that is pre-existing and is why the grid does not start
               until `xl` at all.
             */
             leftRail && rightRail &&
-              'xl:grid-cols-[280px_minmax(0,1fr)_360px] min-[1700px]:grid-cols-[320px_minmax(0,1fr)_460px]',
+              'xl:grid-cols-[260px_minmax(0,1fr)_400px] min-[1700px]:grid-cols-[300px_minmax(0,1fr)_500px]',
             leftRail && !rightRail &&
-              'xl:grid-cols-[280px_minmax(0,1fr)] min-[1700px]:grid-cols-[320px_minmax(0,1fr)]'
+              'xl:grid-cols-[260px_minmax(0,1fr)] min-[1700px]:grid-cols-[300px_minmax(0,1fr)]'
           )}
         >
           {leftRail && (
-            <aside className="min-w-0 overflow-y-auto border-r border-border-default bg-bg-surface p-5 xl:order-1">
+            <aside className="min-w-0 border-b border-border-default bg-bg-surface p-5 xl:order-1 xl:overflow-y-auto xl:border-b-0 xl:border-r">
               {leftRail}
             </aside>
           )}
@@ -265,12 +279,12 @@ export function DesktopDocumentChrome({
               dangling reference would be worse than none. */}
           <div
             id="document-sheet"
-            className="min-w-0 overflow-auto bg-bg-inset p-4 md:p-8 xl:order-2"
+            className="min-w-0 overflow-x-auto bg-bg-inset p-4 md:p-8 xl:order-2 xl:overflow-auto"
           >
             {children}
           </div>
           {rightRail && (
-            <aside className="min-w-0 overflow-y-auto border-l border-border-default bg-bg-surface p-5 xl:order-3">
+            <aside className="min-w-0 border-t border-border-default bg-bg-surface p-5 xl:order-3 xl:overflow-y-auto xl:border-t-0 xl:border-l">
               {rightRail}
             </aside>
           )}
