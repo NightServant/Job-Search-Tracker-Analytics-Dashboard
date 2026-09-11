@@ -397,8 +397,11 @@ export function WordResumeEditor({
           onSelect={selectTab}
           applicationSelected={!!tailoring.jobId}
           badges={{
-            grammar: proofread.ran ? proofread.grammar.length : null,
-            spelling: proofread.ran ? proofread.spelling.length : null,
+            // Grammar and style together: the tab covers both, so a count
+            // that only named half of it would understate the work left.
+            grammar: proofread.ran
+              ? proofread.grammar.length + proofread.style.length
+              : null,
           }}
         />
       }

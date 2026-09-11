@@ -22,6 +22,13 @@ import type { IconName } from '@/components/icons'
  * needs one chosen first. Putting the two that always work above the one that
  * needs configuration means a new CV opens on something useful.
  *
+ * SPELL CHECK WAS A THIRD TAB AND IS GONE (Gabe, 2026-09-11). On a real
+ * 949-word CV it produced 26 findings and roughly two thirds were proper
+ * nouns LanguageTool has no dictionary for -- React, Next.js, shadcn/UI,
+ * Laravel, Tarlac. A tab that is wrong two times in three is a list to
+ * dismiss, not a check. `services/grammar` drops those findings at the
+ * boundary, so nothing downstream has to know the tab ever existed.
+ *
  * ATS MATCH AND AI TAILORING WERE TWO TABS UNTIL 2026-09-11 AND THAT WAS
  * WRONG. Gabe: "combine AI tailoring and ATS scoring properly this time."
  * They are one request against one posting -- the score says what a screener
@@ -31,7 +38,7 @@ import type { IconName } from '@/components/icons'
  * that is the order you use them in.
  */
 
-export type DocumentTabId = 'grammar' | 'spelling' | 'tailor'
+export type DocumentTabId = 'grammar' | 'tailor'
 
 export interface DocumentTab {
   id: DocumentTabId
@@ -52,14 +59,7 @@ export const DOCUMENT_TABS: readonly DocumentTab[] = [
     id: 'grammar',
     label: 'grammar check',
     icon: 'Pencil',
-    hint: 'agreement, tense and phrasing',
-    needsApplication: false,
-  },
-  {
-    id: 'spelling',
-    label: 'spell check',
-    icon: 'Check',
-    hint: 'words not in the dictionary',
+    hint: 'agreement, tense, phrasing and style',
     needsApplication: false,
   },
   {

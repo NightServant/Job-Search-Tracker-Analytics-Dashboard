@@ -4,6 +4,7 @@ import {
   applyIssue,
   categoryOf,
   chunkText,
+  contextOf,
   splitByCategory,
   toIssues,
 } from '../grammar'
@@ -86,24 +87,10 @@ describe('chunkText', () => {
 })
 
 describe('categoryOf', () => {
-  it('routes misspellings to the spelling tab', () => {
-    expect(categoryOf('misspelling', 'TYPOS')).toBe('spelling')
-    expect(categoryOf('typographical', 'TYPOS')).toBe('spelling')
-    expect(categoryOf(undefined, 'TYPOS')).toBe('spelling')
-  })
-
-  it('routes style and redundancy to the refinements tab', () => {
+  it('routes style and redundancy to the refinements section', () => {
     expect(categoryOf('style', 'STYLE')).toBe('style')
     expect(categoryOf('style', 'REDUNDANCY')).toBe('style')
     expect(categoryOf(undefined, 'REDUNDANCY')).toBe('style')
-  })
-
-  it('does not confuse a typographical WORD with the TYPOGRAPHY category', () => {
-    // `issueType: typographical` is a mis-typed word and belongs with
-    // spelling; the TYPOGRAPHY category is punctuation and spacing, which is
-    // style. They read alike and mean opposite things.
-    expect(categoryOf('typographical', 'TYPOS')).toBe('spelling')
-    expect(categoryOf(undefined, 'TYPOGRAPHY')).toBe('style')
   })
 
   it('treats grammar, and anything unknown, as grammar', () => {
@@ -132,9 +119,9 @@ describe('toIssues', () => {
   })
 
   it('keeps every replacement, which is what the suggestion list needs', () => {
-    const [issue] = toIssues({ matches: [match(40, 3, ['the', 'ten', 'tea', 'tech'], 'misspelling', 'TYPOS')] })
-    expect(issue.replacements).toEqual(['the', 'ten', 'tea', 'tech'])
-    expect(issue.category).toBe('spelling')
+    const [issue] = toIssues({ matches: [match(40, 3, ['goes', 'went', 'go'])] })
+    expect(issue.replacements).toEqual(['goes', 'went', 'go'])
+    expect(issue.category).toBe('grammar')
   })
 
   it('caps the replacement list so a rail is not flooded', () => {
@@ -178,18 +165,16 @@ describe('toIssues', () => {
 })
 
 describe('splitByCategory', () => {
-  it('separates the three tabs and orders each by position', () => {
+  it('separates the two sections and orders each by position', () => {
     const issues = toIssues({
       matches: [
-        match(30, 2, ['a'], 'misspelling', 'TYPOS'),
+        match(30, 2, ['a']),
         match(10, 2, ['b']),
-        match(5, 2, ['c'], 'misspelling', 'TYPOS'),
         match(20, 2, ['d'], 'style', 'REDUNDANCY'),
       ],
     })
-    const { spelling, grammar, style } = splitByCategory(issues)
-    expect(spelling.map((i) => i.start)).toEqual([5, 30])
-    expect(grammar.map((i) => i.start)).toEqual([10])
+    const { grammar, style } = splitByCategory(issues)
+    expect(grammar.map((i) => i.start)).toEqual([10, 30])
     expect(style.map((i) => i.start)).toEqual([20])
   })
 
@@ -220,5 +205,85 @@ describe('applyIssue', () => {
     // after it -- must not be allowed to slice at a bad index.
     const [issue] = toIssues({ matches: [match(500, 400, ['x'])] })
     expect(applyIssue(text, issue, 'x')).toBe(text)
+  })
+})
+
+describe('what the editor refuses to surface', () => {
+  // Both of these were reported from the running app rather than imagined.
+  const ruleMatch = (id: string, type: string, cat: string, reps: string[]) => ({
+    offset: 0,
+    length: 2,
+    replacements: reps.map((value) => ({ value })),
+    rule: { id, issueType: type, category: { id: cat } },
+  })
+
+  it('drops doubled-space findings, whose suggestion is a space', () => {
+    // Gabe reported this twice. The replacement is literally " ", so the card
+    // rendered an empty button, and ProseMirror normalises runs of spaces on
+    // its own regardless.
+    const dropped = toIssues({
+      matches: [ruleMatch('CONSECUTIVE_SPACES', 'typographical', 'TYPOGRAPHY', [' '])],
+    })
+    expect(dropped).toEqual([])
+  })
+
+  it('drops the comma-spacing rule, which is the other whitespace one', () => {
+    const dropped = toIssues({
+      matches: [ruleMatch('COMMA_PARENTHESIS_WHITESPACE', 'whitespace', 'TYPOGRAPHY', [','])],
+    })
+    expect(dropped).toEqual([])
+  })
+
+  it('drops spelling, which was two-thirds proper nouns on a real CV', () => {
+    const dropped = toIssues({
+      matches: [ruleMatch('MORFOLOGIK_RULE_EN_US', 'misspelling', 'TYPOS', ['calendar'])],
+    })
+    expect(dropped).toEqual([])
+  })
+
+  it('keeps real grammar, which is the whole point of dropping the rest', () => {
+    const kept = toIssues({
+      matches: [ruleMatch('HE_VERB_AGR', 'grammar', 'GRAMMAR', ['goes', 'went'])],
+    })
+    expect(kept).toHaveLength(1)
+    expect(kept[0].category).toBe('grammar')
+  })
+
+  it('keeps style findings, which are the refinements section', () => {
+    const kept = toIssues({
+      matches: [ruleMatch('REDUNDANCY_X', 'style', 'REDUNDANCY', ['use'])],
+    })
+    expect(kept).toHaveLength(1)
+    expect(kept[0].category).toBe('style')
+  })
+
+  it('drops any finding whose only suggestions are whitespace', () => {
+    // A backstop on the shape rather than the rule name: whatever produced it,
+    // a suggestion that renders as nothing is not a control.
+    const dropped = toIssues({
+      matches: [ruleMatch('SOMETHING_NEW', 'grammar', 'GRAMMAR', ['  ', ' '])],
+    })
+    expect(dropped).toEqual([])
+  })
+})
+
+describe('contextOf', () => {
+  const text = 'The team was great. He go to work early. Everyone agreed on that.'
+  const [issue] = toIssues({
+    matches: [{ offset: 23, length: 2, replacements: [{ value: 'goes' }], rule: { id: 'HE_VERB_AGR', issueType: 'grammar', category: { id: 'GRAMMAR' } } }],
+  })
+
+  it('returns the flagged span and what surrounds it', () => {
+    const ctx = contextOf(text, issue)
+    expect(ctx.flagged).toBe('go')
+    expect(ctx.before).toContain('He ')
+    expect(ctx.after).toContain(' to work')
+  })
+
+  it('marks a truncated edge with an ellipsis, and a clean edge without', () => {
+    const long = 'x'.repeat(200) + text
+    const moved = { ...issue, start: issue.start + 200, end: issue.end + 200 }
+    expect(contextOf(long, moved).before.startsWith('…')).toBe(true)
+    expect(contextOf(text, issue).before.startsWith('…')).toBe(false)
   })
 })

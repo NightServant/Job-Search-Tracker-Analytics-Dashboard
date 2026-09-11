@@ -45,7 +45,7 @@ export const MAX_CHUNK_CHARS = 20_000
 
 export const LANGUAGETOOL_ENDPOINT = 'https://api.languagetool.org/v2/check'
 
-export type IssueCategory = 'spelling' | 'grammar' | 'style'
+export type IssueCategory = 'grammar' | 'style'
 
 export interface GrammarIssue {
   /** Offsets into the WHOLE document, not the chunk that produced them. */
@@ -66,10 +66,12 @@ export interface GrammarIssue {
 export interface LanguageToolMatch {
   offset: number
   length: number
+  /** The vendor's rule id. Used to drop the noise rules by name. */
   message?: string
   shortMessage?: string
   replacements?: { value?: string }[]
   rule?: {
+    id?: string
     issueType?: string
     category?: { id?: string; name?: string }
   }
@@ -96,21 +98,64 @@ const STYLE_CATEGORIES = new Set([
   'REDUNDANCY',
   'PLAIN_ENGLISH',
   'WORDINESS',
-  // Punctuation and spacing. NOT the same thing as `issueType:
-  // 'typographical'`, which is a mis-typed WORD and belongs with spelling.
-  // The two read alike and mean opposite things, which is the trap this
-  // comment exists for.
-  'TYPOGRAPHY',
   'CASING',
 ])
 
+/**
+ * Findings this editor deliberately never shows.
+ *
+ * WHITESPACE, because Gabe reported it twice and it was right both times: a
+ * doubled space between words is not an error in a CV, the replacement is
+ * literally `" "` so the suggestion could not even render as a visible
+ * control, and ProseMirror normalises runs of spaces on its own anyway. Two of
+ * the five findings on a four-sentence test document were this rule.
+ *
+ * SPELLING, because Gabe asked for it to go and the numbers backed him. On a
+ * real 949-word CV it produced 26 findings and roughly two thirds were proper
+ * nouns LanguageTool has no dictionary for -- React, Next.js, shadcn/UI,
+ * Laravel, Tarlac. A checker that is wrong two times in three is not a
+ * checker, it is a list to dismiss.
+ *
+ * WHAT THIS COSTS, stated rather than buried: a genuine typo is no longer
+ * flagged. "calandar" will go through. That is the trade, and it is reversible
+ * by deleting `MORFOLOGIK` from this set -- but the browser's own spellcheck
+ * still underlines misspellings in the editor, which is where a typo is
+ * actually noticed.
+ */
+const DROPPED_RULES = new Set([
+  'CONSECUTIVE_SPACES',
+  'COMMA_PARENTHESIS_WHITESPACE',
+  'WHITESPACE_RULE',
+])
+const DROPPED_TYPES = new Set(['whitespace', 'misspelling', 'typographical'])
+
+/** True when a match is one this editor does not surface. See above. */
+export function isDroppedMatch(match: LanguageToolMatch): boolean {
+  const rule = match.rule
+  if (rule?.id && DROPPED_RULES.has(rule.id)) return true
+  if (DROPPED_TYPES.has((rule?.issueType ?? '').toLowerCase())) return true
+  if ((rule?.category?.id ?? '').toUpperCase() === 'TYPOS') return true
+  // A suggestion made only of whitespace cannot be rendered as a control and
+  // is never worth a card, whatever rule produced it.
+  const only = match.replacements ?? []
+  return only.length > 0 && only.every((r) => (r.value ?? '').trim() === '' && r.value !== '')
+}
+
+/**
+ * Which tab a match belongs to.
+ *
+ * `issueType` FIRST, because it is the service's own normalisation and is
+ * stable across the hundreds of individual rules. The category id is the
+ * fallback for the handful of rules that omit it. Anything unrecognised
+ * becomes grammar rather than being dropped: losing an issue is worse than
+ * filing it under the wrong heading, and `rawCategory` carries the original
+ * through for diagnosis.
+ */
 export function categoryOf(issueType?: string, categoryId?: string): IssueCategory {
   const type = (issueType ?? '').toLowerCase()
-  if (type === 'misspelling' || type === 'typographical') return 'spelling'
   if (STYLE_TYPES.has(type)) return 'style'
 
   const id = (categoryId ?? '').toUpperCase()
-  if (id === 'TYPOS') return 'spelling'
   if (STYLE_CATEGORIES.has(id)) return 'style'
   return 'grammar'
 }
@@ -180,7 +225,8 @@ export function toIssues(
         Number.isFinite(match.offset) &&
         Number.isFinite(match.length) &&
         match.offset >= 0 &&
-        match.length >= 0
+        match.length >= 0 &&
+        !isDroppedMatch(match)
     )
     .map((match) => ({
       start: match.offset + offset,
@@ -196,17 +242,38 @@ export function toIssues(
     }))
 }
 
-/** Issues split into the tabs that show them, in document order within each. */
+/** Issues split into the sections that show them, in document order. */
 export function splitByCategory(issues: GrammarIssue[]): {
-  spelling: GrammarIssue[]
   grammar: GrammarIssue[]
   style: GrammarIssue[]
 } {
   const byPosition = [...issues].sort((a, b) => a.start - b.start)
   return {
-    spelling: byPosition.filter((i) => i.category === 'spelling'),
     grammar: byPosition.filter((i) => i.category === 'grammar'),
     style: byPosition.filter((i) => i.category === 'style'),
+  }
+}
+
+/**
+ * The sentence a finding sits in, with where the flagged span falls inside it.
+ *
+ * WORD SHOWS THE SENTENCE and this pane did not, which is most of what made a
+ * finding hard to judge: "Agreement error" over a bare fragment tells you
+ * there is a problem but not whether the checker has understood you. It
+ * matters more now that spelling is gone and what is left is grammar, where
+ * false positives are subtler and the surrounding words are how you spot one.
+ */
+export function contextOf(
+  text: string,
+  issue: GrammarIssue,
+  radius = 60
+): { before: string; flagged: string; after: string } {
+  const start = Math.max(0, issue.start - radius)
+  const end = Math.min(text.length, issue.end + radius)
+  return {
+    before: (start > 0 ? '…' : '') + text.slice(start, issue.start),
+    flagged: text.slice(issue.start, issue.end),
+    after: text.slice(issue.end, end) + (end < text.length ? '…' : ''),
   }
 }
 

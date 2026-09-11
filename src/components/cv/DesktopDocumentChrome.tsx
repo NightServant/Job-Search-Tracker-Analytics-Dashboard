@@ -131,8 +131,28 @@ export function DesktopDocumentChrome({
       </div>
 
       <div className="flex flex-col">
+        {/*
+          THE RIBBON SITS ON ITS OWN GROUND (Gabe, 2026-09-11: "there is no
+          real dividers between components"). A hairline alone was not enough
+          separation: the toolbar, the rails and the page were all the same
+          off-white, so the chrome read as one undifferentiated field with
+          rules drawn through it.
+
+          TONE ALONE WAS NOT ENOUGH, AND THAT IS WORTH MEASURING RATHER THAN
+          arguing about. In light mode the three grounds are 255 / 250 / 244 in
+          luminance -- five and six units apart, which is very nearly
+          invisible and is exactly why the chrome read as one field. In dark
+          mode the same tiers are 19 / 28 / 40, nine and twelve apart, where
+          the tint genuinely does the work.
+
+          So both: `surface` for the ribbon and rails against `inset` around
+          the page, plus `border-border-default` at 212 -- 38 units against
+          surface, about seven times the tonal step -- to carry the boundary
+          where the tint cannot. The tint is not decorative; it is what makes
+          dark mode read without a heavier border.
+        */}
         {tools && (
-          <div className="flex flex-wrap items-center gap-2 border-y border-border-subtle py-2">
+          <div className="flex flex-wrap items-center gap-2 border-y border-border-default bg-bg-surface px-2 py-2">
             {tools}
           </div>
         )}
@@ -167,7 +187,11 @@ export function DesktopDocumentChrome({
             leftRail && !rightRail && 'xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-8'
           )}
         >
-          {leftRail && <aside className="min-w-0 xl:order-1">{leftRail}</aside>}
+          {leftRail && (
+            <aside className="min-w-0 rounded-[4px] border border-border-default bg-bg-surface p-4 xl:order-1">
+              {leftRail}
+            </aside>
+          )}
           {/* `id` IS LOAD-BEARING: the formatting ribbon points at this region
               with `aria-controls`, which is what tells a screen reader that a
               toolbar in the chrome above formats the document down here. A
@@ -178,7 +202,11 @@ export function DesktopDocumentChrome({
           >
             {children}
           </div>
-          {rightRail && <aside className="min-w-0 xl:order-3">{rightRail}</aside>}
+          {rightRail && (
+            <aside className="min-w-0 rounded-[4px] border border-border-default bg-bg-surface p-4 xl:order-3">
+              {rightRail}
+            </aside>
+          )}
         </div>
       </div>
 

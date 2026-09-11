@@ -4,11 +4,24 @@ import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { PanelSection } from '@/components/ui/panel-section'
 import { CssSpinner } from '@/components/ui/css-spinner'
-import type { GrammarIssue } from '@/services/grammar'
+import { contextOf, type GrammarIssue } from '@/services/grammar'
 import type { ProofreadState } from './useProofread'
 
 /**
  * The Spell Check and Grammar Check panes, following Word's Editor pane.
+ *
+ * SPELL CHECK IS GONE AND THIS PANE ABSORBED WHAT WAS WORTH KEEPING (Gabe,
+ * 2026-09-11). Spelling produced 26 findings on a real CV, two thirds of them
+ * proper nouns LanguageTool has no dictionary for; whitespace findings offered
+ * a suggestion that was literally a space. Both are filtered at the service
+ * boundary now, so this pane shows grammar and style and nothing else.
+ *
+ * WHAT "ENHANCED" MEANT IN PRACTICE: every finding now carries the SENTENCE it
+ * sits in, with the flagged span marked inside it. "Agreement error" over a
+ * bare fragment tells you something is wrong but not whether the checker has
+ * understood you -- and that matters more once spelling is gone, because what
+ * is left is grammar, where the false positives are subtler and the
+ * surrounding words are how you spot one.
  *
  * BOTH REFERENCE FEATURES ARE REAL SINCE LANGUAGETOOL REPLACED GRAMMARBOT,
  * which is worth recording because the pane was written twice:
@@ -126,123 +139,6 @@ function Unavailable({ state }: { state: ProofreadState }) {
   )
 }
 
-/**
- * ONE FLAGGED WORD, following the reference's spelling card.
- *
- * The word, what it is being replaced with, and the three ways out: take it,
- * skip this one, skip every one. The heading says "not in dictionary" as the
- * reference does, because that is the accurate description of what a spell
- * checker knows -- it has not found a mistake, it has failed to find the word.
- */
-function SpellingCard({
-  issue,
-  source,
-  state,
-}: {
-  issue: GrammarIssue
-  source: string
-  state: ProofreadState
-}) {
-  const word = source.slice(issue.start, issue.end)
-
-  return (
-    <li
-      data-finding="spelling"
-      className="flex min-h-[9rem] flex-col gap-3 rounded-[4px] border border-border-subtle bg-bg-canvas p-3"
-    >
-      <div className="flex flex-col gap-1">
-        <span className="text-label-caps uppercase text-text-muted">not in dictionary</span>
-        <span
-          className="text-body-l text-text-primary underline decoration-status-rejected-mark decoration-wavy underline-offset-4"
-          lang="en"
-        >
-          {word || '(blank)'}
-        </span>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <span className="text-label-caps uppercase text-text-secondary">suggestions</span>
-        {issue.replacements.length > 0 ? (
-          // EVERY ALTERNATIVE, as the reference shows -- taking one applies
-          // that one, not the first. Buttons rather than a list with a
-          // separate Apply: the suggestion IS the control.
-          <ul className="flex flex-col items-start gap-1">
-            {issue.replacements.map((replacement) => (
-              <li key={replacement}>
-                <button
-                  type="button"
-                  onClick={() => state.apply(issue, replacement)}
-                  className="rounded-[4px] border border-border-default bg-bg-canvas px-2 py-1 text-body-m text-text-primary transition-colors hover:border-accent-default hover:text-accent-default active:scale-[0.99]"
-                >
-                  <ReplacementLabel value={replacement} />
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="text-body-s text-text-muted">
-            no alternative offered — the word is simply not in the dictionary.
-          </p>
-        )}
-        {issue.message && <p className="text-body-s text-text-muted">{issue.message}</p>}
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" size="s" onClick={() => state.ignore(issue)}>
-          ignore once
-        </Button>
-        <Button variant="ghost" size="s" onClick={() => state.ignoreAll(issue)}>
-          ignore everywhere
-        </Button>
-      </div>
-    </li>
-  )
-}
-
-export function SpellCheckPane({ state }: { state: ProofreadState }) {
-  return (
-    // A MINIMUM HEIGHT so the pane holds its shape before a check has run and
-    // when a check comes back clean. Without it the rail collapsed to the
-    // height of one button and the column read as broken rather than empty.
-    <div className="flex min-h-[24rem] flex-col gap-6" data-pane="spelling">
-      <PanelSection title="spell check" icon="Check" className="border-t-0 pt-0">
-        <div className="flex flex-col gap-4">
-          <RunButton state={state} />
-          <Unavailable state={state} />
-
-          {state.ran && state.spelling.length === 0 && !state.error && (
-            <p className="text-body-s text-text-muted">
-              no spelling problems found.
-            </p>
-          )}
-
-          {state.spelling.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {state.spelling.map((issue, index) => (
-                <SpellingCard
-                  key={`${issue.start}-${index}`}
-                  issue={issue}
-                  source={state.text}
-                  state={state}
-                />
-              ))}
-            </ul>
-          )}
-
-          {state.ignored.size > 0 && (
-            <p className="border-t border-border-subtle pt-3 text-body-s text-text-muted">
-              {state.ignored.size} word{state.ignored.size === 1 ? '' : 's'} ignored for this
-              session. this is not saved to a dictionary.
-            </p>
-          )}
-
-          <p className="text-body-s text-text-muted">English (United States)</p>
-        </div>
-      </PanelSection>
-    </div>
-  )
-}
-
 /** ONE GRAMMAR FINDING: the correction and why, with the same three exits. */
 function GrammarCard({
   issue,
@@ -253,15 +149,22 @@ function GrammarCard({
   source: string
   state: ProofreadState
 }) {
-  const original = source.slice(issue.start, issue.end)
+  const context = contextOf(source, issue)
 
   return (
     <li
       data-finding="grammar"
       className="flex min-h-[8rem] flex-col gap-2 rounded-[4px] border border-border-subtle bg-bg-canvas p-3"
     >
-      <p className="text-body-s text-text-muted line-through decoration-text-muted/40">
-        {original || '(insertion)'}
+      {/* THE SENTENCE, with the flagged span marked inside it. A fragment on
+          its own cannot be judged; this is how you tell a real error from the
+          checker misreading you. */}
+      <p className="text-body-s leading-[1.6] text-text-muted">
+        {context.before}
+        <span className="bg-status-rejected-mark/15 text-text-primary underline decoration-status-rejected-mark decoration-wavy underline-offset-2">
+          {context.flagged || '·'}
+        </span>
+        {context.after}
       </p>
       {issue.message && <p className="text-body-m text-text-primary">{issue.message}</p>}
       {issue.replacements.length > 0 ? (
@@ -290,8 +193,8 @@ export function GrammarCheckPane({ state }: { state: ProofreadState }) {
   const { score } = state
 
   return (
-    // See SpellCheckPane: a floor, so the rail keeps its shape when there is
-    // nothing to report yet.
+    // A MINIMUM HEIGHT so the rail holds its shape before a check has run and
+    // when one comes back clean, rather than collapsing to one button.
     <div className="flex min-h-[24rem] flex-col gap-6" data-pane="grammar">
       <PanelSection title="editor score" icon="Pencil" className="border-t-0 pt-0">
         <div className="flex flex-col gap-4">
@@ -327,15 +230,14 @@ export function GrammarCheckPane({ state }: { state: ProofreadState }) {
 
       <PanelSection title="corrections" icon="AlertCircle">
         <div className="flex flex-col">
-          <CountRow label="spelling" count={score.spelling} />
           <CountRow label="grammar" count={score.grammar} />
         </div>
       </PanelSection>
 
       {/* REAL SINCE LANGUAGETOOL: style-tagged findings are the reference's
           Refinements. They are counted separately and weighted lower in the
-          score, because a redundant phrase is a preference and a misspelling
-          is a mistake. */}
+          score, because a redundant phrase is a preference and an agreement
+          error is a mistake. */}
       <PanelSection title="refinements" icon="Info">
         <div className="flex flex-col">
           <CountRow label="style and redundancy" count={score.style} />

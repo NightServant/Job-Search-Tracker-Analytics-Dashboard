@@ -4,7 +4,7 @@ import * as React from 'react'
 import { PanelSection } from '@/components/ui/panel-section'
 import type { Job } from '@/types'
 import { ApplicationPicker } from './ApplicationPicker'
-import { GrammarCheckPane, SpellCheckPane } from './ProofreadPanes'
+import { GrammarCheckPane } from './ProofreadPanes'
 import { TailoringAnalysisRail, type CvTailoringState } from './CvTailoring'
 import type { DocumentTabId } from './documentTabs'
 import type { ProofreadState } from './useProofread'
@@ -79,7 +79,6 @@ export function DocumentRailPane({
       )}
 
       {active === 'grammar' && <GrammarCheckPane state={proofread} />}
-      {active === 'spelling' && <SpellCheckPane state={proofread} />}
 
       {/* ONE PANE, BOTH HALVES, in the order you use them: the score says
           what a screener will miss, the rewrites are what to do about it.

@@ -29,7 +29,6 @@ import type { GrammarIssue } from '@/services/grammar'
 export interface ProofreadScore {
   /** 0..100, rounded. */
   value: number
-  spelling: number
   grammar: number
   style: number
   words: number
@@ -69,16 +68,15 @@ export function countWords(text: string): number {
 
 export function proofreadScore(text: string, issues: GrammarIssue[]): ProofreadScore {
   const words = countWords(text)
-  const spelling = issues.filter((i) => i.category === 'spelling').length
   const grammar = issues.filter((i) => i.category === 'grammar').length
   const style = issues.filter((i) => i.category === 'style').length
 
   // An empty document is not a perfect one, but it is not a flawed one
   // either, and dividing by zero words would make the score NaN.
-  if (words === 0) return { value: 100, spelling, grammar, style, words }
+  if (words === 0) return { value: 100, grammar, style, words }
 
-  const weighted = spelling + grammar + style * STYLE_WEIGHT
+  const weighted = grammar + style * STYLE_WEIGHT
   const density = weighted / words
   const value = Math.round(Math.max(0, 1 - density / FLOOR_DENSITY) * 100)
-  return { value, spelling, grammar, style, words }
+  return { value, grammar, style, words }
 }

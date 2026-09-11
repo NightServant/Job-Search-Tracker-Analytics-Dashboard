@@ -44,7 +44,6 @@ export interface ProofreadState {
   running: boolean
   ran: boolean
   error: string | null
-  spelling: GrammarIssue[]
   grammar: GrammarIssue[]
   style: GrammarIssue[]
   score: ProofreadScore
@@ -58,13 +57,7 @@ export interface ProofreadState {
   text: string
 }
 
-const EMPTY_SCORE: ProofreadScore = {
-  value: 100,
-  spelling: 0,
-  grammar: 0,
-  style: 0,
-  words: 0,
-}
+const EMPTY_SCORE: ProofreadScore = { value: 100, grammar: 0, style: 0, words: 0 }
 
 export function useProofread(editor: Editor | null): ProofreadState {
   const [running, setRunning] = React.useState(false)
@@ -165,10 +158,7 @@ export function useProofread(editor: Editor | null): ProofreadState {
     [issues, ignored, text, wordFor]
   )
 
-  const { spelling, grammar, style } = React.useMemo(
-    () => splitByCategory(visible),
-    [visible]
-  )
+  const { grammar, style } = React.useMemo(() => splitByCategory(visible), [visible])
 
   const score = React.useMemo(
     () => (ran ? proofreadScore(text, visible) : EMPTY_SCORE),
@@ -179,7 +169,6 @@ export function useProofread(editor: Editor | null): ProofreadState {
     running,
     ran,
     error,
-    spelling,
     grammar,
     style,
     score,

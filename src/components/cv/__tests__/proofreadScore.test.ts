@@ -49,13 +49,10 @@ describe('proofreadScore', () => {
   })
 
   it('reports each count separately for the corrections and refinements rows', () => {
-    const mixed = [
-      ...issues(2, 'misspelling', 'TYPOS'),
-      ...issues(3, 'grammar', 'GRAMMAR'),
-      ...issues(4, 'style', 'REDUNDANCY'),
-    ]
+    // Spelling is filtered at the service boundary now, so a score only ever
+    // sees grammar and style.
+    const mixed = [...issues(3, 'grammar', 'GRAMMAR'), ...issues(4, 'style', 'REDUNDANCY')]
     const score = proofreadScore('word '.repeat(100), mixed)
-    expect(score.spelling).toBe(2)
     expect(score.grammar).toBe(3)
     expect(score.style).toBe(4)
   })
@@ -64,7 +61,7 @@ describe('proofreadScore', () => {
     // A redundant phrase is a preference; a misspelling is an error. A wordy
     // but correct CV should not score like a careless one.
     const wordy = proofreadScore('word '.repeat(200), issues(6, 'style', 'REDUNDANCY')).value
-    const careless = proofreadScore('word '.repeat(200), issues(6, 'misspelling', 'TYPOS')).value
+    const careless = proofreadScore('word '.repeat(200), issues(6, 'grammar', 'GRAMMAR')).value
     expect(wordy).toBeGreaterThan(careless)
   })
 
@@ -79,7 +76,7 @@ describe('proofreadScore', () => {
     // The measured case the floor was changed for: 949 words, 26 spelling and
     // 24 style. It should land clearly between "clean" and "hopeless".
     const mixed = [
-      ...issues(26, 'misspelling', 'TYPOS'),
+      ...issues(26, 'grammar', 'GRAMMAR'),
       ...issues(24, 'style', 'REDUNDANCY'),
     ]
     const value = proofreadScore('word '.repeat(949), mixed).value
