@@ -18,6 +18,7 @@ function configWith(tailoring: Partial<IntegrationConfig['tailoring']> = {}): In
       ...tailoring,
     },
     esco: { baseUrl: 'https://esco.test/api', enabled: true },
+    grammar: { baseUrl: 'https://grammar.test/v1/check' },
   }
 }
 

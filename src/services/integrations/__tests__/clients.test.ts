@@ -13,6 +13,7 @@ function configWith(overrides: Partial<IntegrationConfig> = {}): IntegrationConf
     formatex: { baseUrl: 'https://formatex.test/api/v1' },
     tailoring: { model: '' },
     esco: { baseUrl: 'https://esco.test/api', enabled: true },
+    grammar: { baseUrl: 'https://grammar.test/v1/check' },
     ...overrides,
   }
 }
