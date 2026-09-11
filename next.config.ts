@@ -30,6 +30,42 @@ const nextConfig: NextConfig = {
    * ~2MB of zip machinery no client should ever receive.
    */
   serverExternalPackages: ['docx'],
+  /**
+   * THE MIDDLEWARE RUNS ON NODE, AND THIS FLAG IS WHAT MAKES THAT REAL.
+   *
+   * vercel.json declares `services` -- `web` (this app) bound to `extractor`
+   * (the FastAPI scraper in scraper/). Services do not support the Edge
+   * runtime, and Next compiles middleware to an Edge Function by default, so
+   * the first deploy of src/middleware.ts failed the build outright:
+   *
+   *   Edge Runtime is not supported in services. Service "web" produced Edge
+   *   Function output "src/middleware".
+   *
+   * `runtime: 'nodejs'` in the middleware's own config is the other half. ON
+   * ITS OWN IT IS WORSE THAN USELESS: without this flag Next 15.5 accepts the
+   * export, builds successfully, and SILENTLY EMITS NO MIDDLEWARE AT ALL --
+   * the `ƒ Middleware` line disappears from the build summary and the auth
+   * gate ceases to exist. A green build that quietly removes the thing
+   * standing in front of every private route is the worst shape a failure can
+   * take, so neither half of this may be removed without the other.
+   *
+   * NEXT 15.5.23 WARNS "Unrecognized key(s) in object: 'nodeMiddleware'" AND
+   * HONOURS IT ANYWAY -- the config schema lags the feature. The same build
+   * prints "Experiments (use with caution): ✓ nodeMiddleware". Do not chase
+   * that warning; it is noise, and the behaviour is verified below.
+   *
+   * DO NOT TRUST middleware-manifest.json TO CONFIRM ANY OF THIS. For node
+   * middleware it stays `{"middleware":{},"sortedMiddleware":[]}` even when
+   * the middleware is present and running. The only honest check is a request:
+   * `next start`, then GET /dashboard signed out and expect 307 -> /login.
+   *
+   * This is also the direction Vercel recommends independently of the services
+   * constraint -- Edge is no longer the preferred runtime, and Node middleware
+   * runs in the same regions.
+   */
+  experimental: {
+    nodeMiddleware: true,
+  },
   eslint: {
     // The repo already lints via `npm run lint` with its own config. Next bundles
     // a stricter one that fails the build on pre-existing `any` usages across

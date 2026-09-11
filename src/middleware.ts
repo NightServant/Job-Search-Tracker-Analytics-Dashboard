@@ -105,6 +105,19 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   /**
+   * NODE, NOT EDGE, AND IT IS LOAD-BEARING IN BOTH DIRECTIONS.
+   *
+   * Required because vercel.json uses `services`, which reject Edge Function
+   * output -- with this line absent the deploy fails the build. But this line
+   * ALONE, without `experimental.nodeMiddleware` in next.config.ts, makes Next
+   * 15.5 emit no middleware whatsoever while still reporting success: no
+   * build error, no `ƒ Middleware` in the summary, and no auth gate in front
+   * of any private route.
+   *
+   * The two settings are a pair. See next.config.ts for the full account.
+   */
+  runtime: 'nodejs',
+  /**
    * Everything except static assets and images.
    *
    * `_next/static`, `_next/image` and the file extensions below are served
