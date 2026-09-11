@@ -152,3 +152,46 @@ describe('normalizeTypography', () => {
     }
   })
 })
+
+import { readRuledHeadings, ruleKey } from '../pageGeometry'
+
+describe('readRuledHeadings', () => {
+  const ruled = (text: string) =>
+    `<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:color="1A1A1A"/></w:pBdr>` +
+    `</w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`
+  const plain = (text: string) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`
+
+  it('finds the headings Word underlines with a paragraph border', () => {
+    const xml = ruled('PROFESSIONAL SUMMARY') + plain('body text') + ruled('EDUCATION')
+    expect(readRuledHeadings(xml)).toEqual(['PROFESSIONAL SUMMARY', 'EDUCATION'])
+  })
+
+  it('joins a heading split across runs, which Word does constantly', () => {
+    // Word splits a run at every formatting change, so "TECHNICAL SKILLS" can
+    // arrive as three <w:t> elements.
+    const split =
+      '<w:p><w:pPr><w:pBdr><w:bottom w:val="single"/></w:pBdr></w:pPr>' +
+      '<w:r><w:t>TECH</w:t></w:r><w:r><w:t>NICAL </w:t></w:r><w:r><w:t>SKILLS</w:t></w:r></w:p>'
+    expect(readRuledHeadings(split)).toEqual(['TECHNICAL SKILLS'])
+  })
+
+  it('ignores a border that is explicitly none', () => {
+    const none = '<w:p><w:pPr><w:pBdr><w:bottom w:val="nil"/></w:pBdr></w:pPr><w:r><w:t>x</w:t></w:r></w:p>'
+    expect(readRuledHeadings(none)).toEqual([])
+  })
+
+  it('ignores a bordered paragraph with no text', () => {
+    const empty = '<w:p><w:pPr><w:pBdr><w:bottom w:val="single"/></w:pBdr></w:pPr></w:p>'
+    expect(readRuledHeadings(empty)).toEqual([])
+  })
+
+  it('returns nothing for a document with no borders at all', () => {
+    expect(readRuledHeadings(plain('just text'))).toEqual([])
+  })
+})
+
+describe('ruleKey', () => {
+  it('matches across the whitespace and case mammoth normalises', () => {
+    expect(ruleKey('  PROFESSIONAL   SUMMARY ')).toBe(ruleKey('Professional Summary'))
+  })
+})

@@ -231,3 +231,48 @@ export function normalizeTypography(raw: unknown): DocumentTypography {
     paragraphSpacing: num(t.paragraphSpacing, -1, 100),
   }
 }
+
+/**
+ * The section headings a document underlines with a paragraph border.
+ *
+ * WORD DRAWS THESE WITH `w:pBdr`, a border on the PARAGRAPH rather than a
+ * horizontal rule between paragraphs, and it is the single most visible thing
+ * on a CV laid out this way: eight rules under PROFESSIONAL SUMMARY, TECHNICAL
+ * SKILLS, EDUCATION and the rest are most of what makes the page look like a
+ * CV rather than a memo. Gabe reported them as "no borders" and they were the
+ * one part of that report still unfixed after the font and spacing.
+ *
+ * MAMMOTH CANNOT CARRY THEM. Its paragraph object exposes exactly `type`,
+ * `children`, `styleId`, `styleName`, `numbering`, `alignment` and `indent` --
+ * probed directly rather than assumed -- so there is no transform or style map
+ * that would preserve a border. The only way to know is to read the package.
+ *
+ * MATCHED BY TEXT, WHICH IS RELIABLE FOR EXACTLY THIS. Matching by index would
+ * break the moment mammoth merges or drops a paragraph, and matching by style
+ * name fails because these carry none. Section headings are short, upper-case
+ * and unique within a CV, so their text is a good key -- and a false positive
+ * costs a rule under a line that should not have one, not a corrupted
+ * document.
+ */
+export function readRuledHeadings(documentXml: string): string[] {
+  const paragraphs = documentXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) ?? []
+  const ruled: string[] = []
+
+  for (const paragraph of paragraphs) {
+    // A bottom border specifically: Word also uses `w:pBdr` for boxes and for
+    // the line above a footnote separator, and neither is a heading rule.
+    if (!/<w:pBdr>[\s\S]*?<w:bottom\b[^>]*w:val="(?!nil|none)/.test(paragraph)) continue
+    const text = [...paragraph.matchAll(/<w:t[^>]*>([^<]*)<\/w:t>/g)]
+      .map((m) => m[1])
+      .join('')
+      .trim()
+    if (text) ruled.push(text)
+  }
+
+  return ruled
+}
+
+/** Compared case- and space-insensitively, since mammoth normalises runs. */
+export function ruleKey(text: string): string {
+  return text.replace(/\s+/g, ' ').trim().toLowerCase()
+}

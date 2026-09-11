@@ -1,5 +1,6 @@
 import {
   Document,
+  BorderStyle,
   HeadingLevel,
   Packer,
   Paragraph,
@@ -72,6 +73,21 @@ function paragraphsFrom(node: TipTapNode): Paragraph[] {
         new Paragraph({
           heading: HEADING_FOR[level] ?? HeadingLevel.HEADING_3,
           children: runsFrom(node),
+          // THE RULE UNDER A SECTION HEADING, WRITTEN BACK. Word draws it as
+          // a border on the paragraph; the import reads it out of `w:pBdr`
+          // and marks the heading, and without this the export would drop it
+          // again -- so a document imported with eight section rules would
+          // come back out with none, which is the page-setup bug repeating on
+          // a different property.
+          //
+          // `size: 6` is eighths of a point, matching what Word wrote.
+          ...(node.attrs?.ruled
+            ? {
+                border: {
+                  bottom: { style: BorderStyle.SINGLE, size: 6, color: '1A1A1A', space: 2 },
+                },
+              }
+            : {}),
         }),
       ]
     }

@@ -1,7 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import JSZip from 'jszip'
-import { readPageGeometry, readTypography, textColumnInches } from '../pageGeometry'
+import {
+  readPageGeometry,
+  readRuledHeadings,
+  readTypography,
+  ruleKey,
+  textColumnInches,
+} from '../pageGeometry'
+import { Document, Packer } from 'docx'
 import { sectionsFrom } from '@/services/integrations/docxExport'
 
 /**
@@ -69,6 +76,25 @@ describe.skipIf(!present)('a real .docx from Word', () => {
     expect(t.fontFamily).toContain(runFaces[0])
   })
 
+  it('finds the rules Word draws under each section heading', async () => {
+    // The last unfixed part of "no borders, font, spacing". Word draws these
+    // with `w:pBdr` on the paragraph, and mammoth carries no borders at all --
+    // its paragraph object exposes only type, children, styleId, styleName,
+    // numbering, alignment and indent, probed directly.
+    const zip = await JSZip.loadAsync(readFileSync(FILE!))
+    const documentXml = await zip.file('word/document.xml')!.async('string')
+    const ruled = readRuledHeadings(documentXml)
+
+    expect(ruled.length).toBeGreaterThan(0)
+    // Every one is a real heading rather than a stray bordered paragraph.
+    for (const heading of ruled) {
+      expect(heading.trim().length).toBeGreaterThan(2)
+      expect(heading.length).toBeLessThan(80)
+    }
+    // Keys normalise, which is how they are matched back to mammoth's output.
+    expect(new Set(ruled.map(ruleKey)).size).toBe(ruled.length)
+  })
+
   it('exports back at its own page, not at the editor default', async () => {
     const geometry = readPageGeometry(await load())
     const [section] = sectionsFrom({ type: 'doc', attrs: { pageGeometry: geometry }, content: [] })
@@ -120,5 +146,31 @@ describe('the editor adapts to other page sizes', () => {
     expect(body(cases[0].xml)).toBeCloseTo(9.69, 1) // A4 at 1in
     expect(body(cases[1].xml)).toBeCloseTo(12, 1)   // Legal at 1in
     expect(body(cases[1].xml)).not.toBeCloseTo(9.4, 1)
+  })
+})
+
+describe('a heading rule survives the round trip', () => {
+  it('writes w:pBdr back into the packed file, for ruled headings only', async () => {
+    // Without this the export drops the eight section rules a document was
+    // imported with -- the page-setup bug repeating on a different property.
+    //
+    // ASSERTED ON THE PACKED XML rather than on the Paragraph object, because
+    // `docx` does not expose its options and a test against internals would
+    // pass while the file came out blank.
+    const sections = sectionsFrom({
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2, ruled: true }, content: [{ type: 'text', text: 'EDUCATION' }] },
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Plain' }] },
+      ],
+    })
+    const zip = await JSZip.loadAsync(await Packer.toBuffer(new Document({ sections })))
+    const xml = await zip.file('word/document.xml')!.async('string')
+
+    // Exactly one: the ruled heading, not the plain one beside it.
+    expect(xml.match(/<w:pBdr>/g) ?? []).toHaveLength(1)
+    expect(xml).toContain('<w:bottom w:val="single"')
+    // And it is attached to the heading that carried the mark.
+    expect(xml).toMatch(/<w:pBdr>[\s\S]*?<\/w:pPr>[\s\S]*?EDUCATION/)
   })
 })

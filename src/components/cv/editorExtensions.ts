@@ -1,5 +1,6 @@
 import StarterKit from '@tiptap/starter-kit'
 import Document from '@tiptap/extension-document'
+import Heading from '@tiptap/extension-heading'
 import TextAlign from '@tiptap/extension-text-align'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
@@ -68,10 +69,34 @@ const DocumentWithPage = Document.extend({
   },
 })
 
+/**
+ * Headings, taught to carry the rule Word draws under a section.
+ *
+ * `w:pBdr` is a border on the PARAGRAPH, not a horizontal rule between them,
+ * and it is most of what makes a CV look like a CV. mammoth cannot carry it --
+ * its paragraph object exposes no borders at all -- so the import matches
+ * those headings by text and sets this. Rendered as a real attribute so it
+ * survives a round trip through the editor and reaches the export.
+ */
+const HeadingWithRule = Heading.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      ruled: {
+        default: false,
+        renderHTML: (attributes) =>
+          attributes.ruled ? { 'data-ruled': 'true' } : {},
+        parseHTML: (element) => element.getAttribute('data-ruled') === 'true',
+      },
+    }
+  },
+})
+
 export const WORD_EDITOR_EXTENSIONS = [
-  // StarterKit's own Document is replaced by the one above.
-  StarterKit.configure({ document: false }),
+  // StarterKit's own Document and Heading are replaced by the two above.
+  StarterKit.configure({ document: false, heading: false }),
   DocumentWithPage,
+  HeadingWithRule,
   TextStyle,
   FontFamily,
   FontSize,

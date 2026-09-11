@@ -3,7 +3,9 @@ import {
   DEFAULT_GEOMETRY,
   NO_TYPOGRAPHY,
   readPageGeometry,
+  readRuledHeadings,
   readTypography,
+  ruleKey,
   type DocumentTypography,
   type PageGeometry,
 } from './pageGeometry'
@@ -215,7 +217,7 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
     }
   )
 
-  return withSetup(htmlToWordContent(html), setup)
+  return withSetup(htmlToWordContent(html, setup.ruled), setup)
 }
 
 /**
@@ -229,7 +231,7 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
  */
 async function readSetupFromDocx(
   arrayBuffer: ArrayBuffer
-): Promise<{ geometry: PageGeometry; typography: DocumentTypography }> {
+): Promise<{ geometry: PageGeometry; typography: DocumentTypography; ruled: string[] }> {
   try {
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(arrayBuffer)
@@ -237,13 +239,14 @@ async function readSetupFromDocx(
     // `styles.xml` is optional and only supplies the fallback face, so a
     // package without one still reads its geometry and its run fonts.
     const stylesXml = (await zip.file('word/styles.xml')?.async('string')) ?? ''
-    if (!documentXml) return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY }
+    if (!documentXml) return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY, ruled: [] }
     return {
       geometry: readPageGeometry(documentXml),
       typography: readTypography(documentXml, stylesXml),
+      ruled: readRuledHeadings(documentXml),
     }
   } catch {
-    return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY }
+    return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY, ruled: [] }
   }
 }
 
@@ -258,7 +261,7 @@ async function readSetupFromDocx(
  */
 function withSetup(
   content: ResumeContent,
-  setup: { geometry: PageGeometry; typography: DocumentTypography }
+  setup: { geometry: PageGeometry; typography: DocumentTypography; ruled: string[] }
 ): ResumeContent {
   return {
     ...(content as object),
@@ -273,10 +276,24 @@ function withSetup(
 type TipTapNode = { type: string; attrs?: Record<string, unknown>; content?: TipTapNode[]; marks?: Array<{ type: string }>; text?: string }
 
 /** Exported for tests: the HTML walk, without the file reading around it. */
-export function htmlToWordContent(html: string): ResumeContent {
+export function htmlToWordContent(html: string, ruled: string[] = []): ResumeContent {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
   const blocks: TipTapNode[] = []
   collectBlocks(doc.body, blocks)
+
+  // THE RULE UNDER A SECTION HEADING, put back. Word draws it as a border on
+  // the paragraph and mammoth cannot carry it, so the headings that had one
+  // are matched by text and marked here. See lib/pageGeometry.
+  if (ruled.length > 0) {
+    const keys = new Set(ruled.map(ruleKey))
+    for (const block of blocks) {
+      if (block.type !== 'heading') continue
+      const text = (block.content ?? []).map((n) => n.text ?? '').join('')
+      if (keys.has(ruleKey(text))) {
+        block.attrs = { ...(block.attrs ?? {}), ruled: true }
+      }
+    }
+  }
 
   return {
     type: 'doc',
