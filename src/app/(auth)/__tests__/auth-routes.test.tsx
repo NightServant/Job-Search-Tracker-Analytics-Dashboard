@@ -8,14 +8,23 @@ const signUp = vi.fn()
 const verifySignUpOtp = vi.fn()
 const resendSignUpOtp = vi.fn()
 const signInWithProvider = vi.fn()
-// `useSearchParams` arrived with `?next=` support (2026-09-11): middleware
-// sends a signed-out visitor here with the path they asked for attached, and
-// the page reads it back. Defaults to no parameter; one test overrides it.
-const nextParam = vi.hoisted(() => vi.fn((_key: string) => null as string | null))
+// `?next=` support arrived with the middleware (2026-09-11): a signed-out
+// visitor is sent here with the path they asked for attached, and the page
+// reads it back on submit.
+//
+// THE TESTS SET A REAL URL rather than mocking `useSearchParams`, because the
+// page deliberately no longer calls it -- that hook opts a client page out of
+// static prerendering and cost /login its server-rendered form. A mock would
+// have happily passed either way, which is precisely the problem: it tests the
+// parameter plumbing while hiding the thing that actually broke.
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn() }),
-  useSearchParams: () => ({ get: nextParam }),
 }))
+
+/** Puts a query string on the jsdom URL the way arriving at the link would. */
+function atUrl(search: string) {
+  window.history.replaceState({}, '', `/login${search}`)
+}
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
     user: null,
@@ -41,6 +50,9 @@ beforeEach(() => {
   resendSignUpOtp.mockReset()
   signInWithProvider.mockReset()
   window.localStorage.clear()
+  // jsdom keeps the URL between tests, so a leftover `?next=` would leak into
+  // the next one and pass it for the wrong reason.
+  atUrl('')
 })
 
 async function fill(password = 'hunter22') {
@@ -130,9 +142,7 @@ describe('the /signup route', () => {
     // from a private route. Ignoring it would drop a deep link on every
     // sign-in -- somebody following a link to one application would land on
     // the dashboard and have to find it again.
-    nextParam.mockImplementation((key) =>
-      key === 'next' ? '/applications?application=abc-123' : null
-    )
+    atUrl('?next=%2Fapplications%3Fapplication%3Dabc-123')
     signIn.mockResolvedValue(undefined)
     render(<LoginRoute />)
     await fill()
@@ -140,18 +150,16 @@ describe('the /signup route', () => {
     await waitFor(() =>
       expect(push).toHaveBeenCalledWith('/applications?application=abc-123')
     )
-    nextParam.mockImplementation(() => null)
   })
 
   it('refuses a `next` that would leave this origin', async () => {
     // `?next=` is in a URL somebody can send you. `//evil.com` is a valid
     // navigation target to a browser and is exactly what an open redirect is.
-    nextParam.mockImplementation((key) => (key === 'next' ? '//evil.com' : null))
+    atUrl('?next=%2F%2Fevil.com')
     signIn.mockResolvedValue(undefined)
     render(<LoginRoute />)
     await fill()
     await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
     await waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard'))
-    nextParam.mockImplementation(() => null)
   })
 })

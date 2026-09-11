@@ -1,7 +1,6 @@
 'use client'
 
-import { Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { AuthScreen } from '@/components/auth/AuthScreen'
 import { safeNextPath } from '@/lib/authRoutes'
@@ -22,37 +21,41 @@ import { safeNextPath } from '@/lib/authRoutes'
  * for. `safeNextPath` is what stops that parameter being an open redirect --
  * it is in a URL somebody can send you, so `//evil.com` is refused rather than
  * trusted.
+ *
+ * IT IS READ AT SUBMIT TIME, FROM `window.location`, AND NOT VIA
+ * `useSearchParams`. That is not a style preference, it is the difference
+ * between this page having a server render and not having one. Calling
+ * `useSearchParams` in a client component opts it out of static prerendering,
+ * and Next 15 only permits that behind a Suspense boundary -- so the first
+ * version of this file wrapped itself in one and shipped HTML whose boundary
+ * was EMPTY. Measured on the production build: `/signup` had its three inputs
+ * in the markup and `/login` had none at all, the form appearing only after
+ * hydration. SignedOutOnly's docblock calls losing an auth form's server
+ * render a worse regression than the flash it was fixing; it was right, and
+ * this was the same mistake wearing a different hat.
+ *
+ * Reading the parameter when the form is actually submitted costs nothing: it
+ * only matters after a click, which is long after hydration, and it is the
+ * same string either way. The page goes back to being fully static.
  */
-function LoginPage() {
+export default function Page() {
   const router = useRouter()
-  const params = useSearchParams()
   const { signIn, signInWithProvider } = useAuth()
-  const next = safeNextPath(params.get('next')) ?? '/dashboard'
 
   return (
     <AuthScreen
       mode="signin"
       onSubmit={async (email, password) => {
         await signIn(email, password)
-        router.push(next)
+        const next = safeNextPath(
+          new URLSearchParams(window.location.search).get('next')
+        )
+        router.push(next ?? '/dashboard')
       }}
       // No router call on this path: signInWithProvider hands the browser to
       // the provider, so the page is on its way out. Pushing a route into a
       // navigation that is already happening is a race with no winner.
       onProvider={signInWithProvider}
     />
-  )
-}
-
-/**
- * `useSearchParams` opts a client page out of static prerendering, which Next
- * 15 fails the build over unless the read sits behind a Suspense boundary --
- * the same wrapper `/applications` and `/cv` already need.
- */
-export default function Page() {
-  return (
-    <Suspense>
-      <LoginPage />
-    </Suspense>
   )
 }
