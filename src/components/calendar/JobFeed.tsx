@@ -64,6 +64,10 @@ export interface JobFeedProps {
   industries?: FeedFacet[]
   industry?: string | null
   onIndustryChange?: (slug: string) => void
+  /** The feed's geo taxonomy. Empty means no region filter is drawn. */
+  locations?: FeedFacet[]
+  geo?: string | null
+  onGeoChange?: (slug: string) => void
   className?: string
 }
 
@@ -105,6 +109,9 @@ export function JobFeed({
   industries = [],
   industry = null,
   onIndustryChange,
+  locations = [],
+  geo = null,
+  onGeoChange,
   className,
 }: JobFeedProps) {
   const appHref = useAppHref()
@@ -144,6 +151,29 @@ export function JobFeed({
           </CardDescription>
           <CardAction>
             <div className="flex flex-wrap items-center gap-2">
+              {/* WHERE, THEN WHAT. Region first because it is the filter that
+                  decides whether the rail is usable at all: unfiltered, this
+                  feed is overwhelmingly US-eligible, so somebody outside the
+                  US was reading a list of roles they cannot take (Gabe,
+                  2026-09-11). It opens on the reader's own country when the
+                  feed lists one -- see `geoSlugForCountry`. */}
+              {locations.length > 0 && (
+                <div className="w-48 max-sm:w-full">
+                  <Select
+                    id="job-feed-geo"
+                    icon="Globe"
+                    aria-label="Filter roles by region"
+                    value={geo ?? ANY_INDUSTRY}
+                    onValueChange={(next) => onGeoChange?.(next)}
+                    items={[
+                      { value: ANY_INDUSTRY, label: 'anywhere' },
+                      ...locations
+                        .filter((facet) => facet.slug !== 'anywhere')
+                        .map((facet) => ({ value: facet.slug, label: facet.name })),
+                    ]}
+                  />
+                </div>
+              )}
               {industries.length > 0 && (
                 // Width on a wrapper, not on the Select: `Select`'s own root is
                 // `w-full` and only its trigger takes `className`.
@@ -189,7 +219,7 @@ export function JobFeed({
 
           {!loading && !error && jobs.length === 0 && (
             <p className="text-body-s text-text-muted" data-job-feed-state="empty">
-              nothing posted in this field right now. try another one.
+              nothing posted here right now. try another region or field.
             </p>
           )}
 

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import {
   fetchFeedIndustries,
+  fetchFeedLocations,
   fetchRemoteJobs,
   type FeedFacet,
   type FeedJob,
@@ -19,10 +20,10 @@ import {
  * morning and an afternoon visit differ, and long enough that clicking
  * between screens costs nothing.
  */
-export function useJobFeed(industry: string | null, enabled = true) {
+export function useJobFeed(industry: string | null, geo: string | null, enabled = true) {
   return useQuery<FeedJob[]>({
-    queryKey: ['job-feed', industry],
-    queryFn: ({ signal }) => fetchRemoteJobs({ count: 24, industry }, signal),
+    queryKey: ['job-feed', industry, geo],
+    queryFn: ({ signal }) => fetchRemoteJobs({ count: 24, industry, geo }, signal),
     enabled,
     staleTime: 15 * 60_000,
     gcTime: 60 * 60_000,
@@ -36,6 +37,19 @@ export function useJobFeedIndustries(enabled = true) {
   return useQuery<FeedFacet[]>({
     queryKey: ['job-feed-industries'],
     queryFn: ({ signal }) => fetchFeedIndustries(signal),
+    enabled,
+    staleTime: Infinity,
+    gcTime: 24 * 60 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 1,
+  })
+}
+
+/** The feed's own geo taxonomy, behind the panel's region filter. */
+export function useJobFeedLocations(enabled = true) {
+  return useQuery<FeedFacet[]>({
+    queryKey: ['job-feed-locations'],
+    queryFn: ({ signal }) => fetchFeedLocations(signal),
     enabled,
     staleTime: Infinity,
     gcTime: 24 * 60 * 60_000,

@@ -1,10 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
-import {
-  fetchHolidayCountries,
-  fetchPublicHolidays,
-  type HolidayCountry,
-  type PublicHoliday,
-} from '@/services/holidays'
+import { fetchPublicHolidays, type PublicHoliday } from '@/services/holidays'
 
 /**
  * Public holidays for the years a calendar is currently showing.
@@ -34,19 +29,6 @@ export function usePublicHolidays(years: number[], countryCode: string | null) {
       return pages.flat()
     },
     enabled: !!countryCode && sorted.length > 0,
-    staleTime: Infinity,
-    gcTime: 24 * 60 * 60_000,
-    refetchOnWindowFocus: false,
-    retry: 1,
-  })
-}
-
-/** The country list behind the calendar's picker. Fetched once, kept. */
-export function useHolidayCountries(enabled = true) {
-  return useQuery<HolidayCountry[]>({
-    queryKey: ['holiday-countries'],
-    queryFn: ({ signal }) => fetchHolidayCountries(signal),
-    enabled,
     staleTime: Infinity,
     gcTime: 24 * 60 * 60_000,
     refetchOnWindowFocus: false,

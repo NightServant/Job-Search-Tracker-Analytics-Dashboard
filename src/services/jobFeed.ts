@@ -68,6 +68,9 @@ const API = 'https://jobicy.com/api/v2/remote-jobs'
 /** Where the chosen industry is remembered. Per-browser; there is no column. */
 export const JOB_FEED_INDUSTRY_KEY = 'worktrack.job-feed-industry'
 
+/** Where the chosen region is remembered. Same trade as the industry. */
+export const JOB_FEED_GEO_KEY = 'worktrack.job-feed-geo'
+
 /**
  * The handful of named entities this feed actually emits.
  *
@@ -191,6 +194,61 @@ export async function fetchRemoteJobs(
     .map(toFeedJob)
     .filter((job): job is FeedJob => job !== null)
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
+}
+
+/**
+ * The geo slugs the feed currently offers — regions and countries both.
+ *
+ * IT EXISTS BECAUSE THE FEED WAS ALL AMERICAN (Gabe, 2026-09-11: "I want you
+ * to include jobs outside of US"). Unfiltered, Jobicy returns whatever is
+ * newest, and what is newest is overwhelmingly US-eligible — so a tracker used
+ * from Manila opened on a rail of roles nobody there can take. `jobGeo` is an
+ * ELIGIBILITY field, not an office address: `APAC` means they will hire in
+ * APAC, which is the question somebody outside the US is actually asking.
+ *
+ * Fetched rather than hardcoded, for the reason the industries are: the API's
+ * own documentation says to read the current slugs, and a stale one returns an
+ * empty feed that looks like a broken panel.
+ */
+export async function fetchFeedLocations(signal?: AbortSignal): Promise<FeedFacet[]> {
+  const body = (await getJson({ get: 'locations' }, signal)) as { locations?: unknown }
+  const rows = Array.isArray(body.locations) ? body.locations : []
+  return rows
+    .map((raw) => {
+      const row = (raw ?? {}) as Record<string, unknown>
+      const slug = decode(row.geoSlug)
+      const name = decode(row.geoName)
+      return slug && name ? { slug, name } : null
+    })
+    .filter((facet): facet is FeedFacet => facet !== null)
+}
+
+/**
+ * The feed's slug for a country code, by matching the country's English name.
+ *
+ * `Intl.DisplayNames` IS THE WHOLE TRICK and it is why there is no second
+ * lookup table in this repository. The browser already knows that `PH` is
+ * "Philippines"; Jobicy already publishes a location called "Philippines".
+ * Matching those two strings is the entire mapping, and it stays correct as
+ * the feed adds countries without anybody maintaining a list.
+ *
+ * Returns null when the feed has no such country -- most of them -- and the
+ * caller falls back to a region or to anywhere.
+ */
+export function geoSlugForCountry(
+  countryCode: string | null,
+  locations: FeedFacet[]
+): string | null {
+  if (!countryCode || locations.length === 0) return null
+  let name: string | undefined
+  try {
+    name = new Intl.DisplayNames(['en'], { type: 'region' }).of(countryCode)
+  } catch {
+    return null
+  }
+  if (!name || name === countryCode) return null
+  const wanted = name.toLowerCase()
+  return locations.find((facet) => facet.name.toLowerCase() === wanted)?.slug ?? null
 }
 
 /**

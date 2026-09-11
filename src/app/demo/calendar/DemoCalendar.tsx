@@ -5,6 +5,7 @@ import { Calendar } from '@/components/calendar/Calendar'
 import { JobFeed } from '@/components/calendar/JobFeed'
 import { useCalendarExtras } from '@/hooks/useCalendarExtras'
 import { dayKey } from '@/lib/calendar'
+import { buildUpNext } from '@/lib/upNext'
 import { DEMO } from '@/lib/demoFixture'
 
 /**
@@ -34,11 +35,16 @@ const applicationsByDay = DEMO.jobs.reduce<Record<string, number>>((map, job) =>
 
 export function DemoCalendar() {
   const extras = useCalendarExtras()
+  // Rebuilt per render rather than at module scope: `buildUpNext` measures
+  // against the clock, and a value frozen at import would age on a long-lived
+  // tab.
+  const upNext = React.useMemo(() => buildUpNext(DEMO.events, DEMO.jobs), [])
   return (
     <Calendar
       events={DEMO.events}
       companyByJobId={companyByJobId}
       applicationsByDay={applicationsByDay}
+      upNext={upNext}
       feed={<JobFeed {...extras.feed} />}
       {...extras.calendar}
     />

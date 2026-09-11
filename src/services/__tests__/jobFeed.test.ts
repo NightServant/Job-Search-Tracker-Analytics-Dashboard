@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toFeedJob } from '../jobFeed'
+import { geoSlugForCountry, toFeedJob } from '../jobFeed'
 
 const RAW = {
   id: 152938,
@@ -77,5 +77,38 @@ describe('toFeedJob', () => {
     const job = toFeedJob({ ...RAW, salaryMin: 0, salaryMax: 0 })!
     expect(job.salaryMin).toBeNull()
     expect(job.salaryMax).toBeNull()
+  })
+})
+
+describe('geoSlugForCountry', () => {
+  const LOCATIONS = [
+    { slug: 'anywhere', name: 'Anywhere' },
+    { slug: 'apac', name: 'APAC' },
+    { slug: 'philippines', name: 'Philippines' },
+    { slug: 'singapore', name: 'Singapore' },
+    { slug: 'usa', name: 'USA' },
+  ]
+
+  it('matches a country code to the feed slug through Intl, with no second lookup table', () => {
+    // The browser already knows PH is "Philippines" and the feed already
+    // publishes a location by that name. Matching the two strings is the whole
+    // mapping, and it stays correct as the feed adds countries.
+    expect(geoSlugForCountry('PH', LOCATIONS)).toBe('philippines')
+    expect(geoSlugForCountry('SG', LOCATIONS)).toBe('singapore')
+  })
+
+  it('returns null for a country the feed does not list', () => {
+    // Jobicy carries 55 locations; most countries are not among them, and
+    // "anywhere" is a better answer than a wrong country.
+    expect(geoSlugForCountry('IN', LOCATIONS)).toBeNull()
+    expect(geoSlugForCountry('GB', LOCATIONS)).toBeNull()
+  })
+
+  it('handles nothing to match against', () => {
+    expect(geoSlugForCountry(null, LOCATIONS)).toBeNull()
+    expect(geoSlugForCountry('PH', [])).toBeNull()
+    // A code Intl cannot name comes back as the code itself; that is not a
+    // country name and must not be matched against one.
+    expect(geoSlugForCountry('ZZ', LOCATIONS)).toBeNull()
   })
 })

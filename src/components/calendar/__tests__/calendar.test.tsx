@@ -103,24 +103,24 @@ describe('Calendar', () => {
     expect(screen.getByRole('heading', { name: 'planner' })).toBeTruthy()
   })
 
-  it('threads a companyByJobId prop through into both agendas, unmodified', () => {
-    // TWO agendas are in the DOM and exactly one is ever visible: the phone's,
-    // inside the `md:hidden` week-strip block, and the desktop `up next`
-    // section added 2026-09-11. jsdom evaluates no media query, so both render
-    // here -- `getAllByText`, and the count is the assertion that they are
-    // both fed the same map rather than one being wired and one forgotten.
+  it('threads a companyByJobId prop through into the agenda, unmodified', () => {
+    // ONE agenda again. A vertical desktop copy was added on 2026-09-11 and
+    // removed the same day: Gabe called it underwhelming, and the horizontal
+    // `UpNext` rail replaced it. `Agenda` is a phone component once more.
     render(<Calendar events={EVENTS} companyByJobId={{ 'job-1': 'Acme Corp' }} />)
-    expect(screen.getAllByText('Acme Corp')).toHaveLength(2)
+    expect(screen.getAllByText('Acme Corp')).toHaveLength(1)
   })
 
-  it('gives desktop the agenda that used to exist only on phones', () => {
-    const { container } = render(<Calendar events={EVENTS} />)
-    const upNext = container.querySelector('[data-up-next]') as HTMLElement
-    expect(upNext).toBeTruthy()
-    // Hidden below md, where the week-strip block already carries one.
-    expect(upNext.className).toContain('hidden')
-    expect(upNext.className).toContain('md:flex')
-    expect(container.querySelector('[data-week-strip]')!.className).toContain('md:hidden')
+  it('opens with the up-next rail, above both the feed and the month', () => {
+    const { container } = render(
+      <Calendar events={EVENTS} feed={<div data-test-feed />} />
+    )
+    const rail = container.querySelector('[data-up-next]')!
+    const feed = container.querySelector('[data-test-feed]')!
+    const block = container.querySelector('[data-calendar-block]')!
+    // Things to DO before things to look at.
+    expect(rail.compareDocumentPosition(feed) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(feed.compareDocumentPosition(block) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 })
 
@@ -209,19 +209,13 @@ describe('public holidays', () => {
     expect(container.querySelector('[data-month-grid]')).toBeTruthy()
   })
 
-  it('offers the country picker only once there are countries to pick', () => {
+  it('offers no country picker at all — the clock decides', () => {
+    // Gabe, 2026-09-11: "local aware is the reason to remove the dropdown for
+    // country holidays." `resolveHolidayCountry` reads the time zone, which is
+    // about where the machine IS; the dropdown only ever restated that.
     const { container } = render(<Calendar events={[]} />)
     expect(container.querySelector('#holiday-country')).toBeNull()
-
-    cleanup()
-    render(
-      <Calendar
-        events={[]}
-        holidayCountry="PH"
-        holidayCountries={[{ countryCode: 'PH', name: 'Philippines' }]}
-      />
-    )
-    expect(screen.getByLabelText('Public holidays for')).toBeTruthy()
+    expect(screen.queryByLabelText('Public holidays for')).toBeNull()
   })
 
   it('reports the years its grid covers so the caller fetches exactly those', () => {
@@ -347,20 +341,13 @@ describe('where the calendar puts its own controls', () => {
     // one component further down the page, so beside the page title they read
     // as the app's own navigation. `PageHeader`'s action slot is for
     // page-level actions -- /applications' add, /documents' new CV.
-    const { container } = render(
-      <Calendar
-        events={[]}
-        holidayCountry="PH"
-        holidayCountries={[{ countryCode: 'PH', name: 'Philippines' }]}
-      />
-    )
+    const { container } = render(<Calendar events={[]} />)
     const header = container.querySelector('[data-body-header]')!
-    expect(header.querySelector('#holiday-country')).toBeNull()
     expect(within(header as HTMLElement).queryByRole('button', { name: /previous/i })).toBeNull()
 
     // Present, just somewhere that makes sense: the block that holds the grid.
-    const block = container.querySelector('[data-calendar-block]')!
-    expect(block.querySelector('#holiday-country')).toBeTruthy()
+    const block = container.querySelector('[data-calendar-block]')! as HTMLElement
+    expect(within(block).getByRole('button', { name: /previous/i })).toBeTruthy()
     expect(block.querySelector('[data-month-grid]')).toBeTruthy()
   })
 

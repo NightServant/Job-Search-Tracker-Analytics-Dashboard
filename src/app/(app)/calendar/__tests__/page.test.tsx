@@ -30,6 +30,7 @@ vi.mock('@/hooks/usePublicHolidays', () => ({
 vi.mock('@/hooks/useJobFeed', () => ({
   useJobFeed: () => ({ data: [], isLoading: false, error: null }),
   useJobFeedIndustries: () => ({ data: [] }),
+  useJobFeedLocations: () => ({ data: [] }),
 }))
 
 import Page from '../page'

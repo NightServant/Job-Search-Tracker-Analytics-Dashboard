@@ -1,10 +1,10 @@
 'use client'
 
 import * as React from 'react'
-import { useJobFeed, useJobFeedIndustries } from '@/hooks/useJobFeed'
-import { useHolidayCountries, usePublicHolidays } from '@/hooks/usePublicHolidays'
-import { HOLIDAY_COUNTRY_KEY, resolveHolidayCountry } from '@/services/holidays'
-import { JOB_FEED_INDUSTRY_KEY } from '@/services/jobFeed'
+import { useJobFeed, useJobFeedIndustries, useJobFeedLocations } from '@/hooks/useJobFeed'
+import { usePublicHolidays } from '@/hooks/usePublicHolidays'
+import { resolveHolidayCountry } from '@/services/holidays'
+import { JOB_FEED_GEO_KEY, JOB_FEED_INDUSTRY_KEY, geoSlugForCountry } from '@/services/jobFeed'
 import type { JobFeedProps } from '@/components/calendar/JobFeed'
 import type { CalendarProps } from '@/components/calendar/Calendar'
 
@@ -28,15 +28,23 @@ import type { CalendarProps } from '@/components/calendar/Calendar'
  */
 export interface CalendarExtras {
   /** Spread straight into `Calendar`. */
-  calendar: Pick<
-    CalendarProps,
-    'holidays' | 'holidayCountry' | 'holidayCountries' | 'onHolidayCountryChange' | 'onVisibleYearsChange'
-  >
+  calendar: Pick<CalendarProps, 'holidays' | 'onVisibleYearsChange'>
   /** Spread straight into `JobFeed`. */
-  feed: Pick<JobFeedProps, 'jobs' | 'loading' | 'error' | 'industries' | 'industry' | 'onIndustryChange'>
+  feed: Pick<
+    JobFeedProps,
+    | 'jobs'
+    | 'loading'
+    | 'error'
+    | 'industries'
+    | 'industry'
+    | 'onIndustryChange'
+    | 'locations'
+    | 'geo'
+    | 'onGeoChange'
+  >
 }
 
-/** `all` is the panel's sentinel for "no industry filter", not an API slug. */
+/** `all` is the panel's sentinel for "no filter", not an API slug. */
 const ANY_INDUSTRY = 'all'
 
 /** Reads a remembered choice without letting a blocked store throw. */
@@ -61,38 +69,61 @@ export function useCalendarExtras(): CalendarExtras {
   // cursor lives there and only it knows a December grid reaches into January.
   const [years, setYears] = React.useState<number[]>(() => [new Date().getFullYear()])
 
-  // Null until the effect runs: `localStorage` and `navigator` do not exist
-  // during the server render, and reading them in the initial state would be a
-  // hydration mismatch rather than a clever shortcut.
+  // WHERE THE MACHINE IS, not what language it reads. Resolved from the clock,
+  // with the language region as a fallback; there is no picker in front of it
+  // any more (Gabe, 2026-09-11: "local aware is the reason to remove the
+  // dropdown for country holidays"), so this value IS the answer rather than a
+  // default somebody is expected to go and correct.
+  //
+  // Null until the effect runs: `Intl` and `navigator` do not exist during the
+  // server render, and reading them in the initial state would be a hydration
+  // mismatch rather than a clever shortcut.
   const [country, setCountry] = React.useState<string | null>(null)
   const [industry, setIndustry] = React.useState<string | null>(null)
+  const [geo, setGeo] = React.useState<string | null>(null)
+  // Whether the region has been settled -- by a stored choice, by the default
+  // below, or by the reader picking one. Without it the default would keep
+  // reapplying and overwrite a choice on every render that locations resolve.
+  const geoSettled = React.useRef(false)
 
   React.useEffect(() => {
-    const storedCountry = readStored(HOLIDAY_COUNTRY_KEY)
-    if (storedCountry) setCountry(storedCountry)
-    else {
-      const languages = navigator.languages?.length ? navigator.languages : [navigator.language]
-      setCountry(resolveHolidayCountry(languages))
-    }
+    // The clock is read inside `resolveHolidayCountry`; the languages are only
+    // its fallback. See services/timezoneCountry for why.
+    const languages = navigator.languages?.length ? navigator.languages : [navigator.language]
+    setCountry(resolveHolidayCountry(languages))
 
     const storedIndustry = readStored(JOB_FEED_INDUSTRY_KEY)
     if (storedIndustry) setIndustry(storedIndustry)
+
+    const storedGeo = readStored(JOB_FEED_GEO_KEY)
+    if (storedGeo !== null) {
+      // '' is a stored "anywhere", which is a real choice and must not be
+      // mistaken for "never chose".
+      setGeo(storedGeo || null)
+      geoSettled.current = true
+    }
   }, [])
 
   const holidays = usePublicHolidays(years, country)
-  const holidayCountries = useHolidayCountries()
-  const feed = useJobFeed(industry)
+  const feed = useJobFeed(industry, geo)
   const industries = useJobFeedIndustries()
+  const locations = useJobFeedLocations()
+
+  // THE FEED OPENS WHERE THE READER IS, when the feed knows that country.
+  // Jobicy lists 55 locations, so most countries fall through to `anywhere` --
+  // which is the right answer for them, and a great deal better than the
+  // de-facto US-only rail an unfiltered call returns.
+  const offered = React.useMemo(() => locations.data ?? [], [locations.data])
+  React.useEffect(() => {
+    if (geoSettled.current || offered.length === 0 || !country) return
+    const slug = geoSlugForCountry(country, offered)
+    if (slug) setGeo(slug)
+    geoSettled.current = true
+  }, [country, offered])
 
   return {
     calendar: {
       holidays: holidays.data ?? [],
-      holidayCountry: country,
-      holidayCountries: holidayCountries.data ?? [],
-      onHolidayCountryChange: (code) => {
-        setCountry(code)
-        writeStored(HOLIDAY_COUNTRY_KEY, code)
-      },
       onVisibleYearsChange: setYears,
     },
     feed: {
@@ -105,6 +136,14 @@ export function useCalendarExtras(): CalendarExtras {
         const next = slug === ANY_INDUSTRY ? null : slug
         setIndustry(next)
         writeStored(JOB_FEED_INDUSTRY_KEY, next ?? '')
+      },
+      locations: offered,
+      geo,
+      onGeoChange: (slug) => {
+        const next = slug === ANY_INDUSTRY ? null : slug
+        geoSettled.current = true
+        setGeo(next)
+        writeStored(JOB_FEED_GEO_KEY, next ?? '')
       },
     },
   }

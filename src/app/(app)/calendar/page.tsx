@@ -7,6 +7,7 @@ import { useCalendarExtras } from '@/hooks/useCalendarExtras'
 import { Calendar } from '@/components/calendar/Calendar'
 import { JobFeed } from '@/components/calendar/JobFeed'
 import { dayKey } from '@/lib/calendar'
+import { buildUpNext } from '@/lib/upNext'
 import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
 
@@ -78,6 +79,10 @@ export default function Page() {
     return map
   }, [jobs])
 
+  // What is booked, merged with what has gone quiet. Built here because it
+  // needs both reads; see lib/upNext for why events alone were not enough.
+  const upNext = React.useMemo(() => buildUpNext(events, jobs), [events, jobs])
+
   if (isLoading) {
     return <RouteSkeleton variant="calendar" />
   }
@@ -97,6 +102,7 @@ export default function Page() {
       companyByJobId={companyByJobId}
       {...extras.calendar}
       applicationsByDay={applicationsByDay}
+      upNext={upNext}
       feed={<JobFeed {...extras.feed} />}
     />
   )

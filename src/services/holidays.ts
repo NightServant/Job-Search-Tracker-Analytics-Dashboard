@@ -40,6 +40,8 @@ export interface HolidayCountry {
   name: string
 }
 
+import { countryFromTimeZone } from './timezoneCountry'
+
 const API = 'https://date.nager.at/api/v3'
 
 /** Where the choice is remembered. Per-browser; there is no column for it. */
@@ -54,7 +56,23 @@ export const HOLIDAY_COUNTRY_KEY = 'worktrack.holiday-country'
  * reads English", and inferring the United States from it is exactly the
  * failure mode this is trying not to have.
  */
-export function resolveHolidayCountry(locales: readonly string[]): string | null {
+export function resolveHolidayCountry(
+  locales: readonly string[],
+  timeZone?: string | null
+): string | null {
+  // THE CLOCK FIRST. A time zone is about where the machine is; a language tag
+  // is about what its owner reads. Only one of those answers "whose public
+  // holidays are these".
+  //
+  // `undefined` means "not told, go and look"; an explicit `null` means "there
+  // is no zone, use the language". `??` cannot tell those apart, which is how
+  // a test passing `null` to isolate the language path still picked up the
+  // machine's own clock and asserted PH against every expectation.
+  if (timeZone !== null) {
+    const fromZone = countryFromTimeZone(timeZone)
+    if (fromZone) return fromZone
+  }
+
   for (const tag of locales) {
     // WALKED SUBTAG BY SUBTAG rather than matched with one pattern, and both
     // guards below are things a single pattern got wrong on the first try.

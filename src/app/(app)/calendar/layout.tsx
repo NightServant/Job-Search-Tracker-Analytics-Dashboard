@@ -11,8 +11,13 @@ import type { Metadata } from 'next'
  * misconfiguration away from being indexed. Saying it costs one line.
  */
 export const metadata: Metadata = {
-  title: 'Calendar',
-  description: 'Interviews, deadlines and take-homes, laid out by month.',
+  // `Planner`, not `Calendar` (Gabe, 2026-09-11, catching the browser tab the
+  // rename missed). The path is still /calendar -- every bookmark and the
+  // Overview's own link point at it -- but nothing a reader SEES should still
+  // say calendar: not the sidebar, not the heading, and not the tab.
+  title: 'Planner',
+  description:
+    'What is booked, what has gone quiet, newly posted remote roles, and your month.',
   robots: { index: false, follow: false },
 }
 

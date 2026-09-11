@@ -3,14 +3,15 @@
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ClockIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from '@/components/icons'
 import { buildMonthGrid, weekOf } from '@/lib/calendar'
 import { MonthGrid } from './MonthGrid'
 import { WeekStrip } from './WeekStrip'
 import { Agenda } from './Agenda'
+import { UpNext } from './UpNext'
 import type { CalendarEvent } from '@/services/events'
-import type { HolidayCountry, PublicHoliday } from '@/services/holidays'
+import type { PublicHoliday } from '@/services/holidays'
+import type { UpNextItem } from '@/lib/upNext'
 
 /**
  * The calendar screen's body, over plain props -- same split as `Dashboard`
@@ -54,11 +55,6 @@ export interface CalendarProps {
   companyByJobId?: Record<string, string>
   /** Public holidays for the years this screen is currently showing. */
   holidays?: PublicHoliday[]
-  /** Whose holidays. `null` until one is chosen; see services/holidays. */
-  holidayCountry?: string | null
-  /** What the picker offers. Empty means no picker is drawn at all. */
-  holidayCountries?: HolidayCountry[]
-  onHolidayCountryChange?: (countryCode: string) => void
   /**
    * The years the grid currently covers, so the caller can fetch exactly
    * those.
@@ -78,6 +74,14 @@ export interface CalendarProps {
    */
   applicationsByDay?: Record<string, number>
   /**
+   * What is booked and what has gone quiet, built by `lib/upNext`.
+   *
+   * PASSED IN, not derived here, for the same reason `applicationsByDay` is:
+   * it needs the jobs list as well as the events, and this component takes
+   * plain props rather than reading either.
+   */
+  upNext?: UpNextItem[]
+  /**
    * The fresh-postings panel, rendered under the month.
    *
    * A SLOT, NOT SIX PROPS. It needs a feed, a loading flag, an error flag, a
@@ -93,11 +97,9 @@ export function Calendar({
   events,
   companyByJobId = {},
   holidays = [],
-  holidayCountry = null,
-  holidayCountries = [],
-  onHolidayCountryChange,
   onVisibleYearsChange,
   applicationsByDay = {},
+  upNext = [],
   feed,
 }: CalendarProps) {
   const today = React.useMemo(() => new Date(), [])
@@ -150,13 +152,32 @@ export function Calendar({
         rule
       />
 
-      {/* FIRST, ABOVE THE MONTH (Gabe, 2026-09-10). What is newly posted is
-          perishable in a way a month grid is not -- a role three days old is
-          most of the way through its shortlist, while an interview next
-          Tuesday is still next Tuesday. */}
+      {/* WHAT NEEDS DOING OPENS THE PAGE (Gabe, 2026-09-11). Both bands above
+          the month were things to look at; this is the only one that is a list
+          of things to DO, so it goes first -- which does push `fresh remote
+          roles` down one band, deliberately. Your own commitments outrank a
+          job board. */}
+      <UpNext items={upNext} />
+
+      {/* THEN THE FEED, still above the month (Gabe, 2026-09-10). What is
+          newly posted is perishable in a way a month grid is not -- a role
+          three days old is most of the way through its shortlist, while an
+          interview next Tuesday is still next Tuesday. */}
       {feed}
 
       <section className="flex flex-col gap-3" data-calendar-block>
+        {/* NO COUNTRY PICKER (Gabe, 2026-09-11: "local aware is the reason to
+            remove the dropdown for country holidays"). The clock now answers
+            the question the dropdown was asking -- see
+            `services/timezoneCountry` -- and a control that only ever restates
+            what the machine already knows is a control nobody should have to
+            find.
+
+            THE TRADE, STATED: a VPN, or a laptop carried abroad, now shows the
+            holidays of wherever the clock says it is, with nothing on screen to
+            override it. That is the correct default for the overwhelmingly
+            common case and a wrong answer for a rare one; the override can come
+            back as a settings row if it ever actually bites. */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Hidden below `md` for the same reason it always was: nothing on
               the mobile layout responds to the month cursor. */}
@@ -181,31 +202,6 @@ export function Calendar({
             </div>
           </div>
 
-          {/* THE COUNTRY IS PART OF THE ANSWER, so it is on screen rather than
-              buried in settings. A browser's language tag says what language
-              somebody reads, not where they live, so the detected value is a
-              guess -- and a calendar quietly showing the wrong country's
-              holidays is worse than one showing none. Visible at every width,
-              unlike the month nav beside it, because the mobile layout marks
-              holidays too.
-
-              `ml-auto` so it stays on the trailing edge once the nav beside it
-              is hidden, rather than jumping to the left on a phone. */}
-          {holidayCountries.length > 0 && (
-            <div className="w-52 shrink-0 max-sm:w-full md:ml-auto">
-              <Select
-                id="holiday-country"
-                icon="Globe"
-                aria-label="Public holidays for"
-                value={holidayCountry ?? ''}
-                onValueChange={(next) => onHolidayCountryChange?.(next)}
-                items={holidayCountries.map((country) => ({
-                  value: country.countryCode,
-                  label: `${country.name} holidays`,
-                }))}
-              />
-            </div>
-          )}
         </div>
 
         <MonthGrid
@@ -222,32 +218,6 @@ export function Calendar({
           <Agenda events={events} companyByJobId={companyByJobId} />
         </div>
 
-        {/* UP NEXT, ON DESKTOP, and it is the same `Agenda` the phone has had
-            all along (Gabe, 2026-09-11: "include another section within page.
-            Use unused components if necessary"). The component was written for
-            mobile and gated `md:hidden`, so the widest screens were the ones
-            that never saw it.
-
-            It is NOT a repeat of the grid above. A cell shows a truncated
-            title and only for the month on screen; this gives the time, the
-            duration and the COMPANY -- which `CalendarEvent` does not carry,
-            so it takes the same `job_id` join the mobile agenda does -- and it
-            keeps running past the end of the month, which is exactly where an
-            interview booked for the 3rd of next month currently hides.
-
-            A measure rather than the full width: it is a list of short lines,
-            and stretched to 1136px the time and the title end up a hand apart. */}
-        <section
-          data-up-next
-          aria-label="Up next"
-          className="mt-6 hidden flex-col gap-3 border-t border-border-subtle pt-6 md:flex"
-        >
-          <h2 className="flex items-center gap-2 text-heading-s text-text-primary">
-            <ClockIcon size={16} aria-hidden className="shrink-0 text-text-muted" />
-            up next
-          </h2>
-          <Agenda events={events} companyByJobId={companyByJobId} className="max-w-2xl" />
-        </section>
       </section>
     </div>
   )

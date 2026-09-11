@@ -231,9 +231,11 @@ export function Dashboard({
             <CardTitle icon="Calendar">
               <h2>upcoming events</h2>
             </CardTitle>
-            <CardDescription>interviews and calls already on the calendar.</CardDescription>
+            <CardDescription>interviews and calls already booked in.</CardDescription>
             <CardAction>
-              <PanelLink href={appHref('/calendar')}>open the calendar</PanelLink>
+              {/* The path is still /calendar; the destination is called the
+                  planner now, and a link should name where it goes. */}
+              <PanelLink href={appHref('/calendar')}>open the planner</PanelLink>
             </CardAction>
           </CardHeader>
           <CardContent className="flex flex-1 flex-col">
