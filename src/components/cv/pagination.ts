@@ -114,7 +114,11 @@ export const Pagination = Extension.create<PaginationOptions>({
   },
 
   addProseMirrorPlugins() {
-    const extension = this
+    // Captured by value rather than aliasing `this`: the plugin's `view` runs
+    // long after this call, and tiptap re-creates the extension when its
+    // options change -- so holding a reference to the instance would read a
+    // stale one. `getOptions` reads through the live extension each time.
+    const getOptions = (): PaginationOptions => this.options
 
     return [
       new Plugin({
@@ -125,7 +129,7 @@ export const Pagination = Extension.create<PaginationOptions>({
           let frame = 0
 
           const recompute = () => {
-            const { pageHeight, gap } = extension.options
+            const { pageHeight, gap } = getOptions()
             const dom = editorView.dom as HTMLElement
             if (!pageHeight || pageHeight <= 0) return
 
