@@ -131,4 +131,33 @@ describe('the README describes this repository', () => {
       )
     }
   })
+
+  it('ships a licence, and the README points at it', () => {
+    // The repository had no LICENSE at all until 2026-09-11 while the landing
+    // page said "Open source" -- a claim with nothing behind it. Both halves
+    // are checked: the file exists, and the README names it, because a licence
+    // nobody can find from the front page is a licence nobody will rely on.
+    const licence = readFileSync('LICENSE', 'utf8')
+    expect(licence).toContain('MIT License')
+    expect(licence).toContain('Permission is hereby granted')
+    const text = readme()
+    expect(text).toMatch(/^##\s+Licence\s*$/m)
+    expect(text).toContain('](LICENSE)')
+  })
+
+  it('names every copyright holder the licence does', () => {
+    // TWO AUTHORS, and this is the assertion that keeps them in step. A
+    // one-name copyright line over another author's commits grants rights
+    // nobody had to give; if a holder is ever added or removed, the README has
+    // to say so too rather than quietly disagreeing with the LICENSE file.
+    const licence = readFileSync('LICENSE', 'utf8')
+    const holders = [...licence.matchAll(/^Copyright \(c\) \d{4} (.+)$/gm)].map((m) => m[1])
+    expect(holders.length).toBeGreaterThanOrEqual(2)
+    for (const holder of holders) {
+      // Surnames, so a GitHub handle or a bracketed alias in the README does
+      // not have to match the licence line character for character.
+      const surname = holder.trim().split(/\s+/).pop()!
+      expect(readme(), `README does not name ${holder}`).toContain(surname)
+    }
+  })
 })

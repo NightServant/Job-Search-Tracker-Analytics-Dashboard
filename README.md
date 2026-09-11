@@ -391,6 +391,25 @@ Done since this list was last written: the Next.js and Vercel migration, the des
 - [ ] AI-assisted CV tailoring against a job description
 - [ ] Cookie-backed sessions, so `/` can decide server-side rather than after hydration
 
+## Licence
+
+**MIT.** The full text is in [`LICENSE`](LICENSE); the short version is that you may use, copy, modify and redistribute this, including commercially, so long as the copyright notice travels with it. There is no warranty.
+
+**Two copyright holders, not one.** This repository has had two authors and both hold copyright in what they wrote — see [Credits](#credits):
+
+| | Wrote |
+|---|---|
+| [Janssen Quiambao (Ensues)](https://github.com/Ensues) | the original application, March – May 2026 |
+| [Gabe Cervantes (@NightServant)](https://github.com/NightServant) | everything since August 2026 |
+
+```bash
+git shortlog -sne --all
+```
+
+No commit counts in that table on purpose — they change with every push, and this README already shipped one stale figure. The command above is the live answer, and it is what the two-name copyright line rests on: a grant signed by one author over another author's work would not be worth the file it is written in.
+
+**What this licence does not cover** is the third-party material vendored into the repository — shadcn/ui, AnimateIcons, Arimo, the Pexels video and the Unsplash photograph all arrive under their own terms, which are listed in [Attribution](#attribution) and are unaffected by the MIT grant above. The services the app talks to (Nager.Date, Jobicy, Firecrawl, Apify, Supabase, Vercel) are nobody's to relicense either; see [`docs/INTEGRATIONS.md`](docs/INTEGRATIONS.md).
+
 ## Attribution
 
 Third-party components and assets vendored into this repository, credited when adopted:
