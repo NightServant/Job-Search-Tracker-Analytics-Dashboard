@@ -5,9 +5,11 @@
   </picture>
 </p>
 
-# Worktrack
+<h1 align="center">Worktrack</h1>
 
-**Live: <https://job-search-tracker-analytics-dashbo-one.vercel.app>**
+<p align="center">
+  <strong>Live: <a href="https://job-search-tracker-analytics-dashbo-one.vercel.app">job-search-tracker-analytics-dashbo-one.vercel.app</a></strong>
+</p>
 
 A job search tracker with analytics and a CV builder, built with Next.js 15 (App Router) and React 19 over Supabase Postgres. Worktrack keeps every application, every status change, and every version of your CV in one place, with row-level security scoping every row to its owner.
 
