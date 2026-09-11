@@ -49,6 +49,20 @@ export interface PaginationOptions {
   pageHeight: number
   /** The empty band between two sheets, in CSS pixels. */
   gap: number
+  /**
+   * The page's own margins, in CSS pixels.
+   *
+   * THE SHEET HAS MARGINS ONLY AT ITS TWO ENDS WITHOUT THESE. The editor pads
+   * the whole editable area once, so the first page gets a top margin and the
+   * last page a bottom one -- and every break in between had the text running
+   * flush into the seam. Gabe's screenshot has "ACADEMIC AND PERSONAL
+   * PROJECTS" sitting on the bottom edge of page one with its rule touching
+   * the grey, and "AeroWeather" starting on the top edge of page two. A page
+   * boundary is three bands, not one: the rest of this page's margin, the gap
+   * between sheets, then the next page's margin.
+   */
+  marginTop: number
+  marginBottom: number
 }
 
 /**
@@ -86,12 +100,11 @@ export function breakIndexes(
   return breaks
 }
 
-/** How tall a spacer must be to push the next block onto a fresh page. */
-export function spacerHeight(
+/** How much of the page is still empty when the break falls, in pixels. */
+export function remainingOnPage(
   heights: number[],
   breakIndex: number,
-  pageHeight: number,
-  gap: number
+  pageHeight: number
 ): number {
   let used = 0
   for (let i = 0; i < breakIndex; i += 1) {
@@ -103,14 +116,14 @@ export function spacerHeight(
     if (used + height > pageHeight && used > 0) used = height
     else used += height
   }
-  return Math.max(0, pageHeight - used) + gap
+  return Math.max(0, pageHeight - used)
 }
 
 export const Pagination = Extension.create<PaginationOptions>({
   name: 'worktrackPagination',
 
   addOptions() {
-    return { pageHeight: 0, gap: 24 }
+    return { pageHeight: 0, gap: 24, marginTop: 0, marginBottom: 0 }
   },
 
   addProseMirrorPlugins() {
@@ -129,7 +142,7 @@ export const Pagination = Extension.create<PaginationOptions>({
           let frame = 0
 
           const recompute = () => {
-            const { pageHeight, gap } = getOptions()
+            const { pageHeight, gap, marginTop, marginBottom } = getOptions()
             const dom = editorView.dom as HTMLElement
             if (!pageHeight || pageHeight <= 0) return
 
@@ -152,7 +165,7 @@ export const Pagination = Extension.create<PaginationOptions>({
 
             const indexes = breakIndexes(heights, pageHeight)
             const next = indexes.map((index) => {
-              const height = spacerHeight(heights, index, pageHeight, gap)
+              const remaining = remainingOnPage(heights, index, pageHeight)
               const pos = editorView.posAtDOM(blocks[index], 0)
               return Decoration.widget(
                 Math.max(0, pos - 1),
@@ -160,19 +173,30 @@ export const Pagination = Extension.create<PaginationOptions>({
                   const spacer = document.createElement('div')
                   spacer.setAttribute('data-page-spacer', '')
                   spacer.setAttribute('aria-hidden', 'true')
-                  spacer.style.height = `${height}px`
-                  // The gap shows the well through the sheet, so two pages
-                  // read as two sheets rather than one long one.
-                  spacer.style.background = 'var(--color-bg-inset)'
-                  spacer.style.marginLeft = 'calc(-1 * var(--page-margin-left, 0px))'
-                  spacer.style.marginRight = 'calc(-1 * var(--page-margin-right, 0px))'
                   spacer.style.pointerEvents = 'none'
+                  // PADDING, NOT MARGIN, ON THE WHITE BANDS. A child's top
+                  // margin collapses straight out through a parent that has
+                  // no border or padding, which would move the spacer itself
+                  // rather than the seam inside it.
+                  spacer.style.paddingTop = `${remaining + marginBottom}px`
+                  spacer.style.paddingBottom = `${marginTop}px`
+
+                  // The seam shows the well through the sheet, so two pages
+                  // read as two sheets rather than one long one. Only this
+                  // band is coloured: the padding above and below it is the
+                  // page's own margin and stays white.
+                  const seam = document.createElement('div')
+                  seam.style.height = `${gap}px`
+                  seam.style.background = 'var(--color-bg-inset)'
+                  seam.style.marginLeft = 'calc(-1 * var(--page-margin-left, 0px))'
+                  seam.style.marginRight = 'calc(-1 * var(--page-margin-right, 0px))'
+                  spacer.appendChild(seam)
                   return spacer
                 },
                 // `side: -1` puts the spacer before the block rather than
                 // after the previous one, which matters when the break lands
                 // between two blocks that a transaction is editing.
-                { side: -1, key: `page-${index}-${Math.round(height)}` }
+                { side: -1, key: `page-${index}-${Math.round(remaining)}` }
               )
             })
 

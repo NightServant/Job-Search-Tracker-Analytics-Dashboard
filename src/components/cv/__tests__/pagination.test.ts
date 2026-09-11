@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { breakIndexes, spacerHeight } from '../pagination'
+import { breakIndexes, remainingOnPage } from '../pagination'
 
 /**
  * The break rule, tested without a browser: the plugin measures and this
@@ -45,14 +45,16 @@ describe('breakIndexes', () => {
   })
 })
 
-describe('spacerHeight', () => {
-  it('fills the rest of the page, plus the gap between sheets', () => {
-    // Two 400s used 800 of 1000, so 200 remain, plus a 24 gap.
-    expect(spacerHeight([400, 400, 400], 2, PAGE, 24)).toBe(224)
+describe('remainingOnPage', () => {
+  it('is what is left of the page when the break falls', () => {
+    // Two 400s used 800 of 1000, so 200 remain. The bands around the seam --
+    // this page's bottom margin and the next page's top margin -- are added
+    // by the widget, which is what keeps the text off the page edge.
+    expect(remainingOnPage([400, 400, 400], 2, PAGE)).toBe(200)
   })
 
-  it('is just the gap when the page was filled exactly', () => {
-    expect(spacerHeight([500, 500, 10], 2, PAGE, 24)).toBe(24)
+  it('is nothing when the page was filled exactly', () => {
+    expect(remainingOnPage([500, 500, 10], 2, PAGE)).toBe(0)
   })
 
   it('AGREES WITH breakIndexes, which is what makes this converge', () => {
@@ -61,13 +63,13 @@ describe('spacerHeight', () => {
     // spacers are already in the document.
     const heights = [300, 450, 260, 380, 500, 120]
     for (const index of breakIndexes(heights, PAGE)) {
-      const filled = spacerHeight(heights, index, PAGE, 0)
+      const filled = remainingOnPage(heights, index, PAGE)
       expect(filled).toBeGreaterThanOrEqual(0)
       expect(filled).toBeLessThan(PAGE)
     }
   })
 
   it('never returns a negative height', () => {
-    expect(spacerHeight([2500], 0, PAGE, 0)).toBeGreaterThanOrEqual(0)
+    expect(remainingOnPage([2500], 0, PAGE)).toBeGreaterThanOrEqual(0)
   })
 })

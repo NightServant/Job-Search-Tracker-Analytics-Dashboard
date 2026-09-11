@@ -165,6 +165,10 @@ export function WordResumeEditor({
         pageHeight:
           (geometry.height - geometry.margin.top - geometry.margin.bottom) * 96,
         gap: PAGE_GAP_IN * 96,
+        // The sheet's own margins, so a break leaves white below the last
+        // line and above the first one rather than running text into the seam.
+        marginTop: geometry.margin.top * 96,
+        marginBottom: geometry.margin.bottom * 96,
       }),
     ],
     content: normalizeWordContent(draft.content),
