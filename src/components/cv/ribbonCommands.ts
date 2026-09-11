@@ -273,4 +273,43 @@ export const STYLE_PRESETS: StylePreset[] = [
     apply: (e) => e.chain().focus().toggleBlockquote().run(),
     isActive: (e) => e.isActive('blockquote'),
   },
+  // The rest of Word's gallery, and they are here for a reason beyond
+  // completeness: once the gallery stopped being capped it grew to fill the
+  // ribbon, and seven cards left the band stretched over empty space. Word's
+  // gallery has twelve. These are the ones this editor can actually apply.
+  {
+    id: 'subtitle',
+    label: 'Subtitle',
+    preview: 'text-[11px] tracking-wide text-text-secondary',
+    apply: (e) => e.chain().focus().setParagraph().setFontSize('14px').run(),
+    isActive: () => false,
+  },
+  {
+    id: 'subtle',
+    label: 'Subtle Emph.',
+    preview: 'text-[11px] italic text-text-muted',
+    apply: (e) => e.chain().focus().toggleItalic().setColor('#71717a').run(),
+    isActive: () => false,
+  },
+  {
+    id: 'intense',
+    label: 'Intense Emph.',
+    preview: 'text-[11px] font-semibold italic text-accent-default',
+    apply: (e) => e.chain().focus().toggleItalic().toggleBold().run(),
+    isActive: (e) => e.isActive('italic') && e.isActive('bold'),
+  },
+  {
+    id: 'nospacing',
+    label: 'No Spacing',
+    preview: 'text-[11px] leading-none',
+    apply: (e) => e.chain().focus().setParagraph().setLineHeight('1').run(),
+    isActive: () => false,
+  },
+  {
+    id: 'code',
+    label: 'Code',
+    preview: 'font-mono text-[10px]',
+    apply: (e) => e.chain().focus().toggleCode().run(),
+    isActive: (e) => e.isActive('code'),
+  },
 ]

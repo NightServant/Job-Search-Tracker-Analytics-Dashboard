@@ -39,13 +39,18 @@ export function DesktopDocumentChrome({
 
   return (
     <div
-      // FULL BLEED, NOT A CARD IN A PAGE (Gabe, 2026-09-11: "the editor must
-      // be displayed fully within the app page"). It used to be centred at
-      // max-w-1600 with the app's gutters around it, so a word processor sat
-      // inside a reading column -- the one layout Word never has. The shell
-      // has already dropped the sidebar and bottom nav via `useDocumentFocus`,
-      // so there is nothing left to align to: the editor takes the page.
-      className="flex w-full flex-col"
+      // FULL BLEED AND FULL HEIGHT, NOT A CARD IN A PAGE. It was centred at
+      // max-w-1600 inside the app's gutters, so a word processor sat in a
+      // reading column -- the one layout Word never has.
+      //
+      // `h-[100dvh]` with `overflow-hidden` is what makes the DOCUMENT the
+      // only thing that scrolls (Gabe, 2026-09-11). Before this the whole page
+      // scrolled, so the ribbon and both rails slid away the moment you read
+      // past the first screen -- a formatting bar you have to scroll back up
+      // to reach is a formatting bar you stop using. `dvh` rather than `vh`
+      // because mobile browsers change the viewport as their chrome hides, and
+      // `vh` would leave the foot of the document under the address bar.
+      className="flex h-[100dvh] w-full flex-col overflow-hidden"
       data-document-workspace
     >
       {/*
@@ -66,7 +71,7 @@ export function DesktopDocumentChrome({
         document name is a label on the window, not a headline over the
         content. It keeps h1 semantics for screen readers regardless.
       */}
-      <div className="flex items-center gap-2 border-b border-border-default bg-bg-surface px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border-default bg-bg-surface px-3 py-1.5">
         {/* THE WAY OUT KEEPS ITS WORDS (Gabe, 2026-09-11: "do not forget to
             include the redirect button"). The first pass at this bar reduced
             it to a bare chevron because that is what Word's home icon is --
@@ -88,12 +93,6 @@ export function DesktopDocumentChrome({
           <ChevronLeftIcon size={16} aria-hidden className={iconMotion('back')} />
           <span className="hidden sm:inline">back to documents</span>
         </Link>
-
-        <Separator orientation="vertical" className="h-5 shrink-0" />
-
-        {/* THE QUICK ACCESS ROW. Word keeps save and undo here; this keeps
-            save and the exports, because those are what a CV is for. */}
-        <div className="flex shrink-0 items-center gap-1">{actions}</div>
 
         {/* CENTRED, as Word centres "Document1". `min-w-0` on both this and
             the input is what lets a long name ellipsis instead of pushing the
@@ -138,18 +137,10 @@ export function DesktopDocumentChrome({
               <span className="ml-2 text-status-interviewing-mark">unsaved changes</span>
             )}
           </span>
-          {destructiveActions && (
-            <>
-              {/* A real gap, not a bigger margin: the separator says these are
-                  a different category of action rather than the end of a row. */}
-              <Separator orientation="vertical" className="mx-1 h-5" />
-              {destructiveActions}
-            </>
-          )}
         </div>
       </div>
 
-      <div className="flex flex-col">
+      <div className="flex min-h-0 flex-1 flex-col">
         {/*
           THE RIBBON SITS ON ITS OWN GROUND (Gabe, 2026-09-11: "there is no
           real dividers between components"). A hairline alone was not enough
@@ -170,9 +161,36 @@ export function DesktopDocumentChrome({
           where the tint cannot. The tint is not decorative; it is what makes
           dark mode read without a heavier border.
         */}
-        {tools && (
-          <div className="flex flex-wrap items-center gap-2 border-y border-border-default bg-bg-surface px-2 py-2">
-            {tools}
+        {/* THE CTAs LIVE IN THE RIBBON NOW (Gabe, 2026-09-11: "move the CTAs
+            within the toolbar"). They were in the title bar, which left the
+            right end of the ribbon empty once the styles gallery stopped
+            being capped -- a band of nothing where Word puts its Editing
+            group. Putting them here fills that space with the controls a
+            person reaches for most, and leaves the title bar doing what
+            Word's does: naming the file.
+
+            `ml-auto` rather than a spacer: the ribbon's own bands size
+            themselves, and whatever is left over goes to the gap before these.
+            */}
+        {/* THE ROW RENDERS WHENEVER THERE ARE ACTIONS, not only when there are
+            tools. Gating the whole band on `tools` cost the LaTeX editor every
+            one of its controls -- it passes no formatting ribbon -- which two
+            tests caught immediately. The ribbon half is what is optional. */}
+        {(tools || actions || destructiveActions) && (
+          <div className="flex shrink-0 items-stretch gap-2 border-y border-border-default bg-bg-surface px-2 py-1">
+            <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">{tools}</div>
+            <div className="ml-auto flex shrink-0 items-center gap-1 border-l border-border-subtle pl-2">
+              {actions}
+              {destructiveActions && (
+                <>
+                  {/* A real gap, not a bigger margin: the separator says these
+                      are a different category of action rather than the end of
+                      a row. */}
+                  <Separator orientation="vertical" className="mx-1 h-6" />
+                  {destructiveActions}
+                </>
+              )}
+            </div>
           </div>
         )}
         {/*
@@ -199,15 +217,20 @@ export function DesktopDocumentChrome({
           ~470px they had when the analysis rail was still taking 320 on the
           right.
         */}
+        {/* `min-h-0` IS THE LOAD-BEARING HALF of "only the document scrolls".
+            A flex child's automatic minimum size is its content height, so
+            without this the grid refuses to shrink, the frame grows past the
+            viewport and the page scrolls after all -- which is the bug this
+            whole layout exists to fix. Each region then scrolls itself. */}
         <div
           className={cn(
-            'grid gap-6',
-            leftRail && rightRail && 'xl:grid-cols-[300px_minmax(0,1fr)_320px] xl:gap-8',
-            leftRail && !rightRail && 'xl:grid-cols-[300px_minmax(0,1fr)] xl:gap-8'
+            'grid min-h-0 flex-1 gap-0',
+            leftRail && rightRail && 'xl:grid-cols-[280px_minmax(0,1fr)_340px]',
+            leftRail && !rightRail && 'xl:grid-cols-[280px_minmax(0,1fr)]'
           )}
         >
           {leftRail && (
-            <aside className="min-w-0 rounded-[4px] border border-border-default bg-bg-surface p-4 xl:order-1">
+            <aside className="min-w-0 overflow-y-auto border-r border-border-default bg-bg-surface p-4 xl:order-1">
               {leftRail}
             </aside>
           )}
@@ -217,19 +240,23 @@ export function DesktopDocumentChrome({
               dangling reference would be worse than none. */}
           <div
             id="document-sheet"
-            className="min-w-0 overflow-x-auto bg-bg-inset p-4 md:p-8 xl:order-2"
+            className="min-w-0 overflow-auto bg-bg-inset p-4 md:p-8 xl:order-2"
           >
             {children}
           </div>
           {rightRail && (
-            <aside className="min-w-0 rounded-[4px] border border-border-default bg-bg-surface p-4 xl:order-3">
+            <aside className="min-w-0 overflow-y-auto border-l border-border-default bg-bg-surface p-4 xl:order-3">
               {rightRail}
             </aside>
           )}
         </div>
       </div>
 
-      {footnote && <div className="text-body-s text-text-muted">{footnote}</div>}
+      {footnote && (
+        <div className="shrink-0 border-t border-border-default bg-bg-surface px-3 py-1 text-body-s text-text-muted">
+          {footnote}
+        </div>
+      )}
     </div>
   )
 }
