@@ -57,8 +57,13 @@ describe('the formatting ribbon', () => {
       'justify',
       'block quote',
       'inline code',
-      'horizontal rule',
       'clear formatting',
+      'increase indent',
+      'decrease indent',
+      'grow font',
+      'shrink font',
+      'uppercase',
+      'title case',
       'undo',
       'redo',
     ]) {
@@ -74,7 +79,6 @@ describe('the formatting ribbon', () => {
     render(<DocumentToolbar editor={editor} />)
     expect(screen.getByLabelText('font')).toBeInTheDocument()
     expect(screen.getByLabelText('font size')).toBeInTheDocument()
-    expect(screen.getByLabelText('paragraph style')).toBeInTheDocument()
   })
 
   it('applies a font family to the real document', async () => {
@@ -98,11 +102,9 @@ describe('the formatting ribbon', () => {
     const groups = [...container.querySelectorAll('[data-ribbon-group]')].map((g) =>
       g.getAttribute('data-ribbon-group')
     )
-    // Word's five, not the nine the first attempt printed across the bar.
-    expect(groups).toEqual(
-      expect.arrayContaining(['styles', 'typeface', 'font', 'paragraph'])
-    )
-    expect(groups.length).toBeLessThanOrEqual(6)
+    // Word's bands, not the nine the second attempt printed across the bar.
+    expect(groups).toEqual(expect.arrayContaining(['font', 'paragraph', 'styles']))
+    expect(groups.length).toBeLessThanOrEqual(4)
   })
 
   it('reflects the cursor position, not just the last click', async () => {
@@ -150,7 +152,7 @@ describe('the formatting ribbon', () => {
     // Bold and italic survive at any width; the style select does too, because
     // heading level is the single most-used control in a CV.
     expect(labels).toEqual(expect.arrayContaining(['bold', 'italic']))
-    expect(screen.getByLabelText('paragraph style')).toBeInTheDocument()
+    expect(screen.getByLabelText('font')).toBeInTheDocument()
 
     // Undo is hidden on the smallest screens; it is ⌘Z regardless. Scoped to
     // the GROUP, because the button's nearest div is the row inside it.
@@ -164,5 +166,45 @@ describe('the formatting ribbon', () => {
     render(<DocumentToolbar editor={editor} />)
     const toolbar = screen.getByRole('toolbar', { name: 'formatting' })
     expect(toolbar).toHaveAttribute('aria-controls', 'document-sheet')
+  })
+})
+
+describe('the styles gallery', () => {
+  it('is CARDS with a live sample, not a dropdown', () => {
+    // The one thing a `<select>` cannot do, and the entire reason Word spends
+    // that much ribbon on it: seeing what a style looks like before choosing.
+    const e = editorWith()
+    const { container } = render(<DocumentToolbar editor={e} />)
+    const cards = [...container.querySelectorAll('[data-style-card]')]
+    expect(cards.length).toBeGreaterThan(4)
+    for (const card of cards) {
+      expect(card.textContent).toContain('AaBbCc')
+    }
+    e.destroy()
+  })
+
+  it('applies its style to the real document, and marks itself active', async () => {
+    const e = editorWith('<p>hello</p>')
+    const { rerender } = render(<DocumentToolbar editor={e} />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Heading 1' }))
+    expect(e.isActive('heading', { level: 2 })).toBe(true)
+
+    rerender(<DocumentToolbar editor={e} />)
+    expect(screen.getByRole('button', { name: 'Heading 1' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+    e.destroy()
+  })
+
+  it('stacks each band two rows deep, which is what makes it a ribbon', () => {
+    // The shape both earlier attempts missed. A single row of the same
+    // controls overflowed a 1200px column; stacked they need about half.
+    const e = editorWith()
+    const { container } = render(<DocumentToolbar editor={e} />)
+    const font = container.querySelector('[data-ribbon-group="font"]')!
+    expect(font.children.length).toBe(2)
+    e.destroy()
   })
 })

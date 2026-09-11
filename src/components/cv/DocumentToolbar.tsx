@@ -10,47 +10,49 @@ import {
   LINE_SPACINGS,
   RIBBON_GROUPS,
   STYLE_PRESETS,
+  currentFontPx,
   type RibbonCommand,
 } from './ribbonCommands'
 
 /**
- * Word's Home ribbon, under this system's rules.
+ * Word's Home ribbon.
  *
- * WHAT WAS WRONG WITH THE LAST ONE (Gabe, 2026-09-11: "still not implemented
- * properly... 1v1 replica"): it was fourteen bare buttons in a row. Word's
- * ribbon is not a row of buttons -- it is NAMED GROUPS, and the two controls
- * people reach for first, the font face and its size, were not there at all
- * because the extensions backing them were never installed.
+ * THE THIRD ATTEMPT, and the two before it missed the same thing: Word's
+ * ribbon is TWO ROWS PER GROUP with a STYLES GALLERY, not one row of buttons
+ * with a style dropdown. Gabe put the reference on screen twice before this
+ * landed, so the corrections are worth recording rather than quietly fixing:
  *
- * SO THE GROUPS ARE WORD'S, IN WORD'S ORDER, with Word's group captions
- * printed under each band. `ribbonCommands` holds that list; this file is only
- * how it draws.
+ *   ATTEMPT 1 -- fourteen bare buttons in a single flat row. No font, no
+ *   size, no groups at all.
+ *   ATTEMPT 2 -- groups, but NINE of them, each captioned, still one row.
+ *   That overflowed a 1200px column and clipped the last band, and Word has
+ *   no "script" or "spacing" group to begin with.
+ *   THIS ONE -- Font and Paragraph as two stacked rows, a real Styles
+ *   gallery, no captions, three bands.
  *
- * THE DESIGN SYSTEM TAKES THE CHROME AND LEAVES THE STRUCTURE. Word raises its
- * buttons, bands its groups in gradients and boxes its style gallery; none of
- * that survives, and none of it is what makes a ribbon readable. Hairline
- * rules separate groups where Word draws a separator, every control is capped
- * at 4px, nothing has a shadow, and the accent marks the ACTIVE format only --
- * which is precisely the "current action" the accent is reserved for. An
- * active button is the one place a filled block is correct here, because it is
- * a pressed control and not a status.
+ * THE TWO-ROW SHAPE IS ALSO WHAT MAKES IT FIT. The same controls in one line
+ * needed ~1200px; stacked they need about half that, at the height the styles
+ * gallery already sets.
  *
- * SELECTS, NOT DROPDOWN MENUS, for font/size/style/spacing. A native select is
- * one tap on a phone, is keyboard-navigable for free, and reports its value
- * without a popover -- and the value IS the information here ("this paragraph
- * is Calibri 11"). A custom menu would have to reimplement all of that to look
- * marginally more like Word.
+ * NO GROUP CAPTIONS, because the reference has none -- bands are told apart by
+ * the vertical rule between them, which is what this design system reaches for
+ * anyway.
+ *
+ * THE GALLERY SHOWS EACH STYLE IN ITS OWN TYPE, which is the one thing a
+ * dropdown cannot do and the entire reason Word spends that much ribbon on it.
+ * The active card takes an accent BORDER rather than a fill: it marks the
+ * current action without turning a state into a filled block.
  */
 
 const CONTROL =
-  'h-8 rounded-[4px] border border-border-default bg-bg-canvas px-1.5 text-body-s ' +
+  'h-7 rounded-[4px] border border-border-default bg-bg-canvas px-1 text-body-s ' +
   'text-text-primary transition-colors duration-(--duration-fast) ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30 ' +
   'disabled:cursor-not-allowed disabled:opacity-40'
 
 const BUTTON =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-[4px] border px-2 ' +
-  'text-body-s transition-colors duration-(--duration-fast) active:scale-[0.97] ' +
+  'inline-flex h-7 min-w-7 items-center justify-center rounded-[4px] border px-1.5 ' +
+  'text-body-s leading-none transition-colors duration-(--duration-fast) active:scale-[0.97] ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30 ' +
   'disabled:cursor-not-allowed disabled:opacity-40'
 
@@ -75,41 +77,44 @@ function CommandButton({ command, editor }: { command: RibbonCommand; editor: Ed
           : 'border-border-default bg-bg-canvas text-text-secondary hover:bg-bg-inset'
       )}
     >
-      {Glyph ? <Glyph /> : Icon ? <Icon size={14} aria-hidden /> : <span aria-hidden>{command.text}</span>}
+      {Glyph ? (
+        <Glyph />
+      ) : Icon ? (
+        <Icon size={13} aria-hidden />
+      ) : (
+        <span aria-hidden>{command.text}</span>
+      )}
     </button>
   )
 }
 
-/** A group of controls with Word's caption under it. */
-function Group({
-  label,
+/** A band of the ribbon: stacked rows, with a rule before it. */
+function Band({
+  id,
   visibility,
   first,
   children,
 }: {
-  label: string
+  id: string
   visibility: string
   first?: boolean
   children: React.ReactNode
 }) {
   return (
     <div
-      data-ribbon-group={label}
+      data-ribbon-group={id}
       className={cn(
-        'flex-col items-center gap-1 px-2.5',
+        'shrink-0 flex-col justify-center gap-1 px-3',
         visibility,
-        // A rule between groups, where Word draws its separator.
         !first && 'border-l border-border-subtle'
       )}
     >
-      <div className="flex items-center gap-1">{children}</div>
-      {/* WORD PRINTS THE GROUP NAME UNDER THE BAND, and it is what turns a row
-          of glyphs into findable groups -- "the list buttons" becomes a place
-          rather than a shape you have to recognise. */}
-      <span className="text-label-caps uppercase leading-none text-text-muted">{label}</span>
+      {children}
     </div>
   )
 }
+
+const ROW = 'flex items-center gap-1'
 
 export function DocumentToolbar({ editor }: { editor: Editor | null }) {
   // Re-render on selection and document change, so every `isActive` below
@@ -126,117 +131,162 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
     }
   }, [editor])
 
-  const currentFamily =
-    (editor?.getAttributes('textStyle').fontFamily as string | undefined) ?? ''
-  const currentSize = String(
-    (editor?.getAttributes('textStyle').fontSize as string | undefined) ?? ''
-  ).replace('px', '')
-  const currentStyle = STYLE_PRESETS.find((s) => editor && s.isActive(editor))?.id ?? 'normal'
+  const currentFamily = (editor?.getAttributes('textStyle').fontFamily as string | undefined) ?? ''
+  const fontPx = currentFontPx(editor)
+  const history = RIBBON_GROUPS[0]
+  const [fontRow, markRow] = RIBBON_GROUPS[1].rows
+  const paragraph = RIBBON_GROUPS[2]
 
   return (
     <div
       role="toolbar"
       aria-label="formatting"
       aria-controls="document-sheet"
-      // `min-w-0` + `overflow-x-auto` so a ribbon wider than the column
-      // SCROLLS rather than being clipped by it, which is what the nine-group
-      // version did -- the last band was simply cut off with no way to reach
-      // it. Wrapping is not the alternative: a three-row ribbon eats the
-      // document it sits above.
-      className="flex min-w-0 items-stretch overflow-x-auto"
+      // Scrolls rather than clips when the column is narrower than the bands.
+      // Wrapping is not the alternative: a ribbon that grows to four rows eats
+      // the document it sits above.
+      className="flex min-w-0 items-stretch overflow-x-auto py-1"
       data-document-toolbar
     >
-      {/* STYLES FIRST at this width rather than last as Word has it: the
-          heading level is the single most-used control in a CV, and a ribbon
-          that scrolls should put its most-used control where it cannot. */}
-      <Group label="styles" visibility="flex" first>
-        <select
-          aria-label="paragraph style"
-          value={currentStyle}
-          disabled={!editor}
-          onChange={(event) => {
-            const preset = STYLE_PRESETS.find((s) => s.id === event.target.value)
-            if (preset && editor) preset.apply(editor)
-          }}
-          className={cn(CONTROL, 'w-[104px]')}
-        >
-          {STYLE_PRESETS.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.label}
-            </option>
-          ))}
-        </select>
-      </Group>
+      <Band id="history" visibility={history.visibility} first>
+        {history.rows.map((row, index) => (
+          <div key={index} className={ROW}>
+            {row.map((command) => (
+              <CommandButton key={command.id} command={command} editor={editor} />
+            ))}
+          </div>
+        ))}
+      </Band>
 
-      <Group label="typeface" visibility="hidden md:flex">
-        <select
-          aria-label="font"
-          value={currentFamily}
-          disabled={!editor}
-          onChange={(event) =>
-            event.target.value
-              ? editor?.chain().focus().setFontFamily(event.target.value).run()
-              : editor?.chain().focus().unsetFontFamily().run()
-          }
-          className={cn(CONTROL, 'w-[116px]')}
-        >
-          <option value="">(default)</option>
-          {FONT_FAMILIES.map((font) => (
-            <option key={font.label} value={font.value}>
-              {font.label}
-            </option>
-          ))}
-        </select>
-        <select
-          aria-label="font size"
-          value={currentSize}
-          disabled={!editor}
-          onChange={(event) =>
-            event.target.value
-              ? editor?.chain().focus().setFontSize(`${event.target.value}px`).run()
-              : editor?.chain().focus().unsetFontSize().run()
-          }
-          className={cn(CONTROL, 'w-[58px]')}
-        >
-          <option value="">–</option>
-          {FONT_SIZES.map((size) => (
-            <option key={size} value={size}>
-              {size}
-            </option>
-          ))}
-        </select>
-        {/* LINE SPACING SITS WITH THE FACE AND SIZE rather than in a band of
-            its own. Word files it under Paragraph, but it is a select and the
-            other two selects are here; a lone dropdown in its own captioned
-            group is what made the first ribbon nine bands wide. */}
-        <select
-          aria-label="line spacing"
-          disabled={!editor}
-          defaultValue=""
-          onChange={(event) =>
-            event.target.value
-              ? editor?.chain().focus().setLineHeight(event.target.value).run()
-              : editor?.chain().focus().unsetLineHeight().run()
-          }
-          className={cn(CONTROL, 'w-[58px]')}
-        >
-          <option value="">↕</option>
-          {LINE_SPACINGS.map((value) => (
-            <option key={value} value={value}>
-              {value}
-            </option>
-          ))}
-        </select>
-      </Group>
-
-      {RIBBON_GROUPS.map((group) => (
-        <Group key={group.id} label={group.label} visibility={group.visibility}>
-          {group.commands.map((command) => (
+      {/* FONT: the selects and size stepping above, the marks below --
+          Word's arrangement exactly. */}
+      <Band id="font" visibility="flex">
+        <div className={ROW}>
+          <select
+            aria-label="font"
+            value={currentFamily}
+            disabled={!editor}
+            onChange={(event) =>
+              event.target.value
+                ? editor?.chain().focus().setFontFamily(event.target.value).run()
+                : editor?.chain().focus().unsetFontFamily().run()
+            }
+            className={cn(CONTROL, 'w-[124px]')}
+          >
+            <option value="">(default)</option>
+            {FONT_FAMILIES.map((font) => (
+              <option key={font.label} value={font.value}>
+                {font.label}
+              </option>
+            ))}
+          </select>
+          <select
+            aria-label="font size"
+            value={String(fontPx)}
+            disabled={!editor}
+            onChange={(event) =>
+              editor?.chain().focus().setFontSize(`${event.target.value}px`).run()
+            }
+            className={cn(CONTROL, 'w-[52px]')}
+          >
+            {FONT_SIZES.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+          {fontRow.map((command) => (
             <CommandButton key={command.id} command={command} editor={editor} />
           ))}
-        </Group>
-      ))}
+        </div>
+        <div className={ROW}>
+          {markRow.map((command) => (
+            <CommandButton key={command.id} command={command} editor={editor} />
+          ))}
+        </div>
+      </Band>
 
+      {/* PARAGRAPH: lists and indents above, alignment below. */}
+      <Band id="paragraph" visibility={paragraph.visibility}>
+        <div className={ROW}>
+          {paragraph.rows[0].map((command) => (
+            <CommandButton key={command.id} command={command} editor={editor} />
+          ))}
+        </div>
+        <div className={ROW}>
+          {paragraph.rows[1].map((command) => (
+            <CommandButton key={command.id} command={command} editor={editor} />
+          ))}
+          <select
+            aria-label="line spacing"
+            disabled={!editor}
+            defaultValue=""
+            onChange={(event) =>
+              event.target.value
+                ? editor?.chain().focus().setLineHeight(event.target.value).run()
+                : editor?.chain().focus().unsetLineHeight().run()
+            }
+            className={cn(CONTROL, 'w-[52px]')}
+          >
+            <option value="">↕</option>
+            {LINE_SPACINGS.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+      </Band>
+
+      {/* STYLES: the gallery, spanning the band's height as Word's does. */}
+      <Band id="styles" visibility="hidden lg:flex">
+        {/* A FIXED VIEWPORT THAT SCROLLS ITSELF, which is what Word's gallery
+            is -- it shows a few cards and an expander rather than growing to
+            fit every style. Measured: seven 76px cards push the whole ribbon
+            to 1235px in a 1200px column, so without a cap here the gallery is
+            what makes the bar overflow. Capped, the bar fits and the gallery
+            scrolls on its own. */}
+        <div
+          role="group"
+          aria-label="styles"
+          className="flex h-full max-w-[268px] items-center gap-1 overflow-x-auto xl:max-w-[420px]"
+        >
+          {STYLE_PRESETS.map((preset) => {
+            const active = editor ? preset.isActive(editor) : false
+            return (
+              <button
+                key={preset.id}
+                type="button"
+                aria-label={preset.label}
+                aria-pressed={active}
+                title={preset.label}
+                disabled={!editor}
+                onClick={() => editor && preset.apply(editor)}
+                data-style-card={preset.id}
+                className={cn(
+                  'flex h-[46px] w-[76px] shrink-0 flex-col items-center justify-center gap-1',
+                  'rounded-[4px] border px-1 transition-colors duration-(--duration-fast)',
+                  'active:scale-[0.98] focus-visible:outline-none',
+                  'focus-visible:ring-2 focus-visible:ring-accent-default/30',
+                  'disabled:cursor-not-allowed disabled:opacity-40',
+                  active
+                    ? 'border-accent-default bg-bg-surface'
+                    : 'border-border-default bg-bg-canvas hover:bg-bg-inset'
+                )}
+              >
+                {/* THE SAMPLE, SET IN THE STYLE IT APPLIES. This is the whole
+                    reason the gallery is cards and not a dropdown. */}
+                <span aria-hidden className={cn('leading-none text-text-primary', preset.preview)}>
+                  AaBbCc
+                </span>
+                <span className="w-full truncate text-center text-[9px] leading-none text-text-muted">
+                  {preset.label}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+      </Band>
     </div>
   )
 }

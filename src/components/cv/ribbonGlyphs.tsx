@@ -133,3 +133,33 @@ export function HighlightGlyph() {
     </svg>
   )
 }
+
+/** An arrow into a stack of lines: Word's increase-indent mark. */
+export function IndentGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden focusable="false">
+      {[2, 11].map((y) => (
+        <rect key={y} x={0} y={y} width={14} height={1.5} rx={0.5} fill="currentColor" />
+      ))}
+      {[5.5, 8.25].map((y) => (
+        <rect key={y} x={5} y={y} width={9} height={1.5} rx={0.5} fill="currentColor" />
+      ))}
+      <path d="M0 5.5 3 7l-3 1.5z" fill="currentColor" />
+    </svg>
+  )
+}
+
+/** The same, pointing out: decrease indent. */
+export function OutdentGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden focusable="false">
+      {[2, 11].map((y) => (
+        <rect key={y} x={0} y={y} width={14} height={1.5} rx={0.5} fill="currentColor" />
+      ))}
+      {[5.5, 8.25].map((y) => (
+        <rect key={y} x={5} y={y} width={9} height={1.5} rx={0.5} fill="currentColor" />
+      ))}
+      <path d="M3 5.5 0 7l3 1.5z" fill="currentColor" />
+    </svg>
+  )
+}
