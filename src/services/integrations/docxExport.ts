@@ -6,6 +6,7 @@ import {
   TextRun,
   type ISectionOptions,
 } from 'docx'
+import { TWIPS_PER_INCH, normalizeGeometry } from '@/lib/pageGeometry'
 
 /**
  * Turns the Word editor's TipTap document into a real .docx.
@@ -109,13 +110,35 @@ function paragraphsFrom(node: TipTapNode): Paragraph[] {
 export function sectionsFrom(doc: unknown): ISectionOptions[] {
   const root = (doc ?? {}) as TipTapNode
   const children = (root.content ?? []).flatMap(paragraphsFrom)
+
+  /**
+   * THE PAGE THE DOCUMENT CARRIES, not a fixed one.
+   *
+   * This used to write 0.8in on every side and no size at all, which meant
+   * every export came out US Letter with margins the author never chose. On
+   * an imported CV that is the import bug in reverse: a document read at
+   * 0.35in margins, edited, and exported at 0.8in has had its page setup
+   * replaced twice over -- and the file a recruiter opens is not the file
+   * that was uploaded.
+   *
+   * `pageGeometry` rides on the doc node (see components/cv/editorExtensions
+   * for why it has to be an attribute), so by the time a document reaches
+   * here it is either the page it was imported at or Word's default.
+   */
+  const geometry = normalizeGeometry(root.attrs?.pageGeometry)
+  const twips = (inches: number) => Math.round(inches * TWIPS_PER_INCH)
+
   return [
     {
       properties: {
         page: {
-          // 0.8in on every side, matching the editor's own letter preview --
-          // so what was on screen is what comes out.
-          margin: { top: 1152, right: 1152, bottom: 1152, left: 1152 },
+          size: { width: twips(geometry.width), height: twips(geometry.height) },
+          margin: {
+            top: twips(geometry.margin.top),
+            right: twips(geometry.margin.right),
+            bottom: twips(geometry.margin.bottom),
+            left: twips(geometry.margin.left),
+          },
         },
       },
       children: children.length > 0 ? children : [new Paragraph({ children: [new TextRun('')] })],

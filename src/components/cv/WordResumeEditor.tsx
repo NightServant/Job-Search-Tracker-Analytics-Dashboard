@@ -23,6 +23,7 @@ import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './docum
 import { useProofread } from './useProofread'
 import { useThesaurus } from './useThesaurus'
 import { useFitToWidth } from './useFitToWidth'
+import { normalizeGeometry } from '@/lib/pageGeometry'
 import { useResumeExport } from './useResumeExport'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
@@ -287,7 +288,15 @@ export function WordResumeEditor({
   const thesaurus = useThesaurus(editor)
   // Word's zoom-to-fit: the page scales to the well instead of scrolling
   // sideways. See useFitToWidth for why this replaced nudging breakpoints.
-  const fit = useFitToWidth()
+  // THE PAGE THIS DOCUMENT WAS WRITTEN FOR. Imported .docx files carry their
+  // own size and margins on the doc node; anything else gets Word's default.
+  // Hard-coding 0.8in here is what made an imported ATS CV reflow -- see
+  // lib/pageGeometry.
+  const geometry = normalizeGeometry(
+    (normalizeWordContent(draft.content) as { attrs?: { pageGeometry?: unknown } }).attrs
+      ?.pageGeometry
+  )
+  const fit = useFitToWidth(geometry.width * 96)
 
   /**
    * WHICH RAIL TAB IS OPEN, remembered per browser.
@@ -446,12 +455,38 @@ export function WordResumeEditor({
         (`CSS.supports('zoom', '0.7')` verified true in the app).
       */}
       <div
-        className="mx-auto min-h-[11in] w-[8.5in] bg-white"
-        style={{ zoom: fit.scale }}
+        className="mx-auto bg-white"
+        style={{
+          zoom: fit.scale,
+          width: `${geometry.width}in`,
+          minHeight: `${geometry.height}in`,
+          // PAGE BOUNDARIES, which the sheet had none of (Gabe, 2026-09-11:
+          // "page break does not apply"). A CV that runs to two pages was one
+          // continuous white block, so there was no way to see where the
+          // first page ended -- which is the single thing a print proof is
+          // for. A repeating gradient draws a rule at every page height, so
+          // the break appears wherever the content actually crosses it rather
+          // than where a manual break was typed. Word paginates by flow too;
+          // this document has zero explicit breaks and still prints on two.
+          backgroundImage:
+            `repeating-linear-gradient(to bottom, transparent 0, transparent calc(${geometry.height}in - 1px), var(--color-border-default) calc(${geometry.height}in - 1px), var(--color-border-default) ${geometry.height}in)`,
+        }}
       >
         <EditorContent
           editor={editor}
-          className="min-h-[11in] p-[0.8in] [&_.ProseMirror]:min-h-[9.4in] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
+          style={{
+            padding: `${geometry.margin.top}in ${geometry.margin.right}in ${geometry.margin.bottom}in ${geometry.margin.left}in`,
+            // THE TYPING AREA DERIVES FROM THE PAGE, rather than the 9.4in
+            // that was hard-coded for Letter at 0.8in margins. On A4 that
+            // number is wrong by a third of an inch and on Legal by three,
+            // so the editable region either fell short of the page or ran
+            // past it -- both of which look like the sheet is the wrong size.
+            '--page-body-height': `${Math.max(
+              1,
+              geometry.height - geometry.margin.top - geometry.margin.bottom
+            )}in`,
+          } as React.CSSProperties}
+          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
         />
       </div>
       </div>

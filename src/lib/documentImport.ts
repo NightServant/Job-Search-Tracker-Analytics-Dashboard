@@ -1,4 +1,5 @@
 import type { ResumeContent, ResumeMode } from '@/services/resumeService'
+import { DEFAULT_GEOMETRY, readPageGeometry, type PageGeometry } from './pageGeometry'
 
 export interface ImportedDocument {
   mode: ResumeMode
@@ -185,6 +186,13 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
   // a reader importing a .txt should not pay to download it.
   const mammoth = await import('mammoth')
   const arrayBuffer = await readArrayBuffer(file)
+  // THE PAGE THE DOCUMENT WAS WRITTEN FOR, read before the content. mammoth
+  // converts the body and discards the section setup entirely, so the margins
+  // have to come out of the package directly -- and without them every import
+  // renders at the editor's hard-coded 0.8in, which is what "the format
+  // breaks" meant. See `pageGeometry`.
+  const geometry = await readGeometryFromDocx(arrayBuffer)
+
   const { value: html } = await mammoth.convertToHtml(
     { arrayBuffer },
     // Word's own style names, mapped to what the editor can show. Without
@@ -200,7 +208,43 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
     }
   )
 
-  return htmlToWordContent(html)
+  return withGeometry(htmlToWordContent(html), geometry)
+}
+
+/**
+ * Pull `word/document.xml` out of the package and read its section setup.
+ *
+ * JSZIP IS ALREADY HERE, pulled in by `docx` for the export side, so this
+ * costs no new dependency. Any failure -- a corrupt zip, a package with no
+ * document part -- falls back to Word's own default rather than failing an
+ * import over page margins, which would turn a cosmetic problem into a
+ * blocking one.
+ */
+async function readGeometryFromDocx(arrayBuffer: ArrayBuffer): Promise<PageGeometry> {
+  try {
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(arrayBuffer)
+    const xml = await zip.file('word/document.xml')?.async('string')
+    return xml ? readPageGeometry(xml) : DEFAULT_GEOMETRY
+  } catch {
+    return DEFAULT_GEOMETRY
+  }
+}
+
+/**
+ * Attach the geometry to the document JSON.
+ *
+ * ON THE DOC NODE'S `attrs`, which is the one place tiptap preserves across a
+ * round trip -- the schema declares the attribute, so `getJSON()` gives it
+ * back after an edit and the page a CV was imported at survives being typed
+ * in and saved. A sibling key beside `type: 'doc'` would be dropped the first
+ * time the editor re-serialised.
+ */
+function withGeometry(content: ResumeContent, geometry: PageGeometry): ResumeContent {
+  return {
+    ...(content as object),
+    attrs: { ...((content as { attrs?: object }).attrs ?? {}), pageGeometry: geometry },
+  } as ResumeContent
 }
 
 type TipTapNode = { type: string; attrs?: Record<string, unknown>; content?: TipTapNode[]; marks?: Array<{ type: string }>; text?: string }
