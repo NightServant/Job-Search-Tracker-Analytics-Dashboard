@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { Field } from '@/components/ui/field'
 import { Select } from '@/components/ui/select'
-import { CheckIcon } from '@/components/icons'
+import { BriefcaseIcon, CheckIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { assertJobFormDataValid } from '@/services/jobValidation'
 import { fromLocalDateTimeInput, toLocalDateTimeInput } from '@/services/date'
@@ -244,7 +244,23 @@ export function ApplicationRecordView({
         {/* The top padding is on each COLUMN, never on the grid: on the grid
             it would push the columns clear of the pipeline's border and the
             vertical rules would stop short of it again. */}
-        <div className={cn('flex flex-col gap-5', layout === 'record' && 'pt-6')}>
+        <div className={cn('flex flex-col gap-4', layout === 'record' && 'pt-6')}>
+          {/* THE FIRST COLUMN HAD NO HEADING and the other two did, so the
+              record read as a form with two panels bolted to it rather than as
+              three columns of one thing. Same markup as `RecordDescription`
+              and `RecordAts` down to the glyph size, because "looks like a
+              heading" is not the same as "is the same heading".
+
+              Only on the record: the wizard's review step is one form being
+              checked before a save, not a record being read, and a column
+              title there would be labelling a thing that has no siblings
+              yet. */}
+          {layout === 'record' && (
+            <h3 className="flex items-center gap-2 text-heading-s text-text-primary">
+              <BriefcaseIcon size={16} aria-hidden className="shrink-0 text-text-muted" />
+              the application
+            </h3>
+          )}
           <RecordBasics form={form} showAll={layout === 'review'} />
 
           {/* WHICH CV WENT WITH IT sits with the basics because it is one of
@@ -337,7 +353,36 @@ export function ApplicationRecordView({
           'max-sm:[&_button]:h-11 max-sm:[&_button]:flex-1'
         )}
       >
-        <Button type="submit" disabled={saving || nothingToSave}>
+        {/* THE STATE, THEN THE ACTION. `Save application` used to sit alone on
+            the leading edge and go grey with nothing to explain it -- a
+            disabled primary with no adjacent reason reads as broken rather
+            than as satisfied. Saying which of the two it is costs one line and
+            turns the grey into an answer.
+
+            `aria-live="polite"` because this is the only feedback a save
+            gives: the dialog deliberately stays open (the row is derived from
+            `jobs`, so the new values simply arrive), which means a screen
+            reader would otherwise get silence where a sighted user gets a
+            button greying out. */}
+        {layout === 'record' && (
+          <p
+            aria-live="polite"
+            data-record-save-state
+            className="min-w-0 text-body-s text-text-muted max-sm:sr-only"
+          >
+            {saving ? 'saving…' : dirty ? 'unsaved changes' : 'everything is saved'}
+          </p>
+        )}
+
+        {/* `ms-auto` on the record only. A dialog's primary action belongs on
+            the trailing edge, where the eye finishes; the wizard's review step
+            keeps its own arrangement, because there the save is the end of a
+            four-step flow rather than one of the things this surface does. */}
+        <Button
+          type="submit"
+          disabled={saving || nothingToSave}
+          className={cn(layout === 'record' && 'ms-auto')}
+        >
           {saving ? (
             <CssSpinner size={14} />
           ) : (

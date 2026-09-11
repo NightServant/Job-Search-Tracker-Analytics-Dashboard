@@ -8,7 +8,7 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { ArrowRightIcon, ChevronLeftIcon, icons, type IconName } from '@/components/icons'
+import { ArrowRightIcon, icons, type IconName } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
 import { isSupportedCurrency } from '@/services/userPreferences'
@@ -328,9 +328,15 @@ export function AddApplicationDialog({
                 placeholder="https://careers.acme.com/123"
               />
             </Field>
+            {/* THE LINK IS REQUIRED NOW (Gabe, 2026-09-11). It used to be
+                optional, with this paragraph inviting people past it -- and
+                that invitation led straight to the one path this flow handles
+                worst: three steps of a four-step wizard whose whole promise is
+                "the model does three of them", with nothing for the model to
+                read. Better to stop at the first step, where the fix is
+                obvious, than at the third, where it is not. */}
             <p className="text-body-s text-text-muted">
-              No link? Continue anyway — the next steps still work, and you can paste the
-              description in on the review step.
+              Everything after this step is built from the page at that address.
             </p>
           </div>
         )
@@ -445,12 +451,6 @@ export function AddApplicationDialog({
               }}
               summary={summary}
               submitLabel="Save application"
-              footer={
-                <Button type="button" variant="ghost" onClick={() => setStep('status')}>
-                  <ChevronLeftIcon size={16} aria-hidden className={iconMotion('back')} />
-                  back
-                </Button>
-              }
             />
           </div>
         )
@@ -476,10 +476,18 @@ export function AddApplicationDialog({
         {(step === 'link' || step === 'status') && (
           <div className="flex items-center gap-3 border-t border-border-subtle pt-5 max-sm:[&_button]:h-11 max-sm:[&_button]:flex-1">
             {step === 'link' ? (
+              // DISABLED UNTIL THERE IS SOMETHING TO READ. `normalizePostingUrl`
+              // completes a bare domain, so "acme.com/jobs/1" counts; only an
+              // empty field is nothing. The shape is still checked on click,
+              // because "looks like a URL" and "is non-empty" are different
+              // questions and only the second one should gate a button --
+              // disabling on the first would leave somebody mid-type staring
+              // at a dead control.
               <Button
+                disabled={!normalizePostingUrl(draft.url)}
                 onClick={() => {
                   const url = normalizePostingUrl(draft.url)
-                  if (url && !/^https?:\/\/.+/i.test(url)) {
+                  if (!/^https?:\/\/.+/i.test(url)) {
                     setLinkError('That does not look like a web address.')
                     return
                   }
@@ -491,17 +499,16 @@ export function AddApplicationDialog({
                 <ArrowRightIcon size={16} aria-hidden className={iconMotion('forward')} />
               </Button>
             ) : (
-              <>
-                <Button onClick={() => void goRead()} disabled={autofilling}>
-                  {autofilling ? <CssSpinner size={14} /> : null}
-                  fill it in
-                  <ArrowRightIcon size={16} aria-hidden className={iconMotion('forward')} />
-                </Button>
-                <Button variant="ghost" onClick={() => setStep('link')}>
-                  <ChevronLeftIcon size={16} aria-hidden className={iconMotion('back')} />
-                  back
-                </Button>
-              </>
+              // NO `back` (Gabe, 2026-09-11: "it destroys the whole process of
+              // creation"). Nothing is stranded by its removal: the review step
+              // renders every field open, the posting URL among them, so a
+              // mistyped link is still fixable -- one step further on rather
+              // than one step back.
+              <Button onClick={() => void goRead()} disabled={autofilling}>
+                {autofilling ? <CssSpinner size={14} /> : null}
+                fill it in
+                <ArrowRightIcon size={16} aria-hidden className={iconMotion('forward')} />
+              </Button>
             )}
           </div>
         )}

@@ -11,7 +11,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { IconButton } from '@/components/ui/icon-button'
+import { Button } from '@/components/ui/button'
 import { StatusMarker, type Status } from '@/components/ui/status-marker'
 import { EmptyState } from '@/components/ui/empty-state'
 import { EyeIcon, TrashIcon } from '@/components/icons'
@@ -148,13 +148,15 @@ export function ApplicationsTable({
                 "these two want no width at all", so the surplus went to
                 salary, which needs none of it. The header row is where a table
                 states its proportions; these five add up to 92% and the
-                remainder is the actions column's fixed w-20. */}
+                remainder is the actions column's fixed w-28. */}
             <TableHead sticky className="w-[24%]">company</TableHead>
             <TableHead className="w-[22%]">position</TableHead>
             <TableHead className="w-[14%]">status</TableHead>
             <TableHead className="w-[20%]">salary</TableHead>
             <TableHead className="w-[12%] text-right">applied on</TableHead>
-            {(onOpen || onDelete) && <TableHead className="w-20 text-right">actions</TableHead>}
+            {/* `w-28`, up from `w-20`: the delete control is a labelled
+                button now and 80px cropped it. */}
+            {(onOpen || onDelete) && <TableHead className="w-28 text-right">actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -228,21 +230,46 @@ export function ApplicationsTable({
                         accessibility tree too, so a desktop test never finds
                         two ways to open the same record. */}
                     {onOpen && (
-                      <IconButton
+                      <Button
+                        variant="secondary"
+                        size="s"
                         aria-label={`View ${job.role} at ${job.company}`}
                         onClick={() => onOpen(job)}
                         className="sm:hidden"
                       >
                         <EyeIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('none')}`} />
-                      </IconButton>
+                        view
+                      </Button>
                     )}
                     {onDelete && (
-                      <IconButton
+                      /* A LABELLED DANGER BUTTON, NOT A BARE GLYPH (Gabe,
+                         2026-09-11). A trash icon alone is the most
+                         destructive control on the screen wearing the
+                         quietest chrome — the same weight as the eye beside
+                         it, in a row somebody is scanning, one pixel from the
+                         thing they meant to click.
+
+                         The treatment is `DangerZone`'s, not a new one: a
+                         secondary button re-coloured with
+                         `status-rejected-mark`. This system paints destructive
+                         intent in the rejected hue and reserves the accent for
+                         "the current action", so a filled red button here
+                         would shout louder than `add` does.
+
+                         THE ACCESSIBLE NAME STILL CARRIES THE ROW. Ten buttons
+                         all announcing "delete" is a list nobody can navigate,
+                         and `aria-label` opens with the visible word so the
+                         name still contains the label (WCAG 2.5.3). */
+                      <Button
+                        variant="secondary"
+                        size="s"
                         aria-label={`Delete ${job.role} at ${job.company}`}
                         onClick={() => onDelete(job)}
+                        className="border-status-rejected-mark text-status-rejected-mark hover:bg-status-rejected-mark/10"
                       >
                         <TrashIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('lid')}`} />
-                      </IconButton>
+                        delete
+                      </Button>
                     )}
                   </div>
                 </TableCell>

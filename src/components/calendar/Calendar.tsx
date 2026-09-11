@@ -4,7 +4,7 @@ import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Select } from '@/components/ui/select'
-import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon } from '@/components/icons'
+import { ChevronLeftIcon, ChevronRightIcon, CalendarIcon, ClockIcon } from '@/components/icons'
 import { buildMonthGrid, weekOf } from '@/lib/calendar'
 import { MonthGrid } from './MonthGrid'
 import { WeekStrip } from './WeekStrip'
@@ -145,8 +145,8 @@ export function Calendar({
           The header keeps the rule, so the page still opens the same way every
           other screen does. */}
       <PageHeader
-        title="calendar"
-        description="interviews and follow-ups, laid out by month."
+        title="planner"
+        description="what is booked, what is open, and what has just been posted."
         rule
       />
 
@@ -221,6 +221,33 @@ export function Calendar({
           <WeekStrip days={week} holidays={holidays} today={today} />
           <Agenda events={events} companyByJobId={companyByJobId} />
         </div>
+
+        {/* UP NEXT, ON DESKTOP, and it is the same `Agenda` the phone has had
+            all along (Gabe, 2026-09-11: "include another section within page.
+            Use unused components if necessary"). The component was written for
+            mobile and gated `md:hidden`, so the widest screens were the ones
+            that never saw it.
+
+            It is NOT a repeat of the grid above. A cell shows a truncated
+            title and only for the month on screen; this gives the time, the
+            duration and the COMPANY -- which `CalendarEvent` does not carry,
+            so it takes the same `job_id` join the mobile agenda does -- and it
+            keeps running past the end of the month, which is exactly where an
+            interview booked for the 3rd of next month currently hides.
+
+            A measure rather than the full width: it is a list of short lines,
+            and stretched to 1136px the time and the title end up a hand apart. */}
+        <section
+          data-up-next
+          aria-label="Up next"
+          className="mt-6 hidden flex-col gap-3 border-t border-border-subtle pt-6 md:flex"
+        >
+          <h2 className="flex items-center gap-2 text-heading-s text-text-primary">
+            <ClockIcon size={16} aria-hidden className="shrink-0 text-text-muted" />
+            up next
+          </h2>
+          <Agenda events={events} companyByJobId={companyByJobId} className="max-w-2xl" />
+        </section>
       </section>
     </div>
   )

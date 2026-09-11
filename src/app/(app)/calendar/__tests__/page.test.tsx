@@ -106,14 +106,15 @@ describe('Calendar route wrapper', () => {
       error: null,
     })
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'calendar' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'planner' })).toBeTruthy()
   })
 
   it('joins event.job_id against the jobs cache and carries the company into the agenda', () => {
     useEventsMock.mockReturnValue({ data: [EVENT], isLoading: false, error: null })
     useJobsMock.mockReturnValue({ data: [JOB], isLoading: false, error: null })
     render(<Page />)
-    expect(screen.getByRole('heading', { name: 'calendar' })).toBeTruthy()
-    expect(screen.getByText('Acme Corp')).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'planner' })).toBeTruthy()
+    // Two agendas, one visible per width -- see the component's own test.
+    expect(screen.getAllByText('Acme Corp')).toHaveLength(2)
   })
 })

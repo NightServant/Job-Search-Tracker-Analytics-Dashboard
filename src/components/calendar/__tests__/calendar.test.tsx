@@ -96,14 +96,31 @@ describe('Calendar', () => {
     expect(today.className).toContain('h-[2px]')
   })
 
-  it('renders a page header titled Calendar', () => {
+  it('renders a page header titled planner', () => {
+    // `calendar` until 2026-09-11. The route is still /calendar; the word
+    // changed because the screen stopped being a month grid -- see NAV.
     render(<Calendar events={EVENTS} />)
-    expect(screen.getByRole('heading', { name: 'calendar' })).toBeTruthy()
+    expect(screen.getByRole('heading', { name: 'planner' })).toBeTruthy()
   })
 
-  it('threads a companyByJobId prop through into the agenda, unmodified', () => {
+  it('threads a companyByJobId prop through into both agendas, unmodified', () => {
+    // TWO agendas are in the DOM and exactly one is ever visible: the phone's,
+    // inside the `md:hidden` week-strip block, and the desktop `up next`
+    // section added 2026-09-11. jsdom evaluates no media query, so both render
+    // here -- `getAllByText`, and the count is the assertion that they are
+    // both fed the same map rather than one being wired and one forgotten.
     render(<Calendar events={EVENTS} companyByJobId={{ 'job-1': 'Acme Corp' }} />)
-    expect(screen.getByText('Acme Corp')).toBeTruthy()
+    expect(screen.getAllByText('Acme Corp')).toHaveLength(2)
+  })
+
+  it('gives desktop the agenda that used to exist only on phones', () => {
+    const { container } = render(<Calendar events={EVENTS} />)
+    const upNext = container.querySelector('[data-up-next]') as HTMLElement
+    expect(upNext).toBeTruthy()
+    // Hidden below md, where the week-strip block already carries one.
+    expect(upNext.className).toContain('hidden')
+    expect(upNext.className).toContain('md:flex')
+    expect(container.querySelector('[data-week-strip]')!.className).toContain('md:hidden')
   })
 })
 

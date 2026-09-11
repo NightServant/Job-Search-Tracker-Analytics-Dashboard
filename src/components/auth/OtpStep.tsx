@@ -89,6 +89,10 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
           autoComplete="one-time-code"
           maxLength={CODE_LENGTH}
           required
+          // Six dots, not "Enter the code": this is the one field where the
+          // SHAPE of the answer is the useful hint, and the label above
+          // already names what it is.
+          placeholder="······"
           autoFocus
           // The last field in the flow, so it gets the same caret as the three
           // before it. The wide tracking is not a problem for it: skiper106's

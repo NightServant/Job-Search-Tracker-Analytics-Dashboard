@@ -174,6 +174,7 @@ export function SignUpFlow({
                   inputMode="email"
                   autoComplete="email"
                   required
+                  placeholder="you@example.com"
                   smoothCaret
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -188,6 +189,9 @@ export function SignUpFlow({
                     icon="Lock"
                     autoComplete="new-password"
                     required
+                    // The rules are listed under this field, so the
+                    // placeholder names only the one people get wrong.
+                    placeholder="at least 10 characters"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                   />
@@ -202,6 +206,7 @@ export function SignUpFlow({
                   icon="Lock"
                   autoComplete="new-password"
                   required
+                  placeholder="type it again"
                   value={confirm}
                   onChange={(e) => setConfirm(e.target.value)}
                 />

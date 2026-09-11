@@ -14,7 +14,7 @@ import type { NavEntry } from '@/components/ui/sidebar'
 export const DEMO_NAV: NavEntry[] = [
   { href: '/demo/dashboard', label: 'overview', icon: 'Overview' },
   { href: '/demo/applications', label: 'applications', icon: 'Applications' },
-  { href: '/demo/calendar', label: 'calendar', icon: 'Calendar' },
+  { href: '/demo/calendar', label: 'planner', icon: 'Calendar' },
   { href: '/demo/documents', label: 'documents', icon: 'Documents' },
   { href: '/demo/analytics', label: 'analytics', icon: 'Analytics' },
 ]

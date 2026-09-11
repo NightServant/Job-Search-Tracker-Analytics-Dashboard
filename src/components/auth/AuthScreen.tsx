@@ -163,6 +163,12 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
               inputMode="email"
               autoComplete="email"
               required
+              // A REAL ADDRESS SHAPE, not "Enter your email" (Gabe,
+              // 2026-09-11). The label already says Email; a placeholder that
+              // repeats it in a sentence is the field telling you twice. What
+              // an empty field can usefully say is what a filled one LOOKS
+              // like, which is the one thing the label cannot.
+              placeholder="you@example.com"
               smoothCaret
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -176,6 +182,7 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
               icon="Lock"
               autoComplete={isSignUp ? 'new-password' : 'current-password'}
               required
+              placeholder={isSignUp ? 'at least 10 characters' : 'your password'}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
             />
@@ -189,6 +196,7 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
                 icon="Lock"
                 autoComplete="new-password"
                 required
+                placeholder="type it again"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
               />

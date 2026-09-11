@@ -176,7 +176,12 @@ describe('when the posting cannot be read at all', () => {
     expect(screen.getByText(/tidy and summarise/i)).toBeInTheDocument()
   })
 
-  it('does not call the extractor at all when no link was given', async () => {
+  it('will not start at all without a link, rather than reaching the read step with nothing to read', async () => {
+    // REPLACES "does not call the extractor at all when no link was given"
+    // (Gabe, 2026-09-11). That test pinned the old contract: continue past an
+    // empty field and discover on step three that a four-step flow whose whole
+    // promise is "the model does three of them" has nothing to work from. The
+    // gate moved to the first step, where the fix is obvious.
     const onAutofill = fill({})
     render(
       <AddApplicationDialog
@@ -188,11 +193,40 @@ describe('when the posting cannot be read at all', () => {
       />
     )
     const user = userEvent.setup()
-    await user.click(screen.getByRole('button', { name: /continue/i }))
-    await user.click(screen.getByRole('button', { name: /fill it in/i }))
+    const advance = screen.getByRole('button', { name: /continue/i })
+    expect(advance).toBeDisabled()
 
-    expect(await screen.findByRole('button', { name: /save application/i })).toBeTruthy()
+    // A bare domain counts -- `normalizePostingUrl` completes it -- so the gate
+    // is "is there anything here", not "did you type the scheme".
+    await user.type(screen.getByLabelText(/job posting url/i), 'careers.example.com/j/1')
+    expect(advance).not.toBeDisabled()
     expect(onAutofill).not.toHaveBeenCalled()
-    expect(screen.getByText(/No link to read/i)).toBeInTheDocument()
+  })
+
+  it('offers no way back once the wizard has started', async () => {
+    // Gabe, 2026-09-11: "remove the back button in general, it destroys the
+    // whole process of creation." Nothing is stranded by it -- the review step
+    // renders every field open, the posting URL among them.
+    const onAutofill = fill({})
+    render(
+      <AddApplicationDialog
+        open
+        onOpenChange={vi.fn()}
+        defaultCurrency={resolveDefaultCurrency(null)}
+        onSubmit={vi.fn()}
+        onAutofill={onAutofill}
+      />
+    )
+    const user = userEvent.setup()
+    await user.type(screen.getByLabelText(/job posting url/i), 'https://careers.example.com/j/1')
+    await user.click(screen.getByRole('button', { name: /continue/i }))
+    expect(screen.queryByRole('button', { name: /^back$/i })).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: /fill it in/i }))
+    await screen.findByRole('button', { name: /save application/i })
+    expect(screen.queryByRole('button', { name: /^back$/i })).toBeNull()
+    // The URL is still editable from the review step, which is what makes the
+    // removal safe rather than merely shorter.
+    expect(screen.getByLabelText(/posting url/i)).toHaveValue('https://careers.example.com/j/1')
   })
 })

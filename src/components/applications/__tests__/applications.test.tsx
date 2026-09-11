@@ -40,6 +40,11 @@ afterEach(() => cleanup())
  */
 async function addUpToReview(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: 'add' }))
+  // A LINK IS REQUIRED FROM THE FIRST STEP (Gabe, 2026-09-11): `continue` is
+  // disabled until there is one, because every step after it is built from
+  // that page. These tests are about the save, but they still have to get
+  // past the door like anybody else.
+  await user.type(screen.getByLabelText(/job posting url/i), 'https://careers.example.com/j/1')
   await user.click(screen.getByRole('button', { name: /continue/i }))
   await user.click(screen.getByRole('button', { name: /fill it in/i }))
   return screen.findByRole('button', { name: /save application/i })

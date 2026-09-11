@@ -188,7 +188,9 @@ describe('the bottom nav on a phone', () => {
     )
     const nav = container.querySelector('[data-bottom-nav]')!
     const labels = [...nav.querySelectorAll('span')].filter((s) =>
-      /^(overview|applications|calendar|documents|analytics)$/.test(s.textContent ?? '')
+      // `planner` was `calendar` until 2026-09-11; the route is still
+      // /calendar, only the label moved. See the note on NAV.
+      /^(overview|applications|planner|documents|analytics)$/.test(s.textContent ?? '')
     )
     expect(labels).toHaveLength(5)
     for (const label of labels) {

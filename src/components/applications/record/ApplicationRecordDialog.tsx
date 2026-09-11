@@ -91,7 +91,16 @@ export function ApplicationRecordDialog({
       bodyScroll={false}
       title="application overview"
       icon="Briefcase"
-      description="Everything Worktrack knows about this application, in one place. The bar below tracks how far it has got; the three columns hold what the job is, the posting itself, and how your CV reads against it. Anything in the first two columns can be changed here — edit what you need and press Save application."
+      // NO DESCRIPTION (Gabe, 2026-09-11: "remove the description of the
+      // description"). It was four lines explaining that the bar below tracks
+      // progress and the three columns hold the job, the posting and the ATS
+      // match -- all of which the bar and the three headings say for
+      // themselves, in place, where somebody is already looking.
+      //
+      // It cost about 130px at the top of every open, which on a 900px laptop
+      // is a fifth of the record pushed under the fold to explain a layout
+      // nobody had trouble reading. A dialog that has to narrate itself is a
+      // dialog with a labelling problem; the fix is the labels, not the essay.
     >
       {job && (
         <ApplicationRecordView
