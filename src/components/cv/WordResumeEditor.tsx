@@ -23,7 +23,8 @@ import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './docum
 import { useProofread } from './useProofread'
 import { useThesaurus } from './useThesaurus'
 import { useFitToWidth } from './useFitToWidth'
-import { normalizeGeometry, normalizeTypography } from '@/lib/pageGeometry'
+import { cssLineHeight, normalizeGeometry, normalizeTypography } from '@/lib/pageGeometry'
+import { useNaturalLineHeight } from './useNaturalLineHeight'
 import { Pagination } from './pagination'
 import { useResumeExport } from './useResumeExport'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
@@ -141,6 +142,9 @@ export function WordResumeEditor({
   // The face, size and spacing the document was set in. Null members mean
   // "the editor's own styles", which is what a CV typed here gets.
   const type = normalizeTypography(docAttrs?.documentTypography)
+  // Word's line spacing is a multiple of the FONT's line box, not of its size,
+  // so the face has to be measured before that multiple means anything in CSS.
+  const naturalLineHeight = useNaturalLineHeight(type.fontFamily)
 
   /**
    * The extension list lives in `editorExtensions` so the ribbon's tests build
@@ -518,7 +522,13 @@ export function WordResumeEditor({
             // sans-serif 15px on the file that reported this.
             ...(type.fontFamily ? { fontFamily: type.fontFamily } : {}),
             ...(type.fontSize ? { fontSize: `${type.fontSize}pt` } : {}),
-            ...(type.lineHeight ? { lineHeight: type.lineHeight } : {}),
+            // `w:line="235"` is 0.98 of SINGLE spacing, and single is the
+            // font's own line box -- not 0.98 of the font size, which is what
+            // handing the raw number to CSS meant and what set every line on
+            // the reported CV about 15% tight.
+            ...(cssLineHeight(type.lineHeight, naturalLineHeight)
+              ? { lineHeight: cssLineHeight(type.lineHeight, naturalLineHeight)! }
+              : {}),
             ...(type.paragraphSpacing !== null
               ? { '--doc-para-space': `${type.paragraphSpacing}pt` }
               : {}),
@@ -539,7 +549,7 @@ export function WordResumeEditor({
               ? { '--doc-h-after': `${type.headingSpaceAfter}pt` }
               : {}),
           } as React.CSSProperties}
-          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:[margin-block:0_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h1]:text-[length:var(--doc-h1-size,1.45em)] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:[margin-block:var(--doc-h-before,1rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h2]:text-[length:var(--doc-h2-size,1.05em)] [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h3]:[margin-block:var(--doc-h-before,0.75rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h3]:font-bold [&_.ProseMirror_h3]:text-[length:var(--doc-h2-size,1em)] [&_.ProseMirror_[data-ruled]]:border-b [&_.ProseMirror_[data-ruled]]:border-current [&_.ProseMirror_[data-ruled]]:pb-0.5 [&_.ProseMirror_p]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:[margin-block:0_var(--doc-para-space,0.25rem)]"
+          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:[margin-block:0_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h1]:text-[length:var(--doc-h1-size,1.45em)] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:[margin-block:var(--doc-h-before,1rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h2]:text-[length:var(--doc-h2-size,1.05em)] [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h3]:[margin-block:var(--doc-h-before,0.75rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h3]:font-bold [&_.ProseMirror_h3]:text-[length:var(--doc-h2-size,1em)] [&_.ProseMirror_[data-ruled]]:border-b [&_.ProseMirror_[data-ruled]]:border-current [&_.ProseMirror_[data-ruled]]:pb-0.5 [&_.ProseMirror_p]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:[margin-block:0] [&_.ProseMirror_li_p]:[margin-block:0_var(--doc-para-space,0.25rem)]"
         />
       </div>
       </div>

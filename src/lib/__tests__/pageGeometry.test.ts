@@ -97,10 +97,13 @@ describe('readTypography', () => {
     '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman"/></w:rPr>' +
     '</w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:line="235" w:lineRule="auto"/>' +
     '</w:pPr></w:pPrDefault></w:docDefaults>'
-  const DOC =
-    '<w:rFonts w:ascii="Garamond"/><w:sz w:val="22"/><w:spacing w:after="40"/>' +
-    '<w:rFonts w:ascii="Garamond"/><w:sz w:val="22"/><w:spacing w:after="60"/>' +
-    '<w:rFonts w:ascii="Garamond"/><w:sz w:val="32"/><w:spacing w:after="160"/>'
+  // Real paragraph markup rather than loose fragments: a run's size is only
+  // meaningful inside the run it belongs to, which is how it is now read.
+  const para = (after: string, half: string, text: string) =>
+    `<w:p><w:pPr><w:spacing w:after="${after}"/></w:pPr><w:r>` +
+    `<w:rPr><w:rFonts w:ascii="Garamond"/><w:sz w:val="${half}"/></w:rPr>` +
+    `<w:t>${text}</w:t></w:r></w:p>`
+  const DOC = para('40', '22', 'one') + para('60', '22', 'two') + para('160', '32', 'three')
 
   it('TAKES THE FACE THE RUNS USE, not the one the defaults declare', () => {
     // The trap this test exists for: reading docDefaults alone returns Times
@@ -117,6 +120,38 @@ describe('readTypography', () => {
     // 22 half-points is 11pt. The median keeps one 16pt heading from dragging
     // the body size up.
     expect(readTypography(DOC).fontSize).toBe(11)
+  })
+
+  it('counts a run that states NO size at the document default', () => {
+    // The bug: only the sizes actually written down were counted. On the
+    // reported CV 24 runs of 109 state one -- the headings and the dates --
+    // and their median came out 9.5pt, so the body rendered 5% small. The 85
+    // runs that are the body state nothing and resolve to 10pt.
+    const body = (text: string) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`
+    const heading = `<w:p><w:r><w:rPr><w:sz w:val="32"/></w:rPr><w:t>NAME</w:t></w:r></w:p>`
+    expect(readTypography(heading + body('a') + body('b') + body('c')).fontSize).toBe(10)
+    // And the stated default wins over the implicit one when there is one.
+    const styles = '<w:docDefaults><w:rPrDefault><w:rPr><w:sz w:val="24"/></w:rPr></w:rPrDefault></w:docDefaults>'
+    expect(readTypography(body('a') + body('b'), styles).fontSize).toBe(12)
+  })
+
+  it('does not read a heading style as the document default', () => {
+    // `<w:rPrDefault>` with a lazy scan after it runs straight past its own
+    // closing tag into the style definitions. On the reported CV that found a
+    // 16pt heading style, so every unsized body run resolved to 16 and the
+    // whole document rendered in its own title size.
+    const styles =
+      '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Times New Roman"/></w:rPr>' +
+      '</w:rPrDefault></w:docDefaults>' +
+      '<w:style w:styleId="Title"><w:rPr><w:rFonts w:ascii="Cambria"/><w:sz w:val="32"/></w:rPr></w:style>'
+    const body = '<w:p><w:r><w:t>plain body text</w:t></w:r></w:p>'
+    expect(readTypography(body, styles).fontSize).toBe(10)
+    expect(readTypography(body, styles).fontFamily).toContain('Times New Roman')
+  })
+
+  it('ignores a run carrying no text, which occupies no line', () => {
+    const bookmark = '<w:p><w:r><w:rPr><w:sz w:val="96"/></w:rPr></w:r><w:r><w:t>body</w:t></w:r></w:p>'
+    expect(readTypography(bookmark).fontSize).toBe(10)
   })
 
   it('converts w:line 240ths into a multiplier', () => {
@@ -153,17 +188,18 @@ describe('normalizeTypography', () => {
   })
 })
 
-import { readRuledHeadings, ruleKey } from '../pageGeometry'
+import { cssLineHeight, readParagraphFormats, ruleKey } from '../pageGeometry'
 
-describe('readRuledHeadings', () => {
+describe('readParagraphFormats', () => {
   const ruled = (text: string) =>
     `<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="6" w:color="1A1A1A"/></w:pBdr>` +
     `</w:pPr><w:r><w:t>${text}</w:t></w:r></w:p>`
   const plain = (text: string) => `<w:p><w:r><w:t>${text}</w:t></w:r></w:p>`
+  const keys = (xml: string) => readParagraphFormats(xml).filter((f) => f.ruled).map((f) => f.key)
 
   it('finds the headings Word underlines with a paragraph border', () => {
     const xml = ruled('PROFESSIONAL SUMMARY') + plain('body text') + ruled('EDUCATION')
-    expect(readRuledHeadings(xml)).toEqual(['PROFESSIONAL SUMMARY', 'EDUCATION'])
+    expect(keys(xml)).toEqual([ruleKey('PROFESSIONAL SUMMARY'), ruleKey('EDUCATION')])
   })
 
   it('joins a heading split across runs, which Word does constantly', () => {
@@ -172,21 +208,69 @@ describe('readRuledHeadings', () => {
     const split =
       '<w:p><w:pPr><w:pBdr><w:bottom w:val="single"/></w:pBdr></w:pPr>' +
       '<w:r><w:t>TECH</w:t></w:r><w:r><w:t>NICAL </w:t></w:r><w:r><w:t>SKILLS</w:t></w:r></w:p>'
-    expect(readRuledHeadings(split)).toEqual(['TECHNICAL SKILLS'])
+    expect(keys(split)).toEqual([ruleKey('TECHNICAL SKILLS')])
   })
 
   it('ignores a border that is explicitly none', () => {
     const none = '<w:p><w:pPr><w:pBdr><w:bottom w:val="nil"/></w:pBdr></w:pPr><w:r><w:t>x</w:t></w:r></w:p>'
-    expect(readRuledHeadings(none)).toEqual([])
+    expect(keys(none)).toEqual([])
   })
 
-  it('ignores a bordered paragraph with no text', () => {
+  it('ignores a paragraph with no text, which mammoth drops anyway', () => {
     const empty = '<w:p><w:pPr><w:pBdr><w:bottom w:val="single"/></w:pBdr></w:pPr></w:p>'
-    expect(readRuledHeadings(empty)).toEqual([])
+    expect(readParagraphFormats(empty)).toEqual([])
   })
 
   it('returns nothing for a document with no borders at all', () => {
-    expect(readRuledHeadings(plain('just text'))).toEqual([])
+    expect(keys(plain('just text'))).toEqual([])
+  })
+
+  it('decodes the entities the package escapes, so an ampersand can pair', () => {
+    // The rule under "CERTIFICATIONS, TRAININGS & AWARDS" never appeared: the
+    // key from the package read "&amp;" and the key from mammoth read "&", so
+    // the two never matched. Four paragraphs on the reported CV do this.
+    const xml = ruled('CERTIFICATIONS, TRAININGS &amp; AWARDS')
+    expect(readParagraphFormats(xml)[0].key).toBe(ruleKey('CERTIFICATIONS, TRAININGS & AWARDS'))
+  })
+
+  it('keeps each paragraph its OWN spacing, not the document median', () => {
+    // The bug: one median `w:after` applied to every block made the twelve
+    // skills paragraphs 3pt tight each -- half an inch off one section.
+    const xml =
+      '<w:p><w:pPr><w:spacing w:before="130" w:after="50"/></w:pPr><w:r><w:t>HEADING</w:t></w:r></w:p>' +
+      '<w:p><w:pPr><w:spacing w:after="80"/></w:pPr><w:r><w:t>a skills line</w:t></w:r></w:p>' +
+      '<w:p><w:pPr><w:spacing w:after="10"/></w:pPr><w:r><w:t>a bullet</w:t></w:r></w:p>'
+    expect(readParagraphFormats(xml).map((f) => [f.spaceBefore, f.spaceAfter])).toEqual([
+      [6.5, 2.5],
+      [null, 4],
+      [null, 0.5],
+    ])
+  })
+
+  it('reads a paragraph size only when every run agrees on one', () => {
+    // 22 half-points is 11pt, against the 10pt a run inherits by stating
+    // nothing. A paragraph mixing the two gets null rather than a guess,
+    // because mammoth's HTML has no run boundaries to hang two sizes on.
+    const uniform = '<w:p><w:r><w:rPr><w:sz w:val="22"/></w:rPr><w:t>sub-title</w:t></w:r></w:p>'
+    const mixed =
+      '<w:p><w:r><w:t>degree</w:t></w:r>' +
+      '<w:r><w:rPr><w:sz w:val="19"/></w:rPr><w:t> | Aug 2022</w:t></w:r></w:p>'
+    expect(readParagraphFormats(uniform)[0].fontSize).toBe(11)
+    expect(readParagraphFormats(mixed)[0].fontSize).toBeNull()
+    // And a paragraph at the document default gets null: it needs no override.
+    expect(readParagraphFormats(plain('body'))[0].fontSize).toBeNull()
+  })
+})
+
+describe('cssLineHeight', () => {
+  it('scales Word\'s multiple of SINGLE by the font\'s own line box', () => {
+    // `w:line="235"` is 0.98 of single spacing, and single is the font's line
+    // box. Handing 0.98 to CSS means 0.98 of the FONT SIZE -- about 15%
+    // tighter than Word, which is nine lines of drift down a page.
+    expect(cssLineHeight(235 / 240, 1.15)).toBeCloseTo(1.126, 3)
+    expect(cssLineHeight(null, 1.15)).toBeNull()
+    // A probe that never laid out must not collapse every line to nothing.
+    expect(cssLineHeight(1, 0)).toBeNull()
   })
 })
 

@@ -1,6 +1,7 @@
 import StarterKit from '@tiptap/starter-kit'
 import Document from '@tiptap/extension-document'
 import Heading from '@tiptap/extension-heading'
+import Paragraph from '@tiptap/extension-paragraph'
 import TextAlign from '@tiptap/extension-text-align'
 import Subscript from '@tiptap/extension-subscript'
 import Superscript from '@tiptap/extension-superscript'
@@ -70,6 +71,57 @@ const DocumentWithPage = Document.extend({
 })
 
 /**
+ * The space Word puts above and below a paragraph, carried per block.
+ *
+ * ONE NUMBER FOR THE WHOLE DOCUMENT WAS NOT ENOUGH, which is the bug these
+ * attributes exist for. The imported CV writes eight different `w:after`
+ * values -- 0.5pt under a bullet, 4pt between skills lines, 8pt under the
+ * contact line -- and rendering the median of them made the skills section
+ * half an inch shorter than Word draws it. See lib/pageGeometry.
+ *
+ * `padding-top` RATHER THAN `margin-top`, AND THAT IS THE POINT. CSS collapses
+ * adjacent vertical margins and takes the larger; Word ADDS space-after to the
+ * next paragraph's space-before. A bullet closing a section at 0.5pt after,
+ * followed by a heading at 6.5pt before, is a 7pt gap in Word and would be a
+ * 6.5pt gap in CSS. Padding does not collapse, so the sum survives.
+ *
+ * `margin-top: 0` GOES WITH IT because the editor's own stylesheet sets a
+ * heading margin from the document's heading spacing; without this the two
+ * would stack and every section heading would sit at double its gap.
+ */
+const SPACING_ATTRIBUTES = {
+  spaceBefore: {
+    default: null as number | null,
+    renderHTML: (attributes: Record<string, unknown>) =>
+      typeof attributes.spaceBefore === 'number'
+        ? { style: `margin-top: 0; padding-top: ${attributes.spaceBefore}pt` }
+        : {},
+    parseHTML: (element: HTMLElement) => sizeFromStyle(element.style.paddingTop),
+  },
+  spaceAfter: {
+    default: null as number | null,
+    renderHTML: (attributes: Record<string, unknown>) =>
+      typeof attributes.spaceAfter === 'number'
+        ? { style: `margin-bottom: ${attributes.spaceAfter}pt` }
+        : {},
+    parseHTML: (element: HTMLElement) => sizeFromStyle(element.style.marginBottom),
+  },
+}
+
+/** Points back out of a rendered style, so a copied paragraph keeps its gaps. */
+function sizeFromStyle(value: string | undefined): number | null {
+  const points = Number.parseFloat(value?.replace('pt', '') ?? '')
+  return value?.endsWith('pt') && Number.isFinite(points) ? points : null
+}
+
+/** Paragraphs, taught the same. */
+const ParagraphWithSpacing = Paragraph.extend({
+  addAttributes() {
+    return { ...this.parent?.(), ...SPACING_ATTRIBUTES }
+  },
+})
+
+/**
  * Headings, taught to carry the rule Word draws under a section.
  *
  * `w:pBdr` is a border on the PARAGRAPH, not a horizontal rule between them,
@@ -82,6 +134,7 @@ const HeadingWithRule = Heading.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
+      ...SPACING_ATTRIBUTES,
       ruled: {
         default: false,
         renderHTML: (attributes) =>
@@ -93,10 +146,12 @@ const HeadingWithRule = Heading.extend({
 })
 
 export const WORD_EDITOR_EXTENSIONS = [
-  // StarterKit's own Document and Heading are replaced by the two above.
-  StarterKit.configure({ document: false, heading: false }),
+  // StarterKit's own Document, Heading and Paragraph are replaced by the three
+  // above.
+  StarterKit.configure({ document: false, heading: false, paragraph: false }),
   DocumentWithPage,
   HeadingWithRule,
+  ParagraphWithSpacing,
   TextStyle,
   FontFamily,
   FontSize,

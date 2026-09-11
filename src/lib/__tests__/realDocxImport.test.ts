@@ -3,13 +3,15 @@ import { existsSync, readFileSync } from 'node:fs'
 import JSZip from 'jszip'
 import {
   readPageGeometry,
-  readRuledHeadings,
+  readParagraphFormats,
   readTypography,
   ruleKey,
   textColumnInches,
 } from '../pageGeometry'
 import { Document, Packer } from 'docx'
 import { sectionsFrom } from '@/services/integrations/docxExport'
+import { htmlToWordContent, MAMMOTH_OPTIONS } from '../documentImport'
+import mammoth from 'mammoth'
 
 /**
  * Driven by a real Word export rather than a hand-written fixture, because the
@@ -81,18 +83,108 @@ describe.skipIf(!present)('a real .docx from Word', () => {
     // with `w:pBdr` on the paragraph, and mammoth carries no borders at all --
     // its paragraph object exposes only type, children, styleId, styleName,
     // numbering, alignment and indent, probed directly.
-    const zip = await JSZip.loadAsync(readFileSync(FILE!))
-    const documentXml = await zip.file('word/document.xml')!.async('string')
-    const ruled = readRuledHeadings(documentXml)
+    const documentXml = await load()
+    const ruled = readParagraphFormats(documentXml).filter((format) => format.ruled)
 
     expect(ruled.length).toBeGreaterThan(0)
     // Every one is a real heading rather than a stray bordered paragraph.
     for (const heading of ruled) {
-      expect(heading.trim().length).toBeGreaterThan(2)
-      expect(heading.length).toBeLessThan(80)
+      expect(heading.key.trim().length).toBeGreaterThan(2)
+      expect(heading.key.length).toBeLessThan(80)
+      expect(heading.key).toBe(ruleKey(heading.key))
     }
     // Keys normalise, which is how they are matched back to mammoth's output.
-    expect(new Set(ruled.map(ruleKey)).size).toBe(ruled.length)
+    expect(new Set(ruled.map((format) => format.key)).size).toBe(ruled.length)
+  })
+
+  it('reads the body size from what runs RESOLVE to, not what they declare', async () => {
+    // The reported CV states a size on 24 of its 109 runs -- headings and
+    // dates -- and nothing on the 85 that are the body. Counting only the
+    // stated ones put the median on a date size and rendered the whole
+    // document a size small.
+    const zip = await JSZip.loadAsync(readFileSync(FILE!))
+    const documentXml = await zip.file('word/document.xml')!.async('string')
+    const stylesXml = (await zip.file('word/styles.xml')?.async('string')) ?? ''
+
+    const stated = [...documentXml.matchAll(/<w:sz w:val="(\d+)"/g)].length
+    const runs = (documentXml.match(/<w:r\b[^>]*>[\s\S]*?<\/w:r>/g) ?? []).length
+    // Only meaningful on a document that leaves most runs unsized, which is
+    // the normal shape and the one that reproduced this.
+    if (stated < runs) {
+      const size = readTypography(documentXml, stylesXml).fontSize!
+      const declared = new Set(
+        [...documentXml.matchAll(/<w:sz w:val="(\d+)"/g)].map((m) => Number(m[1]) / 2)
+      )
+      expect(declared.has(size)).toBe(false)
+    }
+  })
+
+  it('keeps each paragraph its own spacing rather than one median', async () => {
+    // A CV separates a bullet from a heading with different gaps, and the
+    // median of them fitted more onto page one than Word does.
+    const formats = readParagraphFormats(await load())
+    expect(formats.length).toBeGreaterThan(0)
+    const afters = new Set(formats.map((format) => format.spaceAfter))
+    expect(afters.size).toBeGreaterThan(1)
+  })
+
+  it('writes each paragraph\'s spacing back out', async () => {
+    const [before, after] = [6.5, 2.5]
+    const sections = sectionsFrom({
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 2, spaceBefore: before, spaceAfter: after },
+          content: [{ type: 'text', text: 'EDUCATION' }],
+        },
+      ],
+    })
+    const zip = await JSZip.loadAsync(await Packer.toBuffer(new Document({ sections })))
+    const xml = await zip.file('word/document.xml')!.async('string')
+    // Points back into the twips Word stores.
+    expect(xml).toContain(`w:before="${before * 20}"`)
+    expect(xml).toContain(`w:after="${after * 20}"`)
+  })
+
+  it('carries the whole of it through mammoth and into the editor JSON', async () => {
+    // END TO END, because every part of this has been right in isolation and
+    // wrong once assembled: the readers parse a package, mammoth throws the
+    // formatting away, and the two are paired back up by text. This is the
+    // only case that exercises the pairing against a real document.
+    // `{ buffer }` rather than `{ arrayBuffer }` only because this runs under
+    // Node, where mammoth's build takes the other handle. The options are the
+    // production ones.
+    const { value: html } = await mammoth.convertToHtml(
+      { buffer: readFileSync(FILE!) },
+      MAMMOTH_OPTIONS
+    )
+    const documentXml = await load()
+    const zip = await JSZip.loadAsync(readFileSync(FILE!))
+    const stylesXml = (await zip.file('word/styles.xml')?.async('string')) ?? ''
+    const imported = {
+      content: htmlToWordContent(html, readParagraphFormats(documentXml, stylesXml)),
+    }
+
+    type Block = { type?: string; attrs?: Record<string, unknown>; content?: Block[] }
+    const walk = (nodes: Block[]): Block[] =>
+      nodes.flatMap((node) => [node, ...walk(node.content ?? [])])
+    const blocks = walk((imported.content as unknown as { content: Block[] }).content)
+    expect(blocks.length).toBeGreaterThan(20)
+
+    // Only the blocks a .docx would call a paragraph: lists and text nodes
+    // are tiptap's own nesting and have no counterpart to be paired with.
+    const paragraphs = blocks.filter((b) => b.type === 'paragraph' || b.type === 'heading')
+    const spaced = paragraphs.filter((b) => typeof b.attrs?.spaceAfter === 'number')
+    // NEARLY ALL of them find their own formatting. A low number here means
+    // the pairing drifted, which is the failure that matters and the one a
+    // count of distinct values alone would not catch.
+    expect(spaced.length).toBeGreaterThan(paragraphs.length * 0.9)
+    // And they are not all the same number, which was the bug.
+    expect(new Set(spaced.map((b) => b.attrs!.spaceAfter)).size).toBeGreaterThan(1)
+
+    // The heading rules survive the same pairing.
+    expect(blocks.some((b) => b.type === 'heading' && b.attrs?.ruled === true)).toBe(true)
   })
 
   it('exports back at its own page, not at the editor default', async () => {

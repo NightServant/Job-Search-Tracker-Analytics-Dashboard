@@ -3,9 +3,10 @@ import {
   DEFAULT_GEOMETRY,
   NO_TYPOGRAPHY,
   readPageGeometry,
-  readRuledHeadings,
+  readParagraphFormats,
   readTypography,
   ruleKey,
+  type ParagraphFormat,
   type DocumentTypography,
   type PageGeometry,
 } from './pageGeometry'
@@ -170,6 +171,25 @@ export async function importDocument(file: File): Promise<ImportedDocument> {
 
 
 /**
+ * Word's own style names, mapped to what the editor can show. Without this,
+ * "Title" and "Heading 1" both arrive as plain paragraphs.
+ *
+ * EXPORTED SO THE TEST CONVERTS THE SAME WAY. mammoth ships two builds: the
+ * browser one takes an `arrayBuffer` and the Node one takes a `buffer`, and
+ * only the handle differs. Sharing the options means a test running under Node
+ * exercises the real conversion rather than a second, drifting copy of it.
+ */
+export const MAMMOTH_OPTIONS = {
+  styleMap: [
+    "p[style-name='Title'] => h1:fresh",
+    "p[style-name='Heading 1'] => h1:fresh",
+    "p[style-name='Heading 2'] => h2:fresh",
+    "p[style-name='Heading 3'] => h3:fresh",
+  ],
+  convertImage: undefined,
+}
+
+/**
  * A .docx into the Word editor's content, via mammoth.
  *
  * mammoth produces HTML; this walks that HTML into tiptap's JSON. It does NOT
@@ -202,22 +222,9 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
   // breaks" meant. See `pageGeometry`.
   const setup = await readSetupFromDocx(arrayBuffer)
 
-  const { value: html } = await mammoth.convertToHtml(
-    { arrayBuffer },
-    // Word's own style names, mapped to what the editor can show. Without
-    // this, "Title" and "Heading 1" both arrive as plain paragraphs.
-    {
-      styleMap: [
-        "p[style-name='Title'] => h1:fresh",
-        "p[style-name='Heading 1'] => h1:fresh",
-        "p[style-name='Heading 2'] => h2:fresh",
-        "p[style-name='Heading 3'] => h3:fresh",
-      ],
-      convertImage: undefined,
-    }
-  )
+  const { value: html } = await mammoth.convertToHtml({ arrayBuffer }, MAMMOTH_OPTIONS)
 
-  return withSetup(htmlToWordContent(html, setup.ruled), setup)
+  return withSetup(htmlToWordContent(html, setup.formats), setup)
 }
 
 /**
@@ -231,7 +238,7 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
  */
 async function readSetupFromDocx(
   arrayBuffer: ArrayBuffer
-): Promise<{ geometry: PageGeometry; typography: DocumentTypography; ruled: string[] }> {
+): Promise<{ geometry: PageGeometry; typography: DocumentTypography; formats: ParagraphFormat[] }> {
   try {
     const JSZip = (await import('jszip')).default
     const zip = await JSZip.loadAsync(arrayBuffer)
@@ -239,14 +246,14 @@ async function readSetupFromDocx(
     // `styles.xml` is optional and only supplies the fallback face, so a
     // package without one still reads its geometry and its run fonts.
     const stylesXml = (await zip.file('word/styles.xml')?.async('string')) ?? ''
-    if (!documentXml) return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY, ruled: [] }
+    if (!documentXml) return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY, formats: [] }
     return {
       geometry: readPageGeometry(documentXml),
       typography: readTypography(documentXml, stylesXml),
-      ruled: readRuledHeadings(documentXml),
+      formats: readParagraphFormats(documentXml, stylesXml),
     }
   } catch {
-    return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY, ruled: [] }
+    return { geometry: DEFAULT_GEOMETRY, typography: NO_TYPOGRAPHY, formats: [] }
   }
 }
 
@@ -261,7 +268,7 @@ async function readSetupFromDocx(
  */
 function withSetup(
   content: ResumeContent,
-  setup: { geometry: PageGeometry; typography: DocumentTypography; ruled: string[] }
+  setup: { geometry: PageGeometry; typography: DocumentTypography; formats: ParagraphFormat[] }
 ): ResumeContent {
   return {
     ...(content as object),
@@ -273,32 +280,100 @@ function withSetup(
   } as ResumeContent
 }
 
-type TipTapNode = { type: string; attrs?: Record<string, unknown>; content?: TipTapNode[]; marks?: Array<{ type: string }>; text?: string }
+type TipTapNode = { type: string; attrs?: Record<string, unknown>; content?: TipTapNode[]; marks?: Array<{ type: string; attrs?: Record<string, unknown> }>; text?: string }
 
 /** Exported for tests: the HTML walk, without the file reading around it. */
-export function htmlToWordContent(html: string, ruled: string[] = []): ResumeContent {
+export function htmlToWordContent(html: string, formats: ParagraphFormat[] = []): ResumeContent {
   const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html')
   const blocks: TipTapNode[] = []
   collectBlocks(doc.body, blocks)
-
-  // THE RULE UNDER A SECTION HEADING, put back. Word draws it as a border on
-  // the paragraph and mammoth cannot carry it, so the headings that had one
-  // are matched by text and marked here. See lib/pageGeometry.
-  if (ruled.length > 0) {
-    const keys = new Set(ruled.map(ruleKey))
-    for (const block of blocks) {
-      if (block.type !== 'heading') continue
-      const text = (block.content ?? []).map((n) => n.text ?? '').join('')
-      if (keys.has(ruleKey(text))) {
-        block.attrs = { ...(block.attrs ?? {}), ruled: true }
-      }
-    }
-  }
+  applyFormats(blocks, formats)
 
   return {
     type: 'doc',
     content: blocks.length > 0 ? blocks : [{ type: 'paragraph' }],
   } as unknown as ResumeContent
+}
+
+
+/**
+ * Put each paragraph's own spacing, rule and size back onto mammoth's blocks.
+ *
+ * MAMMOTH CONVERTS A .DOCX TO SEMANTIC HTML and drops every formatting
+ * property on the way -- that is its design, and it is the right one for
+ * reading a document's STRUCTURE. It leaves the layout to be recovered
+ * separately, which is what `readParagraphFormats` reads and this reattaches.
+ *
+ * PAIRED BY TEXT, WALKING FORWARD. A `Map` keyed on text would be wrong on a
+ * CV: "Relevant Coursework: ..." appears under both schools with different
+ * spacing. A cursor pairs the first occurrence with the first, and a block
+ * that matches nothing is stepped over WITHOUT consuming an entry -- so a
+ * table mammoth flattened into paragraphs cannot shift every format after it.
+ *
+ * A MATCHED PARAGRAPH TAKES BOTH NUMBERS, including the zeroes. Word treats an
+ * unstated `w:before` as no space at all, so leaving the attribute null would
+ * let the editor's own default show through on exactly the paragraphs the
+ * document is most specific about.
+ */
+function applyFormats(blocks: TipTapNode[], formats: ParagraphFormat[]): void {
+  if (formats.length === 0) return
+  let cursor = 0
+
+  for (const block of textBlocksOf(blocks)) {
+    const key = ruleKey(textOf(block))
+    if (!key) continue
+    const index = formats.findIndex((format, i) => i >= cursor && format.key === key)
+    if (index === -1) continue
+    const format = formats[index]
+    cursor = index + 1
+
+    block.attrs = {
+      ...(block.attrs ?? {}),
+      spaceBefore: format.spaceBefore ?? 0,
+      spaceAfter: format.spaceAfter ?? 0,
+      ...(format.ruled && block.type === 'heading' ? { ruled: true } : {}),
+    }
+
+    // Headings already take their size from the document's own heading scale,
+    // so marking their runs as well would say the same thing twice.
+    if (format.fontSize !== null && block.type === 'paragraph') {
+      setFontSize(block.content ?? [], `${format.fontSize}pt`)
+    }
+  }
+}
+
+/**
+ * The blocks that hold text, in document order, list items included.
+ *
+ * A .docx has no nesting here -- a bullet is a paragraph carrying a numbering
+ * reference -- so the tiptap tree has to be flattened back to that shape
+ * before it can be paired with one.
+ */
+function* textBlocksOf(nodes: TipTapNode[]): Generator<TipTapNode> {
+  for (const node of nodes) {
+    if (node.type === 'bulletList' || node.type === 'orderedList') {
+      for (const item of node.content ?? []) yield* textBlocksOf(item.content ?? [])
+      continue
+    }
+    yield node
+  }
+}
+
+function textOf(node: TipTapNode): string {
+  if (typeof node.text === 'string') return node.text
+  return (node.content ?? []).map(textOf).join('')
+}
+
+/** A `textStyle` mark on every text node, which is how tiptap carries a size. */
+function setFontSize(content: TipTapNode[], size: string): void {
+  for (const node of content) {
+    if (typeof node.text === 'string') {
+      const marks = (node.marks ?? []).filter((m) => m.type !== 'textStyle')
+      node.marks = [...marks, { type: 'textStyle', attrs: { fontSize: size } }]
+      continue
+    }
+    if (node.content) setFontSize(node.content, size)
+  }
 }
 
 const HEADINGS: Record<string, number> = { H1: 1, H2: 2, H3: 3, H4: 3, H5: 3, H6: 3 }

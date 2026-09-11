@@ -34,7 +34,7 @@ import { TWIPS_PER_INCH, normalizeGeometry } from '@/lib/pageGeometry'
 export interface TipTapNode {
   type?: string
   text?: string
-  marks?: { type?: string }[]
+  marks?: { type?: string; attrs?: Record<string, unknown> }[]
   content?: TipTapNode[]
   attrs?: Record<string, unknown>
 }
@@ -42,15 +42,41 @@ export interface TipTapNode {
 function runsFrom(node: TipTapNode): TextRun[] {
   if (typeof node.text === 'string') {
     const marks = new Set((node.marks ?? []).map((m) => m.type))
+    // A size the import read off the document -- the 11pt sub-title under a
+    // name, against a 10pt body. Without it the export flattens back to one
+    // size and the round trip loses what the import had just recovered.
+    const fontSize = (node.marks ?? []).find((m) => m.type === 'textStyle')?.attrs?.fontSize
+    const points = Number.parseFloat(String(fontSize ?? '').replace('pt', ''))
     return [
       new TextRun({
         text: node.text,
         bold: marks.has('bold'),
         italics: marks.has('italic'),
+        // `w:sz` is half-points, which is what `size` takes as a number.
+        ...(Number.isFinite(points) && points > 0 ? { size: Math.round(points * 2) } : {}),
       }),
     ]
   }
   return (node.content ?? []).flatMap(runsFrom)
+}
+
+/**
+ * The space above and below a paragraph, back in twips.
+ *
+ * Word stores these on the paragraph and the import reads them there, so an
+ * export that dropped them would hand back a document whose sections all sat
+ * at one spacing -- the same shape of loss as exporting at the wrong page
+ * size, on a different property.
+ */
+function spacingFrom(node: TipTapNode): { spacing: { before?: number; after?: number } } | undefined {
+  const twips = (value: unknown) =>
+    typeof value === 'number' && Number.isFinite(value) && value >= 0
+      ? Math.round(value * 20)
+      : undefined
+  const before = twips(node.attrs?.spaceBefore)
+  const after = twips(node.attrs?.spaceAfter)
+  if (before === undefined && after === undefined) return undefined
+  return { spacing: { ...(before !== undefined ? { before } : {}), ...(after !== undefined ? { after } : {}) } }
 }
 
 /** Flatten a node's text, for the cases where runs are not needed. */
@@ -73,6 +99,7 @@ function paragraphsFrom(node: TipTapNode): Paragraph[] {
         new Paragraph({
           heading: HEADING_FOR[level] ?? HeadingLevel.HEADING_3,
           children: runsFrom(node),
+          ...spacingFrom(node),
           // THE RULE UNDER A SECTION HEADING, WRITTEN BACK. Word draws it as
           // a border on the paragraph; the import reads it out of `w:pBdr`
           // and marks the heading, and without this the export would drop it
@@ -94,7 +121,12 @@ function paragraphsFrom(node: TipTapNode): Paragraph[] {
     case 'paragraph': {
       // An empty paragraph is spacing the author put there on purpose.
       const runs = runsFrom(node)
-      return [new Paragraph({ children: runs.length > 0 ? runs : [new TextRun('')] })]
+      return [
+        new Paragraph({
+          children: runs.length > 0 ? runs : [new TextRun('')],
+          ...spacingFrom(node),
+        }),
+      ]
     }
     case 'bulletList':
     case 'orderedList':
@@ -106,6 +138,9 @@ function paragraphsFrom(node: TipTapNode): Paragraph[] {
           (block) =>
             new Paragraph({
               children: runsFrom(block),
+              // A bullet's spacing lives on the paragraph inside the item,
+              // which is where the import put it.
+              ...spacingFrom(block),
               ...(node.type === 'bulletList'
                 ? { bullet: { level: 0 } }
                 : { numbering: { reference: 'cv-numbering', level: 0 } }),

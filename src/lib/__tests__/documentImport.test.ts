@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import type { ParagraphFormat } from '../pageGeometry'
 import {
   importDocument,
   htmlToWordContent,
@@ -89,6 +90,71 @@ describe('importDocument', () => {
     await expect(importDocument(file('cv.pdf', 'x'))).rejects.toBeInstanceOf(
       UnsupportedDocumentError
     )
+  })
+})
+
+describe('the formatting mammoth drops, put back', () => {
+  const format = (over: Partial<ParagraphFormat> & { key: string }): ParagraphFormat => ({
+    spaceBefore: null,
+    spaceAfter: null,
+    ruled: false,
+    fontSize: null,
+    ...over,
+  })
+  type Block = { type: string; attrs?: Record<string, unknown>; content?: Block[] }
+  const blocks = (html: string, formats: ParagraphFormat[]) =>
+    (htmlToWordContent(html, formats) as unknown as { content: Block[] }).content
+
+  it('gives each paragraph the spacing its own w:spacing declared', () => {
+    const [first, second] = blocks('<p>alpha</p><p>beta</p>', [
+      format({ key: 'alpha', spaceBefore: 5, spaceAfter: 4 }),
+      format({ key: 'beta', spaceAfter: 0.5 }),
+    ])
+    expect(first.attrs).toMatchObject({ spaceBefore: 5, spaceAfter: 4 })
+    // An unstated `w:before` is no space in Word, so it must not fall through
+    // to the editor's own default on a paragraph the document was specific
+    // about.
+    expect(second.attrs).toMatchObject({ spaceBefore: 0, spaceAfter: 0.5 })
+  })
+
+  it('reaches the paragraph inside a list item, where a bullet keeps its own', () => {
+    const [list] = blocks('<ul><li><p>a bullet</p></li></ul>', [
+      format({ key: 'a bullet', spaceAfter: 0.5 }),
+    ])
+    expect(list.content![0].content![0].attrs).toMatchObject({ spaceAfter: 0.5 })
+  })
+
+  it('pairs repeated lines in order rather than by lookup', () => {
+    // "Relevant Coursework: ..." appears under both schools in a real CV, with
+    // different spacing. A map keyed on text would give both the first.
+    const [a, b] = blocks('<p>Relevant Coursework</p><p>Relevant Coursework</p>', [
+      format({ key: 'relevant coursework', spaceAfter: 2 }),
+      format({ key: 'relevant coursework', spaceAfter: 8 }),
+    ])
+    expect(a.attrs).toMatchObject({ spaceAfter: 2 })
+    expect(b.attrs).toMatchObject({ spaceAfter: 8 })
+  })
+
+  it('steps over a block it cannot match without consuming a format', () => {
+    // A table mammoth flattened into paragraphs would otherwise shift every
+    // format after it by one.
+    const [, second] = blocks('<p>a cell Word held in a table</p><p>beta</p>', [
+      format({ key: 'beta', spaceAfter: 4 }),
+    ])
+    expect(second.attrs).toMatchObject({ spaceAfter: 4 })
+  })
+
+  it('marks a ruled heading and sizes a paragraph the document set apart', () => {
+    const [heading, tagline] = blocks('<h2>EDUCATION</h2><p>Aspiring developer</p>', [
+      format({ key: 'education', ruled: true, fontSize: 11 }),
+      format({ key: 'aspiring developer', fontSize: 11 }),
+    ])
+    expect(heading.attrs).toMatchObject({ ruled: true })
+    // A heading takes its size from the document's own heading scale, so
+    // marking its runs as well would say the same thing twice.
+    expect(heading.attrs?.fontSize).toBeUndefined()
+    const marks = (tagline.content![0] as unknown as { marks?: { type: string; attrs?: Record<string, unknown> }[] }).marks
+    expect(marks).toEqual([{ type: 'textStyle', attrs: { fontSize: '11pt' } }])
   })
 })
 
