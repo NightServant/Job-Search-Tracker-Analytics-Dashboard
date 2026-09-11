@@ -19,6 +19,7 @@ import { RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useUserPreferences } from '@/hooks/useUserPreferences'
 import { useResumes } from '@/hooks/useResumes'
+import { linksToUnpin } from '@/services/applicationDocuments'
 import { usePostingDigest } from '@/hooks/usePostingDigest'
 import {
   useDocumentLinks,
@@ -137,25 +138,23 @@ function ApplicationsRoute() {
     // means "no CV", and only that should remove an existing link.
     if (resumeId === undefined) return
     try {
+      // THE OLD CV HAS TO GO FIRST. `application_documents` is unique on the
+      // PAIR, so pinning a different CV adds a row instead of replacing one --
+      // the application ends up linked to both and the dialog reads whichever
+      // came back first. That is Gabe's "not functioning when I select the new
+      // CV": the pick was stored, beside the one it was meant to replace. See
+      // `linksToUnpin`.
+      //
+      // Reads the links already loaded for the open row rather than
+      // re-fetching: a newly created application cannot have any, so the only
+      // case with something to remove is the one where `openLinks` is already
+      // the right list.
+      for (const staleId of linksToUnpin(openLinks, resumeId)) {
+        await unpinLink.mutateAsync({ jobId, resumeId: staleId })
+      }
       if (resumeId) await pinLink.mutateAsync({ job_id: jobId, resume_id: resumeId })
-      else await unpinAllLinks(jobId)
     } catch (err) {
       showError('Saved, but the CV link did not', message(err, 'Unknown error'))
-    }
-  }
-
-  /**
-   * Clears every CV pinned to an application, which is what "none" means.
-   *
-   * Uses the links already loaded for the open row rather than re-reading
-   * them. A newly created application cannot have any, so the only case that
-   * reaches here with something to remove is the one where `openLinks` is
-   * already correct -- and re-fetching would drag the Supabase client into
-   * this module for a list it is holding.
-   */
-  const unpinAllLinks = async (jobId: string) => {
-    for (const link of openLinks) {
-      await unpinLink.mutateAsync({ jobId, resumeId: link.resume_id })
     }
   }
 

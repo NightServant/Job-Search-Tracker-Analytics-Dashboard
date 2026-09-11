@@ -20,11 +20,18 @@ export interface DocumentLinkInput {
  */
 export const documentLinkService = {
   /**
-   * Attach a CV to an application, replacing any existing attachment.
+   * Attach a CV to an application.
    *
-   * application_documents is UNIQUE (job_id, resume_id), so a second pin of the
-   * same pair is a conflict rather than a second row. Upserting makes re-pinning
-   * mean "change which snapshot I sent", which is what the UI action is.
+   * REPLACES A RE-PIN OF THE SAME CV, AND ONLY THAT. `application_documents`
+   * is UNIQUE (job_id, resume_id) -- on the PAIR -- so pinning the same CV
+   * again is a conflict and the upsert turns it into "change which snapshot I
+   * sent", which is what that UI action is. Pinning a DIFFERENT CV is a new
+   * row, because the table is deliberately many-to-many: `listForResume`
+   * answers "where did this CV go?" and needs every row.
+   *
+   * So this does NOT make an application single-CV, and a caller driving a
+   * single-select field has to clear the others itself -- see `linksToUnpin`,
+   * which is where that was missing.
    */
   async pin(client: SupabaseClient, input: DocumentLinkInput): Promise<ApplicationDocument> {
     const userId = await requireUserId(client)
@@ -58,6 +65,10 @@ export const documentLinkService = {
       .from('application_documents')
       .select('resume_id, sent_at, resumes(title), resume_snapshots(version)')
       .eq('job_id', jobId)
+      // NEWEST FIRST, because callers read `[0]` as "the CV that was sent".
+      // Without an order Postgres is free to return these in any order, so
+      // which CV the record dialog showed was not actually decided anywhere.
+      .order('sent_at', { ascending: false })
     if (error) throw toError(error)
 
     return (data ?? []).map((row) => {

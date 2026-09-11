@@ -99,6 +99,56 @@ describe('the "CV submitted" field on an application', () => {
     expect(screen.getAllByText(/no CVs yet/i).length).toBeGreaterThan(0)
   })
 
+  it('MAKES THE RECORD SAVABLE, which is what "not functioning" meant', async () => {
+    // Gabe, 2026-09-11: the dropdown looked broken because the pick was
+    // unreachable. `dirty` compares the `jobs` payload, and which CV was sent
+    // is a row in `application_documents` -- so changing only the CV left Save
+    // disabled and the status line claiming everything was saved.
+    const onDirtyChange = vi.fn()
+    render(
+      <ApplicationRecordView
+        job={null}
+        onSubmit={vi.fn()}
+        defaultCurrency={CURRENCY}
+        resumes={RESUMES}
+        linkedResumeId="r1"
+        onLinkedResumeChange={vi.fn()}
+        onDirtyChange={onDirtyChange}
+      />
+    )
+    const save = screen.getByRole('button', { name: /save application/i })
+    expect(save).toBeDisabled()
+
+    await userEvent.click(screen.getByLabelText(/cv submitted/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'backend cv' }))
+
+    expect(save).toBeEnabled()
+    expect(document.querySelector('[data-record-save-state]')).toHaveTextContent(/unsaved/i)
+    // And the dialog hears about it, or Escape drops the pick with no prompt.
+    expect(onDirtyChange).toHaveBeenLastCalledWith(true)
+  })
+
+  it('goes quiet again when the original CV is picked back', async () => {
+    render(
+      <ApplicationRecordView
+        job={null}
+        onSubmit={vi.fn()}
+        defaultCurrency={CURRENCY}
+        resumes={RESUMES}
+        linkedResumeId="r1"
+        onLinkedResumeChange={vi.fn()}
+      />
+    )
+    const save = screen.getByRole('button', { name: /save application/i })
+    await userEvent.click(screen.getByLabelText(/cv submitted/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'backend cv' }))
+    expect(save).toBeEnabled()
+
+    await userEvent.click(screen.getByLabelText(/cv submitted/i))
+    await userEvent.click(await screen.findByRole('option', { name: 'frontend cv' }))
+    expect(save).toBeDisabled()
+  })
+
   it('keeps the link out of the submitted job payload', async () => {
     // `resume_id` is not a column on `jobs`; sending it would put a non-column
     // straight into jobService.createJob.

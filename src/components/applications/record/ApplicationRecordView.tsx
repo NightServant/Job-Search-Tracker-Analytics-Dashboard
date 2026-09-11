@@ -139,10 +139,42 @@ export function ApplicationRecordView({
    * and a successful save re-baselines, which is what stops the button coming
    * back to life over values that are already stored.
    */
-  const nothingToSave = layout === 'record' && !dirty
-
   const [resumeId, setResumeId] = React.useState(linkedResumeId ?? '')
   React.useEffect(() => setResumeId(linkedResumeId ?? ''), [linkedResumeId])
+
+  /**
+   * THE CV COUNTS AS A CHANGE (Gabe, 2026-09-11: "CV dropdown ... is not
+   * functioning when I select the new CV").
+   *
+   * `dirty` compares the `jobs` payload against what the record opened with,
+   * and which CV was sent is not a column on `jobs` -- it is a row in
+   * `application_documents` held in the state above. So picking a different CV
+   * and changing nothing else left `dirty` false: the Save button stayed
+   * disabled, the status line said "everything is saved", and there was no way
+   * to store the pick at all. The field looked broken because it was
+   * unreachable, not because the select was.
+   */
+  const resumeDirty = resumeId !== (linkedResumeId ?? '')
+  const unsaved = dirty || resumeDirty
+
+  /**
+   * And the DIALOG has to hear about it too, or picking a CV and pressing
+   * Escape drops it with no prompt -- which is the same silent loss the
+   * discard confirmation exists to prevent.
+   *
+   * Reported from here rather than from `useRecordDraft`, which knows only
+   * about the payload. This effect is declared after that hook's, so React
+   * runs it second and the combined answer is the one the parent keeps.
+   */
+  React.useEffect(() => {
+    onDirtyChange?.(unsaved)
+    // `onDirtyChange` is a fresh closure on every parent render and including
+    // it would report on every keystroke -- the same reason `useRecordDraft`
+    // depends only on its own flag.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unsaved])
+
+  const nothingToSave = layout === 'record' && !unsaved
 
   const [formError, setFormError] = React.useState('')
 
@@ -370,7 +402,7 @@ export function ApplicationRecordView({
             data-record-save-state
             className="min-w-0 text-body-s text-text-muted max-sm:sr-only"
           >
-            {saving ? 'saving…' : dirty ? 'unsaved changes' : 'everything is saved'}
+            {saving ? 'saving…' : unsaved ? 'unsaved changes' : 'everything is saved'}
           </p>
         )}
 

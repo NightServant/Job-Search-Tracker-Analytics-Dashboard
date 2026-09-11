@@ -56,3 +56,38 @@ export function describeLink(link: DocumentLinkSummary): string {
 export function describeResumeLink(link: ResumeLinkSummary): string {
   return `${link.role} · ${link.company} · sent ${formatSentDate(link.sent_at)}`
 }
+
+/**
+ * Which of an application's existing CV links have to go, given the one the
+ * "CV submitted" field now names.
+ *
+ * THE BUG THIS FIXES (Gabe, 2026-09-11): "CV dropdown from the application
+ * overview dialog is not functioning when I select the new CV". Picking a
+ * different CV and saving appeared to do nothing -- reopening the record
+ * showed the OLD one still selected.
+ *
+ * Nothing failed. `application_documents` is `UNIQUE (job_id, resume_id)` --
+ * on the PAIR -- so pinning a DIFFERENT CV to the same application is a brand
+ * new row, not a replacement. The application ended up linked to both, and the
+ * dialog reads `openLinks[0]`, which was still the first one pinned. The
+ * upsert in `documentLinkService.pin` only replaces a re-pin of the SAME CV,
+ * which is a different thing from what the field does.
+ *
+ * THE FIELD IS A SINGLE SELECT, so one application carries one CV and picking
+ * another means the previous one is no longer what was sent. The table stays
+ * many-to-many -- that is right for the data, and the reverse lookup depends
+ * on it -- and it is this one UI seam that narrows it.
+ *
+ * `null` is "none", and it clears every link. That is what the empty option in
+ * the dropdown means, and it is the case that used to have its own function.
+ *
+ * A SAVE ALSO REPAIRS AN APPLICATION THAT ALREADY HAS TWO, since every link
+ * that is not the chosen one is named here -- so a record left in that state
+ * by the bug corrects itself the next time a CV is picked.
+ */
+export function linksToUnpin(
+  links: readonly { resume_id: string }[],
+  chosen: string | null
+): string[] {
+  return links.filter((link) => link.resume_id !== chosen).map((link) => link.resume_id)
+}
