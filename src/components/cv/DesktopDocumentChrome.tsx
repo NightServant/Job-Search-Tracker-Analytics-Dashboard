@@ -235,37 +235,27 @@ export function DesktopDocumentChrome({
           className={cn(
             'grid gap-0 xl:min-h-0 xl:flex-1',
             /*
-              TWO SETS OF WIDTHS, AND THE SECOND BREAKPOINT IS 1700, NOT 2xl.
-              The right rail carries the most now -- ATS score, keywords,
-              rewrites and synonyms -- so it takes the extra room where there
-              is any (Gabe, 2026-09-11). Where there is any is the whole
-              question, and it is arithmetic rather than taste.
+              THE RAILS NO LONGER TRADE AGAINST THE PAGE.
 
-              A letter page is 816px and the well around it adds 64, so three
-              columns need 880px left over after both rails:
+              They did, and the numbers here had been nudged three times by
+              2026-09-11 without the tension going anywhere: a letter page is a
+              fixed 816px, its well adds 64, so every pixel a rail gained was a
+              pixel the page lost. Widening the left rail to 320 would have put
+              the page into a sideways scroll at 1366, 1440 and 1536 -- the
+              three commonest laptop widths there are.
 
-                rails 280+360  ->  page fits from 1536
-                rails 320+460  ->  page fits from ~1700
-
-              Putting the wider pair on `2xl` (1536) would therefore BREAK the
-              page at exactly the width where it starts fitting, so
-              `min-[1700px]` is where the wide rails actually have room to be
-              wide -- at 1700 a 300/500 pair leaves 836 for an 816px page.
-
-              THE RIGHT RAIL IS THE WIDER OF THE TWO and grows the most,
-              because it carries the most: an ATS ring, two keyword lists, the
-              tailoring rewrites and the thesaurus. Gabe reported the scoring
-              as cramped; the left rail holds an outline and a table of counts,
-              which are narrow by nature.
-
-              Below 1536 the page already scrolls horizontally in three
-              columns; that is pre-existing and is why the grid does not start
-              until `xl` at all.
+              `useFitToWidth` removed the constraint rather than balancing it.
+              The page now scales to whatever column it is given, as Word's
+              zoom does, so a rail can be as wide as it is useful and the page
+              still shows whole. These widths are chosen for the CONTENT now:
+              the left rail holds an outline, a statistics table with a label
+              and a figure on one line, and the tab list; the right holds an
+              ATS ring, two keyword lists, rewrites and the thesaurus.
             */
             leftRail && rightRail &&
-              'xl:grid-cols-[260px_minmax(0,1fr)_400px] min-[1700px]:grid-cols-[300px_minmax(0,1fr)_500px]',
+              'xl:grid-cols-[320px_minmax(0,1fr)_400px] min-[1700px]:grid-cols-[380px_minmax(0,1fr)_500px]',
             leftRail && !rightRail &&
-              'xl:grid-cols-[260px_minmax(0,1fr)] min-[1700px]:grid-cols-[300px_minmax(0,1fr)]'
+              'xl:grid-cols-[320px_minmax(0,1fr)] min-[1700px]:grid-cols-[380px_minmax(0,1fr)]'
           )}
         >
           {leftRail && (

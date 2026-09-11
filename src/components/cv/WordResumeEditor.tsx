@@ -22,6 +22,7 @@ import { DocumentRailPane } from './DocumentRailPane'
 import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './documentTabs'
 import { useProofread } from './useProofread'
 import { useThesaurus } from './useThesaurus'
+import { useFitToWidth } from './useFitToWidth'
 import { useResumeExport } from './useResumeExport'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
@@ -284,6 +285,9 @@ export function WordResumeEditor({
   const proofread = useProofread(editor)
   // Follows the caret; see useThesaurus for why it is not behind a button.
   const thesaurus = useThesaurus(editor)
+  // Word's zoom-to-fit: the page scales to the well instead of scrolling
+  // sideways. See useFitToWidth for why this replaced nudging breakpoints.
+  const fit = useFitToWidth()
 
   /**
    * WHICH RAIL TAB IS OPEN, remembered per browser.
@@ -426,11 +430,30 @@ export function WordResumeEditor({
       }
       footnote="letter-style layout preview with 0.8in margins for a print-ready CV."
     >
-      <div className="mx-auto min-h-[11in] w-full max-w-[8.5in] bg-white">
+      <div ref={fit.ref} className="w-full">
+      {/*
+        `zoom`, NOT `transform: scale()`, and the difference is layout.
+        A transform is painted only: a page drawn at 0.7 still occupies its
+        full 11in in the flow, so the well ends in a third of a page of nothing
+        and the scrollbar promises more document than exists. Correcting that
+        by hand means measuring the sheet and multiplying its height, which is
+        a second source of truth for a number the browser already knows.
+
+        `zoom` participates in layout -- measured here: a 1000px child at 0.7
+        gives a 700px wrapper, where the transform leaves it at 1000 -- so the
+        flow, the scroll height and the caret all agree with what is drawn,
+        with no correction and no wrapper. Supported in every current browser
+        (`CSS.supports('zoom', '0.7')` verified true in the app).
+      */}
+      <div
+        className="mx-auto min-h-[11in] w-[8.5in] bg-white"
+        style={{ zoom: fit.scale }}
+      >
         <EditorContent
           editor={editor}
           className="min-h-[11in] p-[0.8in] [&_.ProseMirror]:min-h-[9.4in] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-3 [&_.ProseMirror_h1]:text-[2rem] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-6 [&_.ProseMirror_h2]:mb-2 [&_.ProseMirror_h2]:text-[1.15rem] [&_.ProseMirror_h2]:font-semibold [&_.ProseMirror_p]:my-2 [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
         />
+      </div>
       </div>
     </DocumentWorkspace>
   )
