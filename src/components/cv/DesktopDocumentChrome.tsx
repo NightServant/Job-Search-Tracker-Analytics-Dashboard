@@ -71,7 +71,7 @@ export function DesktopDocumentChrome({
         document name is a label on the window, not a headline over the
         content. It keeps h1 semantics for screen readers regardless.
       */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border-default bg-bg-surface px-3 py-1.5">
+      <div className="flex shrink-0 items-center gap-2 border-b border-border-default bg-bg-surface px-4 py-2">
         {/* THE WAY OUT KEEPS ITS WORDS (Gabe, 2026-09-11: "do not forget to
             include the redirect button"). The first pass at this bar reduced
             it to a bare chevron because that is what Word's home icon is --
@@ -177,9 +177,9 @@ export function DesktopDocumentChrome({
             one of its controls -- it passes no formatting ribbon -- which two
             tests caught immediately. The ribbon half is what is optional. */}
         {(tools || actions || destructiveActions) && (
-          <div className="flex shrink-0 items-stretch gap-2 border-y border-border-default bg-bg-surface px-2 py-1">
+          <div className="flex shrink-0 items-stretch gap-3 border-y border-border-default bg-bg-surface px-4 py-2.5">
             <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">{tools}</div>
-            <div className="ml-auto flex shrink-0 items-center gap-1 border-l border-border-subtle pl-2">
+            <div className="ml-auto flex shrink-0 items-center gap-1.5 border-l border-border-subtle pl-3">
               {actions}
               {destructiveActions && (
                 <>
@@ -225,12 +225,37 @@ export function DesktopDocumentChrome({
         <div
           className={cn(
             'grid min-h-0 flex-1 gap-0',
-            leftRail && rightRail && 'xl:grid-cols-[280px_minmax(0,1fr)_340px]',
-            leftRail && !rightRail && 'xl:grid-cols-[280px_minmax(0,1fr)]'
+            /*
+              TWO SETS OF WIDTHS, AND THE SECOND BREAKPOINT IS 1700, NOT 2xl.
+              The right rail carries the most now -- ATS score, keywords,
+              rewrites and synonyms -- so it takes the extra room where there
+              is any (Gabe, 2026-09-11). Where there is any is the whole
+              question, and it is arithmetic rather than taste.
+
+              A letter page is 816px and the well around it adds 64, so three
+              columns need 880px left over after both rails:
+
+                rails 280+360  ->  page fits from 1536
+                rails 320+460  ->  page fits from ~1700
+
+              Putting the wider pair on `2xl` (1536) would therefore BREAK the
+              page at exactly the width where it starts fitting -- 692px of
+              column for an 816px page, 124 short, so the document would scroll
+              sideways to be read. `min-[1700px]` is where the wide rails
+              actually have room to be wide.
+
+              Below 1536 the page already scrolls horizontally in three
+              columns; that is pre-existing and is why the grid does not start
+              until `xl` at all.
+            */
+            leftRail && rightRail &&
+              'xl:grid-cols-[280px_minmax(0,1fr)_360px] min-[1700px]:grid-cols-[320px_minmax(0,1fr)_460px]',
+            leftRail && !rightRail &&
+              'xl:grid-cols-[280px_minmax(0,1fr)] min-[1700px]:grid-cols-[320px_minmax(0,1fr)]'
           )}
         >
           {leftRail && (
-            <aside className="min-w-0 overflow-y-auto border-r border-border-default bg-bg-surface p-4 xl:order-1">
+            <aside className="min-w-0 overflow-y-auto border-r border-border-default bg-bg-surface p-5 xl:order-1">
               {leftRail}
             </aside>
           )}
@@ -245,7 +270,7 @@ export function DesktopDocumentChrome({
             {children}
           </div>
           {rightRail && (
-            <aside className="min-w-0 overflow-y-auto border-l border-border-default bg-bg-surface p-4 xl:order-3">
+            <aside className="min-w-0 overflow-y-auto border-l border-border-default bg-bg-surface p-5 xl:order-3">
               {rightRail}
             </aside>
           )}

@@ -8,6 +8,7 @@ import { GrammarCheckPane } from './ProofreadPanes'
 import { TailoringAnalysisRail, type CvTailoringState } from './CvTailoring'
 import type { DocumentTabId } from './documentTabs'
 import type { ProofreadState } from './useProofread'
+import type { ThesaurusState } from './useThesaurus'
 import type { TailoringSuggestion } from '@/services/integrations/tailoring'
 
 /**
@@ -32,6 +33,7 @@ export interface DocumentRailPaneProps {
   jobs: Job[]
   linkedJobIds?: readonly string[]
   proofread: ProofreadState
+  thesaurus?: ThesaurusState
   tailoring: CvTailoringState
   onApplySuggestion?: (suggestion: TailoringSuggestion) => void
 }
@@ -42,6 +44,7 @@ export function DocumentRailPane({
   jobs,
   linkedJobIds = [],
   proofread,
+  thesaurus,
   tailoring,
   onApplySuggestion,
 }: DocumentRailPaneProps) {
@@ -78,7 +81,7 @@ export function DocumentRailPane({
         </PanelSection>
       )}
 
-      {active === 'grammar' && <GrammarCheckPane state={proofread} />}
+      {active === 'grammar' && <GrammarCheckPane state={proofread} thesaurus={thesaurus} />}
 
       {/* ONE PANE, BOTH HALVES, in the order you use them: the score says
           what a screener will miss, the rewrites are what to do about it.

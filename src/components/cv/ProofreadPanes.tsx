@@ -6,6 +6,7 @@ import { PanelSection } from '@/components/ui/panel-section'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { contextOf, type GrammarIssue } from '@/services/grammar'
 import type { ProofreadState } from './useProofread'
+import type { ThesaurusState } from './useThesaurus'
 
 /**
  * The Spell Check and Grammar Check panes, following Word's Editor pane.
@@ -189,7 +190,64 @@ function GrammarCard({
   )
 }
 
-export function GrammarCheckPane({ state }: { state: ProofreadState }) {
+/**
+ * Synonyms for the word under the caret, over Datamuse.
+ *
+ * WORD PUTS A THESAURUS IN ITS REVIEW TAB and this pane had nothing like it,
+ * which mattered more once spelling was removed: what is left is grammar and
+ * style, and "find a better verb" is the single most common thing a person
+ * does to a CV. Gabe asked for more free, open APIs -- this is the one of four
+ * probed that was both keyless and CORS-open, and the only one whose answers
+ * were usable. See `services/thesaurus` for why the other three were not.
+ *
+ * IT ONLY APPEARS WHEN IT HAS SOMETHING TO SAY. A permanent empty panel
+ * reading "select a word" is a line of instruction occupying a rail; an
+ * absence is quieter and says the same thing.
+ */
+function ThesaurusPanel({ state }: { state: ThesaurusState }) {
+  if (!state.word) return null
+
+  return (
+    <PanelSection title="synonyms" icon="Search">
+      <div className="flex flex-col gap-2">
+        <p className="text-body-s text-text-muted">
+          for <span className="text-text-primary">{state.word}</span>
+        </p>
+
+        {state.loading && <p className="text-body-s text-text-muted">looking up…</p>}
+
+        {!state.loading && state.empty && (
+          <p className="text-body-s text-text-muted">nothing found for that word.</p>
+        )}
+
+        {state.synonyms.length > 0 && (
+          <ul className="flex flex-wrap gap-1.5">
+            {state.synonyms.map((synonym) => (
+              <li key={synonym.word}>
+                <button
+                  type="button"
+                  onClick={() => state.apply(synonym.word)}
+                  title={`replace with ${synonym.word}`}
+                  className="rounded-[4px] border border-border-default bg-bg-canvas px-2 py-1 text-body-s text-text-primary transition-colors hover:border-accent-default hover:text-accent-default active:scale-[0.98]"
+                >
+                  {synonym.word}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </PanelSection>
+  )
+}
+
+export function GrammarCheckPane({
+  state,
+  thesaurus,
+}: {
+  state: ProofreadState
+  thesaurus?: ThesaurusState
+}) {
   const { score } = state
 
   return (
@@ -274,6 +332,8 @@ export function GrammarCheckPane({ state }: { state: ProofreadState }) {
       {state.ran && state.grammar.length === 0 && !state.error && (
         <p className="text-body-s text-text-muted">no grammar problems found.</p>
       )}
+
+      {thesaurus && <ThesaurusPanel state={thesaurus} />}
     </div>
   )
 }

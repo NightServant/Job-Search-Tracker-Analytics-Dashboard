@@ -107,7 +107,7 @@ function Band({
     <div
       data-ribbon-group={id}
       className={cn(
-        'flex-col justify-center gap-1 px-3',
+        'flex-col justify-center gap-1.5 px-4',
         grow ? 'min-w-0 flex-1' : 'shrink-0',
         visibility,
         !first && 'border-l border-border-subtle'
@@ -149,7 +149,7 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
       // Scrolls rather than clips when the column is narrower than the bands.
       // Wrapping is not the alternative: a ribbon that grows to four rows eats
       // the document it sits above.
-      className="flex min-w-0 items-stretch overflow-x-auto py-1"
+      className="flex min-w-0 items-stretch overflow-x-auto"
       data-document-toolbar
     >
       <Band id="history" visibility={history.visibility} first>

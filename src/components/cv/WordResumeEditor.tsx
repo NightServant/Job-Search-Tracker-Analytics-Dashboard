@@ -20,6 +20,7 @@ import { DocumentToolbar } from './DocumentToolbar'
 import { DocumentRailPane } from './DocumentRailPane'
 import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './documentTabs'
 import { useProofread } from './useProofread'
+import { useThesaurus } from './useThesaurus'
 import { useResumeExport } from './useResumeExport'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
@@ -280,6 +281,8 @@ export function WordResumeEditor({
 
   const tailoring = useCvTailoring({ cvText: editor?.getText() ?? '', jobs })
   const proofread = useProofread(editor)
+  // Follows the caret; see useThesaurus for why it is not behind a button.
+  const thesaurus = useThesaurus(editor)
 
   /**
    * WHICH RAIL TAB IS OPEN, remembered per browser.
@@ -410,6 +413,7 @@ export function WordResumeEditor({
           active={tab}
           jobs={jobs}
           proofread={proofread}
+          thesaurus={thesaurus}
           tailoring={tailoring}
         />
       }
