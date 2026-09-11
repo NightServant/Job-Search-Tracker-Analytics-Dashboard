@@ -38,16 +38,23 @@ describe('SignedOutOnly', () => {
     expect(screen.queryByText('sign in form')).toBeNull()
   })
 
-  it('paints nothing while auth is still resolving', () => {
-    // The window the inline script cannot cover on a client-side navigation.
-    // Rendering the form here and retracting it a moment later is precisely
-    // the flash being removed.
+  it('still paints while auth is resolving, so the form keeps its server render', () => {
+    // THE REGRESSION THIS PINS. Gating on `loading` as well as `user` looked
+    // more careful and cost the form its server render outright: `loading`
+    // starts true on the server, so /signup shipped an empty shell and the
+    // form appeared only after hydration -- zero occurrences of `signup-email`
+    // in the deployed HTML.
+    //
+    // It is safe to paint here because of where the bug actually was:
+    // `AuthProvider` lives in the root layout, so on a client-side navigation
+    // -- the path that produced the report -- `user` is already populated and
+    // the test above catches it.
     useAuthMock.mockReturnValue({ user: null, loading: true })
     render(
       <SignedOutOnly>
         <p>sign in form</p>
       </SignedOutOnly>
     )
-    expect(screen.queryByText('sign in form')).toBeNull()
+    expect(screen.getByText('sign in form')).toBeTruthy()
   })
 })

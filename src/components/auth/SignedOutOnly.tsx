@@ -20,12 +20,26 @@ import { useAuth } from '@/contexts/AuthContext'
  * document is parsed and no inline script runs. That is the path that produced
  * the screenshot.
  *
- * IT COSTS THE SIGNED-OUT VISITOR ALMOST NOTHING, which is what makes this the
- * right trade rather than a tax. With no token in storage, `getSession()`
- * resolves from localStorage with no network call at all, so `loading` is
- * false on the first tick and the form paints as it always did. The wait only
- * exists for someone who HAS a session -- and for them the correct thing on
- * screen is not a sign-in form.
+ * IT KEYS ON `user` AND DELIBERATELY NOT ON `loading`, and that is the whole
+ * design. The first version gated on both, which cost the form its SERVER
+ * RENDER: `loading` starts true on the server, so the page shipped an empty
+ * shell and the form appeared only after hydration -- measured on the deployed
+ * build, `signup-email` appeared zero times in the HTML. That is a worse
+ * regression than the flash it was fixing, and it hit every signed-out visitor
+ * rather than the rare signed-in one.
+ *
+ * Keying on `user` alone restores the server render and still fixes the report,
+ * because of where the bug actually lives. `AuthProvider` sits in the ROOT
+ * layout, so on a CLIENT-SIDE navigation it is already mounted and `user` is
+ * already populated -- there is no resolution window to flash through. The form
+ * simply never renders. On a full page load the pre-paint script handles it
+ * before this component exists.
+ *
+ * WHAT IS LEFT UNCOVERED, stated rather than discovered: a full page load, by
+ * a signed-in visitor, where the inline script could not run -- localStorage
+ * blocked, or a browser refusing it. There the form paints until
+ * `getSession()` resolves, exactly as it did before any of this. That is rare,
+ * and it is not worth every signed-out visitor losing their first paint.
  *
  * IT IS NOT A SECURITY BOUNDARY and must not be read as one. Nothing here
  * protects data: that is row-level security on every table plus the auth check
@@ -41,11 +55,12 @@ import { useAuth } from '@/contexts/AuthContext'
  * exemption.
  */
 export function SignedOutOnly({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth()
+  const { user } = useAuth()
 
-  // `loading`: we do not yet know. `user`: we know, and the redirect is already
-  // in flight. Neither is a state in which a sign-in form should be on screen.
-  if (loading || user) return null
+  // Known to be signed in: the redirect is already in flight and a sign-in form
+  // is never the right thing to have on screen. Anything else -- signed out, or
+  // not yet known -- renders, which is what keeps the server render intact.
+  if (user) return null
 
   return <>{children}</>
 }
