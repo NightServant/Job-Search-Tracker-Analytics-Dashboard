@@ -137,6 +137,67 @@ export function passwordRequirements(password: string): PasswordRequirement[] {
   ]
 }
 
+/**
+ * Throwaway-inbox providers, which a confirmation code cannot tell apart from a
+ * real address.
+ *
+ * WHY THIS EXISTS AT ALL, given the OTP. Sending a code and requiring it back
+ * is the strongest proof an address is real that anyone can have -- better than
+ * any verification vendor, because it tests delivery AND control at once. It
+ * closes the made-up address (`asdf@asdf.com`) completely. What it cannot close
+ * is `you@mailinator.com`: mail genuinely arrives there, anybody can read it
+ * without signing up, and the inbox is gone in an hour. The code round-trip
+ * succeeds and the account is still attached to nothing.
+ *
+ * THIS LIST IS INCOMPLETE AND ALWAYS WILL BE. New throwaway domains appear
+ * faster than any list is updated, and the well-funded ones rotate deliberately.
+ * It is worth having because it costs one set lookup and stops the providers
+ * people actually reach for, not because it is a boundary. Treat a pass as
+ * "not obviously disposable", never as "verified".
+ *
+ * Domains are the common entries from the public `disposable-email-domains`
+ * list (CC0). Kept inline rather than added as a dependency: it is data, not
+ * code, it changes slowly enough to paste, and a signup path should not gain a
+ * package that could be updated out from under it. To refresh, take the head of
+ * that list; to check one address without adding a vendor to the signup path,
+ * `https://open.kickbox.com/v1/disposable/<email>` answers keyless -- but it
+ * sends the address to a third party, which is why it is not wired in here.
+ */
+const DISPOSABLE_DOMAINS = new Set([
+  '10minutemail.com', '1secmail.com', '33mail.com', 'anonbox.net',
+  'burnermail.io', 'byom.de', 'discard.email', 'dispostable.com',
+  'e4ward.com', 'emailondeck.com', 'fakeinbox.com', 'getnada.com',
+  'grr.la', 'guerrillamail.com', 'guerrillamailblock.com',
+  'harakirimail.com', 'incognitomail.com', 'inboxkitten.com',
+  'jetable.org', 'luxusmail.org', 'mail.tm', 'mailcatch.com',
+  'maildrop.cc', 'mailexpire.com', 'mailinator.com', 'mailnesia.com',
+  'mailpoof.com', 'minuteinbox.com', 'moakt.com', 'mohmal.com',
+  'mytemp.email', 'sharklasers.com', 'spam4.me', 'spambog.com',
+  'spamgourmet.com', 'temp-mail.io', 'temp-mail.org', 'tempail.com',
+  'tempinbox.com', 'tempmail.com', 'tempr.email', 'throwawaymail.com',
+  'trashmail.com', 'trashmail.de', 'vomoto.com', 'yopmail.com',
+])
+
+/**
+ * Whether the address belongs to a known throwaway-inbox provider.
+ *
+ * SUBDOMAINS COUNT. Several of these hand out `anything.mailinator.com`, so
+ * matching the exact domain only would be trivially sidestepped by the feature
+ * the provider advertises. The walk is right-to-left over the labels, which
+ * also means a lookalike like `notmailinator.com` does NOT match -- it shares
+ * no label boundary with the real one.
+ */
+export function isDisposableEmail(raw: string): boolean {
+  const domain = normalizeEmail(raw).split('@')[1]
+  if (!domain) return false
+
+  const labels = domain.split('.')
+  for (let i = 0; i < labels.length - 1; i += 1) {
+    if (DISPOSABLE_DOMAINS.has(labels.slice(i).join('.'))) return true
+  }
+  return false
+}
+
 export function isPasswordStrong(password: string): boolean {
   if (password.length > PASSWORD_MAX_LENGTH) return false
   return passwordRequirements(password).every((r) => r.met)

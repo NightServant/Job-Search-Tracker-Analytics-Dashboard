@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  isDisposableEmail,
   normalizeEmail,
   isValidEmail,
   passwordRequirements,
@@ -139,5 +140,44 @@ describe('passwordScore', () => {
     expect(passwordScore('Str0ng!Passw0rd')).toBe(1)
     expect(passwordScore('abc')).toBeGreaterThan(0)
     expect(passwordScore('abc')).toBeLessThan(1)
+  })
+})
+
+describe('isDisposableEmail', () => {
+  it('catches the throwaway providers people actually reach for', () => {
+    for (const address of [
+      'someone@mailinator.com',
+      'someone@yopmail.com',
+      'someone@guerrillamail.com',
+      'SOMEONE@10MinuteMail.com',
+    ]) {
+      expect(isDisposableEmail(address), address).toBe(true)
+    }
+  })
+
+  it('catches subdomains, which several providers hand out by design', () => {
+    // mailinator advertises `anything.mailinator.com`, so an exact-domain
+    // match would be sidestepped by the provider's own headline feature.
+    expect(isDisposableEmail('someone@inbox.mailinator.com')).toBe(true)
+    expect(isDisposableEmail('someone@a.b.mailinator.com')).toBe(true)
+  })
+
+  it('does not flag a lookalike that merely ends in the same letters', () => {
+    // `notmailinator.com` shares no label boundary with `mailinator.com`, and
+    // a naive endsWith would have refused a real address.
+    expect(isDisposableEmail('someone@notmailinator.com')).toBe(false)
+    expect(isDisposableEmail('someone@mailinator.com.example.org')).toBe(false)
+  })
+
+  it('leaves ordinary addresses alone', () => {
+    for (const address of [
+      'someone@gmail.com',
+      'someone@outlook.com',
+      'someone@a-company.co.uk',
+      'not-an-email',
+      '',
+    ]) {
+      expect(isDisposableEmail(address), address).toBe(false)
+    }
   })
 })

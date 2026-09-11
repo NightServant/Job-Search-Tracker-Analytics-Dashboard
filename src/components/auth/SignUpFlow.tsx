@@ -10,6 +10,7 @@ import { CheckIcon, UserRoundIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import {
   isPasswordStrong,
+  isDisposableEmail,
   isValidEmail,
   normalizeEmail,
   PASSWORD_MAX_LENGTH,
@@ -107,6 +108,17 @@ export function SignUpFlow({
 
     if (!isValidEmail(cleanEmail)) {
       setError('That does not look like an email address we can reach.')
+      return
+    }
+    // Checked BEFORE anything is sent. A throwaway inbox passes the emailed
+    // code -- mail really does arrive there -- so the code cannot be what
+    // catches it, and refusing after the send would waste the send and leave a
+    // half-made account behind.
+    if (isDisposableEmail(cleanEmail)) {
+      setError(
+        'That is a temporary inbox. Use an address you will still have later, ' +
+          'or you will not be able to get back into this account.'
+      )
       return
     }
     if (!isPasswordStrong(password)) {
