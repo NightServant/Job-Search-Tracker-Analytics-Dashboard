@@ -1,5 +1,6 @@
 import { InstantSignedInRedirect } from '@/components/auth/InstantSignedInRedirect'
 import { SignedInRedirect } from '@/components/auth/SignedInRedirect'
+import { SignedOutOnly } from '@/components/auth/SignedOutOnly'
 
 /**
  * A passthrough that does two things, and it exists for the first of them: so
@@ -27,6 +28,15 @@ import { SignedInRedirect } from '@/components/auth/SignedInRedirect'
  * only shared server component the two routes have. It is also the thing that
  * would otherwise be forgotten by a third auth route.
  *
+ * THE THIRD THING, added 2026-09-11: the forms do not paint until it is known
+ * that the visitor needs one. Both redirects above are corrections made AFTER
+ * something is on screen -- the script before paint on a full load, the client
+ * component after hydration otherwise -- and on a client-side navigation into
+ * this group there was nothing stopping the form rendering in the meantime.
+ * `(app)/layout.tsx` has always held its children back the same way; this is
+ * the mirror it never had. See SignedOutOnly for why it costs a signed-out
+ * visitor nothing.
+ *
  * SIGNING OUT IS NOT AFFECTED. `clearStoredSession` removes the key before the
  * browser is sent anywhere, so the arriving /login has nothing to find. That
  * ordering is the whole reason sign-out clears locally first rather than
@@ -38,7 +48,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       {/* First, so the browser decides before it parses the form below. */}
       <InstantSignedInRedirect />
       <SignedInRedirect />
-      {children}
+      <SignedOutOnly>{children}</SignedOutOnly>
     </div>
   )
 }

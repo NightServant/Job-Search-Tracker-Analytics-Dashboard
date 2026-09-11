@@ -195,7 +195,14 @@ export function ProgressTrack({ steps, current, label, className }: ProgressTrac
                 stacked row tall enough for the vertical connector to have
                 somewhere to run. Without it a step with no description leaves
                 the line hanging in space. */}
-            <span className="flex min-w-0 flex-1 flex-col gap-1 pb-1 sm:pb-0">
+            {/* CENTRED UNDER ITS OWN NODE from `sm` up (Gabe, 2026-09-11:
+                "text not aligned to the icon itself"). The node is centred in
+                its column and the text was not, so every label sat at the
+                column's leading edge while its icon was in the middle -- the
+                two rows read as unrelated. Left-aligned below `sm`, where the
+                layout is a row and the text sits BESIDE the node rather than
+                under it. */}
+            <span className="flex min-w-0 flex-1 flex-col gap-1 pb-1 sm:items-center sm:pb-0 sm:text-center">
               <span
                 className={cn(
                   'truncate text-label-caps uppercase transition-colors duration-(--duration-base)',
@@ -258,8 +265,16 @@ function Connector({
   return (
     <span
       className={cn(
+        // STOPS SHORT OF THE NODE. These ran to the column's centre -- i.e.
+        // underneath the 36px node -- and relied on the node's own background
+        // to cover them. That works for a `bg-bg-canvas` node and fails for the
+        // CURRENT one, whose centre is a 10% tint: the line showed straight
+        // through the icon. `calc(50% + 22px)` is the node's 18px radius plus a
+        // 4px breath, so there is nothing to cover in the first place.
         'absolute top-1/2 hidden h-[2px] -translate-y-1/2 bg-border-subtle sm:block',
-        side === 'left' ? 'left-0 right-1/2' : 'left-1/2 right-0'
+        side === 'left'
+          ? 'left-0 right-[calc(50%+22px)]'
+          : 'left-[calc(50%+22px)] right-0'
       )}
     >
       {filled && (
