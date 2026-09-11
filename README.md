@@ -17,7 +17,7 @@ A job search tracker with analytics and a CV builder, built with Next.js 15 (App
 
 Worktrack is a full-stack application with an account behind it, which is the main thing separating it from a spreadsheet: the pipeline, the analytics and the CV history are all views over the same rows, and a status change recorded once shows up in the board, the timeline and the funnel without being entered three times.
 
-Eight routes sit behind authentication — `/dashboard`, `/applications`, `/applications/[id]`, `/calendar`, `/documents`, `/cv`, `/analytics` and `/settings`. In front of it are the landing page at `/`, `/login` and `/signup`, the read-only demo at `/demo/*`, and `/privacy`.
+Behind authentication sit `/dashboard`, `/applications`, `/applications/[id]`, `/calendar`, `/documents`, `/documents/templates`, `/cv`, `/analytics` and `/settings`. In front of it are the landing page at `/`, `/login` and `/signup`, the read-only demo at `/demo/*`, and `/privacy`.
 
 **Data belongs to one person and the database enforces it.** Row-level security is enabled on every table and every policy scopes rows to `auth.uid()`, so a request for someone else's row returns nothing rather than being filtered out afterwards by the interface. That holds even when the application asks for the wrong thing, which is the point of putting it there rather than in a service layer.
 
@@ -83,24 +83,117 @@ The dates move with the clock. A fixture pinned to literal dates would say "appl
 
 ### Job tracking
 - Applications with company, role, salary range, location, work mode, source, tags, and tech stack
-- Status pipeline — wishlist → applied → interviewing → offer / rejected — with drag-and-drop
+- Status pipeline — wishlist → applied → interviewing → offer / rejected — shown as a progress bar on every application and as filter tabs over the list
 - Automatic status-change history, recorded by a database trigger rather than by the client, so a transition cannot be lost by a failed request
-- Auto-fill from a job posting URL, parsed server-side across multiple job boards
-- Filtering, search, sorting, and CSV export
+- Auto-fill from a job posting URL, parsed server-side; a hosted fetcher (Firecrawl) is tried for the pages this server cannot open itself
+- Search, ordering by date applied or alphabetically, pagination, and CSV **import and export**
+- One record dialog that reads and edits the same application: what the job is, the posting itself, and how your CV scores against it
+
+### Calendar
+- Interviews, deadlines, take-homes and follow-ups on a month grid, with a week strip and an agenda on a phone
+- Setting an application's status to *interviewing* takes a date and time, which writes the interview to the calendar
+- Applications you sent are plotted on the day you sent them
+- Public holidays for your country, from [Nager.Date](https://github.com/nager/nager.date) — keyless, and the country is a picker rather than a guess
+- A rail of newly posted remote roles from [Jobicy](https://jobicy.com); *track it* hands the URL to the add flow, which reads the employer's own page
 
 ### Analytics
 - Conversion and offer rates, applications over time, status distribution
 - Time-in-stage metrics, conversion funnels, and source trends
+- A date range that narrows every panel on the screen, not just one
 - Precomputed metrics cached in Postgres behind an edge function (stale-while-revalidate)
 - Every figure is computed from your own rows, so it is only ever as good as what you put in
 
 ### CV builder
 - Word-style rich text editor (Tiptap) with autosave
 - LaTeX source editor with live side-by-side preview
-- Template presets for both modes
+- Template presets for both modes, browsable on their own screen
 - Version history — snapshots capped at 10 per CV
-- PDF export via edge function
-- An ATS check that reads the document rather than guessing at it
+- PDF export via edge function; `.docx` export headlessly
+- An ATS check that reads the document rather than guessing at it, and names both the matched and the missing keywords
+
+### Profile
+- Import your LinkedIn profile by pasting its public address; the roles, education, certifications and projects feed CV tailoring
+- What a public profile does **not** carry — skills, languages, the paragraph under each role — is said out loud rather than left looking like a failed import
+
+### How Worktrack compares
+
+Worktrack is not trying to out-feature the commercial trackers. It is trying to be the one you can run yourself, over a database you own, without a per-item credit meter. This section says where that trade lands — including where it loses.
+
+**Everything below was read from each product's own pricing page on 10 September 2026** — [tealhq.com/pricing](https://www.tealhq.com/pricing) and [huntr.co/pricing](https://huntr.co/pricing) — and the rows say *listed* or *not listed*, never *has* or *lacks*. A pricing page is a marketing document, not an inventory: something missing from it may still exist in the product. Prices change; re-check before quoting these.
+
+#### What each free tier gives you
+
+| | **Worktrack** | **Teal** (Free Forever) | **Huntr** (Free) |
+|---|---|---|---|
+| Applications tracked | no cap in the app; your Postgres quota is the ceiling | unlimited | up to 100 |
+| CVs | no cap in the app | unlimited | unlimited base résumés |
+| CV templates | Word **and** LaTeX presets (see the Templates screen) | 10 | all templates |
+| Job-description keyword matching | every keyword, matched and missing, against the CV you linked | top 5 keywords | basic |
+| AI generations | your own API key, unmetered by us | 10 bullet credits, 2 summary, 2 cover letter | limited credits, then paid |
+| Tailored CVs | limited only by your own API key | unlimited résumés, top-5 matching | 2 |
+| Document uploads | your Supabase storage quota | not listed | up to 100 |
+
+#### What each one charges to lift those limits
+
+| | Worktrack | Teal+ | Huntr Pro |
+|---|---|---|---|
+| Cheapest published term | — | **$79** / 90 days | **$90** / quarter ($30/mo) |
+| Monthly | — | $29 / 30 days | $40 / month |
+| Weekly | — | $13 / 7 days | — |
+| 90 days at the cheapest term | **$0** | **$79** | **$90** |
+
+```mermaid
+xychart-beta
+    title "Subscription cost over one 90-day job search, at each tool's cheapest published term (USD, 10 Sep 2026)"
+    x-axis ["Worktrack", "Teal+", "Huntr Pro"]
+    y-axis "US dollars" 0 --> 100
+    bar [0, 79, 90]
+```
+
+**$0 is a subscription figure, not a running cost, and the difference matters.** Worktrack charges no subscription because you host it — so you pay your own providers instead:
+
+| What you run | What it costs |
+|---|---|
+| Vercel Hobby + Supabase free tier | $0 on the free tiers this project is built to fit |
+| CV tailoring | your own OpenAI-compatible endpoint, at your provider's rate — or a local model, at nothing |
+| Job-posting fetch fallback ([Firecrawl](https://firecrawl.dev)) | optional; the app works without a key and says so |
+| LinkedIn profile import ([Apify](https://apify.com)) | **~$0.51 per profile**, measured — see [`scraper/extractor/apify_profile.py`](scraper/extractor/apify_profile.py) |
+| Public holidays, remote-job feed | $0 — both are keyless public APIs |
+
+#### What Worktrack does that neither page lists
+
+- **A LaTeX CV editor** with a live side-by-side preview and PDF output, alongside the Word-style one
+- **Public holidays on the calendar**, per country, from a keyless open-source API
+- **A rail of newly posted remote roles** inside the tracker, where *track it* hands the URL to the add flow and the app reads the employer's own page
+- **Self-hosting on your own Supabase project**, with row-level security scoping every row to its owner — nobody's terms of service sit between you and your applications
+- **Bring-your-own model key**, so AI is billed by your provider rather than metered as credits
+- **CSV import as well as export**, so the spreadsheet you already keep is a starting point rather than a thing you retype
+
+#### What they do that Worktrack does not
+
+Stated plainly, because a comparison that only runs one way is an advertisement:
+
+- **A browser extension.** Both list one; Huntr's "Chrome Job Clipper" saves a posting in a click and its **application autofill** fills employer forms for you. Worktrack has neither — you paste a URL and it reads the page.
+- **A job board of their own.** Teal and Huntr surface listings and company data in-product. Worktrack shows a third-party remote feed and nothing else.
+- **Contact management.** Huntr lists it as unlimited on the free tier. Worktrack removed contacts from the record on purpose; the columns still exist, nothing renders them.
+- **AI cover letters.** Both list generation; Worktrack tailors CVs and does not write cover letters.
+- **Maturity.** Support, a company behind it, and years of iteration. Worktrack is one person's project.
+
+#### Check the rest yourself
+
+The figures above are quoted with the date they were read, because somebody else's pricing page is not something this repository can recompute. Its **own** numbers are a different matter — a count typed into a README is wrong by the next commit, so here is where to get each one live instead:
+
+| | Where it comes from |
+|---|---|
+| Test suite, TypeScript | `npm test` |
+| Test suite, Python extractor | `npm run test:scraper` |
+| Database migrations | `ls supabase/migrations/*.sql` |
+| Edge functions | `ls supabase/functions` |
+| Routes behind authentication | `find "src/app/(app)" -name page.tsx` |
+| CV templates, per mode | [`src/services/resumeTemplateService.ts`](src/services/resumeTemplateService.ts) |
+| Supported currencies | [`src/services/userPreferences.ts`](src/services/userPreferences.ts) |
+
+This is the same rule the landing page follows and `src/lib/__tests__/attribution.test.ts` enforces: a claim nothing recomputes is a claim that rots, and this README shipped a stale test count once already.
 
 ### Accounts
 [Sign in](/login) or [create an account](/signup). Registration is three steps — credentials, a six-digit code sent to the address, then the dashboard — with the password rules shown on the form and checked as you type.
