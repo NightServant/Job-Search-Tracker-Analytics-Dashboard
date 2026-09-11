@@ -39,7 +39,11 @@ export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
         // own: nothing happens unless a child asks for `group-hover/icon:`.
         ICON_MOTION_GROUP,
         'grid h-7 w-9 place-items-center rounded-md text-text-muted',
-        'transition-colors duration-(--duration-fast) hover:bg-bg-inset hover:text-text-primary',
+        // The same press as `buttonVariants`, for the same reason: an icon
+        // button is the only control on a row and needs to confirm the tap.
+        'transition-[color,background-color,transform] duration-(--duration-fast)',
+        'hover:bg-bg-inset hover:text-text-primary',
+        'active:scale-[0.94] motion-reduce:active:scale-100 motion-reduce:transition-none',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
         className
       )}

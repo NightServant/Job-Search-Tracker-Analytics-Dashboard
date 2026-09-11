@@ -79,77 +79,51 @@ describe('the registration progress bar', () => {
     expect(bar).toBeInTheDocument()
     const steps = [...bar.querySelectorAll('[data-step]')].map((s) => s.getAttribute('data-step'))
     expect(steps).toEqual(['your details', 'verify', 'done'])
-    // Scoped to [data-step], not a bare [data-state]: the icon row above the
-    // track carries a state too, so an unscoped query returns whichever row
-    // happens to come first in the DOM.
     expect(
       bar.querySelector('[data-step][data-state="current"]')?.getAttribute('data-step')
     ).toBe('your details')
   })
 
-  it('carries an icon per step, above the track', async () => {
+  it('carries an icon and a description per step', () => {
+    // THE ICON IS INSIDE THE NODE NOW (2026-09-11), not floating in a row
+    // above a separate track. Two of the tests this replaces existed only to
+    // police that two-row arrangement -- "icons above the track" and "each
+    // icon in the same state as its own label" -- and neither can fail any
+    // more: there is one row, built from one list, so the icon and the label
+    // are the same element's children.
     setup()
     const bar = document.querySelector('[data-registration-progress]')!
-    const icons = [...bar.querySelectorAll('[data-step-icon]')]
-    expect(icons.map((i) => i.getAttribute('data-step-icon'))).toEqual([
-      'your details',
-      'verify',
-      'done',
-    ])
-    // Each one renders a real glyph rather than an empty span reserving space.
-    expect(icons.every((i) => i.querySelector('svg') !== null)).toBe(true)
-
-    // ABOVE the track, which is the half of the request that is about
-    // position. compareDocumentPosition is the order the DOM actually has,
-    // not the order the source happens to read in.
-    const track = bar.querySelector('[data-progress-fill]')!.parentElement!
-    expect(icons[0].compareDocumentPosition(track) & Node.DOCUMENT_POSITION_FOLLOWING)
-      .toBeTruthy()
+    const steps = [...bar.querySelectorAll('[data-step]')]
+    expect(steps).toHaveLength(3)
+    expect(steps.every((step) => step.querySelector('svg') !== null)).toBe(true)
+    // The descriptions are the reason this moved to the shared tracker: the
+    // way IN was the only progress bar in the app without them.
+    expect(bar.textContent).toContain('a six-digit code')
   })
 
-  it('centres each icon over its own label rather than hugging an edge', () => {
-    // justify-between put the first glyph on the container's left edge and the
-    // last on its right, while the labels beneath them are several times
-    // wider -- so an 18px icon sat at the corner of its label, not over it.
-    // The fix is one shared column model, asserted here as: both rows are
-    // grids with the SAME template, and the content of each cell is centred.
-    setup()
-    const bar = document.querySelector('[data-registration-progress]')!
-    const iconRow = bar.querySelector('[data-progress-icons]') as HTMLElement
-    const labelRow = bar.querySelector('ol') as HTMLElement
-
-    expect(iconRow.style.gridTemplateColumns).toBe('repeat(3, minmax(0, 1fr))')
-    expect(labelRow.style.gridTemplateColumns).toBe(iconRow.style.gridTemplateColumns)
-    expect(iconRow.className).not.toContain('justify-between')
-    expect(labelRow.className).not.toContain('justify-between')
-    expect((iconRow.firstElementChild as HTMLElement).className).toContain('justify-center')
-    expect((labelRow.firstElementChild as HTMLElement).className).toContain('text-center')
-  })
-
-  it('keeps each icon in the same state as its own label', async () => {
-    // Two rows rendered from one list is how they drift: an icon row still
-    // showing step one while the labels have moved on says nothing useful.
+  it('fills the connector behind every step that is done', async () => {
+    // Replaces the old width-percentage assertion on a single track element.
+    // The fill is per-segment now, so "how far" is a COUNT of filled
+    // connectors rather than a number parsed out of an inline style.
     setup()
     const bar = () => document.querySelector('[data-registration-progress]')!
-    const stateOf = (sel: string) =>
-      [...bar().querySelectorAll(sel)].map((n) => n.getAttribute('data-state'))
+    const filled = () => bar().querySelectorAll('[data-progress-fill]').length
 
-    expect(stateOf('[data-step-icon]')).toEqual(stateOf('[data-step]'))
-
+    const atStart = filled()
     await fillDetails()
-    await waitFor(() =>
-      expect(stateOf('[data-step-icon]')).toEqual(['done', 'current', 'todo'])
-    )
-    expect(stateOf('[data-step-icon]')).toEqual(stateOf('[data-step]'))
+    await waitFor(() => expect(filled()).toBeGreaterThan(atStart))
   })
 
-  it('advances as the person moves through the flow', async () => {
+  it('advances the current step as the person moves through the flow', async () => {
     setup()
-    const fill = () => document.querySelector('[data-progress-fill]') as HTMLElement
-    expect(fill().style.width).toBe('0%')
+    const currentStep = () =>
+      document
+        .querySelector('[data-registration-progress] [data-step][data-state="current"]')
+        ?.getAttribute('data-step')
 
+    expect(currentStep()).toBe('your details')
     await fillDetails()
-    await waitFor(() => expect(fill().style.width).toBe('50%'))
+    await waitFor(() => expect(currentStep()).toBe('verify'))
   })
 })
 

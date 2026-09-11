@@ -1,7 +1,23 @@
 'use client'
 
 import * as React from 'react'
-import { AtsDonut } from '@/components/ui/ats-donut'
+import dynamic from 'next/dynamic'
+import { LazyPanel } from '@/components/ui/lazy-panel'
+
+/**
+ * THE ATS RING IS CODE-SPLIT (2026-09-11). It is the last thing pulling
+ * recharts into this screen's first load, and it sits inside a panel most
+ * visits never look at -- on /applications it lives in a dialog that starts
+ * closed.
+ *
+ * `ssr: false` for the same reason as every other chart here: recharts
+ * measures its container before drawing, and its `useId`-derived chart id was
+ * a hydration mismatch between server and client.
+ */
+const AtsDonut = dynamic(() => import('@/components/ui/ats-donut').then((m) => m.AtsDonut), {
+  ssr: false,
+  loading: () => <LazyPanel height="h-40" label="the ATS score" />,
+})
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { AlertCircleIcon, CheckIcon, CloseIcon, ShieldCheckIcon } from '@/components/icons'

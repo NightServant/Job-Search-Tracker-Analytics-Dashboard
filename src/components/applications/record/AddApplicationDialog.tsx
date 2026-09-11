@@ -8,9 +8,9 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { ArrowRightIcon, icons, type IconName } from '@/components/icons'
+import { ProgressTrack } from '@/components/ui/progress-track'
+import { ArrowRightIcon, type IconName } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
-import { cn } from '@/lib/utils'
 import { isSupportedCurrency } from '@/services/userPreferences'
 import { ApplicationRecordView } from './ApplicationRecordView'
 import { draftFromJob, normalizePostingUrl, useRecordDraft, type RecordDraft } from './useRecordDraft'
@@ -58,55 +58,28 @@ const STEPS: StepDef[] = [
 ]
 
 /**
- * The progress bar the revision asked for: a rule per step, in the accent once
- * the step is behind you, with its own icon and its own sentence.
+ * The wizard's four steps, on the shared `ui/progress-track` (2026-09-11).
  *
- * The accent is used here and NOT the status palette, which is the opposite of
+ * IT TAKES THE ACCENT AND NOT THE STATUS PALETTE, which is the opposite of
  * `ApplicationPipeline` one screen over -- and deliberately. That bar tracks an
  * application through five named statuses, which have colours. This one tracks
  * a person through a form, which does not; the accent is what this system uses
- * for "you are here".
+ * for "you are here", and it is the tracker's default tone.
  */
 function WizardProgress({ current }: { current: number }) {
   return (
-    <ol
-      className="grid gap-x-4 gap-y-4 sm:grid-flow-col sm:auto-cols-fr"
-      data-add-progress={STEPS[current]?.id}
-    >
-      {STEPS.map((step, index) => {
-        const Icon = icons[step.icon]
-        const done = index <= current
-        return (
-          <li key={step.id} className="flex flex-col gap-2">
-            <span
-              aria-hidden
-              className={cn('h-[2px] w-full', done ? 'bg-accent-default' : 'bg-border-subtle')}
-            />
-            <span className="flex items-center gap-2">
-              <Icon
-                size={16}
-                aria-hidden
-                className={cn('shrink-0', done ? 'text-text-primary' : 'text-text-muted')}
-              />
-              <span
-                className={cn(
-                  'text-label-caps uppercase',
-                  index === current
-                    ? 'text-text-primary'
-                    : done
-                      ? 'text-text-secondary'
-                      : 'text-text-muted'
-                )}
-              >
-                {step.label}
-              </span>
-              {index === current && <span className="sr-only">(current step)</span>}
-            </span>
-            <span className="text-body-s text-text-muted">{step.description}</span>
-          </li>
-        )
-      })}
-    </ol>
+    <div data-add-progress={STEPS[current]?.id}>
+      <ProgressTrack
+        label="New application progress"
+        current={current}
+        steps={STEPS.map((step) => ({
+          id: step.id,
+          label: step.label,
+          description: step.description,
+          icon: step.icon,
+        }))}
+      />
+    </div>
   )
 }
 
@@ -465,6 +438,7 @@ export function AddApplicationDialog({
       title="new application"
       icon="Briefcase"
       description="four steps, and the model does three of them."
+      headerSeparator={false}
     >
       <div className="flex flex-col gap-6">
         <WizardProgress current={index} />

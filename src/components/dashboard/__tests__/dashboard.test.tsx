@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, within, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Dashboard } from '../Dashboard'
 import { makeJob } from '@/test/fixtures'
@@ -23,75 +23,92 @@ const FRESH_FIXTURE: Job[] = [
   makeJob({ id: 'fresh-3', status: 'wishlist', company: 'Initech', role: 'Analyst' }),
 ]
 
+/**
+ * Renders the Overview and waits for its code-split charts to arrive.
+ *
+ * The three recharts panels are `next/dynamic` with `ssr: false` (2026-09-11),
+ * so a synchronous `render` returns placeholders. Waiting for every
+ * `aria-busy` to clear is the general form -- it does not care which charts a
+ * given fixture produces, which matters because an empty pipeline renders an
+ * empty-state instead of a donut.
+ */
+async function renderDashboard(ui: React.ReactElement) {
+  const result = render(ui)
+  await waitFor(() =>
+    expect(result.container.querySelector('[aria-busy]')).toBeNull()
+  )
+  return result
+}
+
 describe('Dashboard', () => {
-  it('puts the KPI strip above the follow-up nudge, as the frame draws it', () => {
+  it('puts the KPI strip above the follow-up nudge, as the frame draws it', async () => {
     // REVERSED in M5.5 Item 5, deliberately. This asserted the opposite,
     // from roadmap 5.3's prose ("KPI strip, follow-up nudge first"). Figma
     // 20:64 puts the KPI Strip at y=129 and the Follow-up Nudge at y=287, so
     // the frame and the prose disagree -- and the roadmap names the Figma
     // file as the source of truth for design. Both are above the fold at
     // 1024px, so the nudge is not buried either way.
-    const { container } = render(<Dashboard jobs={STALE_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={STALE_FIXTURE} />)
     const nudge = container.querySelector('[data-follow-up]')!
     const kpis = container.querySelector('[data-kpi-strip]')!
     expect(kpis.compareDocumentPosition(nudge) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('reads the calendar rather than inventing an events sentence', () => {
+  it('reads the calendar rather than inventing an events sentence', async () => {
     // The old block printed the literal string "N interviews in progress",
     // derived from job statuses -- so it had no empty state and could never
     // show a real event. Item 5's first complaint.
-    render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
+    await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
     expect(screen.queryByText(/interviews in progress/i)).toBeNull()
     expect(screen.getByText(/nothing scheduled yet/i)).toBeTruthy()
   })
 
-  it('distinguishes a failing calendar read from an empty calendar', () => {
-    render(<Dashboard jobs={FRESH_FIXTURE} events={[]} eventsError />)
+  it('distinguishes a failing calendar read from an empty calendar', async () => {
+    await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} events={[]} eventsError />)
     expect(screen.getByText(/could not load your calendar/i)).toBeTruthy()
     expect(screen.queryByText(/nothing scheduled yet/i)).toBeNull()
   })
 
-  it('renders the three charts Gabe asked for', () => {
+  it('renders the three charts Gabe asked for', async () => {
     // line/area over time, the status doughnut, and bars by source. recharts
     // has been a dependency since M5 and this screen imported none of it.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     expect(container.querySelector('[data-chart-over-time]')).toBeTruthy()
     expect(container.querySelector('[data-chart-donut]')).toBeTruthy()
     expect(container.querySelector('[data-chart-sources]')).toBeTruthy()
   })
 
-  it('keeps all five statuses in the donut legend, including the zeros', () => {
+  it('keeps all five statuses in the donut legend, including the zeros', async () => {
     // A legend that drops empty statuses changes length as data changes, and
     // the colour under a given segment starts meaning something else.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     expect(container.querySelectorAll('[data-donut-legend] li')).toHaveLength(5)
   })
 
-  it('hides the nudge entirely when nothing is stale', () => {
+  it('hides the nudge entirely when nothing is stale', async () => {
     // An empty "nothing to chase" card trains the eye to skip the slot.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     expect(container.querySelector('[data-follow-up]')).toBeNull()
   })
 
-  it('renders the recent-applications table with real column labels', () => {
+  it('renders the recent-applications table with real column labels', async () => {
     // Replaces "renders six blocks": the six generic text blocks are gone.
     // The old Recent applications block was loose text with no column labels,
     // so nothing lined up between rows and a screen reader got no row/column
     // relationship at all.
-    render(<Dashboard jobs={FRESH_FIXTURE} />)
+    await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     const table = screen.getByRole('table')
     for (const label of ['company', 'position', 'status', 'applied on']) {
       expect(within(table).getByRole('columnheader', { name: label })).toBeTruthy()
     }
   })
 
-  it('leads with four stat cards whose hero is the number', () => {
+  it('leads with four stat cards whose hero is the number', async () => {
     // Gabe, 2026-09-10: four cards rather than five loose figures, with the
     // statistic as each card's hero. `text-data-xl` is the largest step in the
     // scale -- larger than the page title, deliberately, because a dashboard
     // is read number-first.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     const strip = container.querySelector('[data-kpi-strip]')!
     const cards = strip.querySelectorAll('[data-stat-card]')
     expect(cards).toHaveLength(4)
@@ -101,11 +118,11 @@ describe('Dashboard', () => {
     }
   })
 
-  it('puts two more stat cards between the charts and the recent-applications table', () => {
+  it('puts two more stat cards between the charts and the recent-applications table', async () => {
     // "I highly recommend to add more two card components before recent
     // applications table" -- and BEFORE is the part worth pinning: inside the
     // grid, after the four panels, ahead of the full-width table.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     const grid = container.querySelector('.xl\\:grid-cols-2')!
     const inGrid = [...grid.children]
     const statCards = inGrid.filter((c) => c.hasAttribute('data-stat-card'))
@@ -119,32 +136,32 @@ describe('Dashboard', () => {
     }
   })
 
-  it('shows KPI values with tabular figures', () => {
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+  it('shows KPI values with tabular figures', async () => {
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     for (const v of container.querySelectorAll('[data-kpi-value]')) {
       expect(v.className).toContain('tabular')
     }
   })
 
-  it('draws the header rule the frame specifies and no card borders', () => {
+  it('draws the header rule the frame specifies and no card borders', async () => {
     // Figma 20:68 is a 2px full-width rule under the page title. Separation in
     // this system is hairline rules, never boxed cards -- the six bordered
     // blocks this replaced were themselves a fix round in M5.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     const rule = container.querySelector('[data-header-rule]') as HTMLElement
     expect(rule).toBeTruthy()
     expect(rule.className).toContain('border-t-2')
   })
 
-  it('links each row in Recent applications to that job\'s own detail route', () => {
+  it('links each row in Recent applications to that job\'s own detail route', async () => {
     // Task 5 built /applications/[id] after this dashboard shipped; every
     // path off this page used to dead-end on the unfiltered list.
-    render(<Dashboard jobs={FRESH_FIXTURE} />)
+    await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
     const link = screen.getByRole('link', { name: /Globex/i })
     expect(link.getAttribute('href')).toBe('/applications/fresh-2')
   })
 
-  it('shows "Not applied" for a wishlist job rather than a fabricated or raw timestamp', () => {
+  it('shows "Not applied" for a wishlist job rather than a fabricated or raw timestamp', async () => {
     // date_applied is null for a job nobody has applied to yet. Falling back
     // to created_at used to print that row's signup timestamp as if it were
     // an applied date, and it was a full TIMESTAMPTZ string besides. Alone in
@@ -155,7 +172,7 @@ describe('Dashboard', () => {
       date_applied: null,
       created_at: '2026-08-20T14:23:01.123456+00:00',
     })
-    render(<Dashboard jobs={[wishlist]} />)
+    await renderDashboard(<Dashboard jobs={[wishlist]} />)
     expect(screen.getByText('not applied')).toBeTruthy()
     expect(screen.queryByText(/2026-08-20T/)).toBeNull()
   })
@@ -164,7 +181,7 @@ describe('Dashboard', () => {
     // The nudge is a CTA now, not an inline list -- fifteen rows made it the
     // longest thing on the dashboard and pushed both charts below the fold.
     // The destination it guards is unchanged; it just lives one click away.
-    const { container } = render(<Dashboard jobs={STALE_FIXTURE} />)
+    const { container } = await renderDashboard(<Dashboard jobs={STALE_FIXTURE} />)
     const nudge = container.querySelector('[data-follow-up]') as HTMLElement
     expect(nudge).not.toBeNull()
 
@@ -192,8 +209,8 @@ function panelCards(root: HTMLElement | Element): HTMLElement[] {
 }
 
 describe('Overview layout and copy', () => {
-  it('lays the panels out two-up in the order Gabe specified, table last and full width', () => {
-    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+  it('lays the panels out two-up in the order Gabe specified, table last and full width', async () => {
+    const { container } = await renderDashboard(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     const grid = container.querySelector('.xl\\:grid-cols-2')!
     const titles = [...grid.querySelectorAll('[data-slot="card"] h2')].map((h) => h.textContent)
     expect(titles).toEqual([
@@ -212,12 +229,12 @@ describe('Overview layout and copy', () => {
     expect(table.className).toContain('xl:col-span-2')
   })
 
-  it('gives every panel a way through to the screen it summarises', () => {
+  it('gives every panel a way through to the screen it summarises', async () => {
     // Four of the five used to be dead ends. Every panel here is an
     // abridgement of a screen in the sidebar, and a reader who wanted more had
     // to work out for themselves which one -- which is the work an overview
     // exists to have already done.
-    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    const { container } = await renderDashboard(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     const cards = panelCards(container)
     const routes = new Map<string, string>()
     for (const card of cards) {
@@ -233,11 +250,11 @@ describe('Overview layout and copy', () => {
     expect(routes.get('recent applications')).toBe('/applications')
   })
 
-  it('names each panel with a glyph the heading does not have to repeat', () => {
+  it('names each panel with a glyph the heading does not have to repeat', async () => {
     // Gabe's 2026-09-05 ask. `aria-hidden` and inside the title slot, so the
     // heading's own name is unchanged -- which the assertion above relies on
     // to find these cards by their text at all.
-    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    const { container } = await renderDashboard(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     for (const card of panelCards(container)) {
       const title = card.querySelector('[data-slot="card-title"]')!
       expect(title.querySelector('svg'), `${title.textContent} has no glyph`).toBeTruthy()
@@ -245,8 +262,8 @@ describe('Overview layout and copy', () => {
     }
   })
 
-  it('says what the page and each panel are for', () => {
-    const { container } = render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+  it('says what the page and each panel are for', async () => {
+    const { container } = await renderDashboard(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     expect(container.querySelector('[data-page-description]')!.textContent).toMatch(/at a glance/i)
     // Every panel carries one line, so none of them is a bare title.
     const cards = panelCards(container)
@@ -256,23 +273,21 @@ describe('Overview layout and copy', () => {
     }
   })
 
-  it('keeps the page description out of the heading name', () => {
+  it('keeps the page description out of the heading name', async () => {
     // A heading's accessible name should be the page's name, not the name
     // plus a sentence of prose -- so the description is a sibling of the h1.
-    render(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
+    await renderDashboard(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     expect(screen.getByRole('heading', { level: 1, name: 'overview' })).toBeTruthy()
   })
 
-  it('bands the recent-applications table from the shared accent pair', () => {
-    const { container } = render(
-      <Dashboard
+  it('bands the recent-applications table from the shared accent pair', async () => {
+    const { container } = await renderDashboard(<Dashboard
         jobs={[
           makeJob({ id: '1', status: 'applied' }),
           makeJob({ id: '2', status: 'applied' }),
           makeJob({ id: '3', status: 'applied' }),
         ]}
-      />
-    )
+      />)
     const head = container.querySelector('[data-recent-applications] thead')!
     expect(head.className).toMatch(/bg-accent-surface/)
     // accent-default is the TEXT weight (accent-400 in dark); a full-width
@@ -295,12 +310,12 @@ describe('by status and by source internals', () => {
     makeJob({ id: '2', status: 'offer', source: 'Referral' }),
   ]
 
-  it('puts the chart and its legend in two columns, not stacked', () => {
+  it('puts the chart and its legend in two columns, not stacked', async () => {
     // Gabe's ask. Stacked, the ring plus five legend rows made by-status the
     // tallest panel on the Overview while the right half of a 668px card sat
     // empty. Measured side by side at 1440px: chart 816-992, legend from
     // 1074, same row.
-    const { container } = render(<Dashboard jobs={jobs} />)
+    const { container } = await renderDashboard(<Dashboard jobs={jobs} />)
     for (const legend of ['[data-donut-legend]', '[data-source-legend]']) {
       const grid = container.querySelector(legend)!.parentElement!
       expect(grid.className, legend).toContain('sm:grid-cols-2')
@@ -309,12 +324,10 @@ describe('by status and by source internals', () => {
     }
   })
 
-  it('truncates a long label inside its own column rather than widening it', () => {
+  it('truncates a long label inside its own column rather than widening it', async () => {
     // Without min-w-0 a flex child refuses to shrink below its content, so a
     // long source name would widen the legend track and squeeze the chart.
-    const { container } = render(
-      <Dashboard jobs={[makeJob({ id: '1', status: 'applied', source: 'A Very Long Job Board Name' })]} />
-    )
+    const { container } = await renderDashboard(<Dashboard jobs={[makeJob({ id: '1', status: 'applied', source: 'A Very Long Job Board Name' })]} />)
     const legend = container.querySelector('[data-source-legend]')!
     expect(legend.className).toContain('min-w-0')
     const name = [...legend.querySelectorAll('span')].find((el) =>
@@ -326,18 +339,16 @@ describe('by status and by source internals', () => {
 })
 
 describe('over-time statistics and source ranking on the Overview', () => {
-  it('states the total, the busiest month and the change the curve only implies', () => {
+  it('states the total, the busiest month and the change the curve only implies', async () => {
     // A curve answers "what shape" and is poor at "how many": reading a total
     // off six stacked areas means adding them up by eye.
-    const { container } = render(
-      <Dashboard
+    const { container } = await renderDashboard(<Dashboard
         jobs={[
           makeJob({ id: '1', status: 'applied', created_at: '2026-08-01T00:00:00Z' }),
           makeJob({ id: '2', status: 'applied', created_at: '2026-08-02T00:00:00Z' }),
           makeJob({ id: '3', status: 'applied', created_at: '2026-07-02T00:00:00Z' }),
         ]}
-      />
-    )
+      />)
     const stats = container.querySelector('[data-over-time-stats]')!
     expect(stats.textContent).toMatch(/total/i)
     expect(stats.textContent).toMatch(/busiest month/i)
@@ -351,19 +362,16 @@ describe('over-time statistics and source ranking on the Overview', () => {
     expect(stats.className).toContain('divide-x')
   })
 
-  it('writes a dash rather than a percentage against zero', () => {
+  it('writes a dash rather than a percentage against zero', async () => {
     // +100% "against" a month with nothing in it is not a percentage, and
     // Infinity is worse.
-    const { container } = render(
-      <Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />
-    )
+    const { container } = await renderDashboard(<Dashboard jobs={[makeJob({ id: '1', status: 'applied' })]} />)
     const stats = container.querySelector('[data-over-time-stats]')!
     expect(stats.textContent).not.toMatch(/Infinity|NaN/)
   })
 
-  it('labels the source rows primary, secondary and others', () => {
-    const { container } = render(
-      <Dashboard
+  it('labels the source rows primary, secondary and others', async () => {
+    const { container } = await renderDashboard(<Dashboard
         jobs={[
           // Counts are 3 / 2 / 1, deliberately unambiguous: on a tie the
           // ranking breaks alphabetically, so equal counts would make which
@@ -375,8 +383,7 @@ describe('over-time statistics and source ranking on the Overview', () => {
           makeJob({ id: '5', status: 'applied', source: 'LinkedIn' }),
           makeJob({ id: '6', status: 'applied', source: 'Indeed' }),
         ]}
-      />
-    )
+      />)
     const rows = [...container.querySelectorAll('[data-source-rank]')]
     expect(rows.map((r) => (r as HTMLElement).dataset.sourceRank)).toEqual([
       'primary',
@@ -391,15 +398,13 @@ describe('over-time statistics and source ranking on the Overview', () => {
     expect(rows[2].textContent).toMatch(/1 source\b/)
   })
 
-  it('draws no others row when every source is already named', () => {
-    const { container } = render(
-      <Dashboard
+  it('draws no others row when every source is already named', async () => {
+    const { container } = await renderDashboard(<Dashboard
         jobs={[
           makeJob({ id: '1', status: 'applied', source: 'Jobstreet' }),
           makeJob({ id: '2', status: 'applied', source: 'LinkedIn' }),
         ]}
-      />
-    )
+      />)
     const rows = [...container.querySelectorAll('[data-source-rank]')]
     expect(rows.map((r) => (r as HTMLElement).dataset.sourceRank)).toEqual([
       'primary',
@@ -416,8 +421,8 @@ describe('source chart colours', () => {
     makeJob({ id: '4', status: 'applied', source: 'Indeed' }),
   ]
 
-  it('gives each rank its own colour rather than one accent at three opacities', () => {
-    const { container } = render(<Dashboard jobs={jobs} />)
+  it('gives each rank its own colour rather than one accent at three opacities', async () => {
+    const { container } = await renderDashboard(<Dashboard jobs={jobs} />)
     const swatches = [...container.querySelectorAll('[data-source-rank] span[aria-hidden]')].map(
       (el) => (el as HTMLElement).style.background
     )
@@ -430,12 +435,12 @@ describe('source chart colours', () => {
     }
   })
 
-  it('never bakes a resolved colour in, and never borrows a status hue', () => {
+  it('never bakes a resolved colour in, and never borrows a status hue', async () => {
     // Always the token reference, so the browser resolves it live at paint --
     // that is what lets the ramp invert on a theme change. And a source is
     // not a status: the five status hues mean one specific thing everywhere
     // else in this app.
-    const { container } = render(<Dashboard jobs={jobs} />)
+    const { container } = await renderDashboard(<Dashboard jobs={jobs} />)
     const swatches = [...container.querySelectorAll('[data-source-rank] span[aria-hidden]')].map(
       (el) => (el as HTMLElement).style.background
     )
@@ -463,8 +468,8 @@ describe('source chart colours', () => {
  * the next time one of the other four grows a footer.
  */
 describe('panel links', () => {
-  it('gives each panel exactly one link to its own destination', () => {
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
+  it('gives each panel exactly one link to its own destination', async () => {
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
     for (const card of panelCards(container)) {
       const title = card.querySelector('h2')!.textContent!
       const action = card.querySelector('[data-slot="card-action"] a')!
@@ -474,10 +479,10 @@ describe('panel links', () => {
     }
   })
 
-  it('keeps the empty calendar panel down to the card action alone', () => {
+  it('keeps the empty calendar panel down to the card action alone', async () => {
     // The empty state is where the duplicate was worst: two invitations to
     // open the calendar around one sentence already saying to.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} events={[]} />)
     const card = panelCards(container).find(
       (c) => c.querySelector('h2')!.textContent === 'upcoming events'
     )!
@@ -499,11 +504,11 @@ describe('the upcoming events panel', () => {
     notes: null,
   }))
 
-  it('shows four events, not three', () => {
+  it('shows four events, not three', async () => {
     // Four because the panel shares a row height with `by source`, and three
     // rows left it visibly short of its neighbour once the footer link came
     // out. The fourth row is information in that space rather than air.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={EVENTS} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} events={EVENTS} />)
     expect(container.querySelectorAll('[data-event-row]')).toHaveLength(4)
     expect(screen.getByText('Event 4')).toBeInTheDocument()
     // Positive companion for the cut-off: the fifth really is withheld rather
@@ -511,11 +516,11 @@ describe('the upcoming events panel', () => {
     expect(screen.queryByText('Event 5')).toBeNull()
   })
 
-  it('lets its rows share the panel height instead of one row taking it', () => {
+  it('lets its rows share the panel height instead of one row taking it', async () => {
     // jsdom has no layout, so this pins the contract: rows grow between a
     // floor and a ceiling. Unbounded `flex-1` turned four events into four
     // slabs with the dividers a screen apart.
-    const { container } = render(<Dashboard jobs={FRESH_FIXTURE} events={EVENTS} />)
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} events={EVENTS} />)
     const row = container.querySelector('[data-event-row]')!
     expect(row.className).toContain('flex-1')
     expect(row.className).toContain('min-h-16')

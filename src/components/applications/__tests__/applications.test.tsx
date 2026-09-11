@@ -980,11 +980,17 @@ describe('the insights band above the toolbar', () => {
     expect(band.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
-  it('pairs one chart with four statistics cards', () => {
+  it('pairs one chart with four statistics cards', async () => {
+    // AWAITED, because the chart is `next/dynamic` now (2026-09-11). Without
+    // the wait this passed only when some earlier test in the file had already
+    // warmed the import -- it failed the moment it ran first, which is the
+    // definition of an order-dependent test rather than a passing one.
     const { container } = render(<ApplicationsPage jobs={JOBS} />)
     const band = container.querySelector('[data-applications-insights]')!
-    expect(band.querySelector('[data-chart-sources-bars], [data-sources-empty]')).toBeTruthy()
     expect(band.querySelectorAll('[data-stat-card]')).toHaveLength(4)
+    await waitFor(() =>
+      expect(band.querySelector('[data-chart-sources-bars], [data-sources-empty]')).toBeTruthy()
+    )
   })
 
   it('stays away entirely on an empty account', () => {

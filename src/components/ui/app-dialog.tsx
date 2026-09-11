@@ -99,6 +99,15 @@ export interface AppDialogProps {
    * body goes back to scrolling the lot.
    */
   bodyScroll?: boolean
+  /**
+   * The hairline between the header and the body.
+   *
+   * On by default, because a title sitting straight on a form needs the
+   * division. Off for the two dialogs that open with a progress tracker: the
+   * run of nodes IS a horizontal band under the title, and a rule immediately
+   * above it drew two parallel lines a few millimetres apart.
+   */
+  headerSeparator?: boolean
   children: React.ReactNode
 }
 
@@ -118,6 +127,7 @@ export function AppDialog({
   actions,
   size = 'm',
   bodyScroll = true,
+  headerSeparator = true,
   children,
 }: AppDialogProps) {
   const Icon = icon ? icons[icon] : null
@@ -164,7 +174,14 @@ export function AppDialog({
             </DialogDescription>
           )}
         </DialogHeader>
-        <Separator className="shrink-0" />
+        {/* OPT-OUT (Gabe, 2026-09-11: "remove the separator between the
+            component title and pipeline workflow"). A dialog that opens with a
+            progress tracker already has a horizontal band under its title --
+            the run of nodes and connectors -- and a hairline immediately above
+            it drew two parallel lines two millimetres apart. Every other
+            dialog keeps it: a title sitting straight on a form needs the
+            division. */}
+        {headerSeparator && <Separator className="shrink-0" />}
         {/* `flex-1 min-h-0` rather than a second viewport calculation. The old
             `max-h-[calc(85vh-6rem)]` had to guess the header's height, and the
             guess was wrong for any dialog whose header wrapped to two lines or

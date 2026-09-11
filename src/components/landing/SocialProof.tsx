@@ -72,7 +72,7 @@ export function SocialProof() {
         {SOCIAL_PROOF.tiles.map((tile, i) => {
           const Glyph = icons[tile.icon]
           return (
-            <Reveal key={tile.title} delay={i * 0.06}>
+            <Reveal variant="zoom" key={tile.title} delay={i * 0.06}>
               <div
                 data-proof-entry={tile.title}
                 className="group grid grid-cols-1 gap-x-8 gap-y-4 border-b border-border-subtle py-8 transition-colors hover:bg-bg-surface md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-baseline md:py-10"

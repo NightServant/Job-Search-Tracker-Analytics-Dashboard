@@ -49,7 +49,7 @@ export function ProblemStatement() {
         {PROBLEM.pains.map((pain, i) => {
           const Glyph = icons[pain.icon]
           return (
-            <Reveal key={pain.title} delay={i * 0.08}>
+            <Reveal variant="zoom" key={pain.title} delay={i * 0.08}>
               <li className="grid grid-cols-1 items-start gap-x-10 gap-y-6 border-b border-border-default py-10 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:py-14">
                 <div className="flex flex-col gap-3">
                   <span className={cn('tabular', LANDING_TYPE.meta)}>

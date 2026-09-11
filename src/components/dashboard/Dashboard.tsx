@@ -15,9 +15,8 @@ import {
 } from '@/components/ui/card'
 import { FollowUpNudge } from './FollowUpNudge'
 import { HeadlineStats, PipelineStats } from './OverviewStats'
-import { ApplicationsOverTime } from './ApplicationsOverTime'
-import { StatusDonut } from './StatusDonut'
-import { SourceMix } from './SourceMix'
+import dynamic from 'next/dynamic'
+import { LazyPanel } from '@/components/ui/lazy-panel'
 import { UpcomingEvents } from './UpcomingEvents'
 import { RecentApplicationsTable } from './RecentApplicationsTable'
 import { ArrowRightIcon } from '@/components/icons'
@@ -69,6 +68,42 @@ function PanelLink({ href, children }: { href: string; children: React.ReactNode
     </Link>
   )
 }
+
+/**
+ * THE THREE CHARTS ARE CODE-SPLIT, and recharts is why (Gabe, 2026-09-11:
+ * "implement lazy loading for performance optimization especially in the five
+ * main pages").
+ *
+ * recharts is the largest dependency this app has and it is imported by five
+ * components across three screens. Statically imported, every one of them is
+ * in the Overview's first-load bundle -- including `by source`, which is below
+ * the fold on every laptop.
+ *
+ * `ssr: false` IS NOT A SHORTCUT, it is the correct setting for these. recharts
+ * measures its container before it can draw, and a server has no layout -- so
+ * the server render was already producing markup the client immediately threw
+ * away. It was also producing a HYDRATION MISMATCH: `ChartContainer` builds a
+ * `data-chart` id from `useId`, and the server's id and the client's did not
+ * match, which React logged on every single load of this page. Splitting these
+ * out fixes the warning and the payload with one change.
+ *
+ * Each placeholder reserves the height its chart will take, so nothing reflows
+ * when the chunk lands.
+ */
+const ApplicationsOverTime = dynamic(
+  () => import('./ApplicationsOverTime').then((m) => m.ApplicationsOverTime),
+  { ssr: false, loading: () => <LazyPanel height="h-56" label="the applications trend" /> }
+)
+
+const StatusDonut = dynamic(() => import('./StatusDonut').then((m) => m.StatusDonut), {
+  ssr: false,
+  loading: () => <LazyPanel height="h-56" label="the status breakdown" />,
+})
+
+const SourceMix = dynamic(() => import('./SourceMix').then((m) => m.SourceMix), {
+  ssr: false,
+  loading: () => <LazyPanel height="h-56" label="the source mix" />,
+})
 
 /** In-flight beyond two weeks with no sign of life is when chasing becomes reasonable. */
 const STALE_AFTER_DAYS = 14

@@ -410,6 +410,62 @@
 
 /* The Figma motion spec (node 43:523) names 1200ms ease-in-out for skeleton
    loading. Tailwind's own animate-pulse is 2s cubic-bezier(0.4, 0, 0.6, 1). */
+/* THE PROGRESS TRACKER'S TWO ANIMATIONS (ui/progress-track, 2026-09-11).
+
+   `progress-fill` grows a connector from its node outward. NO `animation-fill-
+   mode`, deliberately: the bar's resting width is already 100%, so it is
+   correct before the animation starts and correct if the animation never runs
+   at all. A `backwards` fill would hold it at 0% through its own delay, which
+   is how a tracker ends up looking empty on a prerender or in a paused tab.
+
+   `progress-pulse` marks the step you are ON. It animates opacity and
+   transform on a ring BEHIND the node, so nothing under it reflows -- the same
+   compositor-only rule every other motion in this file follows. Slow on
+   purpose: a progress marker that pulses quickly reads as an alert. */
+@utility animate-progress-fill {
+  animation: progress-fill var(--duration-slow) var(--ease-standard);
+}
+
+/* The stacked tracker's connector, growing downward instead of across. Same
+   no-fill-mode rule as `progress-fill`: the resting height is already 100%. */
+@utility animate-progress-drop {
+  animation: progress-drop var(--duration-slow) var(--ease-standard);
+}
+
+@utility animate-progress-pulse {
+  animation: progress-pulse 2400ms var(--ease-standard) infinite;
+}
+
+@keyframes progress-fill {
+  from {
+    width: 0%;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes progress-drop {
+  from {
+    transform: scaleY(0);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes progress-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+
 @utility animate-pulse {
   animation: pulse var(--duration-skeleton) var(--ease-standard) infinite;
 }

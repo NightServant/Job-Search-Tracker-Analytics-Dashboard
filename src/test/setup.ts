@@ -116,4 +116,3 @@ if (typeof (globalThis as { IntersectionObserver?: unknown }).IntersectionObserv
 }
 
 // Mock global variables set by Vite
-

@@ -33,6 +33,10 @@ function read(file: string): string {
  */
 const ROUNDED_FULL_ALLOWED = new Set([
   'avatar.tsx', 'carousel.tsx', 'css-spinner.tsx', 'drawer.tsx', 'message.tsx',
+  // progress-track draws the tracker's step nodes and the ring that pulses
+  // behind the current one. Both are genuinely circular -- a step marker is as
+  // round as an avatar -- and the 4px cap governs rectangles.
+  'progress-track.tsx',
   'progress.tsx', 'questionnaire.tsx', 'radio-group.tsx', 'scroll-area.tsx',
   'slider.tsx', 'switch.tsx',
 ])

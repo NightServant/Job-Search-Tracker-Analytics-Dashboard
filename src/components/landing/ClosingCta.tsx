@@ -59,7 +59,7 @@ import { CLOSING_CTA } from './content'
 export function ClosingCta() {
   return (
     <Section name="cta">
-      <Reveal className="grid grid-cols-1 items-start gap-x-16 gap-y-12 border-t border-border-default pt-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:pt-20">
+      <Reveal variant="slideRight" className="grid grid-cols-1 items-start gap-x-16 gap-y-12 border-t border-border-default pt-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:pt-20">
         <div className="flex flex-col gap-8">
           <h2 className={LANDING_TYPE.sectionTitle}>{CLOSING_CTA.heading}</h2>
           <p className={cn('max-w-2xl', LANDING_TYPE.sectionLede)}>{CLOSING_CTA.body}</p>

@@ -273,27 +273,31 @@ describe('ApplicationRecordView', () => {
     )
     const bar = container.querySelector('[data-application-pipeline]')!
     expect(bar.getAttribute('data-application-pipeline')).toBe('interviewing')
-    const reached = [...bar.querySelectorAll('[data-step]')].map((li) => [
+    // `data-state` replaced `data-reached` when the three progress bars in
+    // this app were unified on `ui/progress-track` (2026-09-11). It carries
+    // three values where the old boolean carried two, which is the point --
+    // "reached" could not tell the stage you are ON from the ones behind it.
+    const states = [...bar.querySelectorAll('[data-step]')].map((li) => [
       li.getAttribute('data-step'),
-      li.getAttribute('data-reached'),
+      li.getAttribute('data-state'),
     ])
-    expect(reached).toEqual([
-      ['wishlist', 'true'],
-      ['applied', 'true'],
-      ['interviewing', 'true'],
-      ['offer', 'false'],
+    expect(states).toEqual([
+      ['wishlist', 'done'],
+      ['applied', 'done'],
+      ['interviewing', 'current'],
+      ['offer', 'todo'],
     ])
-    // AND WHICH ONE YOU ARE AT, which "reached" alone cannot say -- three of
-    // the four are reached. The rule carries it: 3px in the status colour for
-    // the current step, 2px for the ones behind it, 1px grey for the ones
-    // ahead. Before that hierarchy existed the bar answered "how far" and left
-    // "where now" to be inferred from type weights.
+    // AND WHICH ONE YOU ARE AT, which "reached" alone could not say -- three
+    // of the four are reached. It is `aria-current="step"` now rather than a
+    // 3px rule, which is the same fact said in a way a screen reader also
+    // gets, and the tracker marks it visually with a pulsing ring.
     const current = [...bar.querySelectorAll('[data-step]')].filter(
-      (li) => li.getAttribute('data-current') === 'true'
+      (li) => li.getAttribute('data-state') === 'current'
     )
     expect(current).toHaveLength(1)
     expect(current[0].getAttribute('data-step')).toBe('interviewing')
-    expect(current[0].querySelector('span[aria-hidden]')!.className).toContain('h-[3px]')
+    expect(current[0].getAttribute('aria-current')).toBe('step')
+    expect(current[0].querySelector('[data-progress-pulse]')).toBeTruthy()
   })
 
   it('hides the fields this application has never filled in, behind one control', () => {

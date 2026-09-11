@@ -89,6 +89,7 @@ export function ApplicationRecordDialog({
       // sitting under it.
       // The record keeps its own chrome still and scrolls only its columns.
       bodyScroll={false}
+      headerSeparator={false}
       title="application overview"
       icon="Briefcase"
       // NO DESCRIPTION (Gabe, 2026-09-11: "remove the description of the

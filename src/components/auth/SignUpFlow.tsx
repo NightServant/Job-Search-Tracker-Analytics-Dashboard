@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, PasswordInput } from '@/components/ui/input'
-import { CheckIcon, CircleCheckIcon, ShieldCheckIcon, UserRoundIcon } from '@/components/icons'
+import { CheckIcon, UserRoundIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import {
   isPasswordStrong,
@@ -20,7 +20,7 @@ import { AuthBrandPanel } from './AuthBrandPanel'
 import { OAuthButtons } from './OAuthButtons'
 import { OtpStep } from './OtpStep'
 import { PasswordRequirements } from './PasswordRequirements'
-import { RegistrationProgress } from './RegistrationProgress'
+import { ProgressTrack } from '@/components/ui/progress-track'
 
 /**
  * Registration, as three steps over one layout.
@@ -59,10 +59,20 @@ export interface SignUpFlowProps {
  * the address is really yours, a tick for being through. A numbered circle
  * would have said nothing the label does not already say.
  */
+/**
+ * Three steps, named rather than numbered: a bar that says "2 of 3" tells
+ * someone how much is left but not what is coming, and "verify" arriving as a
+ * surprise after a password form is the moment people abandon a sign-up.
+ *
+ * The DESCRIPTIONS are new (2026-09-11) and they are the reason this moved to
+ * the shared tracker rather than keeping its own: every other progress bar in
+ * this app carries a line under each step saying what happens there, and the
+ * one on the way IN was the only one that did not.
+ */
 const STEPS = [
-  { label: 'your details', icon: UserRoundIcon },
-  { label: 'verify', icon: ShieldCheckIcon },
-  { label: 'done', icon: CircleCheckIcon },
+  { id: 'your details', label: 'your details', description: 'an email and a password', icon: 'UserRound' as const },
+  { id: 'verify', label: 'verify', description: 'a six-digit code', icon: 'ShieldCheck' as const },
+  { id: 'done', label: 'done', description: 'you are in', icon: 'CircleCheck' as const },
 ]
 type Step = 0 | 1 | 2
 
@@ -148,7 +158,12 @@ export function SignUpFlow({
         <div className="flex-1" />
 
         <div className="mx-auto flex w-full max-w-[480px] flex-col gap-8">
-          <RegistrationProgress steps={STEPS} current={step} />
+          {/* `data-registration-progress` is kept on the wrapper: it is what
+              the sign-up tests reach for, and the flow's own identity does not
+              change just because the bar inside it is now shared. */}
+          <div data-registration-progress>
+            <ProgressTrack label="Registration progress" steps={STEPS} current={step} />
+          </div>
 
           {step === 0 && (
             <form onSubmit={handleDetails} className="flex flex-col gap-6">

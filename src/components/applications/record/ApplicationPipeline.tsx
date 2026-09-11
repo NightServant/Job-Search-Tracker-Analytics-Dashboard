@@ -1,6 +1,7 @@
 import * as React from 'react'
-import { icons, type IconName } from '@/components/icons'
-import { STATUS_MARK_CLASSES, type Status } from '@/components/ui/status-marker'
+import { type IconName } from '@/components/icons'
+import { type Status } from '@/components/ui/status-marker'
+import { ProgressTrack, type ProgressTone } from '@/components/ui/progress-track'
 import { cn } from '@/lib/utils'
 import type { JobStatusHistoryEntry } from '@/types'
 
@@ -25,10 +26,58 @@ import type { JobStatusHistoryEntry } from '@/types'
  * about the STAGE, not about this row's dates; the dates live in the record
  * below and repeating them here would be two sources for one fact.
  *
- * The vocabulary is the system's: a 2px rule in the status colour under a
- * label, the same shape `StatusMarker` uses. Nothing here is a pill, nothing
- * is filled, and the accent is never used to mean status.
+ * THE SHAPE IS NOW `ui/progress-track`, shared with the add wizard and the
+ * registration stepper (Gabe, 2026-09-11). Three screens drew three different
+ * progress bars before that; this file is down to what is actually specific to
+ * an application -- which stages exist, which colour each one wears, and the
+ * rejection rule above.
+ *
+ * The vocabulary is still the system's: the solid status colour lives in the
+ * connector, which is a rule, and no node is a filled pill. See the tracker's
+ * own docblock for why that is the honest reading of the rule rather than a
+ * way around it.
  */
+
+/**
+ * A tone per status, so the run is coloured by what each stage MEANS.
+ *
+ * Written out rather than built from a token name: Tailwind reads class names
+ * as literal strings out of the source, so `bg-status-${s}-mark` would be
+ * purged and every connector would render colourless.
+ */
+const STATUS_TONES: Record<Status, ProgressTone> = {
+  wishlist: {
+    line: 'bg-status-wishlist-mark',
+    edge: 'border-status-wishlist-mark',
+    ink: 'text-status-wishlist-mark',
+    tint: 'bg-status-wishlist-mark/10',
+  },
+  applied: {
+    line: 'bg-status-applied-mark',
+    edge: 'border-status-applied-mark',
+    ink: 'text-status-applied-mark',
+    tint: 'bg-status-applied-mark/10',
+  },
+  interviewing: {
+    line: 'bg-status-interviewing-mark',
+    edge: 'border-status-interviewing-mark',
+    ink: 'text-status-interviewing-mark',
+    tint: 'bg-status-interviewing-mark/10',
+  },
+  offer: {
+    line: 'bg-status-offer-mark',
+    edge: 'border-status-offer-mark',
+    ink: 'text-status-offer-mark',
+    tint: 'bg-status-offer-mark/10',
+  },
+  rejected: {
+    line: 'bg-status-rejected-mark',
+    edge: 'border-status-rejected-mark',
+    ink: 'text-status-rejected-mark',
+    tint: 'bg-status-rejected-mark/10',
+  },
+}
+
 interface Step {
   status: Status
   label: string
@@ -98,81 +147,22 @@ export function ApplicationPipeline({
   const current = run.indexOf(status)
 
   return (
-    <div
-      className={cn('flex flex-col gap-3', className)}
-      data-application-pipeline={status}
-      aria-label="Application progress"
-    >
-      {/* MORE ROOM, so the step you are AT is findable at a glance (Gabe,
-          2026-09-10). Four evenly-weighted blocks 16px apart read as a legend;
-          32px apart, with the current one carrying the only 3px rule, they
-          read as a progress bar with a position on it. */}
-      <ol className="grid gap-x-8 gap-y-6 sm:grid-flow-col sm:auto-cols-fr">
-        {run.map((step, index) => {
-          const { label, description, icon } = STEPS[step]
-          const Icon = icons[icon]
-          // REACHED, not "is". A record at `offer` has been through applied and
-          // interviewing, and a bar that showed only the current stage would
-          // be a label with extra steps drawn round it.
-          const reached = index <= current
-          const isCurrent = index === current
-          return (
-            <li
-              key={step}
-              className="flex flex-col gap-2.5"
-              data-step={step}
-              data-reached={reached}
-              data-current={isCurrent || undefined}
-            >
-              {/*
-                THREE WEIGHTS, ONE VOCABULARY. The rule is the only thing this
-                system uses to carry a status, so the hierarchy is built out of
-                the rule rather than out of a fill or a pill:
-
-                  3px, in the status colour  -- you are here
-                  2px, in the status colour  -- been through it
-                  1px, border-subtle         -- not yet
-
-                Before this every reached step drew the same 2px, so "where is
-                this application up to" was answerable only by reading the type
-                weights, which is not what a progress bar is for.
-              */}
-              <span
-                aria-hidden
-                className={cn(
-                  'w-full',
-                  isCurrent ? 'h-[3px]' : reached ? 'h-[2px]' : 'h-px',
-                  reached ? STATUS_MARK_CLASSES[step] : 'bg-border-subtle'
-                )}
-              />
-              <span className="flex items-center gap-2">
-                <Icon
-                  size={16}
-                  aria-hidden
-                  className={cn('shrink-0', reached ? 'text-text-primary' : 'text-text-muted')}
-                />
-                <span
-                  className={cn(
-                    'text-label-caps uppercase',
-                    // The stage you are AT is the one the eye should land on;
-                    // the ones behind it are context and the ones ahead have
-                    // not happened. Three weights, one line of type.
-                    isCurrent
-                      ? 'text-text-primary'
-                      : reached
-                        ? 'text-text-secondary'
-                        : 'text-text-muted'
-                  )}
-                >
-                  {label}
-                </span>
-                {isCurrent && <span className="sr-only">(current stage)</span>}
-              </span>
-              <span className="text-body-s text-text-muted">{description}</span>
-            </li>
-          )
-        })}
-      </ol>
+    <div className={cn(className)} data-application-pipeline={status}>
+      <ProgressTrack
+        label="Application progress"
+        current={current}
+        steps={run.map((step) => ({
+          id: step,
+          label: STEPS[step].label,
+          description: STEPS[step].description,
+          icon: STEPS[step].icon,
+          // EACH STEP WEARS ITS OWN STATUS COLOUR, not one tone for the whole
+          // run: the five hues mean specific things everywhere else in this
+          // app, and a rejected tail rendered in the offer green would be the
+          // one place they stopped meaning them.
+          tone: STATUS_TONES[step],
+        }))}
+      />
     </div>
   )
 }

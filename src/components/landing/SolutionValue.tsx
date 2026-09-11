@@ -58,7 +58,7 @@ export function SolutionValue({ children }: SolutionValueProps) {
         {SOLUTION.claims.map((claim, i) => {
           const Glyph = icons[claim.icon]
           return (
-            <Reveal key={claim.title} delay={i * 0.08} className="h-full">
+            <Reveal variant="zoom" key={claim.title} delay={i * 0.08} className="h-full">
               <div className="flex h-full min-h-[260px] flex-col gap-4 bg-bg-canvas p-8 transition-colors hover:bg-bg-surface md:p-10">
                 {/*
                   The glyph leads on its own line here rather than sitting

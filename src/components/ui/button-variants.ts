@@ -31,7 +31,22 @@ import { cva, type VariantProps } from 'class-variance-authority'
  */
 export const buttonVariants = cva(
   'inline-flex items-center justify-center gap-2 rounded-md font-medium ' +
-    'transition-colors duration-(--duration-fast) ' +
+    // TRANSFORM JOINS THE TRANSITION (Gabe, 2026-09-11: "add tapped animations
+    // across all buttons"). `transition-colors` alone meant a press changed
+    // nothing that moved, so on a touch screen -- where there is no hover to
+    // confirm the finger landed -- a button gave no feedback at all until the
+    // work it started finished.
+    //
+    // NAMED PROPERTIES, NOT `transition-all`. `all` animates width, height and
+    // every inherited property besides, so a button whose label swaps to
+    // "Saving" would slide its own width and any ancestor layout change would
+    // drag it along.
+    'transition-[color,background-color,border-color,transform] duration-(--duration-fast) ' +
+    // 0.97, not 0.9. The press should read as the control taking the weight,
+    // not as it shrinking away; at a 40px control 0.97 is just over a pixel on
+    // each edge, which is felt more than seen. `active:` rather than a JS
+    // handler so it covers pointer, touch and keyboard-Enter alike.
+    'active:scale-[0.97] motion-reduce:active:scale-100 motion-reduce:transition-none ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default ' +
     'focus-visible:ring-offset-2 focus-visible:ring-offset-bg-canvas ' +
     'disabled:pointer-events-none disabled:opacity-50',

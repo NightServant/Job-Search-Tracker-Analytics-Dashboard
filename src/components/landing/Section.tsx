@@ -105,8 +105,10 @@ export interface SectionHeadingProps {
 }
 
 export function SectionHeading({ eyebrow, title, lede, icon: Icon }: SectionHeadingProps) {
+  // A HEADER ARRIVES FROM THE LEADING EDGE, so it reads as the section opening
+  // rather than as another block drifting up the page with everything else.
   return (
-    <Reveal className="mb-12 flex flex-col gap-3">
+    <Reveal variant="slideLeft" className="mb-12 flex flex-col gap-3">
       {eyebrow && (
         <p className={LANDING_TYPE.eyebrow}>{eyebrow}</p>
       )}
