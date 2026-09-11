@@ -93,18 +93,22 @@ function Band({
   id,
   visibility,
   first,
+  grow,
   children,
 }: {
   id: string
   visibility: string
   first?: boolean
+  /** Takes the remaining width. Exactly one band should. */
+  grow?: boolean
   children: React.ReactNode
 }) {
   return (
     <div
       data-ribbon-group={id}
       className={cn(
-        'shrink-0 flex-col justify-center gap-1 px-3',
+        'flex-col justify-center gap-1 px-3',
+        grow ? 'min-w-0 flex-1' : 'shrink-0',
         visibility,
         !first && 'border-l border-border-subtle'
       )}
@@ -239,17 +243,18 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
       </Band>
 
       {/* STYLES: the gallery, spanning the band's height as Word's does. */}
-      <Band id="styles" visibility="hidden lg:flex">
-        {/* A FIXED VIEWPORT THAT SCROLLS ITSELF, which is what Word's gallery
-            is -- it shows a few cards and an expander rather than growing to
-            fit every style. Measured: seven 76px cards push the whole ribbon
-            to 1235px in a 1200px column, so without a cap here the gallery is
-            what makes the bar overflow. Capped, the bar fits and the gallery
-            scrolls on its own. */}
+      {/* THE GALLERY TAKES THE REST OF THE BAR (Gabe, 2026-09-11: "toolbar has
+          unused space at the right side"). It was capped at a fixed width,
+          which left 341px empty at 1440 and 101px at 1200 -- measured, not
+          guessed. Growing fills that AND is what Word does: a wider window
+          shows more style cards rather than more blank ribbon. It still
+          scrolls internally, so a narrow column shows fewer cards instead of
+          pushing the other bands off. */}
+      <Band id="styles" visibility="hidden lg:flex" grow>
         <div
           role="group"
           aria-label="styles"
-          className="flex h-full max-w-[268px] items-center gap-1 overflow-x-auto xl:max-w-[420px]"
+          className="flex h-full items-center gap-1 overflow-x-auto"
         >
           {STYLE_PRESETS.map((preset) => {
             const active = editor ? preset.isActive(editor) : false

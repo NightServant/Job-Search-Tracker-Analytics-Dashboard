@@ -168,14 +168,21 @@ export function AppShell({
             // `p-gutter` is one fluid token in place of the old `p-4 md:p-8`
             // pair: 16px at 320, ~23px on a tablet, 32px from 1200 up, with no
             // jump at 768. See --spacing-gutter.
-            'min-w-0 flex-1 p-gutter',
+            'min-w-0 flex-1',
+            // THE GUTTER GOES WITH THE NAV (Gabe, 2026-09-11: "there is still
+            // margin surrounding the word editor"). `useDocumentFocus` already
+            // removes the sidebar, the bottom nav and the top bar for an open
+            // document; the shell's own padding was the last thing insetting a
+            // word processor from the edges of the screen, which is the one
+            // layout Word never has. Every other screen keeps it.
+            documentFocused ? 'p-0' : 'p-gutter',
             // The bottom nav is fixed, so without clearance the last row of
             // every list sits under it and the page looks cut off. `pb-nav` is
             // that clearance plus the iOS home-indicator inset in one calc --
             // see the utility for why it is not two classes. With the nav
             // hidden the padding is dead space at the foot of a document, so
             // it goes with it.
-            documentFocused ? 'pb-gutter' : 'pb-nav lg:pb-gutter',
+            documentFocused ? 'pb-0' : 'pb-nav lg:pb-gutter',
             // `min-h-0` is the load-bearing half: without it this flex item's
             // automatic minimum size is its CONTENT height, so the column
             // refuses to shrink and the "fit" does nothing at all.
@@ -188,7 +195,11 @@ export function AppShell({
               the screens want different things -- see contentWidth. */}
           <div
             className={cn(
-              width,
+              // The cap hands surplus width back as margin from `lg` up, which
+              // is right for a list and wrong for a document: an editor that
+              // stops at 1280 on a 1920 monitor is the same inset the gutter
+              // was. A focused document takes the width it is given.
+              documentFocused ? 'w-full' : width,
               viewportFit && 'shell-fits:flex shell-fits:min-h-0 shell-fits:flex-1 shell-fits:flex-col'
             )}
           >
