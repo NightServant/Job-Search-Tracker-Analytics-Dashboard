@@ -35,6 +35,18 @@ export function sessionStorageKeyFor(url: string): string | null {
  * able to reach a server. Revoking the token elsewhere is best-effort;
  * clearing it HERE is not.
  *
+ * IT CLEARS COOKIES NOW, AND STILL CLEARS localStorage (2026-09-11). The
+ * session moved to cookies so the server could read it -- see
+ * `lib/supabase.ts` -- and this function's guarantee has to move with it, or
+ * "sign out" quietly becomes "ask the server nicely" again. The localStorage
+ * half is kept deliberately: anybody carrying a session from before that
+ * change still has one parked there, and signing out should take it with them
+ * rather than leaving it to rot in the browser forever.
+ *
+ * `@supabase/ssr` may split a large session across `…auth-token.0`, `.1`, so
+ * every cookie whose name starts with the key is removed rather than just the
+ * exact one.
+ *
  * Returns whether anything was actually removed, so a caller can tell "cleaned
  * up" from "there was nothing to clean".
  */
@@ -43,6 +55,24 @@ export function clearStoredSession(url: string): boolean {
   if (!key || typeof window === 'undefined') return false
 
   let removed = false
+
+  // COOKIES FIRST, because that is where the session actually lives now.
+  try {
+    for (const entry of document.cookie.split(';')) {
+      const name = entry.split('=')[0]?.trim()
+      if (!name || !name.startsWith(key)) continue
+      // Expiring it in the past is the only way to delete a cookie. Both the
+      // bare path and the root are cleared: the browser keys a cookie on its
+      // path, so deleting `/` alone would leave one written under another.
+      for (const path of ['/', window.location.pathname]) {
+        document.cookie = `${name}=; Path=${path}; Max-Age=0; SameSite=Lax`
+      }
+      removed = true
+    }
+  } catch {
+    // Cookies disabled. Fall through and still try localStorage.
+  }
+
   try {
     if (window.localStorage.getItem(key) !== null) {
       window.localStorage.removeItem(key)

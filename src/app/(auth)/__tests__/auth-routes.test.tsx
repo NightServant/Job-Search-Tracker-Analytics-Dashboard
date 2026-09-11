@@ -8,8 +8,13 @@ const signUp = vi.fn()
 const verifySignUpOtp = vi.fn()
 const resendSignUpOtp = vi.fn()
 const signInWithProvider = vi.fn()
+// `useSearchParams` arrived with `?next=` support (2026-09-11): middleware
+// sends a signed-out visitor here with the path they asked for attached, and
+// the page reads it back. Defaults to no parameter; one test overrides it.
+const nextParam = vi.hoisted(() => vi.fn((_key: string) => null as string | null))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push, replace: vi.fn() }),
+  useSearchParams: () => ({ get: nextParam }),
 }))
 vi.mock('@/contexts/AuthContext', () => ({
   useAuth: () => ({
@@ -118,5 +123,35 @@ describe('the /signup route', () => {
     expect(await screen.findByText('User already registered')).toBeInTheDocument()
     expect(screen.queryByLabelText(/^Verification code/)).toBeNull()
     expect(push).not.toHaveBeenCalled()
+  })
+
+  it('finishes the journey the visitor started, not the one we assume', async () => {
+    // Middleware attaches `?next=` when it turns a signed-out visitor away
+    // from a private route. Ignoring it would drop a deep link on every
+    // sign-in -- somebody following a link to one application would land on
+    // the dashboard and have to find it again.
+    nextParam.mockImplementation((key) =>
+      key === 'next' ? '/applications?application=abc-123' : null
+    )
+    signIn.mockResolvedValue(undefined)
+    render(<LoginRoute />)
+    await fill()
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith('/applications?application=abc-123')
+    )
+    nextParam.mockImplementation(() => null)
+  })
+
+  it('refuses a `next` that would leave this origin', async () => {
+    // `?next=` is in a URL somebody can send you. `//evil.com` is a valid
+    // navigation target to a browser and is exactly what an open redirect is.
+    nextParam.mockImplementation((key) => (key === 'next' ? '//evil.com' : null))
+    signIn.mockResolvedValue(undefined)
+    render(<LoginRoute />)
+    await fill()
+    await userEvent.click(screen.getByRole('button', { name: 'Sign in' }))
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/dashboard'))
+    nextParam.mockImplementation(() => null)
   })
 })

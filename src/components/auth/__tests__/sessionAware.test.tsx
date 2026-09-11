@@ -1,7 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
-import { hasLiveSession } from '../instantRedirect'
 
 const readSupabaseConfig = vi.hoisted(() => vi.fn())
 vi.mock('@/lib/env', () => ({ currentEnvSource: () => ({}), readSupabaseConfig }))
@@ -22,29 +21,36 @@ beforeEach(() => {
     anonKey: 'anon',
   })
   authState.current = { user: null, loading: false }
+  // COOKIES LEAK BETWEEN TESTS. jsdom shares one `document.cookie` for the
+  // whole file, so a session cookie set by one case was still present in the
+  // next and made "leaves the document unmarked" fail. localStorage was
+  // cleared per-test before the move to cookies; this is the equivalent.
+  for (const entry of document.cookie.split(';')) {
+    const name = entry.split('=')[0]?.trim()
+    if (name) document.cookie = `${name}=; Path=/; Max-Age=0`
+  }
+  document.documentElement.removeAttribute('data-session')
   document.documentElement.removeAttribute('data-session')
 })
 
 describe('marking the document before it paints', () => {
-  it('sets data-session from the stored session, using the shared reader', () => {
-    // Same `hasLiveSession.toString()` trick as the redirect script: one
-    // implementation of "is there a session", and it is the tested one.
+  it('reads the session COOKIE, which is where the session lives now', () => {
+    // It read localStorage until 2026-09-11, when the session moved to cookies
+    // so middleware could see it. `document.cookie` is just as synchronous, so
+    // the before-paint trick survives; only the source changed.
     const { container } = render(<SessionAttributeScript />)
     const script = container.querySelector('[data-session-attribute]')
     expect(script).toBeTruthy()
-    expect(script!.innerHTML).toContain('expires_at')
+    expect(script!.innerHTML).toContain('document.cookie')
+    expect(script!.innerHTML).not.toContain('localStorage')
     expect(script!.innerHTML).toContain('sb-somyuulytwgzltiboewm-auth-token')
     expect(script!.innerHTML).toContain('setAttribute("data-session","live")')
   })
 
-  it('actually sets the attribute when a live session is stored', () => {
+  it('actually sets the attribute when a session cookie is present', () => {
     // The assertion above checks the text; this runs it. A script that reads
     // correctly and does nothing is the failure a substring match misses.
-    const live = { expires_at: Math.floor(Date.now() / 1000) + 3600 }
-    window.localStorage.setItem(
-      'sb-somyuulytwgzltiboewm-auth-token',
-      JSON.stringify(live)
-    )
+    document.cookie = 'sb-somyuulytwgzltiboewm-auth-token=base64-abc; Path=/'
     const { container } = render(<SessionAttributeScript />)
     const source = container.querySelector('[data-session-attribute]')!.innerHTML
     new Function(source)()
@@ -52,8 +58,7 @@ describe('marking the document before it paints', () => {
     window.localStorage.clear()
   })
 
-  it('leaves the document unmarked when nothing is stored', () => {
-    window.localStorage.clear()
+  it('leaves the document unmarked when there is no session cookie', () => {
     const { container } = render(<SessionAttributeScript />)
     new Function(container.querySelector('[data-session-attribute]')!.innerHTML)()
     expect(document.documentElement.hasAttribute('data-session')).toBe(false)
@@ -83,6 +88,15 @@ describe('keeping the mark honest afterwards', () => {
     // closed. This is the half that can say no.
     document.documentElement.setAttribute('data-session', 'live')
     authState.current = { user: null, loading: false }
+  // COOKIES LEAK BETWEEN TESTS. jsdom shares one `document.cookie` for the
+  // whole file, so a session cookie set by one case was still present in the
+  // next and made "leaves the document unmarked" fail. localStorage was
+  // cleared per-test before the move to cookies; this is the equivalent.
+  for (const entry of document.cookie.split(';')) {
+    const name = entry.split('=')[0]?.trim()
+    if (name) document.cookie = `${name}=; Path=/; Max-Age=0`
+  }
+  document.documentElement.removeAttribute('data-session')
     render(<SessionAttributeSync />)
     await waitFor(() =>
       expect(document.documentElement.hasAttribute('data-session')).toBe(false)
@@ -150,12 +164,8 @@ describe('the way out of a public document', () => {
   })
 })
 
-describe('the shared session reader', () => {
-  it('is the one both scripts serialise', () => {
-    // Named here so a future reader knows the redirect script and the
-    // attribute script are not two rules that happen to agree.
-    expect(hasLiveSession(JSON.stringify({ expires_at: 2_000_000_000 }), 1_800_000_000_000)).toBe(
-      true
-    )
-  })
-})
+// The `hasLiveSession` block that stood here is gone with the function
+// (2026-09-11). It existed so the redirect script and the attribute script
+// could be shown to share one rule; there is only one script now, and the
+// redirect it used to serialise is `src/middleware.ts`, which asks Supabase to
+// verify the token rather than reading an expiry out of the browser.

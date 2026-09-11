@@ -1,4 +1,3 @@
-import { InstantSignedInRedirect } from '@/components/auth/InstantSignedInRedirect'
 import { SignedInRedirect } from '@/components/auth/SignedInRedirect'
 import { SignedOutOnly } from '@/components/auth/SignedOutOnly'
 
@@ -45,8 +44,12 @@ import { SignedOutOnly } from '@/components/auth/SignedOutOnly'
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-bg-canvas">
-      {/* First, so the browser decides before it parses the form below. */}
-      <InstantSignedInRedirect />
+      {/* `src/middleware.ts` turns a signed-in visitor away before this page
+          is ever generated, so the inline pre-paint script that used to sit
+          here is gone. These two remain as the belt to its braces: a session
+          that comes into existence WHILE the form is open -- which on /login
+          is the ordinary case -- is something middleware cannot see, because
+          no request is made. */}
       <SignedInRedirect />
       <SignedOutOnly>{children}</SignedOutOnly>
     </div>

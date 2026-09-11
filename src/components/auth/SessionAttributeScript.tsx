@@ -1,6 +1,5 @@
 import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 import { sessionStorageKeyFor } from '@/lib/supabaseSession'
-import { hasLiveSession } from './instantRedirect'
 
 /**
  * Marks the document as belonging to a signed-in reader BEFORE it paints, so a
@@ -14,12 +13,13 @@ import { hasLiveSession } from './instantRedirect'
  * dashboard" under their eyes. That is the same defect Gabe reported on the
  * landing page, in a smaller frame.
  *
- * SAME TRICK AS InstantSignedInRedirect, different verb. localStorage is
- * synchronous, so a blocking inline script can read the stored session while
- * the browser is still parsing the document. That one redirects; this one sets
- * `data-session="live"` on <html> and lets CSS do the rest -- see the
- * `[data-when-signed-in]` rules in index.css, and HomeOrDashboardLink for the
- * only thing using them today.
+ * IT READS THE COOKIE, synchronously, while the browser is still parsing the
+ * document -- so the attribute is set before anything paints. It read
+ * localStorage until 2026-09-11, when the session moved to cookies so that
+ * middleware could see it; `document.cookie` is just as synchronous, so the
+ * trick survives the move intact. This sets `data-session="live"` on <html>
+ * and lets CSS do the rest -- see the `[data-when-signed-in]` rules in
+ * index.css, and HomeOrDashboardLink for the only thing using them today.
  *
  * AN ATTRIBUTE AND CSS RATHER THAN REWRITING THE DOM. A script that edited the
  * button's text and href would be editing markup React is about to hydrate,
@@ -29,10 +29,13 @@ import { hasLiveSession } from './instantRedirect'
  * already carries `suppressHydrationWarning` for next-themes, which sets a
  * class on the same element for the same reason.
  *
- * IT IS A HINT, NOT A CHECK. It reflects what is in this browser's
- * localStorage and verifies nothing. Nothing behind an authorisation decision
- * may read it: a forged entry here changes the wording of a link, and the
- * dashboard and every API route still ask Supabase.
+ * IT IS A HINT, NOT A CHECK, and the cookie version leans on that harder: it
+ * tests only that a session cookie is PRESENT, not that it is valid or
+ * unexpired. Decoding a `@supabase/ssr` cookie in an inline script would mean
+ * reassembling its `.0`/`.1` chunks and base64 in serialised source, which is
+ * a lot of fragile code to decide the wording of one link. Nothing behind an
+ * authorisation decision may read this: a forged cookie changes a link's text,
+ * and middleware, the dashboard and every API route still ask Supabase.
  *
  * SessionAttributeSync keeps it true afterwards -- for an expired token, for a
  * sign-out in another tab, and for a browser where localStorage is unavailable
@@ -45,9 +48,14 @@ export function SessionAttributeScript() {
   const key = sessionStorageKeyFor(url)
   if (!key) return null
 
-  // `hasLiveSession.toString()`, not a copy of it: one implementation of "is
-  // there a session", and it is the one with tests.
-  const script = `(function(){try{var f=${hasLiveSession.toString()};if(f(window.localStorage.getItem("${key}"),Date.now())){document.documentElement.setAttribute("data-session","live");}}catch(e){}})();`
+  // `indexOf(key) === 0` rather than an exact match: `@supabase/ssr` splits a
+  // large session across `…auth-token.0`, `.1`, and either chunk is equally
+  // good evidence that a session exists.
+  //
+  // INJECTION: `key` is the only interpolated value and `sessionStorageKeyFor`
+  // will only return one built from a `^[a-z0-9]+$` project ref, taken from a
+  // build-time variable no request can influence.
+  const script = `(function(){try{var k=${JSON.stringify(key)};if(document.cookie.split(";").some(function(c){return c.trim().indexOf(k)===0;})){document.documentElement.setAttribute("data-session","live");}}catch(e){}})();`
 
   return <script data-session-attribute dangerouslySetInnerHTML={{ __html: script }} />
 }

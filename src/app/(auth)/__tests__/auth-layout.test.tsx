@@ -29,14 +29,15 @@ beforeEach(() => {
  * dashboard, not a form asking them to sign in again.
  */
 describe('the sign-in and sign-up shell', () => {
-  it('decides before the form paints', () => {
-    // The pre-paint script, same one `/` uses. Without it a signed-in visitor
-    // sees a sign-in form for as long as hydration and getSession take, which
-    // is the frame Gabe reported on the landing page.
+  it('leaves the before-paint decision to middleware, not an inline script', () => {
+    // REPLACES "decides before the form paints". That test pinned an inline
+    // `<script>` that read localStorage and redirected before hydration -- a
+    // workaround for the server being unable to see a session at all. The
+    // session is in cookies now and `src/middleware.ts` turns a signed-in
+    // visitor away before this page is generated, so the workaround is gone
+    // rather than merely unused. See lib/authRoutes for the rule it enforces.
     const { container } = render(<AuthLayout>{<p>form</p>}</AuthLayout>)
-    const script = container.querySelector('[data-instant-redirect]')
-    expect(script).toBeTruthy()
-    expect(script!.innerHTML).toContain('window.location.replace("/dashboard")')
+    expect(container.querySelector('[data-instant-redirect]')).toBeNull()
   })
 
   it('also moves somebody who signs in while the page is open', async () => {
