@@ -44,8 +44,8 @@ describe('proofreadScore', () => {
   })
 
   it('counts style at a third when reaching the floor', () => {
-    // 150 style findings weigh 50, which is the floor for 2,500 words.
-    expect(proofreadScore('word '.repeat(2500), issues(150, 'style', 'STYLE')).value).toBe(0)
+    // 600 style findings weigh 200, which is the floor for 2,400 words.
+    expect(proofreadScore('word '.repeat(2400), issues(600, 'style', 'STYLE')).value).toBe(0)
   })
 
   it('reports each count separately for the corrections and refinements rows', () => {
@@ -68,8 +68,22 @@ describe('proofreadScore', () => {
     expect(wordy).toBeGreaterThan(careless)
   })
 
-  it('reaches zero at one issue per fifty words, the documented floor', () => {
-    expect(proofreadScore('word '.repeat(50), issues(1)).value).toBe(0)
-    expect(proofreadScore('word '.repeat(100), issues(1)).value).toBe(50)
+  it('reaches zero at the documented floor of one issue per twelve words', () => {
+    // Recalibrated from 1-in-50 on 2026-09-11: that floor scored a real
+    // 949-word CV at 0%, which is a shrug rather than a score.
+    expect(proofreadScore('word '.repeat(12), issues(1)).value).toBe(0)
+    expect(proofreadScore('word '.repeat(24), issues(1)).value).toBe(50)
+  })
+
+  it('gives a middling score to a CV that merely needs a proofread', () => {
+    // The measured case the floor was changed for: 949 words, 26 spelling and
+    // 24 style. It should land clearly between "clean" and "hopeless".
+    const mixed = [
+      ...issues(26, 'misspelling', 'TYPOS'),
+      ...issues(24, 'style', 'REDUNDANCY'),
+    ]
+    const value = proofreadScore('word '.repeat(949), mixed).value
+    expect(value).toBeGreaterThan(35)
+    expect(value).toBeLessThan(80)
   })
 })

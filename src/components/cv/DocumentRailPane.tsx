@@ -45,7 +45,7 @@ export function DocumentRailPane({
   tailoring,
   onApplySuggestion,
 }: DocumentRailPaneProps) {
-  const needsApplication = active === 'ats' || active === 'tailoring'
+  const isTailor = active === 'tailor'
 
   return (
     <div
@@ -56,7 +56,7 @@ export function DocumentRailPane({
       className="flex flex-col gap-6 focus-visible:outline-none"
       data-document-pane={active}
     >
-      {needsApplication && (
+      {isTailor && (
         <PanelSection title="tailor to" icon="Briefcase" className="border-t-0 pt-0">
           <div className="flex flex-col gap-3">
             <ApplicationPicker
@@ -81,16 +81,15 @@ export function DocumentRailPane({
       {active === 'grammar' && <GrammarCheckPane state={proofread} />}
       {active === 'spelling' && <SpellCheckPane state={proofread} />}
 
-      {/* ATS and tailoring share one analysis rail today: the score and the
-          rewrites come from the same pass over the same posting. They are two
-          TABS because they answer different questions -- "will a screener read
-          this" and "what should it say instead" -- and the pane emphasises the
-          half the tab asked for. */}
-      {needsApplication && (
+      {/* ONE PANE, BOTH HALVES, in the order you use them: the score says
+          what a screener will miss, the rewrites are what to do about it.
+          `emphasis="both"` is the whole point of the merge -- see
+          documentTabs for why two tabs was the wrong shape. */}
+      {isTailor && (
         <TailoringAnalysisRail
           state={tailoring}
           onApply={onApplySuggestion}
-          emphasis={active === 'ats' ? 'match' : 'rewrites'}
+          emphasis="both"
         />
       )}
     </div>

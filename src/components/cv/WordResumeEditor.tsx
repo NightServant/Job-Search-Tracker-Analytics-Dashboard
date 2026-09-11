@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
+import { WORD_EDITOR_EXTENSIONS } from './editorExtensions'
 import type { JSONContent } from '@tiptap/core'
 import { Button } from '@/components/ui/button'
 import { CheckIcon, DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
@@ -119,8 +119,18 @@ export function WordResumeEditor({
   const autosaveTimerRef = useRef<number | null>(null)
   const snapshotTimerRef = useRef<number | null>(null)
 
+  /**
+   * The extension list lives in `editorExtensions` so the ribbon's tests build
+   * the same editor this does -- see that file for why.
+   *
+   * THE DOCBLOCK SITS OUT HERE, NOT INSIDE THE OPTIONS, because
+   * `tiptapSsr.test.ts` scans a fixed window after `useEditor(` for
+   * `immediatelyRender: false` -- and it caught this exact mistake when the
+   * comment was inline and pushed the flag out of range. Keep the options
+   * compact.
+   */
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: WORD_EDITOR_EXTENSIONS,
     content: normalizeWordContent(draft.content),
     editorProps: {
       attributes: { class: 'focus:outline-none min-h-[10in] text-[15px] leading-7 text-zinc-900' },

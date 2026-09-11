@@ -18,12 +18,20 @@ import type { IconName } from '@/components/icons'
  *
  * ORDER IS PROOFREAD-THEN-TARGET, and it is not alphabetical by accident.
  * Grammar and spelling are about the document as written and can be acted on
- * with nothing else set up; ATS and tailoring are about a specific application
- * and need one chosen first. Putting the two that always work above the two
- * that need configuration means a new CV opens on something useful.
+ * with nothing else set up; tailoring is about a specific application and
+ * needs one chosen first. Putting the two that always work above the one that
+ * needs configuration means a new CV opens on something useful.
+ *
+ * ATS MATCH AND AI TAILORING WERE TWO TABS UNTIL 2026-09-11 AND THAT WAS
+ * WRONG. Gabe: "combine AI tailoring and ATS scoring properly this time."
+ * They are one request against one posting -- the score says what a screener
+ * will miss, the rewrites are what to do about it -- so splitting them made
+ * you pick an application twice, read half an answer, and switch tabs to act
+ * on it. The score and the fix now sit in one pane, in that order, because
+ * that is the order you use them in.
  */
 
-export type DocumentTabId = 'grammar' | 'spelling' | 'ats' | 'tailoring'
+export type DocumentTabId = 'grammar' | 'spelling' | 'tailor'
 
 export interface DocumentTab {
   id: DocumentTabId
@@ -55,17 +63,10 @@ export const DOCUMENT_TABS: readonly DocumentTab[] = [
     needsApplication: false,
   },
   {
-    id: 'ats',
-    label: 'ATS match',
+    id: 'tailor',
+    label: 'tailor to a job',
     icon: 'ShieldCheck',
-    hint: 'how a screener reads this CV',
-    needsApplication: true,
-  },
-  {
-    id: 'tailoring',
-    label: 'AI tailoring',
-    icon: 'Analytics',
-    hint: 'rewrites for one posting',
+    hint: 'score this CV, then rewrite it',
     needsApplication: true,
   },
 ] as const

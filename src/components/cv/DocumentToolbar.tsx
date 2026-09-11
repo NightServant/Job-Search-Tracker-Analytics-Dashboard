@@ -3,225 +3,69 @@
 import * as React from 'react'
 import type { Editor } from '@tiptap/core'
 import { cn } from '@/lib/utils'
-import { icons, type IconName } from '@/components/icons'
+import { icons } from '@/components/icons'
+import {
+  FONT_FAMILIES,
+  FONT_SIZES,
+  LINE_SPACINGS,
+  RIBBON_GROUPS,
+  STYLE_PRESETS,
+  type RibbonCommand,
+} from './ribbonCommands'
 
 /**
- * The formatting ribbon, in Word's groups rather than one undifferentiated row.
+ * Word's Home ribbon, under this system's rules.
  *
- * WHAT IT REPLACES: five buttons -- bold, italic, bullets, H1, H2 -- in a flat
- * `flex-wrap`. Everything here beyond those five was already installed;
- * StarterKit 3 ships underline, strike, ordered lists, blockquote, code,
- * horizontal rule and history, so this adds no dependency and no editor
- * configuration. It was simply never surfaced.
+ * WHAT WAS WRONG WITH THE LAST ONE (Gabe, 2026-09-11: "still not implemented
+ * properly... 1v1 replica"): it was fourteen bare buttons in a row. Word's
+ * ribbon is not a row of buttons -- it is NAMED GROUPS, and the two controls
+ * people reach for first, the font face and its size, were not there at all
+ * because the extensions backing them were never installed.
  *
- * GROUPED AND SEPARATED BY RULES, which is the whole reason it reads as a
- * ribbon rather than a toolbar. Word's groups are history / text / paragraph /
- * insert, and a hairline between them is what lets the eye find "the list
- * buttons" without reading every icon. The design system separates with
- * hairlines rather than boxes, so the ribbon gets that for free.
+ * SO THE GROUPS ARE WORD'S, IN WORD'S ORDER, with Word's group captions
+ * printed under each band. `ribbonCommands` holds that list; this file is only
+ * how it draws.
  *
- * RESPONSIVENESS IS BY DROPPING GROUPS, NOT BY WRAPPING. A wrapped ribbon
- * becomes two or three rows on a phone and eats the document it sits above --
- * on a 375px screen the sheet is the point and the toolbar is not. So the
- * groups carry a `priority`: text formatting is always present, paragraph
- * styling appears from `sm`, and history and insert from `md`. Everything
- * dropped is still reachable by keyboard shortcut, which is what makes
- * dropping it honest rather than lossy -- Ctrl/Cmd-Z and Ctrl/Cmd-B work at
- * every width because they are the editor's, not the toolbar's.
+ * THE DESIGN SYSTEM TAKES THE CHROME AND LEAVES THE STRUCTURE. Word raises its
+ * buttons, bands its groups in gradients and boxes its style gallery; none of
+ * that survives, and none of it is what makes a ribbon readable. Hairline
+ * rules separate groups where Word draws a separator, every control is capped
+ * at 4px, nothing has a shadow, and the accent marks the ACTIVE format only --
+ * which is precisely the "current action" the accent is reserved for. An
+ * active button is the one place a filled block is correct here, because it is
+ * a pressed control and not a status.
  *
- * ICON-ONLY WITH A REAL LABEL. Each button is an icon with `aria-label` and
- * `title`, so it is announced and hovers a name. Text labels for fourteen
- * commands would not fit any phone, and a ribbon of words is not a ribbon.
- * The two heading buttons keep their text because "H1" IS the icon.
+ * SELECTS, NOT DROPDOWN MENUS, for font/size/style/spacing. A native select is
+ * one tap on a phone, is keyboard-navigable for free, and reports its value
+ * without a popover -- and the value IS the information here ("this paragraph
+ * is Calibri 11"). A custom menu would have to reimplement all of that to look
+ * marginally more like Word.
  */
 
-const BUTTON =
-  'inline-flex h-8 min-w-8 items-center justify-center rounded-[4px] border px-2 text-body-s ' +
-  'transition-colors duration-(--duration-fast) active:scale-[0.97] ' +
+const CONTROL =
+  'h-8 rounded-[4px] border border-border-default bg-bg-canvas px-1.5 text-body-s ' +
+  'text-text-primary transition-colors duration-(--duration-fast) ' +
   'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30 ' +
   'disabled:cursor-not-allowed disabled:opacity-40'
 
-interface Command {
-  id: string
-  label: string
-  icon?: IconName
-  text?: string
-  run: (editor: Editor) => void
-  isActive?: (editor: Editor) => boolean
-  isDisabled?: (editor: Editor) => boolean
-  shortcut?: string
-}
+const BUTTON =
+  'inline-flex h-8 min-w-8 items-center justify-center rounded-[4px] border px-2 ' +
+  'text-body-s transition-colors duration-(--duration-fast) active:scale-[0.97] ' +
+  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30 ' +
+  'disabled:cursor-not-allowed disabled:opacity-40'
 
-interface Group {
-  id: string
-  /** Tailwind visibility, lowest breakpoint at which the group appears. */
-  visibility: string
-  commands: Command[]
-}
-
-/**
- * `focus()` BEFORE EVERY COMMAND, which is not decorative. Clicking a toolbar
- * button moves focus out of the document; without returning it first the
- * command applies to a selection the editor no longer considers current, and
- * on some of these it silently does nothing at all.
- */
-const GROUPS: Group[] = [
-  {
-    id: 'history',
-    // Last to appear: undo is Ctrl/Cmd-Z everywhere, so it is the least
-    // costly thing to hide when space is short.
-    visibility: 'hidden md:flex',
-    commands: [
-      {
-        id: 'undo',
-        label: 'undo',
-        icon: 'RotateCcw',
-        shortcut: '⌘Z',
-        run: (editor) => editor.chain().focus().undo().run(),
-        isDisabled: (editor) => !editor.can().undo(),
-      },
-      {
-        id: 'redo',
-        label: 'redo',
-        icon: 'ArrowRight',
-        shortcut: '⇧⌘Z',
-        run: (editor) => editor.chain().focus().redo().run(),
-        isDisabled: (editor) => !editor.can().redo(),
-      },
-    ],
-  },
-  {
-    id: 'text',
-    // ALWAYS VISIBLE. Bold and italic are what a CV actually needs at any
-    // width; if only one group survives it is this one.
-    visibility: 'flex',
-    commands: [
-      {
-        id: 'bold',
-        label: 'bold',
-        text: 'B',
-        shortcut: '⌘B',
-        run: (editor) => editor.chain().focus().toggleBold().run(),
-        isActive: (editor) => editor.isActive('bold'),
-      },
-      {
-        id: 'italic',
-        label: 'italic',
-        text: 'I',
-        shortcut: '⌘I',
-        run: (editor) => editor.chain().focus().toggleItalic().run(),
-        isActive: (editor) => editor.isActive('italic'),
-      },
-      {
-        id: 'underline',
-        label: 'underline',
-        text: 'U',
-        shortcut: '⌘U',
-        run: (editor) => editor.chain().focus().toggleUnderline().run(),
-        isActive: (editor) => editor.isActive('underline'),
-      },
-      {
-        id: 'strike',
-        label: 'strikethrough',
-        text: 'S',
-        run: (editor) => editor.chain().focus().toggleStrike().run(),
-        isActive: (editor) => editor.isActive('strike'),
-      },
-    ],
-  },
-  {
-    id: 'headings',
-    visibility: 'flex',
-    commands: [
-      {
-        id: 'h1',
-        label: 'heading 1',
-        text: 'H1',
-        run: (editor) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-        isActive: (editor) => editor.isActive('heading', { level: 1 }),
-      },
-      {
-        id: 'h2',
-        label: 'heading 2',
-        text: 'H2',
-        run: (editor) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-        isActive: (editor) => editor.isActive('heading', { level: 2 }),
-      },
-      {
-        id: 'h3',
-        label: 'heading 3',
-        text: 'H3',
-        run: (editor) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-        isActive: (editor) => editor.isActive('heading', { level: 3 }),
-      },
-    ],
-  },
-  {
-    id: 'paragraph',
-    visibility: 'hidden sm:flex',
-    commands: [
-      {
-        id: 'bullets',
-        label: 'bulleted list',
-        icon: 'Menu',
-        run: (editor) => editor.chain().focus().toggleBulletList().run(),
-        isActive: (editor) => editor.isActive('bulletList'),
-      },
-      {
-        id: 'ordered',
-        label: 'numbered list',
-        text: '1.',
-        run: (editor) => editor.chain().focus().toggleOrderedList().run(),
-        isActive: (editor) => editor.isActive('orderedList'),
-      },
-      {
-        id: 'quote',
-        label: 'block quote',
-        text: '❝',
-        run: (editor) => editor.chain().focus().toggleBlockquote().run(),
-        isActive: (editor) => editor.isActive('blockquote'),
-      },
-    ],
-  },
-  {
-    id: 'insert',
-    visibility: 'hidden md:flex',
-    commands: [
-      {
-        id: 'code',
-        label: 'inline code',
-        icon: 'Code',
-        run: (editor) => editor.chain().focus().toggleCode().run(),
-        isActive: (editor) => editor.isActive('code'),
-      },
-      {
-        id: 'rule',
-        label: 'horizontal rule',
-        text: '—',
-        run: (editor) => editor.chain().focus().setHorizontalRule().run(),
-      },
-      {
-        id: 'clear',
-        label: 'clear formatting',
-        icon: 'Close',
-        run: (editor) => editor.chain().focus().unsetAllMarks().clearNodes().run(),
-      },
-    ],
-  },
-]
-
-function ToolbarCommand({ command, editor }: { command: Command; editor: Editor | null }) {
+function CommandButton({ command, editor }: { command: RibbonCommand; editor: Editor | null }) {
   const Icon = command.icon ? icons[command.icon] : null
+  const Glyph = command.glyph
   const active = editor && command.isActive ? command.isActive(editor) : false
   const disabled = !editor || (command.isDisabled ? command.isDisabled(editor) : false)
-  const title = command.shortcut ? `${command.label} (${command.shortcut})` : command.label
 
   return (
     <button
       type="button"
       aria-label={command.label}
       aria-pressed={command.isActive ? active : undefined}
-      title={title}
+      title={command.shortcut ? `${command.label} (${command.shortcut})` : command.label}
       disabled={disabled}
       onClick={() => editor && command.run(editor)}
       className={cn(
@@ -231,35 +75,168 @@ function ToolbarCommand({ command, editor }: { command: Command; editor: Editor 
           : 'border-border-default bg-bg-canvas text-text-secondary hover:bg-bg-inset'
       )}
     >
-      {Icon ? <Icon size={14} aria-hidden /> : <span aria-hidden>{command.text}</span>}
+      {Glyph ? <Glyph /> : Icon ? <Icon size={14} aria-hidden /> : <span aria-hidden>{command.text}</span>}
     </button>
   )
 }
 
+/** A group of controls with Word's caption under it. */
+function Group({
+  label,
+  visibility,
+  first,
+  children,
+}: {
+  label: string
+  visibility: string
+  first?: boolean
+  children: React.ReactNode
+}) {
+  return (
+    <div
+      data-ribbon-group={label}
+      className={cn(
+        'flex-col items-center gap-1 px-2.5',
+        visibility,
+        // A rule between groups, where Word draws its separator.
+        !first && 'border-l border-border-subtle'
+      )}
+    >
+      <div className="flex items-center gap-1">{children}</div>
+      {/* WORD PRINTS THE GROUP NAME UNDER THE BAND, and it is what turns a row
+          of glyphs into findable groups -- "the list buttons" becomes a place
+          rather than a shape you have to recognise. */}
+      <span className="text-label-caps uppercase leading-none text-text-muted">{label}</span>
+    </div>
+  )
+}
+
 export function DocumentToolbar({ editor }: { editor: Editor | null }) {
+  // Re-render on selection and document change, so every `isActive` below
+  // reflects the CARET rather than the last button anyone pressed. Without
+  // this a ribbon lies the moment you click into differently formatted text.
+  const [, force] = React.useReducer((n: number) => n + 1, 0)
+  React.useEffect(() => {
+    if (!editor) return
+    editor.on('selectionUpdate', force)
+    editor.on('transaction', force)
+    return () => {
+      editor.off('selectionUpdate', force)
+      editor.off('transaction', force)
+    }
+  }, [editor])
+
+  const currentFamily =
+    (editor?.getAttributes('textStyle').fontFamily as string | undefined) ?? ''
+  const currentSize = String(
+    (editor?.getAttributes('textStyle').fontSize as string | undefined) ?? ''
+  ).replace('px', '')
+  const currentStyle = STYLE_PRESETS.find((s) => editor && s.isActive(editor))?.id ?? 'normal'
+
   return (
     <div
       role="toolbar"
       aria-label="formatting"
       aria-controls="document-sheet"
-      className="flex items-center gap-1"
+      // `min-w-0` + `overflow-x-auto` so a ribbon wider than the column
+      // SCROLLS rather than being clipped by it, which is what the nine-group
+      // version did -- the last band was simply cut off with no way to reach
+      // it. Wrapping is not the alternative: a three-row ribbon eats the
+      // document it sits above.
+      className="flex min-w-0 items-stretch overflow-x-auto"
       data-document-toolbar
     >
-      {GROUPS.map((group, index) => (
-        <div
-          key={group.id}
-          className={cn(
-            'items-center gap-1',
-            group.visibility,
-            // A hairline between groups, not a box around them.
-            index > 0 && 'sm:ml-1 sm:border-l sm:border-border-subtle sm:pl-2'
-          )}
+      {/* STYLES FIRST at this width rather than last as Word has it: the
+          heading level is the single most-used control in a CV, and a ribbon
+          that scrolls should put its most-used control where it cannot. */}
+      <Group label="styles" visibility="flex" first>
+        <select
+          aria-label="paragraph style"
+          value={currentStyle}
+          disabled={!editor}
+          onChange={(event) => {
+            const preset = STYLE_PRESETS.find((s) => s.id === event.target.value)
+            if (preset && editor) preset.apply(editor)
+          }}
+          className={cn(CONTROL, 'w-[104px]')}
         >
-          {group.commands.map((command) => (
-            <ToolbarCommand key={command.id} command={command} editor={editor} />
+          {STYLE_PRESETS.map((preset) => (
+            <option key={preset.id} value={preset.id}>
+              {preset.label}
+            </option>
           ))}
-        </div>
+        </select>
+      </Group>
+
+      <Group label="typeface" visibility="hidden md:flex">
+        <select
+          aria-label="font"
+          value={currentFamily}
+          disabled={!editor}
+          onChange={(event) =>
+            event.target.value
+              ? editor?.chain().focus().setFontFamily(event.target.value).run()
+              : editor?.chain().focus().unsetFontFamily().run()
+          }
+          className={cn(CONTROL, 'w-[116px]')}
+        >
+          <option value="">(default)</option>
+          {FONT_FAMILIES.map((font) => (
+            <option key={font.label} value={font.value}>
+              {font.label}
+            </option>
+          ))}
+        </select>
+        <select
+          aria-label="font size"
+          value={currentSize}
+          disabled={!editor}
+          onChange={(event) =>
+            event.target.value
+              ? editor?.chain().focus().setFontSize(`${event.target.value}px`).run()
+              : editor?.chain().focus().unsetFontSize().run()
+          }
+          className={cn(CONTROL, 'w-[58px]')}
+        >
+          <option value="">–</option>
+          {FONT_SIZES.map((size) => (
+            <option key={size} value={size}>
+              {size}
+            </option>
+          ))}
+        </select>
+        {/* LINE SPACING SITS WITH THE FACE AND SIZE rather than in a band of
+            its own. Word files it under Paragraph, but it is a select and the
+            other two selects are here; a lone dropdown in its own captioned
+            group is what made the first ribbon nine bands wide. */}
+        <select
+          aria-label="line spacing"
+          disabled={!editor}
+          defaultValue=""
+          onChange={(event) =>
+            event.target.value
+              ? editor?.chain().focus().setLineHeight(event.target.value).run()
+              : editor?.chain().focus().unsetLineHeight().run()
+          }
+          className={cn(CONTROL, 'w-[58px]')}
+        >
+          <option value="">↕</option>
+          {LINE_SPACINGS.map((value) => (
+            <option key={value} value={value}>
+              {value}
+            </option>
+          ))}
+        </select>
+      </Group>
+
+      {RIBBON_GROUPS.map((group) => (
+        <Group key={group.id} label={group.label} visibility={group.visibility}>
+          {group.commands.map((command) => (
+            <CommandButton key={command.id} command={command} editor={editor} />
+          ))}
+        </Group>
       ))}
+
     </div>
   )
 }
