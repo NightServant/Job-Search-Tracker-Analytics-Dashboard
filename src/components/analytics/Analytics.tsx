@@ -2,23 +2,29 @@
 
 import * as React from 'react'
 import { PageHeader } from '@/components/ui/page-header'
-import {
-  Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardAction,
-  CardContent,
-} from '@/components/ui/card'
-import { AlertCircleIcon, type IconName } from '@/components/icons'
-import { EmptyState } from '@/components/ui/empty-state'
 import { Callout } from './Callout'
 import { SalaryInsights } from './SalaryInsights'
 import { PipelineFlow } from './PipelineFlow'
+import { layOut, type PanelSpec } from './panelLayout'
+import {
+  AnalyticsPanel,
+  PanelBody,
+  Span,
+  type MetricState,
+} from './AnalyticsPanel'
+import { errorMessage } from './errorMessage'
+
+/**
+ * RE-EXPORTED, not redefined. `MetricState` moved to `AnalyticsPanel` -- the
+ * component that actually renders one -- and importing it back here would be
+ * a cycle. `page.tsx` has imported it from this module since M5, so the name
+ * stays available where it always was rather than becoming a second edit in
+ * an unrelated file.
+ */
+export type { MetricState }
 import type { Job } from '@/types'
 import { KpiStat } from '@/components/ui/kpi-stat'
 import { cn } from '@/lib/utils'
-import { Skeleton } from '@/components/ui/skeleton'
 import { RangePicker } from './RangePicker'
 import { FunnelChart, normalizeFunnel } from './FunnelChart'
 import { TimeInStage } from './TimeInStage'
@@ -31,18 +37,6 @@ import type {
   CohortAnalysis,
   ConversionMetrics,
 } from '@/services/analyticsService'
-
-/**
- * One query's worth of state, mirroring what a react-query result carries.
- * Kept as a plain shape (rather than importing `UseQueryResult`) so this
- * component has no react-query dependency of its own -- `page.tsx` is the
- * only file that touches the hooks, matching ruling D.
- */
-export interface MetricState<T> {
-  data: T | null
-  isLoading: boolean
-  error: unknown
-}
 
 export interface AnalyticsProps {
   timeInStage: MetricState<TimeInStageMetric[]>
@@ -77,142 +71,6 @@ export interface AnalyticsProps {
  * get right. Swapping to a bare Card would have quietly dropped that, so the
  * error branch moves here instead of disappearing.
  */
-function AnalyticsPanel({
-  title,
-  icon,
-  description,
-  action,
-  error,
-  children,
-}: {
-  title: string
-  /** A muted glyph before the heading -- see CardTitle. Names the panel; never decoration. */
-  icon?: IconName
-  /** One lowercase line saying what the panel answers. */
-  description?: string
-  action?: React.ReactNode
-  error?: string
-  children: React.ReactNode
-}) {
-  return (
-    // data-analytics-panel because Card renders a div where PanelSection
-    // rendered a <section>. An unnamed <section> is not a landmark, so nothing
-    // in the accessibility tree is lost -- but the panel boundary still has to
-    // be addressable, by tests and by anything that needs to scope a query to
-    // one panel.
-    <Card data-analytics-panel className="h-full">
-      <CardHeader>
-        {/* An <h2> inside CardTitle, not instead of it: CardTitle renders a
-            div, so converting these panels to Cards silently removed every
-            panel heading from the accessibility tree and from the document
-            outline. Tailwind's preflight resets heading size and weight to
-            inherit, so this is semantics at zero visual cost. */}
-        <CardTitle icon={icon}>
-          <h2>{title}</h2>
-        </CardTitle>
-        {description ? <CardDescription>{description}</CardDescription> : null}
-        {action ? <CardAction>{action}</CardAction> : null}
-      </CardHeader>
-      <CardContent className="flex flex-1 flex-col">
-        {error ? (
-          <p className="flex items-center gap-2 text-body-s text-status-rejected-mark">
-            <AlertCircleIcon size={16} aria-hidden className="[&_svg]:size-4" />
-            {error}
-          </p>
-        ) : (
-          children
-        )}
-      </CardContent>
-    </Card>
-  )
-}
-
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : 'Could not load this metric.'
-}
-
-function Span({ children }: { children: React.ReactNode }) {
-  return <span className="text-body-s text-text-muted">{children}</span>
-}
-
-function PanelBody({
-  state,
-  empty,
-  render,
-}: {
-  state: MetricState<unknown>
-  empty: boolean
-  render: () => React.ReactNode
-}) {
-  if (state.isLoading) {
-    return (
-      <div role="status" aria-busy="true">
-        <span className="sr-only">loading</span>
-        <Skeleton className="h-40 w-full" />
-      </div>
-    )
-  }
-  if (empty) {
-    return (
-      <EmptyState icon="Analytics">
-        not enough data yet. this fills in as applications move through the pipeline.
-      </EmptyState>
-    )
-  }
-  return <>{render()}</>
-}
-
-/**
- * One panel's place in the grid. `span` is what the panel WANTS; `layOut`
- * decides what it gets.
- */
-interface PanelSpec {
-  key: string
-  span: 'full' | 'half'
-  node: React.ReactNode
-}
-
-/**
- * Assigns column spans against the panels that rendered.
- *
- * A grid, deliberately: Gabe asked for cards that match their neighbour's
- * height, and a shared row height is exactly what a grid gives and what
- * independent column stacks cannot. The dead space that used to come with
- * that is handled at the other end -- every panel body fills the height it is
- * handed (see `CardContent` below), so a card matching a taller neighbour has
- * content in the difference rather than air.
- *
- * Spans are computed rather than written into the markup. Walk the list
- * tracking which column is next: a full-width panel takes the row and resets
- * to column one; a half-width panel pairs with the next one if there is a
- * half-width panel to pair with, and is promoted to full width if there is
- * not. A lone panel then fills its row instead of sitting beside a hole.
- *
- * Order is the author's -- this only decides widths.
- */
-function layOut(specs: PanelSpec[]): Array<PanelSpec & { full: boolean }> {
-  const out: Array<PanelSpec & { full: boolean }> = []
-  let atRowStart = true
-  for (let i = 0; i < specs.length; i += 1) {
-    const spec = specs[i]
-    if (spec.span === 'full') {
-      out.push({ ...spec, full: true })
-      atRowStart = true
-      continue
-    }
-    if (!atRowStart) {
-      out.push({ ...spec, full: false })
-      atRowStart = true
-      continue
-    }
-    const partner = specs[i + 1]
-    const paired = partner !== undefined && partner.span === 'half'
-    out.push({ ...spec, full: !paired })
-    atRowStart = !paired
-  }
-  return out
-}
 
 function Overview({ data }: { data: ConversionMetrics | null }) {
   const metrics = data ?? {
