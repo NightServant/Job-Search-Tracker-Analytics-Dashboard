@@ -408,14 +408,40 @@ describe('the editor chrome', () => {
     // analysis belongs beside it; the LaTeX editor is already two panes, so a
     // second rail would squeeze both. Asserted as the difference, so it fails
     // if either editor drifts into the other's shape.
+    //
+    // The markers changed on 2026-09-11 when the fixed pair became tabs: the
+    // left rail SELECTS (`data-document-rail`) and the right rail SHOWS
+    // (`data-document-pane`). The assertion is unchanged in substance --
+    // two rails, different parents, selector before panel.
     params('cv-1')
     resolved(wordDraft())
     const { container } = render(<Page />)
-    const target = container.querySelector('[data-tailoring-target]') as HTMLElement
-    const analysis = container.querySelector('[data-tailoring-analysis]') as HTMLElement
-    expect(target).toBeTruthy()
-    expect(analysis).toBeTruthy()
-    expect(target.parentElement).not.toBe(analysis.parentElement)
+    const rail = container.querySelector('[data-document-rail]') as HTMLElement
+    const pane = container.querySelector('[data-document-pane]') as HTMLElement
+    expect(rail).toBeTruthy()
+    expect(pane).toBeTruthy()
+    expect(rail.parentElement).not.toBe(pane.parentElement)
+  })
+
+  it('points each rail tab at the pane it controls', () => {
+    // The whole justification for splitting a selector and its panel across a
+    // document is that `aria-controls` carries the relationship a sighted user
+    // reads out of the layout. If those ids stop matching, the arrangement is
+    // just two columns and a screen reader learns nothing.
+    params('cv-1')
+    resolved(wordDraft())
+    const { container } = render(<Page />)
+    const pane = container.querySelector('[data-document-pane]') as HTMLElement
+    const tabs = [...container.querySelectorAll('[role="tab"]')] as HTMLElement[]
+
+    expect(tabs.length).toBeGreaterThan(1)
+    for (const tab of tabs) {
+      expect(tab.getAttribute('aria-controls')).toBe(pane.id)
+    }
+    // Exactly one selected, and it is the one the panel names.
+    const selected = tabs.filter((tab) => tab.getAttribute('aria-selected') === 'true')
+    expect(selected).toHaveLength(1)
+    expect(pane.getAttribute('aria-labelledby')).toBe(selected[0].id)
   })
 
   it('hides the app navigation while a document is open, and restores it after', () => {

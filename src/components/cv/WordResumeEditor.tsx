@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import type { JSONContent } from '@tiptap/core'
@@ -15,7 +15,11 @@ import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
 import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
-import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
+import { useCvTailoring } from './CvTailoring'
+import { DocumentRailTabs } from './DocumentRail'
+import { DocumentRailPane } from './DocumentRailPane'
+import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './documentTabs'
+import { useProofread } from './useProofread'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
@@ -374,6 +378,36 @@ export function WordResumeEditor({
   // as it is typed -- a score computed against a stale copy is worse than no
   // score, since it looks current.
   const tailoring = useCvTailoring({ cvText: editor?.getText() ?? '', jobs })
+  const proofread = useProofread(editor)
+
+  /**
+   * WHICH RAIL TAB IS OPEN, remembered per browser.
+   *
+   * Somebody proofreading a CV does it over several sittings, and reopening on
+   * Grammar every time would make the tab they actually use a click they pay
+   * for repeatedly. `asDocumentTab` coerces anything stored, so a renamed or
+   * removed tab cannot leave the rail permanently blank.
+   */
+  const [tab, setTab] = useState<DocumentTabId>(DEFAULT_DOCUMENT_TAB)
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem('worktrack:document-tab')
+      if (stored) setTab(asDocumentTab(stored))
+    } catch {
+      // Private windows and blocked site data throw on access. The default
+      // tab is a fine answer; losing the preference is not worth an error.
+    }
+  }, [])
+
+  const selectTab = useCallback((next: DocumentTabId) => {
+    setTab(next)
+    try {
+      window.localStorage.setItem('worktrack:document-tab', next)
+    } catch {
+      // As above: a remembered tab is a convenience, never a requirement.
+    }
+  }, [])
   const compact = useBelowDesktop()
 
   const restoreSnapshot = async (content: unknown) => {
@@ -494,8 +528,25 @@ export function WordResumeEditor({
           </ToolbarButton>
         </>
       }
-      leftRail={<TailoringTargetRail state={tailoring} jobs={jobs} />}
-      rightRail={<TailoringAnalysisRail state={tailoring} />}
+      leftRail={
+        <DocumentRailTabs
+          active={tab}
+          onSelect={selectTab}
+          applicationSelected={!!tailoring.jobId}
+          badges={{
+            grammar: proofread.ran ? proofread.grammar.length : null,
+            spelling: proofread.ran ? proofread.spelling.length : null,
+          }}
+        />
+      }
+      rightRail={
+        <DocumentRailPane
+          active={tab}
+          jobs={jobs}
+          proofread={proofread}
+          tailoring={tailoring}
+        />
+      }
       footnote="letter-style layout preview with 0.8in margins for a print-ready CV."
     >
       <div className="mx-auto min-h-[11in] w-full max-w-[8.5in] bg-white">

@@ -8,6 +8,21 @@ import {
   toIssues,
 } from '../grammar'
 
+/** The live shape, abbreviated: offset/length, an array of replacements. */
+const match = (
+  offset: number,
+  length: number,
+  replacements: string[],
+  issueType = 'grammar',
+  categoryId = 'GRAMMAR'
+) => ({
+  offset,
+  length,
+  shortMessage: 'Problem',
+  replacements: replacements.map((value) => ({ value })),
+  rule: { issueType, category: { id: categoryId } },
+})
+
 describe('chunkText', () => {
   it('leaves text the API already accepts in one piece', () => {
     expect(chunkText('a short CV')).toEqual([{ text: 'a short CV', offset: 0 }])
@@ -18,8 +33,13 @@ describe('chunkText', () => {
   })
 
   it('never exceeds the vendor ceiling', () => {
-    const text = 'word '.repeat(4000) // 20,000 chars
-    for (const chunk of chunkText(text)) {
+    // Deliberately past MAX_CHUNK_CHARS rather than a fixed number, so raising
+    // the cap (5,000 under GrammarBot, 20,000 here) does not quietly stop this
+    // test exercising the split at all.
+    const text = 'word '.repeat(MAX_CHUNK_CHARS)
+    const chunks = chunkText(text)
+    expect(chunks.length).toBeGreaterThan(1)
+    for (const chunk of chunks) {
       expect(chunk.text.length).toBeLessThanOrEqual(MAX_CHUNK_CHARS)
     }
   })
@@ -29,7 +49,9 @@ describe('chunkText', () => {
     // every offset after that point is wrong and corrections land on the wrong
     // words -- which looks like a bad checker rather than a bad splitter.
     const text = 'Sentence one. Sentence two.\n\n' + 'filler words here. '.repeat(600)
-    const chunks = chunkText(text)
+    // An explicit window, so this asserts the reassembly invariant rather than
+    // the vendor's current limit.
+    const chunks = chunkText(text, 1000)
     expect(chunks.length).toBeGreaterThan(1)
     expect(chunks.map((c) => c.text).join('')).toBe(text)
   })
@@ -64,96 +86,115 @@ describe('chunkText', () => {
 })
 
 describe('categoryOf', () => {
-  it('routes the vendor spelling codes to the spelling tab', () => {
-    for (const code of ['SPELL', 'spelling', 'Typo', 'MISSPELLING']) {
-      expect(categoryOf(code), code).toBe('spelling')
-    }
+  it('routes misspellings to the spelling tab', () => {
+    expect(categoryOf('misspelling', 'TYPOS')).toBe('spelling')
+    expect(categoryOf('typographical', 'TYPOS')).toBe('spelling')
+    expect(categoryOf(undefined, 'TYPOS')).toBe('spelling')
   })
 
-  it('treats the documented grammar code, and anything unknown, as grammar', () => {
-    // Deliberately one-sided: an unrecognised code must still reach a tab.
-    // Losing an issue entirely is worse than filing it under the wrong heading.
-    for (const code of ['GRMR', 'SOMETHING_NEW', '', undefined]) {
-      expect(categoryOf(code), String(code)).toBe('grammar')
+  it('routes style and redundancy to the refinements tab', () => {
+    expect(categoryOf('style', 'STYLE')).toBe('style')
+    expect(categoryOf('style', 'REDUNDANCY')).toBe('style')
+    expect(categoryOf(undefined, 'REDUNDANCY')).toBe('style')
+  })
+
+  it('does not confuse a typographical WORD with the TYPOGRAPHY category', () => {
+    // `issueType: typographical` is a mis-typed word and belongs with
+    // spelling; the TYPOGRAPHY category is punctuation and spacing, which is
+    // style. They read alike and mean opposite things.
+    expect(categoryOf('typographical', 'TYPOS')).toBe('spelling')
+    expect(categoryOf(undefined, 'TYPOGRAPHY')).toBe('style')
+  })
+
+  it('treats grammar, and anything unknown, as grammar', () => {
+    // Deliberately one-sided: an unrecognised rule must still reach a tab.
+    // Losing an issue is worse than filing it under the wrong heading.
+    for (const [type, id] of [
+      ['grammar', 'GRAMMAR'],
+      ['whatever-is-new', 'SOMETHING_NEW'],
+      [undefined, undefined],
+    ] as const) {
+      expect(categoryOf(type, id), `${type}/${id}`).toBe('grammar')
     }
   })
 })
 
 describe('toIssues', () => {
-  const response = {
-    correction: 'This is the best',
-    status: 200,
-    edits: [
-      { start: 5, end: 7, replace: 'is', edit_type: 'MODIFY', err_cat: 'GRMR' },
-    ],
-  }
+  it('converts offset/length into start/end', () => {
+    // The vendor changed shape when GrammarBot was replaced. This conversion
+    // happens once, here, so nothing downstream holds two conventions.
+    expect(toIssues({ matches: [match(5, 2, ['is'])] })[0]).toMatchObject({
+      start: 5,
+      end: 7,
+      replacements: ['is'],
+      category: 'grammar',
+    })
+  })
 
-  it('maps the vendor shape onto our own', () => {
-    expect(toIssues(response)).toEqual([
-      {
-        start: 5,
-        end: 7,
-        replace: 'is',
-        category: 'grammar',
-        rawCategory: 'GRMR',
-        description: '',
-      },
-    ])
+  it('keeps every replacement, which is what the suggestion list needs', () => {
+    const [issue] = toIssues({ matches: [match(40, 3, ['the', 'ten', 'tea', 'tech'], 'misspelling', 'TYPOS')] })
+    expect(issue.replacements).toEqual(['the', 'ten', 'tea', 'tech'])
+    expect(issue.category).toBe('spelling')
+  })
+
+  it('caps the replacement list so a rail is not flooded', () => {
+    const many = Array.from({ length: 20 }, (_, i) => `option${i}`)
+    expect(toIssues({ matches: [match(0, 1, many)] })[0].replacements).toHaveLength(5)
   })
 
   it('shifts offsets by the chunk they came from', () => {
-    // The chunk's edits are chunk-relative; the document is what gets
-    // highlighted. Forgetting this is the whole bug class chunking introduces.
-    const [issue] = toIssues(response, 1000)
+    // Chunk matches are chunk-relative; the document is what gets
+    // highlighted. Forgetting this is the bug class chunking introduces.
+    const [issue] = toIssues({ matches: [match(5, 2, ['is'])] }, 1000)
     expect(issue.start).toBe(1005)
     expect(issue.end).toBe(1007)
   })
 
-  it('survives a response with no edits at all', () => {
-    expect(toIssues({ status: 200 })).toEqual([])
-    expect(toIssues({ status: 200, edits: [] })).toEqual([])
+  it('prefers shortMessage, falling back to the long one', () => {
+    const long = { offset: 0, length: 1, message: 'A long explanation.', replacements: [] }
+    expect(toIssues({ matches: [long] })[0].message).toBe('A long explanation.')
   })
 
-  it('drops an edit whose range is impossible', () => {
-    // A backwards range would highlight from the error to the end of the
-    // document, which reads as the checker having flagged everything.
+  it('survives a response with no matches at all', () => {
+    expect(toIssues({})).toEqual([])
+    expect(toIssues({ matches: [] })).toEqual([])
+  })
+
+  it('drops a match whose range is impossible', () => {
     const bad = {
-      edits: [
-        { start: 9, end: 4, replace: 'x', err_cat: 'GRMR' },
-        { start: -1, end: 2, replace: 'y', err_cat: 'GRMR' },
-        { start: 0, end: 1, replace: 'z', err_cat: 'GRMR' },
+      matches: [
+        { offset: -1, length: 2, replacements: [] },
+        { offset: 0, length: -5, replacements: [] },
+        match(0, 1, ['z']),
       ],
     }
-    expect(toIssues(bad).map((i) => i.replace)).toEqual(['z'])
+    expect(toIssues(bad)).toHaveLength(1)
   })
 
-  it('keeps a zero-width edit, which is an insertion', () => {
-    const insert = { edits: [{ start: 3, end: 3, replace: ',', err_cat: 'GRMR' }] }
-    expect(toIssues(insert)).toHaveLength(1)
+  it('keeps a match that proposes nothing, which is still worth showing', () => {
+    const [issue] = toIssues({ matches: [match(3, 4, [])] })
+    expect(issue.replacements).toEqual([])
   })
 })
 
 describe('splitByCategory', () => {
-  it('separates the two tabs and orders each by position', () => {
+  it('separates the three tabs and orders each by position', () => {
     const issues = toIssues({
-      edits: [
-        { start: 30, end: 32, replace: 'a', err_cat: 'SPELL' },
-        { start: 10, end: 12, replace: 'b', err_cat: 'GRMR' },
-        { start: 5, end: 7, replace: 'c', err_cat: 'SPELL' },
+      matches: [
+        match(30, 2, ['a'], 'misspelling', 'TYPOS'),
+        match(10, 2, ['b']),
+        match(5, 2, ['c'], 'misspelling', 'TYPOS'),
+        match(20, 2, ['d'], 'style', 'REDUNDANCY'),
       ],
     })
-    const { spelling, grammar } = splitByCategory(issues)
+    const { spelling, grammar, style } = splitByCategory(issues)
     expect(spelling.map((i) => i.start)).toEqual([5, 30])
     expect(grammar.map((i) => i.start)).toEqual([10])
+    expect(style.map((i) => i.start)).toEqual([20])
   })
 
   it('does not mutate the list it was given', () => {
-    const issues = toIssues({
-      edits: [
-        { start: 9, end: 9, replace: 'a', err_cat: 'GRMR' },
-        { start: 1, end: 1, replace: 'b', err_cat: 'GRMR' },
-      ],
-    })
+    const issues = toIssues({ matches: [match(9, 1, []), match(1, 1, [])] })
     splitByCategory(issues)
     expect(issues.map((i) => i.start)).toEqual([9, 1])
   })
@@ -162,33 +203,22 @@ describe('splitByCategory', () => {
 describe('applyIssue', () => {
   const text = 'This be the best'
 
-  it('replaces exactly the flagged range', () => {
-    const [issue] = toIssues({
-      edits: [{ start: 5, end: 7, replace: 'is', err_cat: 'GRMR' }],
-    })
-    expect(applyIssue(text, issue)).toBe('This is the best')
-  })
-
-  it('inserts when the range is zero-width', () => {
-    const [issue] = toIssues({
-      edits: [{ start: 4, end: 4, replace: ' really', err_cat: 'GRMR' }],
-    })
-    expect(applyIssue(text, issue)).toBe('This really be the best')
+  it('replaces exactly the flagged range with the chosen option', () => {
+    const [issue] = toIssues({ matches: [match(5, 2, ['is', 'was'])] })
+    expect(applyIssue(text, issue, 'is')).toBe('This is the best')
+    // The SECOND suggestion, because the card lets you pick one.
+    expect(applyIssue(text, issue, 'was')).toBe('This was the best')
   })
 
   it('deletes when the replacement is empty', () => {
-    const [issue] = toIssues({
-      edits: [{ start: 4, end: 7, replace: '', err_cat: 'GRMR' }],
-    })
-    expect(applyIssue(text, issue)).toBe('This the best')
+    const [issue] = toIssues({ matches: [match(4, 3, [''])] })
+    expect(applyIssue(text, issue, '')).toBe('This the best')
   })
 
   it('leaves the text alone when the issue does not fit it', () => {
     // A stale issue -- one produced before an earlier accept moved everything
     // after it -- must not be allowed to slice at a bad index.
-    const [issue] = toIssues({
-      edits: [{ start: 500, end: 900, replace: 'x', err_cat: 'GRMR' }],
-    })
-    expect(applyIssue(text, issue)).toBe(text)
+    const [issue] = toIssues({ matches: [match(500, 400, ['x'])] })
+    expect(applyIssue(text, issue, 'x')).toBe(text)
   })
 })

@@ -2,8 +2,15 @@ import { describe, it, expect } from 'vitest'
 import { countWords, proofreadScore } from '../proofreadScore'
 import { toIssues } from '@/services/grammar'
 
-const issues = (n: number, cat = 'GRMR') =>
-  toIssues({ edits: Array.from({ length: n }, (_, i) => ({ start: i, end: i, replace: '', err_cat: cat })) })
+const issues = (n: number, issueType = 'grammar', categoryId = 'GRAMMAR') =>
+  toIssues({
+    matches: Array.from({ length: n }, (_, i) => ({
+      offset: i,
+      length: 1,
+      replacements: [],
+      rule: { issueType, category: { id: categoryId } },
+    })),
+  })
 
 describe('countWords', () => {
   it('counts on whitespace, and nothing on empty', () => {
@@ -36,11 +43,29 @@ describe('proofreadScore', () => {
     expect(proofreadScore('word '.repeat(10), issues(500)).value).toBe(0)
   })
 
-  it('reports the two counts separately for the corrections rows', () => {
-    const mixed = [...issues(2, 'SPELL'), ...issues(3, 'GRMR')]
+  it('counts style at a third when reaching the floor', () => {
+    // 150 style findings weigh 50, which is the floor for 2,500 words.
+    expect(proofreadScore('word '.repeat(2500), issues(150, 'style', 'STYLE')).value).toBe(0)
+  })
+
+  it('reports each count separately for the corrections and refinements rows', () => {
+    const mixed = [
+      ...issues(2, 'misspelling', 'TYPOS'),
+      ...issues(3, 'grammar', 'GRAMMAR'),
+      ...issues(4, 'style', 'REDUNDANCY'),
+    ]
     const score = proofreadScore('word '.repeat(100), mixed)
     expect(score.spelling).toBe(2)
     expect(score.grammar).toBe(3)
+    expect(score.style).toBe(4)
+  })
+
+  it('penalises a style finding less than a mistake', () => {
+    // A redundant phrase is a preference; a misspelling is an error. A wordy
+    // but correct CV should not score like a careless one.
+    const wordy = proofreadScore('word '.repeat(200), issues(6, 'style', 'REDUNDANCY')).value
+    const careless = proofreadScore('word '.repeat(200), issues(6, 'misspelling', 'TYPOS')).value
+    expect(wordy).toBeGreaterThan(careless)
   })
 
   it('reaches zero at one issue per fifty words, the documented floor', () => {

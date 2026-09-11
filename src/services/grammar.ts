@@ -1,97 +1,127 @@
 /**
- * The GrammarBot boundary: chunking text into it, and typed issues out of it.
+ * The LanguageTool boundary: chunking text into it, typed issues out of it.
  *
- * WHY A SERVICE AND NOT A `fetch` IN A COMPONENT. Two reasons, both from the
- * vendor's own quickstart rather than taste. The API refuses browser requests
- * outright -- "Browser-based AJAX requests will not work due to CORS
- * restrictions. To use in a browser, create a server-side script that acts as a
- * proxy" -- and the key travels in the request BODY, so a browser call would
- * publish it to anyone with devtools. `/api/grammar` is that proxy, and this
- * file is the part of it worth testing: everything here is pure.
+ * WHY LANGUAGETOOL AND NOT GRAMMARBOT. GrammarBot is shutting down (Gabe,
+ * 2026-09-11). LanguageTool replaces it and is a better fit on every axis that
+ * mattered here, which is worth recording because it removed three compromises
+ * rather than one:
  *
- * THE CONTRACT, copied from the quickstart so a reader does not have to fetch
- * it:
+ *   NO API KEY. The public endpoint is keyless, so there is nothing to protect
+ *   and nothing to configure before the feature works.
+ *   CORS IS OPEN -- `access-control-allow-origin: *`, verified 2026-09-11 --
+ *   so the browser calls it directly. GrammarBot refused browser requests and
+ *   forced a server proxy; that proxy has been deleted, because with a
+ *   per-IP rate limit a shared server address is strictly worse than each
+ *   user's own.
+ *   SEVERAL REPLACEMENTS PER ERROR, not one. Word's spelling card lists
+ *   alternatives, and with GrammarBot that list could only ever hold a single
+ *   entry. `replacements` is an array.
+ *   A STYLE CATEGORY EXISTS. `REDUNDANCY`, `STYLE` and `TYPOGRAPHY` carry
+ *   `issueType: style`, which is what makes Word's Refinements block real data
+ *   instead of a section that had to be left out to avoid inventing numbers.
  *
- *   POST https://neural.grammarbot.io/v1/check
- *   { "text": "This be the best", "api_key": "..." }
+ * THE CONTRACT, verified against the live endpoint rather than the docs:
  *
- *   { "correction": "This is the best",
- *     "status": 200,
- *     "edits": [ { "start": 5, "end": 7, "replace": "is",
- *                  "edit_type": "MODIFY", "err_cat": "GRMR",
- *                  "err_type": "", "err_desc": "" } ],
- *     "latency": 0.901 }
+ *   POST https://api.languagetool.org/v2/check     (form-encoded)
+ *   language=en-US&text=...
  *
- * ONE API, TWO TABS. Grammar Check and Spell Check are the same endpoint split
- * by `err_cat`, which is what makes two panes out of one request rather than
- * two round trips over the same document.
+ *   { "matches": [ { "offset": 40, "length": 3,
+ *                    "message": "...", "shortMessage": "Spelling mistake",
+ *                    "replacements": [ {"value": "the"}, {"value": "ten"} ],
+ *                    "rule": { "issueType": "misspelling",
+ *                              "category": { "id": "TYPOS" } } } ] }
+ *
+ * NOTE THE SHAPE CHANGE from the previous vendor: `offset`/`length`, not
+ * `start`/`end`. The conversion happens here, once, so nothing downstream has
+ * to remember which convention it is holding.
  */
 
-/** The 5,000-character ceiling is the vendor's, not ours. */
-export const MAX_CHUNK_CHARS = 5000
+/**
+ * The public endpoint's per-request ceiling. Most CVs fit in one request; the
+ * chunker exists for the ones that do not, and for the day this points at a
+ * self-hosted instance with a different limit.
+ */
+export const MAX_CHUNK_CHARS = 20_000
 
-export type IssueCategory = 'spelling' | 'grammar'
+export const LANGUAGETOOL_ENDPOINT = 'https://api.languagetool.org/v2/check'
+
+export type IssueCategory = 'spelling' | 'grammar' | 'style'
 
 export interface GrammarIssue {
   /** Offsets into the WHOLE document, not the chunk that produced them. */
   start: number
   end: number
-  /** The text the API suggests instead. Empty string means "delete this". */
-  replace: string
+  /**
+   * Every suggested replacement, best first, as the service ordered them.
+   * Empty means the service flagged something without proposing a fix.
+   */
+  replacements: string[]
   category: IssueCategory
-  /** The vendor's own code, kept verbatim so an unknown one stays diagnosable. */
+  /** The vendor's own category id, kept so an unknown one stays diagnosable. */
   rawCategory: string
-  /** Human-readable when the vendor supplies one; often empty. */
-  description: string
+  /** Short where the service gives one, falling back to the long message. */
+  message: string
 }
 
-export interface GrammarBotEdit {
-  start: number
-  end: number
-  replace: string
-  edit_type?: string
-  err_cat?: string
-  err_type?: string
-  err_desc?: string
+export interface LanguageToolMatch {
+  offset: number
+  length: number
+  message?: string
+  shortMessage?: string
+  replacements?: { value?: string }[]
+  rule?: {
+    issueType?: string
+    category?: { id?: string; name?: string }
+  }
 }
 
-export interface GrammarBotResponse {
-  correction?: string
-  status?: number
-  edits?: GrammarBotEdit[]
-  latency?: number
+export interface LanguageToolResponse {
+  matches?: LanguageToolMatch[]
 }
 
 /**
- * Spelling categories, and everything else is grammar.
+ * Which tab a match belongs to.
  *
- * THE VENDOR DOCUMENTS `GRMR` AND NOTHING ELSE that we have seen, so this is a
- * deliberately one-sided rule: codes known to mean spelling are listed, and an
- * unrecognised code falls to grammar rather than being dropped. A missing tab
- * is a smaller failure than a missing issue, and `rawCategory` carries the
- * original through so an unknown code can be identified from the UI instead of
- * guessed at from here.
+ * `issueType` FIRST, because it is the service's own normalisation and is
+ * stable across the hundreds of individual rules. The category id is the
+ * fallback for the handful of rules that omit it.
+ *
+ * ANYTHING UNRECOGNISED BECOMES GRAMMAR rather than being dropped. Losing an
+ * issue entirely is a worse failure than filing it under the wrong heading,
+ * and `rawCategory` carries the original through for diagnosis.
  */
-const SPELLING_CODES = new Set(['SPELL', 'SPELLING', 'TYPO', 'MISSPELLING'])
+const STYLE_TYPES = new Set(['style', 'redundancy', 'locale-violation', 'register'])
+const STYLE_CATEGORIES = new Set([
+  'STYLE',
+  'REDUNDANCY',
+  'PLAIN_ENGLISH',
+  'WORDINESS',
+  // Punctuation and spacing. NOT the same thing as `issueType:
+  // 'typographical'`, which is a mis-typed WORD and belongs with spelling.
+  // The two read alike and mean opposite things, which is the trap this
+  // comment exists for.
+  'TYPOGRAPHY',
+  'CASING',
+])
 
-export function categoryOf(rawCategory: string | undefined): IssueCategory {
-  return SPELLING_CODES.has((rawCategory ?? '').toUpperCase()) ? 'spelling' : 'grammar'
+export function categoryOf(issueType?: string, categoryId?: string): IssueCategory {
+  const type = (issueType ?? '').toLowerCase()
+  if (type === 'misspelling' || type === 'typographical') return 'spelling'
+  if (STYLE_TYPES.has(type)) return 'style'
+
+  const id = (categoryId ?? '').toUpperCase()
+  if (id === 'TYPOS') return 'spelling'
+  if (STYLE_CATEGORIES.has(id)) return 'style'
+  return 'grammar'
 }
 
 /**
- * Split text into pieces the API will accept, preferring a natural boundary.
+ * Split text into pieces the service will accept, preferring a natural break.
  *
- * OFFSETS ARE THE WHOLE POINT. Each chunk carries the index it started at, so
- * `toIssues` can add it back and every issue ends up addressing the document
- * the user is actually looking at. Chunking without that bookkeeping is how an
+ * OFFSETS ARE THE WHOLE POINT. Each chunk carries the index it started at so
+ * `toIssues` can add it back, and every issue ends up addressing the document
+ * the user is looking at. Chunking without that bookkeeping is how an
  * underline lands three paragraphs from the word it belongs to.
- *
- * It breaks at a paragraph if there is one in the last fifth of the window, a
- * sentence if not, a space if neither, and mid-word only when a single
- * "word" genuinely exceeds the window -- a base64 blob pasted into a CV, say.
- * Splitting mid-sentence is not a correctness problem but it costs accuracy:
- * the checker cannot see an agreement error whose two halves land in different
- * requests.
  */
 export function chunkText(
   text: string,
@@ -134,57 +164,63 @@ export function chunkText(
 /**
  * Map one response onto document-absolute issues.
  *
- * `offset` is the chunk's start. Edits whose range is malformed are dropped
- * rather than rendered, because an issue with a backwards range would either
- * throw or silently highlight the rest of the document.
+ * `offset` is the chunk's start. Malformed matches are dropped rather than
+ * rendered: a negative offset or length would either throw on slice or
+ * highlight the wrong span.
  */
 export function toIssues(
-  response: GrammarBotResponse,
+  response: LanguageToolResponse,
   offset = 0
 ): GrammarIssue[] {
-  const edits = Array.isArray(response.edits) ? response.edits : []
+  const matches = Array.isArray(response.matches) ? response.matches : []
 
-  return edits
+  return matches
     .filter(
-      (edit) =>
-        Number.isFinite(edit.start) &&
-        Number.isFinite(edit.end) &&
-        edit.end >= edit.start &&
-        edit.start >= 0
+      (match) =>
+        Number.isFinite(match.offset) &&
+        Number.isFinite(match.length) &&
+        match.offset >= 0 &&
+        match.length >= 0
     )
-    .map((edit) => ({
-      start: edit.start + offset,
-      end: edit.end + offset,
-      replace: typeof edit.replace === 'string' ? edit.replace : '',
-      category: categoryOf(edit.err_cat),
-      rawCategory: edit.err_cat ?? '',
-      description: edit.err_desc ?? '',
+    .map((match) => ({
+      start: match.offset + offset,
+      end: match.offset + match.length + offset,
+      replacements: (match.replacements ?? [])
+        .map((replacement) => replacement.value)
+        .filter((value): value is string => typeof value === 'string')
+        // Word shows a handful, not forty; the rest are noise in a 320px rail.
+        .slice(0, 5),
+      category: categoryOf(match.rule?.issueType, match.rule?.category?.id),
+      rawCategory: match.rule?.category?.id ?? '',
+      message: match.shortMessage?.trim() || match.message?.trim() || '',
     }))
 }
 
-/** Issues split into the two tabs, in document order within each. */
+/** Issues split into the tabs that show them, in document order within each. */
 export function splitByCategory(issues: GrammarIssue[]): {
   spelling: GrammarIssue[]
   grammar: GrammarIssue[]
+  style: GrammarIssue[]
 } {
   const byPosition = [...issues].sort((a, b) => a.start - b.start)
   return {
     spelling: byPosition.filter((i) => i.category === 'spelling'),
     grammar: byPosition.filter((i) => i.category === 'grammar'),
+    style: byPosition.filter((i) => i.category === 'style'),
   }
 }
 
 /**
- * Apply one issue to the text it came from.
+ * Apply one replacement to the text it came from.
  *
- * Callers must re-check after applying rather than applying a second issue to
- * the same string: every offset after the edit has moved by the length
- * difference, so a stale issue list would corrupt the document. The panes
- * enforce this by clearing the list after an accept.
+ * Callers must re-check rather than applying a second issue to the result:
+ * every offset after the edit has moved by the length difference, so a stale
+ * list would cut at the wrong index. `useProofread` enforces that by clearing
+ * the list on accept.
  */
-export function applyIssue(text: string, issue: GrammarIssue): string {
+export function applyIssue(text: string, issue: GrammarIssue, replacement: string): string {
   if (issue.start < 0 || issue.end > text.length || issue.end < issue.start) {
     return text
   }
-  return text.slice(0, issue.start) + issue.replace + text.slice(issue.end)
+  return text.slice(0, issue.start) + replacement + text.slice(issue.end)
 }

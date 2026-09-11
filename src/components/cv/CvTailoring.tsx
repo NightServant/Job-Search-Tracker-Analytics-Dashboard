@@ -219,17 +219,42 @@ function Suggestion({
 }
 
 /** RIGHT RAIL: how well it matches, and what to change. */
+/**
+ * `emphasis` IS WHAT MAKES TWO TABS OUT OF ONE RAIL (Gabe, 2026-09-11).
+ *
+ * ATS match and AI tailoring come from the same pass over the same posting, so
+ * they stay one component and one request. They are two TABS because they
+ * answer different questions -- "will a screener read this" and "what should
+ * it say instead" -- and a tab that shows both is not a tab, it is the old
+ * rail with a heading on top.
+ *
+ * THE ATS TAB IS DELIBERATELY RICHER THAN THE RECORD DIALOG, which is what was
+ * asked for. Both draw the same `AtsDonut` and `AtsKeywords` -- one ATS score
+ * should not have two appearances -- but the dialog is a panel someone opened
+ * to glance at, while this is a tab they chose. It lists twice the keywords,
+ * and shows the matched terms at full length rather than as reassurance.
+ */
+export type AnalysisEmphasis = 'match' | 'rewrites' | 'both'
+
 export function TailoringAnalysisRail({
   state,
   onApply,
+  emphasis = 'both',
 }: {
   state: CvTailoringState
   onApply?: (suggestion: TailoringSuggestion) => void
+  emphasis?: AnalysisEmphasis
 }) {
   const { match, result, running } = state
+  const showMatch = emphasis === 'match' || emphasis === 'both'
+  const showRewrites = emphasis === 'rewrites' || emphasis === 'both'
+  // Focused tab, so the rail can afford the fuller list; `both` keeps the
+  // original 12 because it is stacking two sections in one 320px column.
+  const keywordLimit = emphasis === 'match' ? 24 : 12
 
   return (
-    <div className="flex flex-col gap-6" data-tailoring-analysis>
+    <div className="flex flex-col gap-6" data-tailoring-analysis data-emphasis={emphasis}>
+      {showMatch && (
       <PanelSection title="ATS match" icon="ShieldCheck" className="border-t-0 pt-0">
         {match === null ? (
           <p className="text-body-s text-text-muted">
@@ -251,9 +276,7 @@ export function TailoringAnalysisRail({
               label="missing keywords"
               terms={match.missing}
               emptyText="none — every term in the posting shows up in this CV."
-              // Fewer than the record dialog gets: this is a 320px rail beside
-              // a document, not a panel someone opened to study.
-              limit={12}
+              limit={keywordLimit}
             />
             {/* THE OTHER HALF OF THE SPLIT, absent from this rail until
                 2026-09-09. It showed only what the CV lacked -- a list of
@@ -265,13 +288,20 @@ export function TailoringAnalysisRail({
                 missing list is the work, this one is the reassurance, and
                 two lists at equal weight in a 320px rail is a wall. */}
             {match.matched.length > 0 && (
-              <AtsKeywords label="matched" terms={match.matched} limit={12} muted />
+              <AtsKeywords
+                label="matched"
+                terms={match.matched}
+                limit={keywordLimit}
+                muted={emphasis !== 'match'}
+              />
             )}
           </div>
         )}
       </PanelSection>
+      )}
 
-      <PanelSection title="AI tailoring" icon="CircleCheck">
+      {showRewrites && (
+      <PanelSection title="AI tailoring" icon="CircleCheck" className={showMatch ? undefined : 'border-t-0 pt-0'}>
         <div className="flex flex-col gap-4">
           <Button
             size="s"
@@ -324,6 +354,7 @@ export function TailoringAnalysisRail({
           )}
         </div>
       </PanelSection>
+      )}
     </div>
   )
 }

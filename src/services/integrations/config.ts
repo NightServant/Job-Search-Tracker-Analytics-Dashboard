@@ -59,19 +59,6 @@ export interface IntegrationConfig {
   tailoring: { baseUrl?: string; apiKey?: string; model: string }
   /** The EU skills taxonomy. No key, so it is on unless explicitly disabled. */
   esco: { baseUrl: string; enabled: boolean }
-  /**
-   * Grammar and spelling, over GrammarBot.
-   *
-   * ONE KEY SERVES BOTH EDITOR TABS. The endpoint returns grammar and spelling
-   * together and tags each edit with `err_cat`, so Grammar Check and Spell
-   * Check are one request split two ways rather than two integrations.
-   *
-   * Verified against the vendor quickstart on 2026-09-11: the key travels in
-   * the request BODY rather than a header, and browser calls are refused
-   * outright for CORS -- both of which are why this is server-only and why the
-   * variable is not prefixed NEXT_PUBLIC_.
-   */
-  grammar: { baseUrl: string; apiKey?: string }
 }
 
 export function readIntegrationConfig(): IntegrationConfig {
@@ -91,10 +78,6 @@ export function readIntegrationConfig(): IntegrationConfig {
       baseUrl: trimmed('ESCO_BASE_URL') ?? 'https://ec.europa.eu/esco/api',
       enabled: trimmed('ESCO_ENABLED') !== 'false',
     },
-    grammar: {
-      baseUrl: trimmed('GRAMMARBOT_BASE_URL') ?? 'https://neural.grammarbot.io/v1/check',
-      apiKey: trimmed('GRAMMARBOT_API_KEY'),
-    },
   }
 }
 
@@ -109,7 +92,6 @@ export interface IntegrationCapabilities {
   compileLatex: boolean
   tailorCv: boolean
   expandSkills: boolean
-  checkGrammar: boolean
 }
 
 /**
@@ -154,9 +136,6 @@ export function configProblems(config: IntegrationConfig): string[] {
   if (config.formatex.baseUrl && !/^https?:\/\//i.test(config.formatex.baseUrl)) {
     problems.push(`FORMATEX_BASE_URL should be a URL but is "${config.formatex.baseUrl}".`)
   }
-  if (config.grammar.baseUrl && !/^https?:\/\//i.test(config.grammar.baseUrl)) {
-    problems.push(`GRAMMARBOT_BASE_URL should be a URL but is "${config.grammar.baseUrl}".`)
-  }
   return problems
 }
 
@@ -173,8 +152,5 @@ export function capabilitiesOf(config: IntegrationConfig): IntegrationCapabiliti
       !!config.tailoring.model &&
       !/^https?:\/\//i.test(config.tailoring.model),
     expandSkills: config.esco.enabled,
-    // A key alone, because the endpoint has a working default. Unlike
-    // tailoring, there is no model id and no provider choice to get wrong.
-    checkGrammar: !!config.grammar.apiKey,
   }
 }
