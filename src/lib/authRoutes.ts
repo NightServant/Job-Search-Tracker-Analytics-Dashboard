@@ -13,17 +13,26 @@
  *                was asked for rides along as `?next=` so the sign-in can put
  *                the visitor where they were going rather than on a dashboard
  *                they did not ask for.
- *   AUTH-ONLY -- /login and /signup. A session means /dashboard: a form whose
- *                only honest outcome is to put you back where you already are
- *                is not worth showing.
- *   PUBLIC    -- everything else, including `/` and `/privacy`, which a
- *                signed-in person has an ordinary reason to read.
+ *   SIGNED-IN  -- `/`, `/login` and `/signup`. A session means /dashboard: a
+ *   ELSEWHERE     sign-in form whose only honest outcome is to put you back
+ *                 where you already are is not worth showing, and neither is a
+ *                 marketing page pitching a product you already have.
+ *   PUBLIC     -- everything else, including `/privacy`, which a signed-in
+ *                 person has an ordinary reason to read.
  *
- * `/` IS NOT REDIRECTED HERE, and that is a deliberate carry-over rather than
- * an omission. It is a static marketing route whose traffic is overwhelmingly
- * signed out; sending signed-in visitors to the dashboard is still wanted, but
- * doing it in middleware would make the page dynamic for everyone and cost
- * every anonymous visitor the static render. It stays a client-side redirect.
+ * `/` MOVED INTO THAT LIST ON 2026-09-11, reversing what this file said a few
+ * hours earlier. The old reasoning was that redirecting `/` in middleware
+ * would make a static marketing route dynamic for everyone and tax every
+ * anonymous visitor to serve the minority who are signed in. That argument
+ * stopped holding once the middleware gained its no-cookie short circuit: a
+ * request with no session cookie is answered without a network call, and
+ * middleware was already running on `/` regardless. The page itself is still
+ * statically rendered and still served to everyone who is not signed in.
+ *
+ * What it replaces is a client-side redirect that could only fire AFTER the
+ * landing page had painted -- so a signed-in visitor typing the bare domain
+ * watched a marketing pitch appear and then vanish. Gabe asked for that frame
+ * gone.
  */
 
 /** Everything under these prefixes requires a session. */
@@ -37,8 +46,19 @@ const PRIVATE_PREFIXES = [
   '/settings',
 ] as const
 
-/** These exist to get you a session, so holding one makes them pointless. */
-const AUTH_ONLY = ['/login', '/signup'] as const
+/**
+ * Paths a signed-in visitor is moved off.
+ *
+ * `/login` and `/signup` exist to get you a session, so holding one makes them
+ * pointless. `/` is the marketing pitch for a product you already have.
+ *
+ * `/` MATCHES EXACTLY AND NOTHING ELSE, which the comparison below already
+ * guarantees but is worth saying out loud: the check is `=== prefix` or
+ * `startsWith(prefix + '/')`, and for `/` that second form is `'//'` -- which
+ * no ordinary path begins with. A naive `startsWith('/')` would have matched
+ * every route in the app.
+ */
+const REDIRECT_WHEN_SIGNED_IN = ['/', '/login', '/signup'] as const
 
 export function isPrivatePath(pathname: string): boolean {
   return PRIVATE_PREFIXES.some(
@@ -46,8 +66,10 @@ export function isPrivatePath(pathname: string): boolean {
   )
 }
 
-export function isAuthOnlyPath(pathname: string): boolean {
-  return AUTH_ONLY.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
+export function redirectsWhenSignedIn(pathname: string): boolean {
+  return REDIRECT_WHEN_SIGNED_IN.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  )
 }
 
 /**
@@ -92,7 +114,7 @@ export function decideRoute(
     return { redirectTo: `/login?next=${next}` }
   }
 
-  if (isAuthOnlyPath(pathname) && signedIn) {
+  if (redirectsWhenSignedIn(pathname) && signedIn) {
     return { redirectTo: '/dashboard' }
   }
 

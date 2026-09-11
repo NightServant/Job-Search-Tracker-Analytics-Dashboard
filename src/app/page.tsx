@@ -11,10 +11,17 @@ import { SCREENS } from '@/components/landing/screens'
  * from that decision is the important half: this route is still STATIC and
  * still renders Landing for the anonymous traffic that is nearly all of it.
  *
- * The redirect is a client island rather than a server `redirect()`, and it
- * has to be -- reading the session here would make the route dynamic, and the
- * session is not on the server to read in the first place. See
- * SignedInRedirect for why, and for the one frame it costs.
+ * THE REDIRECT MOVED TO MIDDLEWARE on 2026-09-11. It used to be a client
+ * island because the session lived in localStorage and there was nothing on
+ * the server to read; cookie-backed sessions ended that, and `decideRoute`
+ * now sends a signed-in visitor to /dashboard before this component is ever
+ * invoked. The route is STILL STATIC -- middleware runs in front of it and
+ * nothing here reads a session -- so the anonymous majority still gets the
+ * cached render.
+ *
+ * SignedInRedirect stays mounted, and not as a leftover. Middleware sees the
+ * cookies that arrived WITH the request; it cannot see a session that appears
+ * while this page is open. That is the only case left for it.
  *
  * Moving the demo to `/demo/*` is what removed the last objection to any of
  * this. The CTA is a link to a page rather than a session swap, so a

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { decideRoute, isAuthOnlyPath, isPrivatePath, safeNextPath } from '../authRoutes'
+import {
+  decideRoute,
+  isPrivatePath,
+  redirectsWhenSignedIn,
+  safeNextPath,
+} from '../authRoutes'
 
 describe('which routes need a session', () => {
   it('covers every screen behind the app shell, including child routes', () => {
@@ -19,8 +24,9 @@ describe('which routes need a session', () => {
   })
 
   it('leaves the public surface alone', () => {
-    // `/` and `/privacy` are readable signed in or out; `/demo/*` is the whole
-    // point of having a demo.
+    // None of these needs a session to READ. `/` and the auth pages move a
+    // signed-in visitor along, which is a different rule -- see below -- and
+    // not a reason to demand a session from a signed-out one.
     for (const path of ['/', '/privacy', '/login', '/signup', '/demo/dashboard']) {
       expect(isPrivatePath(path), path).toBe(false)
     }
@@ -32,7 +38,32 @@ describe('which routes need a session', () => {
     // day somebody adds one.
     expect(isPrivatePath('/settingsomething')).toBe(false)
     expect(isPrivatePath('/cvs')).toBe(false)
-    expect(isAuthOnlyPath('/loginhelp')).toBe(false)
+    expect(redirectsWhenSignedIn('/loginhelp')).toBe(false)
+  })
+})
+
+describe('which routes move a signed-in visitor along', () => {
+  it('is the landing page and the two auth pages', () => {
+    for (const path of ['/', '/login', '/signup']) {
+      expect(redirectsWhenSignedIn(path), path).toBe(true)
+    }
+  })
+
+  it('does not swallow the whole app now that `/` is in the list', () => {
+    // THE TEST THIS FILE EXISTS FOR. Every path starts with `/`, so a prefix
+    // list containing `/` is one `startsWith` away from redirecting every
+    // route in the app to the dashboard -- including the dashboard, which is
+    // a redirect loop. The match is `=== '/'` or `startsWith('//')`, and
+    // nothing here is either.
+    for (const path of [
+      '/privacy',
+      '/demo/dashboard',
+      '/dashboard',
+      '/applications/abc-123',
+      '/settings',
+    ]) {
+      expect(redirectsWhenSignedIn(path), path).toBe(false)
+    }
   })
 })
 
@@ -56,19 +87,24 @@ describe('decideRoute', () => {
     expect(decideRoute('/signup', true).redirectTo).toBe('/dashboard')
   })
 
+  it('sends a signed-in visitor off the landing page too', () => {
+    // Gabe, 2026-09-11. This file used to assert the opposite -- that `/` was
+    // left to a client-side redirect -- so that the marketing route could stay
+    // static. It is still static for everyone signed out; what changed is that
+    // a signed-in visitor no longer watches the pitch paint and then vanish.
+    expect(decideRoute('/', true).redirectTo).toBe('/dashboard')
+  })
+
+  it('still serves the landing page to everyone signed out', () => {
+    expect(decideRoute('/', false).redirectTo).toBeNull()
+  })
+
   it('lets everyone through where the answer does not depend on a session', () => {
     expect(decideRoute('/applications', true).redirectTo).toBeNull()
     expect(decideRoute('/login', false).redirectTo).toBeNull()
     expect(decideRoute('/privacy', true).redirectTo).toBeNull()
     expect(decideRoute('/privacy', false).redirectTo).toBeNull()
     expect(decideRoute('/demo/dashboard', false).redirectTo).toBeNull()
-  })
-
-  it('leaves the landing page to the client, signed in or out', () => {
-    // Redirecting `/` in middleware would make a static marketing route
-    // dynamic for everyone to serve the minority who are signed in.
-    expect(decideRoute('/', true).redirectTo).toBeNull()
-    expect(decideRoute('/', false).redirectTo).toBeNull()
   })
 })
 

@@ -7,11 +7,13 @@ import { useAuth } from '@/contexts/AuthContext'
 /**
  * Sends a signed-in visitor from a public route to `/dashboard`.
  *
- * THREE ROUTES MOUNT IT: `/`, `/login` and `/signup`. On the auth pages it
- * is doing more work than on the landing page, because signing in IS a state
- * change that happens while the page is open -- the pre-paint script cannot
- * see a session that does not exist yet, and this is what moves somebody who
- * arrived signed out and left signed in.
+ * IT IS NO LONGER THE GATE. Middleware answers all three of the routes that
+ * mount it -- `/`, `/login` and `/signup` -- before a page is sent, so a
+ * visitor who ARRIVES with a session never reaches this component. What is
+ * left is the case middleware structurally cannot see: a session that comes
+ * into existence WHILE the page is open. Signing in is exactly that, which is
+ * why the auth pages still need this and why it is cheap to leave on `/` for
+ * the visitor who signs in elsewhere and comes back to a tab left open.
  *
  * THIS REVERSES A SETTLED DECISION, so the record should say so rather than
  * quietly changing. `/` was made the homepage for everyone on 2026-09-02, on
@@ -22,20 +24,18 @@ import { useAuth } from '@/contexts/AuthContext'
  * one is competing with, and the reviewer case is still served -- the landing
  * page is one click away on the lockup, and reviewers are signed out anyway.
  *
- * IT RENDERS NOTHING AND BLOCKS NOTHING. The landing page paints first and the
- * redirect happens after the session resolves, which is deliberate: `/` is a
- * static route and the overwhelming majority of its traffic is signed out.
- * Holding the page blank until auth resolves -- what AppLayout does, correctly,
- * for a private shell -- would make every anonymous visitor wait on a check
- * whose answer is almost always no, and would give a static marketing page a
- * blank first paint.
+ * IT RENDERS NOTHING AND BLOCKS NOTHING, which is still right: `/` is static
+ * and almost all of its traffic is signed out, so holding the page blank until
+ * auth resolves would make every anonymous visitor wait on a check whose
+ * answer is nearly always no.
  *
- * The cost is honest and worth naming: a signed-in visitor sees the top of the
- * landing page for a moment before being moved. Removing that frame is not a
- * tuning problem, it needs the session readable on the SERVER, and this app
- * uses supabase-js with the default localStorage storage -- there is no auth
- * cookie for middleware to read. Doing it properly means adopting @supabase/ssr
- * and cookie-backed sessions across the app, which is a migration, not a fix.
+ * THE FRAME THIS FILE USED TO APOLOGISE FOR IS GONE. It said a signed-in
+ * visitor would see the top of the landing page before being moved, and that
+ * removing that needed the session readable on the SERVER -- "a migration, not
+ * a fix". The migration happened on 2026-09-11: sessions are cookie-backed via
+ * @supabase/ssr and middleware redirects `/` before anything is rendered. The
+ * paint-then-vanish only remains for a session that appears mid-visit, where
+ * there was nothing to redirect at request time.
  *
  * `replace`, not `push`: otherwise Back from the dashboard returns to `/`,
  * which immediately redirects forward again, and the Back button stops working.
