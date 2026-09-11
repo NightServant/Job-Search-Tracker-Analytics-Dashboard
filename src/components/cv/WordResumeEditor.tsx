@@ -20,12 +20,12 @@ import { DocumentToolbar } from './DocumentToolbar'
 import { DocumentRailPane } from './DocumentRailPane'
 import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './documentTabs'
 import { useProofread } from './useProofread'
+import { useResumeExport } from './useResumeExport'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
 import type { ResumeContent, ResumeDraft, ResumeMode } from '@/services/resumeService'
-import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 
 /**
  * The document-style CV editor: Tiptap, autosave, snapshots and PDF export.
@@ -80,7 +80,6 @@ export function WordResumeEditor({
   const { success, error: showError, info } = useToast()
   const [title, setTitle] = useState(draft.title)
   const [isSaving, setIsSaving] = useState(false)
-  const [isExporting, setIsExporting] = useState(false)
   /**
    * Dirtiness is a comparison between two counters, not a boolean.
    *
@@ -245,85 +244,6 @@ export function WordResumeEditor({
     }
   }, [revision])
 
-  const exportPdf = async () => {
-    if (!editor) return
-    setIsExporting(true)
-    try {
-      // A PDF built from content the database refused is a PDF of something
-      // that does not exist. Without this the editor showed "Save failed" and
-      // "PDF ready" together and handed over the second one.
-      if (!(await saveDraft(false))) return
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('No active session found')
-      const { url: supabaseUrl, anonKey: supabaseAnonKey } = readSupabaseConfig(currentEnvSource())
-      const response = await fetch(`${supabaseUrl}/functions/v1/resume-export-pdf`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: supabaseAnonKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title: title.trim() || 'Untitled CV', content: editor.getJSON() }),
-      })
-      if (!response.ok) throw new Error((await response.text()) || `Export failed (${response.status})`)
-      const blob = await response.blob()
-      const safeName = (title.trim() || 'cv')
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${safeName || 'cv'}.pdf`
-      a.click()
-      URL.revokeObjectURL(url)
-      success('PDF ready', 'Your CV PDF has been downloaded.')
-    } catch (err) {
-      showError('Export failed', err instanceof Error ? err.message : 'Could not export PDF')
-    } finally {
-      setIsExporting(false)
-    }
-  }
-
-  /**
-   * Word export, alongside the PDF one.
-   *
-   * BOTH, not one: ATS parsers still handle .docx more reliably than PDF and
-   * many application forms accept Word only, while a human reviewer opening
-   * the file wants the PDF's fixed layout. Which one matters depends on who is
-   * on the other end, and the author is the only one who knows that.
-   */
-  const [isExportingDocx, setIsExportingDocx] = useState(false)
-  const exportDocx = async () => {
-    if (!editor) return
-    setIsExportingDocx(true)
-    try {
-      const response = await authedFetch('/api/cv/docx', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: title.trim() || 'CV', content: editor.getJSON() }),
-      })
-      if (!response.ok) {
-        const body = (await response.json().catch(() => null)) as { error?: string } | null
-        throw new Error(body?.error || `Export failed (${response.status})`)
-      }
-      const url = URL.createObjectURL(await response.blob())
-      const anchor = document.createElement('a')
-      anchor.href = url
-      anchor.download = `${(title.trim() || 'cv').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'cv'}.docx`
-      anchor.click()
-      // Revoked immediately: the click has already handed the blob to the
-      // download, and holding it keeps the whole file in memory for the tab.
-      URL.revokeObjectURL(url)
-      success('Word file ready', 'Your CV has been downloaded as .docx.')
-    } catch (err) {
-      showError('Export failed', err instanceof Error ? err.message : 'Could not export Word file')
-    } finally {
-      setIsExportingDocx(false)
-    }
-  }
 
   const resetTemplate = () => {
     editor?.commands.setContent(DEFAULT_WORD_CONTENT)
@@ -344,6 +264,10 @@ export function WordResumeEditor({
   // every render rather than memoised, because it has to follow the document
   // as it is typed -- a score computed against a stale copy is worse than no
   // score, since it looks current.
+  // PDF and .docx. `saveDraft` is passed in rather than reached for: see
+  // useResumeExport on why that dependency belongs in the signature.
+  const exportState = useResumeExport({ editor, title, saveDraft, authedFetch })
+
   const tailoring = useCvTailoring({ cvText: editor?.getText() ?? '', jobs })
   const proofread = useProofread(editor)
 
@@ -425,13 +349,13 @@ export function WordResumeEditor({
             <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
             reset
           </Button>
-          <Button variant="ghost" size="s" onClick={exportDocx} disabled={!editor || isExportingDocx}>
+          <Button variant="ghost" size="s" onClick={exportState.exportDocx} disabled={!editor || exportState.isExportingDocx}>
             <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
-            {isExportingDocx ? 'exporting' : 'export .docx'}
+            {exportState.isExportingDocx ? 'exporting' : 'export .docx'}
           </Button>
-          <Button variant="secondary" size="s" onClick={exportPdf} disabled={!editor || isExporting}>
+          <Button variant="secondary" size="s" onClick={exportState.exportPdf} disabled={!editor || exportState.isExportingPdf}>
             <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
-            {isExporting ? 'exporting' : 'export PDF'}
+            {exportState.isExportingPdf ? 'exporting' : 'export PDF'}
           </Button>
           {/*
             SAVE IS PRIMARY, and Export is not. Before this, Export PDF was the

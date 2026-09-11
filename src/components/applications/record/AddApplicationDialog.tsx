@@ -8,15 +8,16 @@ import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
-import { ProgressTrack } from '@/components/ui/progress-track'
-import { ArrowRightIcon, type IconName } from '@/components/icons'
+import { ArrowRightIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
-import { isSupportedCurrency } from '@/services/userPreferences'
 import { ApplicationRecordView } from './ApplicationRecordView'
+import { WizardProgress } from './wizardSteps'
+import { STEPS, type StepId } from './wizardStepModel'
+import { autofillPosting } from './autofillPosting'
 import { draftFromJob, normalizePostingUrl, useRecordDraft, type RecordDraft } from './useRecordDraft'
 import type { PostingDigestResult } from './digest'
 import type { SupportedCurrency } from '@/services/userPreferences'
-import type { JobAutofillResult, JobFormData, WorkMode } from '@/types'
+import type { JobAutofillResult, JobFormData } from '@/types'
 
 /**
  * Adding an application, as four steps instead of a nineteen-field form.
@@ -41,47 +42,6 @@ import type { JobAutofillResult, JobFormData, WorkMode } from '@/types'
  * the whole flow on a fetch nobody controls would make the unreliable half the
  * required half.
  */
-type StepId = 'link' | 'status' | 'fill' | 'review'
-
-interface StepDef {
-  id: StepId
-  label: string
-  description: string
-  icon: IconName
-}
-
-const STEPS: StepDef[] = [
-  { id: 'link', label: 'link', description: 'where the posting lives', icon: 'Link' },
-  { id: 'status', label: 'status', description: 'saved or already sent', icon: 'Flag' },
-  { id: 'fill', label: 'read', description: 'the model fills it in', icon: 'Documents' },
-  { id: 'review', label: 'review', description: 'check it, then save', icon: 'Check' },
-]
-
-/**
- * The wizard's four steps, on the shared `ui/progress-track` (2026-09-11).
- *
- * IT TAKES THE ACCENT AND NOT THE STATUS PALETTE, which is the opposite of
- * `ApplicationPipeline` one screen over -- and deliberately. That bar tracks an
- * application through five named statuses, which have colours. This one tracks
- * a person through a form, which does not; the accent is what this system uses
- * for "you are here", and it is the tracker's default tone.
- */
-function WizardProgress({ current }: { current: number }) {
-  return (
-    <div data-add-progress={STEPS[current]?.id}>
-      <ProgressTrack
-        label="New application progress"
-        current={current}
-        steps={STEPS.map((step) => ({
-          id: step.id,
-          label: step.label,
-          description: step.description,
-          icon: step.icon,
-        }))}
-      />
-    </div>
-  )
-}
 
 export interface AddApplicationDialogProps {
   open: boolean
@@ -168,109 +128,20 @@ export function AddApplicationDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialUrl])
 
-  const goRead = async () => {
-    setStep('fill')
-    setReadNote('')
 
-    const url = normalizePostingUrl(draft.url)
-    if (!onAutofill || !url) {
-      setReadNote(
-        onAutofill
-          ? 'No link to read. Paste the posting into the description column and press “tidy and summarise”.'
-          : 'Reading a posting is not available here. Fill the application in below.'
-      )
-      setStep('review')
-      return
-    }
-
-    let description = ''
-    try {
-      const result = await onAutofill(url)
-      const values = result.values
-      const next: Partial<RecordDraft> = {}
-      if (values.company) next.company = values.company
-      if (values.role) next.role = values.role
-      if (values.location) next.location = values.location
-      if (values.source) next.source = values.source
-      // Guarded against the union: this arrives from a remote page, and an
-      // unrecognised string would put the select into a state no option
-      // matches.
-      if (values.work_mode && ['remote', 'hybrid', 'onsite'].includes(values.work_mode)) {
-        next.workMode = values.work_mode as WorkMode
-      }
-      if (values.salary_min != null) next.salaryMin = String(values.salary_min)
-      if (values.salary_max != null) next.salaryMax = String(values.salary_max)
-      // THE CURRENCY TRAVELS WITH THE FIGURES. A peso range stored under the
-      // account's default relabels a number without converting it.
-      if (values.salary_currency && isSupportedCurrency(values.salary_currency)) {
-        next.currency = values.salary_currency
-      }
-      if (values.description) {
-        description = values.description
-        next.description = values.description
-      }
-      if (values.tech_stack?.length) next.techStack = values.tech_stack.join(', ')
-      if (values.tags?.length) next.tags = values.tags.join(', ')
-      replace(next)
-      setReadNote(
-        result.warnings?.length
-          ? `${result.warnings.join(' ')} Check every field before saving.`
-          : 'Filled from the posting. Check every field before saving.'
-      )
-    } catch (err) {
-      // "The next step" was wrong: this IS the next step. The description
-      // column is to the right of the fields on a wide screen and under them
-      // on a narrow one, which is what the copy has to say instead.
-      setReadNote(
-        `${err instanceof Error ? err.message : 'Could not read that posting.'} ` +
-          'Paste the description into the column beside these fields and press “tidy and summarise”.'
-      )
-    }
-
-    // TIDIED AND SUMMARISED IN THE SAME PASS, so the review step shows a
-    // paragraph rather than eight hundred words. This is the auto-summarise
-    // that replaced the `tidy and summarise` button (Gabe, 2026-09-10) -- it
-    // is the only place the digest runs now, so it also has to apply the
-    // fields the digest mines out of the posting.
-    //
-    // Its own try/catch: a failed summary must not throw away a description
-    // the fetch did recover.
-    if (onDigest && description.trim()) {
-      try {
-        const digest = await onDigest(description)
-        replace({ description: digest.formatted })
-        setSummary(digest.summary)
-        // EMPTY FIELDS ONLY, and through `fillEmpty` rather than a comparison
-        // against `draft`: the auto-fill above has not landed in the closure
-        // this is reading, so anything checked here would look empty and the
-        // digest would overwrite what the extractor just found.
-        const mined = digest.fields
-        fillEmpty({
-          company: mined.company ?? undefined,
-          role: mined.role ?? undefined,
-          location: mined.location ?? undefined,
-          salaryMin: mined.salary_min == null ? undefined : String(mined.salary_min),
-          salaryMax: mined.salary_max == null ? undefined : String(mined.salary_max),
-          techStack: mined.tech_stack?.length ? mined.tech_stack.join(', ') : undefined,
-          // Guarded against the union and the supported set: both arrive from
-          // a remote page, and an unrecognised value would put a select into a
-          // state no option matches, or fail a CHECK at the insert.
-          workMode:
-            mined.work_mode && ['remote', 'hybrid', 'onsite'].includes(mined.work_mode)
-              ? (mined.work_mode as WorkMode)
-              : undefined,
-          currency:
-            mined.salary_currency && isSupportedCurrency(mined.salary_currency)
-              ? mined.salary_currency
-              : undefined,
-        })
-      } catch {
-        // The untidied description is still the right thing to keep.
-      }
-    }
-
-    setStep('review')
-  }
+  // The read step, as an explicit parameter object rather than a closure over
+  // nine values. See autofillPosting for why the width is the honest shape.
+  const goRead = () =>
+    autofillPosting({
+      draft,
+      fillEmpty,
+      replace,
+      setStep,
+      setReadNote,
+      setSummary,
+      onAutofill,
+      onDigest,
+    })
 
   const stepBody = () => {
     switch (step) {
