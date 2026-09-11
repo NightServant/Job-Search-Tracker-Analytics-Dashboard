@@ -18,23 +18,18 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
-import { StatusTabs, STATUS_TABS, type StatusTabValue } from './StatusTabs'
+import { StatusTabs } from './StatusTabs'
+import { useApplicationsFilter, PAGE_SIZE } from './useApplicationsFilter'
+import { useDeepLinkedApplication } from './useDeepLinkedApplication'
+import { useCsvImport } from './useCsvImport'
 import { ApplicationRecordDialog } from './record/ApplicationRecordDialog'
 import { AddApplicationDialog } from './record/AddApplicationDialog'
 import type { ApplicationRecordData } from './record/recordData'
 import type { PostingDigestResult } from './record/digest'
-import { sortJobs, type JobSort } from '@/lib/jobSort'
-import { buildJobDedupKey, buildJobsCsvText, parseJobsCsvText, type ParsedJobRow } from '@/lib/jobCsv'
+import { buildJobsCsvText } from '@/lib/jobCsv'
 import { resolveDefaultCurrency, type SupportedCurrency } from '@/services/userPreferences'
 import type { Job, JobAutofillResult, JobFormData } from '@/types'
 
-interface CsvImport {
-  fileName: string
-  rows: ParsedJobRow[]
-  importable: ParsedJobRow[]
-  duplicates: number
-  invalid: number
-}
 
 /**
  * Which application the record dialog is showing.
@@ -61,7 +56,6 @@ type RecordState = { id: string } | null
  * account with a dozen applications never sees pagination at all and cannot
  * tell whether it exists -- which is exactly how it read on review.
  */
-const PAGE_SIZE = 10
 
 function downloadCsv(fileName: string, text: string) {
   const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' })
@@ -223,13 +217,27 @@ export function ApplicationsPage({
   // top bar, and the page scrolls once for the band above it. 451px of table
   // at that same 1440x820 rather than 156.
 
-  const [search, setSearch] = React.useState('')
-  // DEFAULT `applied`, which is the revision's whole point: both tables
-  // ordered by the date the application actually went out, newest first, not
-  // by when the row happened to be typed into Worktrack.
-  const [sort, setSort] = React.useState<JobSort>('applied')
-  const [tab, setTab] = React.useState<StatusTabValue>('all')
-  const [page, setPage] = React.useState(1)
+  // Search, sort, tab and pagination, which only ever talk to each other and
+  // to `jobs`. See useApplicationsFilter for why that slice moved out.
+  const filter = useApplicationsFilter(jobs)
+  const {
+    search,
+    setSearch,
+    sort,
+    setSort,
+    tab,
+    setTab,
+    counts,
+    listed,
+    paged,
+    pageCount,
+    setPage,
+    emptyListMessage,
+  } = filter
+  // Named `current` at the call sites because the hook already clamped it;
+  // `filter.page` is never a page that does not exist.
+  const current = filter.page
+
   const [open, setOpen] = React.useState<RecordState>(null)
   const [addOpen, setAddOpen] = React.useState(false)
   const [formDirty, setFormDirty] = React.useState(false)
@@ -237,9 +245,10 @@ export function ApplicationsPage({
   // `null` (explicitly "no CV"). Only the second should unpin an existing link.
   const [resumeChoice, setResumeChoice] = React.useState<string | null | undefined>(undefined)
   const [discardOpen, setDiscardOpen] = React.useState(false)
-  const [csv, setCsv] = React.useState<CsvImport | null>(null)
-  const [skipDuplicates, setSkipDuplicates] = React.useState(true)
-  const [parsingCsv, setParsingCsv] = React.useState(false)
+  // Parsing, deduplication and the import request. Six of this component's
+  // props existed only to serve it; see useCsvImport.
+  const csvImport = useCsvImport({ jobs, onImport, onCsvError })
+  const { csv, skipDuplicates, setSkipDuplicates } = csvImport
 
   // DERIVED, never stored. See RecordState for what storing it cost.
   const openJob = open?.id ? (jobs.find((candidate) => candidate.id === open.id) ?? null) : null
@@ -281,163 +290,18 @@ export function ApplicationsPage({
     dismiss()
   }
 
-  // THE OPEN RECORD STOPPED EXISTING. Delete is reachable from inside the
-  // dialog now, and the confirm sits on top of it -- so once the row is gone
-  // from `jobs`, what is underneath is a record of something that no longer
-  // exists, with an edit button that would save it back.
-  //
-  // Keyed on the LIST rather than wired into the delete callback, so it also
-  // covers a row deleted in another tab and arriving through a refetch. When
-  // it fires, `dismiss` sets `open` to null and the next run returns at the
-  // first line, so there is no loop.
-  React.useEffect(() => {
-    const openId = open?.id
-    if (!openId) return
-    if (!jobs.some((candidate) => candidate.id === openId)) dismiss()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobs, open?.id])
-
-  // `?application=<id>` from the desktop redirect off `/applications/<id>`.
-  // Runs once per id: re-running it on every render of `jobs` would reopen
-  // the dialog every time the list refetched, including right after the user
-  // closed it.
-  const openedInitial = React.useRef<string | null>(null)
-  React.useEffect(() => {
-    if (!initialOpenId || openedInitial.current === initialOpenId) return
-    const job = jobs.find((candidate) => candidate.id === initialOpenId)
-    if (!job) return
-    openedInitial.current = initialOpenId
-    setOpen({ id: job.id })
-    onOpenJobChange?.(job)
-    // `jobs` is the only other value read, and it is here so a deep link that
-    // arrives before the list has loaded still opens once it has.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialOpenId, jobs])
-
-  // `?add=<url>` from the calendar's job feed. Once per URL, for the same
-  // reason `?application=` runs once per id: re-running on every render of
-  // `jobs` would reopen the wizard each time the list refetched, including
-  // immediately after somebody closed it.
-  const openedAdd = React.useRef<string | null>(null)
-  React.useEffect(() => {
-    if (!initialAddUrl || openedAdd.current === initialAddUrl) return
-    openedAdd.current = initialAddUrl
-    setAddOpen(true)
-  }, [initialAddUrl])
-
-  // ORDERED BY `date_applied`, NEWEST FIRST, by default -- and by company or
-  // position when the toolbar asks. This used to sort on `created_at`, which
-  // is when the ROW was added to Worktrack rather than when the application
-  // went out; the column the table prints is `applied on`, so the two
-  // disagreed on screen. See lib/jobSort for how a wishlist row with no
-  // applied date is placed.
-  const searched = React.useMemo(() => {
-    const needle = search.trim().toLowerCase()
-    const matched = needle
-      ? jobs.filter(
-          (job) =>
-            job.company.toLowerCase().includes(needle) ||
-            job.role.toLowerCase().includes(needle)
-        )
-      : jobs
-    return sortJobs(matched, sort)
-  }, [jobs, search, sort])
-
-  const counts = React.useMemo(() => {
-    const result = Object.fromEntries(
-      STATUS_TABS.map((value) => [value, 0])
-    ) as Record<StatusTabValue, number>
-    result.all = searched.length
-    for (const job of searched) result[job.status] += 1
-    return result
-  }, [searched])
-
-  const listed = tab === 'all' ? searched : searched.filter((job) => job.status === tab)
-
-  // Pagination. M5 Task 4 removed the original 20-per-page pagination along
-  // with the advanced filters; Gabe asked for it back.
-  const pageCount = Math.max(1, Math.ceil(listed.length / PAGE_SIZE))
-  // Clamp rather than store a page that no longer exists: deleting the last
-  // row of page 3, or narrowing the search, would otherwise leave the user on
-  // an empty page with no way back except paging.
-  const current = Math.min(page, pageCount)
-  const paged = listed.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
-
-  // Search and tab both change the result set, so the page index they were
-  // valid for is meaningless afterwards.
-  React.useEffect(() => {
-    setPage(1)
-  }, [search, tab, sort])
-
-  // A status tab at zero is a real, expected state (nobody has an offer on
-  // day one), not a search yielding nothing -- so it gets its own sentence
-  // rather than the generic "nothing matches these filters" the search box
-  // produces, which would misname the cause.
-  const emptyListMessage =
-    tab === 'all' ? undefined : `no ${tab} applications${search.trim() ? ' match this search' : ' yet'}.`
-
-  const handleCsvFile = async (file: File) => {
-    setParsingCsv(true)
-    try {
-      const result = parseJobsCsvText(await file.text())
-      if (result.fatalError) {
-        onCsvError?.(result.fatalError)
-        setCsv(null)
-        return
-      }
-
-      const existing = new Set(
-        jobs.map((job) =>
-          buildJobDedupKey({
-            company: job.company,
-            role: job.role,
-            date_applied: job.date_applied,
-            url: job.url,
-          })
-        )
-      )
-      const seen = new Set<string>()
-      const importable: ParsedJobRow[] = []
-      let duplicates = 0
-
-      for (const row of result.rows) {
-        if (existing.has(row.dedupKey) || seen.has(row.dedupKey)) {
-          duplicates += 1
-          continue
-        }
-        seen.add(row.dedupKey)
-        importable.push(row)
-      }
-
-      setSkipDuplicates(true)
-      setCsv({
-        fileName: file.name,
-        rows: result.rows,
-        importable,
-        duplicates,
-        invalid: result.issues.length,
-      })
-    } catch (err) {
-      onCsvError?.(err instanceof Error ? err.message : 'Could not read that file.')
-      setCsv(null)
-    } finally {
-      setParsingCsv(false)
-    }
-  }
-
-  const runImport = async () => {
-    if (!csv) return
-    const rows = skipDuplicates ? csv.importable : csv.rows
-    if (rows.length === 0) {
-      setCsv(null)
-      return
-    }
-    // onImport resolves to false on a caught failure rather than throwing, so
-    // the parsed and deduped CSV state stays around for a retry instead of
-    // being thrown away behind a toast.
-    const ok = await onImport?.(rows.map((row) => row.data))
-    if (ok !== false) setCsv(null)
-  }
+  // The URL's opinion about what should be open, reconciled against the list.
+  // Three ref-guarded effects; see useDeepLinkedApplication for why the guards
+  // are load-bearing rather than defensive.
+  useDeepLinkedApplication({
+    jobs,
+    initialOpenId,
+    initialAddUrl,
+    openId: open?.id ?? null,
+    onOpen: openRecord,
+    onOpenAdd: () => setAddOpen(true),
+    onVanished: dismiss,
+  })
 
   /**
    * Saving an edit made in the record dialog.
@@ -565,9 +429,9 @@ export function ApplicationsPage({
         onSearchChange={setSearch}
         sort={sort}
         onSortChange={setSort}
-        onCsvFile={handleCsvFile}
+        onCsvFile={csvImport.handleFile}
         onExport={() => downloadCsv('worktrack-applications.csv', buildJobsCsvText(jobs))}
-        importBusy={importing || parsingCsv}
+        importBusy={importing || csvImport.parsing}
         exportDisabled={jobs.length === 0}
       />
 
@@ -592,11 +456,11 @@ export function ApplicationsPage({
             skip rows already tracked
           </label>
           <div className="flex items-center gap-2">
-            <Button size="s" onClick={runImport} disabled={importing}>
+            <Button size="s" onClick={csvImport.runImport} disabled={importing}>
               <UploadIcon size={16} aria-hidden className={iconMotion('raise')} />
               Import {skipDuplicates ? csv.importable.length : csv.rows.length}
             </Button>
-            <Button variant="ghost" size="s" onClick={() => setCsv(null)} disabled={importing}>
+            <Button variant="ghost" size="s" onClick={() => csvImport.cancel()} disabled={importing}>
               <CloseIcon size={16} aria-hidden className={iconMotion('none')} />
               cancel
             </Button>
