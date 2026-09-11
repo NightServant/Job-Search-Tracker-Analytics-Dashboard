@@ -162,6 +162,28 @@ export interface DocumentTypography {
   lineHeight: number | null
   /** Points of space after a paragraph. */
   paragraphSpacing: number | null
+  /**
+   * Points, for the document's own heading sizes.
+   *
+   * READ RATHER THAN GUESSED, which is the fix this field exists for. The
+   * first version took the body size from the document and then set headings
+   * as `em` multiples of it -- 1.45em for the title, 1.05em for a section.
+   * On the reported CV that renders the name at 13.8pt where Word draws 16,
+   * and a section heading at 10pt where Word draws 11. The document states all
+   * three sizes; nothing needs inventing.
+   */
+  titleSize: number | null
+  sectionSize: number | null
+  /**
+   * Points of space above and below a section heading.
+   *
+   * READ FROM THE HEADINGS THEMSELVES, not guessed, for the same reason as
+   * their size. The reported CV sets every section heading to `before=6.5pt
+   * after=2.5pt`; the editor's `mt-4` is 12pt, nearly double, and that gap
+   * repeated eight times down a page is most of what "margin issues" meant.
+   */
+  headingSpaceBefore: number | null
+  headingSpaceAfter: number | null
 }
 
 export const NO_TYPOGRAPHY: DocumentTypography = {
@@ -169,6 +191,10 @@ export const NO_TYPOGRAPHY: DocumentTypography = {
   fontSize: null,
   lineHeight: null,
   paragraphSpacing: null,
+  titleSize: null,
+  sectionSize: null,
+  headingSpaceBefore: null,
+  headingSpaceAfter: null,
 }
 
 /** The value that appears most often, or null when there are none. */
@@ -210,11 +236,49 @@ export function readTypography(documentXml: string, stylesXml = ''): DocumentTyp
     .map((m) => Number.parseInt(m[1], 10) / 20)
     .filter((n) => Number.isFinite(n) && n >= 0 && n < 100)
 
+  /**
+   * The spacing on the SECTION HEADINGS specifically, taken from the
+   * paragraphs Word underlines. They are the blocks whose spacing is most
+   * visible -- eight of them down a page -- and they are consistent, so the
+   * first one found is the document's answer rather than an average of
+   * everything.
+   */
+  const headingParagraph = (documentXml.match(/<w:p\b[\s\S]*?<\/w:p>/g) ?? []).find(
+    (paragraph) => /<w:pBdr>[\s\S]*?<w:bottom\b[^>]*w:val="(?!nil|none)/.test(paragraph)
+  )
+  const pt = (raw: string | undefined) => {
+    const value = Number.parseInt(raw ?? '', 10) / 20
+    return Number.isFinite(value) && value >= 0 && value < 100 ? value : null
+  }
+
+  /**
+   * THE DISTINCT SIZES, LARGEST FIRST, which is how the headings are found.
+   *
+   * A CV uses a handful of sizes with obvious roles: one for the name, one for
+   * section headings, one for the body. The reported file is 16 / 11 / 9.5,
+   * and the body is the median because it is what most runs are set in. The
+   * title is the largest; a section heading is the largest size that is not
+   * the title and not the body.
+   *
+   * Each is NULL rather than a fallback when the document does not distinguish
+   * them -- a CV set entirely in one size gets the editor's own heading scale
+   * rather than three identical levels.
+   */
+  const body = median(sizes)
+  const distinct = [...new Set(sizes)].sort((a, b) => b - a)
+  const title = distinct.length > 1 && body !== null && distinct[0] > body ? distinct[0] : null
+  const section =
+    body !== null ? (distinct.find((size) => size > body && size !== title) ?? null) : null
+
   return {
     fontFamily: face ? `"${face}", Georgia, serif` : null,
-    fontSize: median(sizes),
+    fontSize: body,
     lineHeight: lineHeight && lineHeight > 0.5 && lineHeight < 4 ? lineHeight : null,
     paragraphSpacing: median(afters),
+    titleSize: title,
+    sectionSize: section,
+    headingSpaceBefore: pt(headingParagraph?.match(/w:before="(\d+)"/)?.[1]),
+    headingSpaceAfter: pt(headingParagraph?.match(/w:after="(\d+)"/)?.[1]),
   }
 }
 
@@ -229,6 +293,10 @@ export function normalizeTypography(raw: unknown): DocumentTypography {
     fontSize: num(t.fontSize, 3, 100),
     lineHeight: num(t.lineHeight, 0.5, 4),
     paragraphSpacing: num(t.paragraphSpacing, -1, 100),
+    titleSize: num(t.titleSize, 3, 100),
+    sectionSize: num(t.sectionSize, 3, 100),
+    headingSpaceBefore: num(t.headingSpaceBefore, -1, 100),
+    headingSpaceAfter: num(t.headingSpaceAfter, -1, 100),
   }
 }
 

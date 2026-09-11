@@ -522,8 +522,24 @@ export function WordResumeEditor({
             ...(type.paragraphSpacing !== null
               ? { '--doc-para-space': `${type.paragraphSpacing}pt` }
               : {}),
+            // HEADING SIZES THE DOCUMENT STATES, rather than em multiples of
+            // the body guessed at. On the reported CV the name is 16pt and a
+            // section heading 11pt against a 9.5pt body; guessing 1.45em and
+            // 1.05em rendered them at 13.8 and 10. Null falls through to the
+            // editor's own scale, which is right for a CV typed here.
+            ...(type.titleSize ? { '--doc-h1-size': `${type.titleSize}pt` } : {}),
+            ...(type.sectionSize ? { '--doc-h2-size': `${type.sectionSize}pt` } : {}),
+            // AND THE SPACE AROUND THEM. `mt-4` is 12pt against the 6.5pt the
+            // reported CV sets, which repeated over eight headings is most of
+            // a visible margin error down the page.
+            ...(type.headingSpaceBefore !== null
+              ? { '--doc-h-before': `${type.headingSpaceBefore}pt` }
+              : {}),
+            ...(type.headingSpaceAfter !== null
+              ? { '--doc-h-after': `${type.headingSpaceAfter}pt` }
+              : {}),
           } as React.CSSProperties}
-          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:mt-0 [&_.ProseMirror_h1]:mb-1 [&_.ProseMirror_h1]:text-[1.45em] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:mt-4 [&_.ProseMirror_h2]:mb-1 [&_.ProseMirror_h2]:text-[1.05em] [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h3]:mt-3 [&_.ProseMirror_h3]:mb-1 [&_.ProseMirror_h3]:font-bold [&_.ProseMirror_[data-ruled]]:border-b [&_.ProseMirror_[data-ruled]]:border-current [&_.ProseMirror_[data-ruled]]:pb-0.5 [&_.ProseMirror_p]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:my-2 [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:my-1"
+          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:[margin-block:0_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h1]:text-[length:var(--doc-h1-size,1.45em)] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:[margin-block:var(--doc-h-before,1rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h2]:text-[length:var(--doc-h2-size,1.05em)] [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h3]:[margin-block:var(--doc-h-before,0.75rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h3]:font-bold [&_.ProseMirror_h3]:text-[length:var(--doc-h2-size,1em)] [&_.ProseMirror_[data-ruled]]:border-b [&_.ProseMirror_[data-ruled]]:border-current [&_.ProseMirror_[data-ruled]]:pb-0.5 [&_.ProseMirror_p]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:[margin-block:0_var(--doc-para-space,0.25rem)]"
         />
       </div>
       </div>

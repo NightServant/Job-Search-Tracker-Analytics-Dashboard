@@ -80,7 +80,17 @@ export function DesktopDocumentChrome({
         document name is a label on the window, not a headline over the
         content. It keeps h1 semantics for screen readers regardless.
       */}
-      <div className="flex shrink-0 items-center gap-2 border-b border-border-default bg-bg-surface px-4 py-2">
+      <div className={cn(
+          // STICKY BELOW `xl`, WHERE THE PAGE ITSELF SCROLLS. From xl the frame
+          // is locked and only the document moves, so this is a no-op there.
+          // Below it the rails stack and the page scrolls -- and without this
+          // the title bar and the ribbon scroll away with it, which is what
+          // Gabe saw: half a ribbon at the top of the window and the actions
+          // stranded beside it. A formatting bar you have to scroll back up to
+          // reach is one you stop using.
+          'sticky top-0 z-30 flex shrink-0 items-center gap-2',
+          'border-b border-border-default bg-bg-surface px-4 py-2'
+        )}>
         {/* THE WAY OUT KEEPS ITS WORDS (Gabe, 2026-09-11: "do not forget to
             include the redirect button"). The first pass at this bar reduced
             it to a bare chevron because that is what Word's home icon is --
@@ -186,7 +196,13 @@ export function DesktopDocumentChrome({
             one of its controls -- it passes no formatting ribbon -- which two
             tests caught immediately. The ribbon half is what is optional. */}
         {(tools || actions || destructiveActions) && (
-          <div className="flex shrink-0 items-stretch gap-3 border-y border-border-default bg-bg-surface px-4 py-2.5">
+          <div className={cn(
+              // Sits under the title bar when both are stuck. `top-[var()]`
+              // would need the bar's measured height; `top-12` is its height
+              // at this padding and is close enough that nothing shows through.
+              'sticky top-12 z-20 flex shrink-0 items-stretch gap-3',
+              'border-y border-border-default bg-bg-surface px-4 py-2.5'
+            )}>
             <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">{tools}</div>
             <div className="ml-auto flex shrink-0 items-center gap-1.5 border-l border-border-subtle pl-3">
               {actions}
@@ -269,7 +285,15 @@ export function DesktopDocumentChrome({
               dangling reference would be worse than none. */}
           <div
             id="document-sheet"
-            className="min-w-0 overflow-x-auto bg-bg-inset p-4 md:p-8 xl:order-2 xl:overflow-auto"
+            className={cn(
+              // GENEROUS ROOM UNDER THE LAST PAGE (Gabe: "no space at the
+              // bottom"). The well's own padding put 32px under the sheet,
+              // which reads as the document being cut off rather than ended --
+              // Word leaves most of a screen below the final page. `pb-24`
+              // is that breathing room.
+              'min-w-0 overflow-x-auto bg-bg-inset p-4 pb-24 md:p-8 md:pb-24',
+              'xl:order-2 xl:overflow-auto'
+            )}
           >
             {children}
           </div>
