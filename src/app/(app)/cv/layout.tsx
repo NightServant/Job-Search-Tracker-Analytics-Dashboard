@@ -12,7 +12,7 @@ import type { Metadata } from 'next'
  */
 export const metadata: Metadata = {
   title: 'CV editor',
-  description: 'Write a CV in Word-style or LaTeX, with version snapshots.',
+  description: 'Write a CV in a Word-style editor, with version snapshots.',
   robots: { index: false, follow: false },
 }
 

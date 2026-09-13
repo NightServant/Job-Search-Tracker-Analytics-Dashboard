@@ -62,14 +62,6 @@ describe('applySuggestions', () => {
     expect(next.content![0].content![0].text).toBe('Shipped the TypeScript rewrite')
   })
 
-  it('replaces plainly in LaTeX source, with no substitution grammar', () => {
-    // `$&` in the replacement is a real hazard: `String.replace` would expand
-    // it against the match, and a CV that mentions a salary has `$` in it.
-    const content = { type: 'latex' as const, source: '\\item Built the $& pipeline' }
-    const next = applySuggestions(content, [suggest('$& pipeline', 'data $& pipeline')])
-    expect(next).toEqual({ type: 'latex', source: '\\item Built the data $& pipeline' })
-  })
-
   it('returns the same LaTeX content when the quote is not in the source', () => {
     const content = { type: 'latex' as const, source: '\\item Built the pipeline' }
     expect(applySuggestions(content, [suggest('not here', 'x')])).toBe(content)

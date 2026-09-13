@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
+import { RailLayoutProvider } from './railLayout'
 import { DocumentViewProvider, type DocumentView } from './documentView'
 import type { DocumentWorkspaceProps } from './DocumentWorkspace'
 
@@ -91,13 +92,35 @@ const TAB = cn(
 )
 
 /**
- * HOW TALL THE PANEL RISES. Roughly half the screen: enough for the ribbon's
- * two rows plus its styles gallery, or for a dozen rail rows, while leaving
- * the document visible above it -- which is the whole difference between this
- * and the sheet it replaced. `svh` rather than `vh` so the panel does not sit
- * under mobile Safari's toolbar when it is expanded.
+ * HOW TALL THE PANEL MAY RISE. Roughly half the screen: enough for a dozen
+ * rail rows while leaving the document visible above it -- which is the whole
+ * difference between this and the sheet it replaced. `svh` rather than `vh` so
+ * the panel does not sit under mobile Safari's toolbar when it is expanded.
+ *
+ * A CAP, NOT A HEIGHT, SINCE 2026-09-13. It was `h-[45svh]`, and a fixed
+ * height on a dock that holds three surfaces of three different sizes is a
+ * promise only the tallest of them can keep. Measured at 390x844 with
+ * `format` open: a 379px panel over a 94px toolbar -- 261px of nothing, under
+ * controls, above a document that wanted the room. Now the panel is as tall as
+ * what is in it, and no taller than this.
+ *
+ * IT IS STILL A CAP THE FORMAT PANEL HITS ON A PHONE, and the arithmetic says
+ * it always will: `@media (pointer: coarse)` puts a 44px floor under every
+ * button (index.css, and it is not negotiable -- it is the thumb), so the four
+ * stacked bands come to 468px of controls and captions. At 390x844 that is
+ * 492px of content against a 380px cap: full, and scrolling 113px, where
+ * before it was 118px of content in the same box with three bands missing. At
+ * 768x1024 it fits exactly -- 442px of content, 442px of panel, nothing
+ * scrolls. Raising the cap for the phone was considered and dropped: the point
+ * of the dock is that the document stays visible above it.
+ *
+ * `flex-none` IS LOAD-BEARING and stays. The vendored `TabsContent` ships
+ * `flex-1`, which is `flex-basis: 0%` -- on the main axis of this column that
+ * beats any height the content computes, so the panel would take whatever the
+ * flex line had going spare rather than what it needs.
  */
-const PANEL = 'h-[45svh] flex-none overflow-auto border-t border-border-subtle px-3 py-3'
+const PANEL =
+  'max-h-[45svh] flex-none overflow-y-auto border-t border-border-subtle px-3 py-3'
 
 export function CompactDocumentChrome({
   // `kindLabel` and `footnote` are deliberately not destructured: this chrome
@@ -113,6 +136,7 @@ export function CompactDocumentChrome({
   tools,
   leftRail,
   rightRail,
+  railNav,
   paged = false,
   children,
 }: DocumentWorkspaceProps) {
@@ -139,11 +163,41 @@ export function CompactDocumentChrome({
    * ON THE LEFT" note in that file), so over there the one tab reads `outline`
    * above a tailoring panel. Not fixed here, because which rail a document
    * uses is the editor's decision and this chrome has no way to ask.
+   *
+   * THE STACKED TOOLBAR IS NOT SWITCHED ON HERE EITHER, and it cannot be. `tools`
+   * arrives as an already-built `ReactNode` -- the same seam `documentView`
+   * describes -- so the only way this file could hand `DocumentToolbar` its
+   * `layout` is `cloneElement`, which would inject an unknown `layout` prop
+   * into whatever the caller passed. The tests pass a bare `<button>` as
+   * `tools`; that would be a React DOM warning for every one of them.
+   *
+   * So the editor decides, from the same `useBelowDesktop()` it already asks
+   * for other reasons -- see `WordResumeEditor`, which passes
+   * `layout={compact ? 'stacked' : 'ribbon'}`. What this file owns is the box:
+   * a capped, content-sized panel (`PANEL` above) is what makes a toolbar that
+   * no longer lies about its height visible as one.
    */
   const surfaces: { id: string; label: string; node: React.ReactNode }[] = []
   if (tools) surfaces.push({ id: 'format', label: 'format', node: tools })
   if (leftRail) surfaces.push({ id: 'outline', label: 'outline', node: leftRail })
-  if (rightRail) surfaces.push({ id: 'tailor', label: 'tailor', node: rightRail })
+  if (rightRail)
+    surfaces.push({
+      id: 'tailor',
+      label: 'tailor',
+      // THE STRIP TRAVELS WITH THE PANE, not with the outline. `railNav` is
+      // what chooses which pane this tab shows, so putting it anywhere else
+      // leaves this surface with no way to switch and the `outline` tab
+      // holding a control for a panel you cannot see while using it.
+      node: (
+        <div className="flex flex-col gap-3">
+          {/* ALWAYS A ROW HERE. The panel is capped at `PANEL`'s max height and
+              already scrolls when the ribbon is in it, so the ~120px a vertical
+              strip costs comes straight off the pane it introduces. */}
+          <RailLayoutProvider layout="row">{railNav}</RailLayoutProvider>
+          {rightRail}
+        </div>
+      ),
+    })
 
   return (
     // `fixed inset-0`, so the editor really is the whole viewport rather

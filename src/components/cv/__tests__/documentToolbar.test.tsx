@@ -229,3 +229,104 @@ describe('the styles gallery', () => {
     e.destroy()
   })
 })
+
+/**
+ * THE PHONE DOCK'S LAYOUT (Gabe, 2026-09-13: "what the hell is this").
+ *
+ * WHAT THIS PROTECTS is the measurement that caused it. At 390x844 with the
+ * `format` tab open, `[data-ribbon-group]` read:
+ *
+ *   history 0x0 | font 420x94 (in a 366px panel) | paragraph 0x0 | styles 0x0
+ *
+ * One band of four, and that one scrolling sideways. The cause was the
+ * ribbon's own `visibility` strings -- `hidden lg:flex`, `hidden md:flex` --
+ * being obeyed inside a vertical panel, where there is no bar to overflow and
+ * nothing to protect the document from.
+ *
+ * ASSERTED ON THE CLASSES, for the reason the responsiveness test above gives:
+ * jsdom has no viewport, so `hidden lg:flex` and `flex` measure the same. The
+ * class is the rule; the browser measurement is in the commit message.
+ */
+describe('the stacked layout, for the phone dock', () => {
+  it('renders every band, because a panel has nothing to hide from', () => {
+    editor = editorWith()
+    const { container } = render(<DocumentToolbar editor={editor} layout="stacked" />)
+    const groups = [...container.querySelectorAll('[data-ribbon-group]')]
+
+    // Font first, history last: the ribbon drops history first when width runs
+    // out, which is this codebase already saying undo is the most expendable
+    // band on the bar.
+    expect(groups.map((g) => g.getAttribute('data-ribbon-group'))).toEqual([
+      'font',
+      'paragraph',
+      'styles',
+      'history',
+    ])
+    for (const group of groups) {
+      expect(group.className, group.getAttribute('data-ribbon-group')!).not.toContain('hidden')
+    }
+  })
+
+  it('reflows its rows instead of scrolling sideways', () => {
+    // The font band's first row is 420px of controls in a 366px panel. Wrapping
+    // is what the ribbon cannot do (a fourth row there eats the document) and
+    // what a panel you opened on purpose can.
+    editor = editorWith()
+    const { container } = render(<DocumentToolbar editor={editor} layout="stacked" />)
+    const root = container.querySelector('[data-document-toolbar]')!
+    expect(root.className).toContain('flex-col')
+    expect(root.className).not.toContain('overflow-x-auto')
+
+    const rows = [...container.querySelectorAll('[data-ribbon-group="paragraph"] > div')]
+    expect(rows.length).toBe(2)
+    for (const row of rows) expect(row.className).toContain('flex-wrap')
+  })
+
+  it('keeps the styles gallery a strip, the one thing that still scrolls sideways', () => {
+    // Twelve 76px cards wrapped at 366px is a four-row block out of something
+    // meant to be flicked through.
+    editor = editorWith()
+    render(<DocumentToolbar editor={editor} layout="stacked" />)
+    expect(screen.getByRole('group', { name: 'styles' }).className).toContain('overflow-x-auto')
+  })
+
+  it('captions each band, which the ribbon deliberately does not', () => {
+    // Word tells its bands apart with the vertical rule between them. Stacked
+    // there is no rule, only a hairline, and a hairline separates without
+    // naming -- so the caption earns its place here and only here.
+    editor = editorWith()
+    const { container } = render(<DocumentToolbar editor={editor} layout="stacked" />)
+    for (const id of ['font', 'paragraph', 'styles', 'history']) {
+      const caption = container.querySelector(`[data-ribbon-group="${id}"] > p`)
+      expect(caption?.textContent, id).toBe(id)
+    }
+
+    cleanup()
+    editor.destroy()
+    editor = editorWith()
+    const ribbon = render(<DocumentToolbar editor={editor} />).container
+    expect(ribbon.querySelectorAll('[data-ribbon-group] > p').length).toBe(0)
+  })
+
+  it('gives undo and redo one row rather than two of one button', () => {
+    // History's "two rows" are one button each: a 2-deep column beside the
+    // ribbon's rule, and two orphaned lines in a captioned panel section.
+    editor = editorWith()
+    const { container } = render(<DocumentToolbar editor={editor} layout="stacked" />)
+    const rows = [...container.querySelectorAll('[data-ribbon-group="history"] > div')]
+    expect(rows.length).toBe(1)
+    expect(rows[0].querySelectorAll('button').length).toBe(2)
+  })
+
+  it('leaves the ribbon exactly as it was when nothing is passed', () => {
+    // `ribbon` is the default so the desktop chrome renders what it always did.
+    editor = editorWith()
+    const { container } = render(<DocumentToolbar editor={editor} />)
+    const root = container.querySelector('[data-document-toolbar]')!
+    expect(root.className).toContain('overflow-x-auto')
+    expect(root.className).not.toContain('flex-col')
+    expect(
+      container.querySelector('[data-ribbon-group="history"]')!.className
+    ).toContain('hidden lg:flex')
+  })
+})

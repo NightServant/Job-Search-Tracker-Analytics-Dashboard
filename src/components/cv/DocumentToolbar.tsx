@@ -47,6 +47,52 @@ import {
  */
 
 /**
+ * AND THE SECOND LAYOUT, for the phone dock (2026-09-13, Gabe on what shipped:
+ * "what the hell is this").
+ *
+ * THE MEASUREMENT THAT FORCED IT, taken at 390x844 with the `format` tab open:
+ *
+ *   [data-ribbon-group=history]   0x0
+ *   [data-ribbon-group=font]      420x94   (in a 366px panel -- it scrolled)
+ *   [data-ribbon-group=paragraph] 0x0
+ *   [data-ribbon-group=styles]    0x0
+ *
+ * One band out of four, overflowing sideways, inside a panel 379px tall. No
+ * lists, no alignment, no styles, no undo, and ~261px of nothing under a 94px
+ * toolbar.
+ *
+ * THE CAUSE IS THAT `visibility` IS A RIBBON RULE BEING READ IN A PANEL. Those
+ * strings (`hidden lg:flex`, `hidden md:flex`) say "drop this band before the
+ * bar overflows sideways", which is the right answer for a horizontal ribbon
+ * pinned above a document and the wrong one for a vertical sheet the user
+ * opened BY TAPPING `format`. So `stacked` ignores them outright: every band
+ * renders, because in a column there is nothing to overflow and nothing to
+ * protect the document from -- height is what the dock caps, not this.
+ *
+ * WHAT CHANGES, AND ONLY THIS:
+ *   - bands are full-width sections down the panel, not columns across a bar;
+ *   - the rule between them is a `border-t` hairline, the ribbon's vertical
+ *     separator being meaningless once they are stacked;
+ *   - rows `flex-wrap`, so a row too wide for 366px takes a second line
+ *     instead of a horizontal scrollbar. `overflow-x-auto` appears nowhere in
+ *     this mode except the styles gallery, which keeps it deliberately: the
+ *     cards are 76px each and twelve of them wrapped would be a four-row block
+ *     out of what is meant to be a strip you flick through.
+ *
+ * EACH STACKED BAND IS CAPTIONED, which is the one place this file disagrees
+ * with Word and with its own docblock above. The reference prints no captions
+ * because its bands are told apart by the vertical rule between them; a
+ * vertical panel has no such cue -- `border-t` separates but does not name --
+ * so without a caption the panel reads as one undifferentiated pile of
+ * buttons. The caption earns its place HERE and nowhere else, and the ribbon
+ * is untouched.
+ *
+ * `ribbon` IS THE DEFAULT so the desktop chrome renders exactly what it did
+ * before this file gained a second mode.
+ */
+export type ToolbarLayout = 'ribbon' | 'stacked'
+
+/**
  * The ribbon's dropdowns are `ui/select`, and the height is the only thing
  * this has to say about them.
  *
@@ -101,26 +147,61 @@ function CommandButton({ command, editor }: { command: RibbonCommand; editor: Ed
   )
 }
 
-/** A band of the ribbon: stacked rows, with a rule before it. */
+/**
+ * A band of the ribbon: stacked rows, with a rule before it.
+ *
+ * IN `stacked` IT IS A SECTION OF THE PANEL INSTEAD, and three things go:
+ * `visibility` (the whole point -- see the 0x0 measurement above), the
+ * vertical rule, and the 16px side padding that the dock's own `px-3` already
+ * provides. The caption is the band's `id`, because every one of them --
+ * history, font, paragraph, styles -- is already the word a person would use
+ * for it, and a second `caption` prop would only be a chance for the two to
+ * disagree.
+ */
 function Band({
   id,
   visibility,
+  stacked,
   first,
   grow,
   children,
 }: {
   id: string
   visibility: string
+  stacked?: boolean
   first?: boolean
-  /** Takes the remaining width. Exactly one band should. */
+  /** Takes the remaining width. Exactly one band should. Ribbon only. */
   grow?: boolean
   children: React.ReactNode
 }) {
+  if (stacked) {
+    return (
+      <div
+        data-ribbon-group={id}
+        // `first:` rather than the `first` prop: in this mode the bands are
+        // the only children and none of them is display:none, so the CSS
+        // answer and the JS one agree. In the ribbon they do not -- `history`
+        // is `hidden` below lg and still `:first-child` -- which is why that
+        // branch keeps the prop.
+        className="flex flex-col gap-1.5 border-t border-border-subtle py-2 first:border-t-0 first:pt-0"
+      >
+        <p className="text-label-caps uppercase text-text-muted">{id}</p>
+        {children}
+      </div>
+    )
+  }
+
   return (
     <div
       data-ribbon-group={id}
       className={cn(
-        'flex-col justify-center gap-1.5 px-4',
+        // ROOM TO BREATHE (Gabe, 2026-09-13: "unwanted space in the toolbar,
+        // allow properties to breathe in desktop and laptop screens"). The
+        // file commands left the ribbon for a menu in the same change, which
+        // gave back about 500px; `px-5` and the wider row gap below spend part
+        // of it on the bands themselves instead of leaving it as one gap at
+        // the end of the bar.
+        'flex-col justify-center gap-2 px-5',
         grow ? 'min-w-0 flex-1' : 'shrink-0',
         visibility,
         !first && 'border-l border-border-subtle'
@@ -131,9 +212,15 @@ function Band({
   )
 }
 
-const ROW = 'flex items-center gap-1'
+const ROW = 'flex items-center gap-1.5'
 
-export function DocumentToolbar({ editor }: { editor: Editor | null }) {
+export function DocumentToolbar({
+  editor,
+  layout = 'ribbon',
+}: {
+  editor: Editor | null
+  layout?: ToolbarLayout
+}) {
   // Re-render on selection and document change, so every `isActive` below
   // reflects the CARET rather than the last button anyone pressed. Without
   // this a ribbon lies the moment you click into differently formatted text.
@@ -148,37 +235,41 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
     }
   }, [editor])
 
+  const stacked = layout === 'stacked'
+  // WRAPPING IS THE FIX FOR THE SIDEWAYS SCROLL, and it is safe here for the
+  // reason it is not safe in the ribbon: a ribbon that grows a row eats the
+  // document under it, while this panel is a surface you opened on purpose and
+  // closes again on the next tap. Measured before: the font band's row 1 is
+  // 420px of controls in a 366px panel.
+  const row = cn(ROW, stacked && 'flex-wrap gap-y-1.5')
+
   const currentFamily = (editor?.getAttributes('textStyle').fontFamily as string | undefined) ?? ''
   const fontPx = currentFontPx(editor)
   const history = RIBBON_GROUPS[0]
   const [fontRow, markRow] = RIBBON_GROUPS[1].rows
   const paragraph = RIBBON_GROUPS[2]
 
-  return (
-    <div
-      role="toolbar"
-      aria-label="formatting"
-      aria-controls="document-sheet"
-      // Scrolls rather than clips when the column is narrower than the bands.
-      // Wrapping is not the alternative: a ribbon that grows to four rows eats
-      // the document it sits above.
-      className="flex min-w-0 items-stretch overflow-x-auto"
-      data-document-toolbar
-    >
-      <Band id="history" visibility={history.visibility} first>
-        {history.rows.map((row, index) => (
-          <div key={index} className={ROW}>
-            {row.map((command) => (
+  const bands: Record<string, React.ReactNode> = {
+    history: (
+      <Band key="history" id="history" visibility={history.visibility} stacked={stacked} first>
+        {/* ONE ROW WHEN STACKED. History's "two rows" are one button each --
+            a 2-deep column beside the ribbon's rule, which is correct there
+            and reads as two orphaned lines in a captioned panel section. */}
+        {(stacked ? [history.rows.flat()] : history.rows).map((commands, index) => (
+          <div key={index} className={row}>
+            {commands.map((command) => (
               <CommandButton key={command.id} command={command} editor={editor} />
             ))}
           </div>
         ))}
       </Band>
+    ),
 
-      {/* FONT: the selects and size stepping above, the marks below --
-          Word's arrangement exactly. */}
-      <Band id="font" visibility="flex">
-        <div className={ROW}>
+    /* FONT: the selects and size stepping above, the marks below --
+       Word's arrangement exactly. */
+    font: (
+      <Band key="font" id="font" visibility="flex" stacked={stacked}>
+        <div className={row}>
           <div className="w-[128px]">
             {/* THE PLACEHOLDER IS THE DOCUMENT'S OWN VALUE (found in review,
                 2026-09-13). `Select` shows `placeholder` whenever `value`
@@ -220,21 +311,23 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
             <CommandButton key={command.id} command={command} editor={editor} />
           ))}
         </div>
-        <div className={ROW}>
+        <div className={row}>
           {markRow.map((command) => (
             <CommandButton key={command.id} command={command} editor={editor} />
           ))}
         </div>
       </Band>
+    ),
 
-      {/* PARAGRAPH: lists and indents above, alignment below. */}
-      <Band id="paragraph" visibility={paragraph.visibility}>
-        <div className={ROW}>
+    /* PARAGRAPH: lists and indents above, alignment below. */
+    paragraph: (
+      <Band key="paragraph" id="paragraph" visibility={paragraph.visibility} stacked={stacked}>
+        <div className={row}>
           {paragraph.rows[0].map((command) => (
             <CommandButton key={command.id} command={command} editor={editor} />
           ))}
         </div>
-        <div className={ROW}>
+        <div className={row}>
           {paragraph.rows[1].map((command) => (
             <CommandButton key={command.id} command={command} editor={editor} />
           ))}
@@ -261,20 +354,25 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
           </div>
         </div>
       </Band>
+    ),
 
-      {/* STYLES: the gallery, spanning the band's height as Word's does. */}
-      {/* THE GALLERY TAKES THE REST OF THE BAR (Gabe, 2026-09-11: "toolbar has
-          unused space at the right side"). It was capped at a fixed width,
-          which left 341px empty at 1440 and 101px at 1200 -- measured, not
-          guessed. Growing fills that AND is what Word does: a wider window
-          shows more style cards rather than more blank ribbon. It still
-          scrolls internally, so a narrow column shows fewer cards instead of
-          pushing the other bands off. */}
-      <Band id="styles" visibility="hidden lg:flex" grow>
+    /* STYLES: the gallery, spanning the band's height as Word's does. */
+    /* THE GALLERY TAKES THE REST OF THE BAR (Gabe, 2026-09-11: "toolbar has
+       unused space at the right side"). It was capped at a fixed width,
+       which left 341px empty at 1440 and 101px at 1200 -- measured, not
+       guessed. Growing fills that AND is what Word does: a wider window
+       shows more style cards rather than more blank ribbon. It still
+       scrolls internally, so a narrow column shows fewer cards instead of
+       pushing the other bands off. */
+    styles: (
+      <Band key="styles" id="styles" visibility="hidden lg:flex" stacked={stacked} grow>
         <div
           role="group"
           aria-label="styles"
-          className="flex h-full items-center gap-1 overflow-x-auto"
+          // THE ONE `overflow-x-auto` STACKED MODE KEEPS. Twelve 76px cards
+          // wrapped at 366px is a four-row block, which turns a strip you
+          // flick through into the tallest thing in the panel.
+          className={cn('flex items-center gap-1 overflow-x-auto', !stacked && 'h-full')}
         >
           {STYLE_PRESETS.map((preset) => {
             const active = editor ? preset.isActive(editor) : false
@@ -312,6 +410,38 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
           })}
         </div>
       </Band>
+    ),
+  }
+
+  /**
+   * HISTORY GOES LAST IN THE PANEL, not first.
+   *
+   * The ribbon's order is Word's, left to right. Stacked, the order is a
+   * ranking instead, and the ribbon already published one: `visibility` drops
+   * history first when width runs out, which is this file saying undo is the
+   * most expendable band on the bar (it is ⌘Z regardless). So it sits at the
+   * end, under the three a thumb came here for.
+   */
+  const order = stacked
+    ? ['font', 'paragraph', 'styles', 'history']
+    : ['history', 'font', 'paragraph', 'styles']
+
+  return (
+    <div
+      role="toolbar"
+      aria-label="formatting"
+      aria-controls="document-sheet"
+      // Ribbon: scrolls rather than clips when the column is narrower than the
+      // bands. Wrapping is not the alternative there -- a ribbon that grows to
+      // four rows eats the document it sits above.
+      //
+      // Stacked: a column, and NO horizontal scroll at any level. The panel
+      // has a width and the rows reflow inside it.
+      className={cn('flex min-w-0', stacked ? 'flex-col' : 'items-stretch overflow-x-auto')}
+      data-document-toolbar
+      data-toolbar-layout={layout}
+    >
+      {order.map((id) => bands[id])}
     </div>
   )
 }

@@ -4,9 +4,27 @@ import * as React from 'react'
 import { icons } from '@/components/icons'
 import { cn } from '@/lib/utils'
 import { DOCUMENT_TABS, type DocumentTab, type DocumentTabId } from './documentTabs'
+import { useRailLayout, type RailLayout } from './railLayout'
 
 /**
- * The left rail: which pane the right rail is showing.
+ * The rail's tab strip: which pane the rail is showing.
+ *
+ * IT DRAWS TWO WAYS, AND THE CHROME PICKS (Gabe, 2026-09-13: horizontal "must
+ * be applied to smaller laptop screens", then "restore the vertical tabs in
+ * larger screens"). `useRailLayout` carries which; see railLayout.tsx for why
+ * the answer cannot be a prop.
+ *
+ * A COLUMN where the rail has a column of its own: each row an icon, a label
+ * and its own hint, selection a rule down the leading edge. That costs ~120px
+ * of height, which a 380px rail beside its own pane can afford.
+ *
+ * A ROW where the rail is shared with the pane it selects: 45px, centred
+ * icon-and-label, selection an underline on the strip's foot, and the hint
+ * collapsed to ONE line for the selected tab. Height is the scarce thing in
+ * that arrangement -- two stacked rows with hints sit directly above the panel
+ * they open -- and the hint is worth keeping either way, because "needs an
+ * application" is the reason a pane is empty and showing it only after you
+ * open the pane is the wrong order.
  *
  * A LIST OF BUTTONS, NOT `ui/tabs`. The shadcn tab primitive puts its triggers
  * and its panels in one component and expects them adjacent; here the triggers
@@ -16,11 +34,11 @@ import { DOCUMENT_TABS, type DocumentTab, type DocumentTabId } from './documentT
  * cannot see -- more machinery than a controlled `activeTab` string needs.
  *
  * THE ACCESSIBILITY IS DONE BY HAND FOR THE SAME REASON, and properly:
- * `role="tablist"` with `aria-orientation="vertical"`, each button
- * `role="tab"` with `aria-selected`, and `aria-controls` pointing at the pane
- * in the other column. That last attribute is the whole justification for the
- * layout -- it is what tells a screen reader that a control on the left drives
- * a region on the right, which sighted users get from the arrangement itself.
+ * `role="tablist"`, each button `role="tab"` with `aria-selected`, and
+ * `aria-controls` pointing at the pane. That last attribute matters most when
+ * the pane is in the OTHER column, which it still is above 1700 -- it is what
+ * tells a screen reader that a control on the left drives a region on the
+ * right, which sighted users get from the arrangement itself.
  *
  * ARROW KEYS MOVE BETWEEN TABS, which is what `role="tablist"` promises. A
  * tablist whose only navigation is Tab is a set of buttons wearing a tablist's
@@ -29,8 +47,11 @@ import { DOCUMENT_TABS, type DocumentTab, type DocumentTabId } from './documentT
  *
  * ORANGE IS FOR THE SELECTED TAB AND NOTHING ELSE HERE. The design system
  * reserves the accent for "the current action", and in this rail the selected
- * pane is exactly that. Selection is carried by a left rule plus weight, not a
- * filled block, because status is never a filled pill in this app.
+ * pane is exactly that. Selection is carried by a 2px rule plus weight in both
+ * arrangements -- never a filled block, because status is never a filled pill
+ * in this app. The rule simply moves: the row's leading edge in a column, the
+ * strip's foot in a row, which is the same underline `ApplicationRecordView`
+ * and the compact dock draw.
  */
 
 export interface DocumentRailTabsProps {
@@ -64,48 +85,74 @@ export function DocumentRailTabs({
     refs.current[next]?.focus()
   }
 
+  const layout = useRailLayout()
+  const row = layout === 'row'
+
+  const current = DOCUMENT_TABS.find((tab) => tab.id === active)
+  const hintFor = (tab: DocumentTab) =>
+    tab.needsApplication && !applicationSelected ? 'needs an application' : tab.hint
+
   return (
-    <div
-      role="tablist"
-      aria-orientation="vertical"
-      aria-label="document tools"
-      className={cn('flex flex-col', className)}
-      data-document-rail
-    >
-      {DOCUMENT_TABS.map((tab) => (
-        <RailTab
-          key={tab.id}
-          tab={tab}
-          active={tab.id === active}
-          badge={badges[tab.id] ?? null}
-          muted={tab.needsApplication && !applicationSelected}
-          paneId={`${id}-pane`}
-          ref={(node) => {
-            refs.current[tab.id] = node
-          }}
-          onSelect={() => onSelect(tab.id)}
-          onMove={(delta) => move(tab.id, delta)}
-        />
-      ))}
+    <div className={cn('flex flex-col', className)} data-document-rail data-rail-layout={layout}>
+      <div
+        role="tablist"
+        aria-orientation={row ? 'horizontal' : 'vertical'}
+        aria-label="document tools"
+        className={cn(
+          'flex',
+          // A HAIRLINE UNDER THE WHOLE STRIP in a row, which is what the active
+          // tab's 2px rule sits on top of: without it the marker is a floating
+          // dash, with it a selection along a track. A column needs none -- each
+          // row carries its own leading rule.
+          row ? 'items-stretch border-b border-border-subtle' : 'flex-col'
+        )}
+      >
+        {DOCUMENT_TABS.map((tab) => (
+          <RailTab
+            key={tab.id}
+            tab={tab}
+            layout={layout}
+            active={tab.id === active}
+            badge={badges[tab.id] ?? null}
+            hint={hintFor(tab)}
+            paneId={`${id}-pane`}
+            ref={(node) => {
+              refs.current[tab.id] = node
+            }}
+            onSelect={() => onSelect(tab.id)}
+            onMove={(delta) => move(tab.id, delta)}
+          />
+        ))}
+      </div>
+
+      {/* The current tab's hint, for the arrangement whose tabs have no room
+          for one of their own. `min-h` rather than a bare conditional, so
+          switching tabs does not move everything below it by a line. */}
+      {row && current && (
+        <p className="min-h-9 px-1 pt-2 text-body-s text-text-muted">{hintFor(current)}</p>
+      )}
     </div>
   )
 }
 
 interface RailTabProps {
   tab: DocumentTab
+  layout: RailLayout
   active: boolean
   badge: number | null
-  muted: boolean
+  /** Shown under the label in a column; the strip shows it once in a row. */
+  hint: string
   paneId: string
   onSelect: () => void
   onMove: (delta: number) => void
 }
 
 const RailTab = React.forwardRef<HTMLButtonElement, RailTabProps>(function RailTab(
-  { tab, active, badge, muted, paneId, onSelect, onMove },
+  { tab, layout, active, badge, hint, paneId, onSelect, onMove },
   ref
 ) {
   const Icon = icons[tab.icon]
+  const row = layout === 'row'
 
   return (
     <button
@@ -129,48 +176,77 @@ const RailTab = React.forwardRef<HTMLButtonElement, RailTabProps>(function RailT
         }
       }}
       className={cn(
-        'group flex w-full items-start gap-3 border-l-2 py-3 pl-3 pr-2 text-left',
-        'transition-colors duration-(--duration-fast)',
+        'group transition-colors duration-(--duration-fast)',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30',
         'active:scale-[0.99]',
-        active
-          ? 'border-l-accent-default bg-bg-surface'
-          : 'border-l-transparent hover:bg-bg-surface/60'
+        row
+          ? cn(
+              'relative flex flex-1 items-center justify-center gap-2 px-2 py-2.5',
+              // The marker sits ON the strip's own hairline rather than above
+              // it, so the two read as one track with a selected span.
+              active
+                ? 'after:absolute after:inset-x-0 after:-bottom-px after:h-[2px] after:bg-accent-default'
+                : 'hover:bg-bg-surface/60'
+            )
+          : cn(
+              'flex w-full items-start gap-3 border-l-2 py-3 pl-3 pr-2 text-left',
+              active
+                ? 'border-l-accent-default bg-bg-surface'
+                : 'border-l-transparent hover:bg-bg-surface/60'
+            )
       )}
     >
       <span
         aria-hidden
         className={cn(
-          'mt-0.5 shrink-0 transition-colors',
+          'shrink-0 transition-colors',
+          !row && 'mt-0.5',
           active ? 'text-accent-default' : 'text-text-muted group-hover:text-text-secondary'
         )}
       >
         <Icon size={16} />
       </span>
 
-      <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="flex items-center gap-2">
+      {row ? (
+        <>
           <span
             className={cn(
-              'text-body-m',
+              'truncate text-body-s',
               active ? 'font-medium text-text-primary' : 'text-text-secondary'
             )}
           >
             {tab.label}
           </span>
-          {badge !== null && badge > 0 && (
-            // A count, not a dot: "3" answers how much work is left and a dot
-            // only says "some". Rendered as a bare numeral against a rule
-            // rather than a filled pill.
-            <span className="shrink-0 border-b border-border-default px-1 text-label-caps tabular-nums text-text-secondary">
-              {badge}
+          {badge !== null && badge > 0 && <Badge count={badge} />}
+        </>
+      ) : (
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex items-center gap-2">
+            <span
+              className={cn(
+                'text-body-m',
+                active ? 'font-medium text-text-primary' : 'text-text-secondary'
+              )}
+            >
+              {tab.label}
             </span>
-          )}
+            {badge !== null && badge > 0 && <Badge count={badge} />}
+          </span>
+          <span className="text-body-s text-text-muted">{hint}</span>
         </span>
-        <span className="text-body-s text-text-muted">
-          {muted ? 'needs an application' : tab.hint}
-        </span>
-      </span>
+      )}
     </button>
   )
 })
+
+/**
+ * A count, not a dot: "3" answers how much work is left and a dot only says
+ * "some". A bare numeral against a rule rather than a filled pill.
+ */
+function Badge({ count }: { count: number }) {
+  return (
+    <span className="shrink-0 border-b border-border-default px-1 text-label-caps tabular-nums text-text-secondary">
+      {count}
+    </span>
+  )
+}

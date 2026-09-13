@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ResumeDraft } from '@/services/resumeService'
 
@@ -88,6 +88,17 @@ vi.mock('@/lib/supabase', () => ({
 import { AppShell } from '@/components/shell/AppShell'
 import Page from '../page'
 
+/**
+ * The file commands moved behind one icon on 2026-09-13 ("compress this into a
+ * settings/avatar icon with dropdown"), so a test that presses one has to open
+ * the menu first. Save is deliberately still outside it.
+ */
+async function openActions() {
+  await act(async () => {
+    fireEvent.click(screen.getByRole('button', { name: /document actions/i }))
+  })
+}
+
 function params(value: string | null) {
   useSearchParamsMock.mockReturnValue({ get: () => value })
 }
@@ -103,16 +114,6 @@ function wordDraft(overrides: Partial<ResumeDraft> = {}): ResumeDraft {
     },
     updated_at: '2026-08-20T10:00:00.000Z',
     ...overrides,
-  }
-}
-
-function latexDraft(): ResumeDraft {
-  return {
-    id: 'cv-2',
-    title: 'LaTeX CV',
-    mode: 'latex',
-    content: { type: 'latex', source: '\\documentclass{article}\\begin{document}Hi\\end{document}' },
-    updated_at: '2026-08-20T10:00:00.000Z',
   }
 }
 
@@ -186,47 +187,6 @@ describe('/cv?draft=<id> opens the right editor', () => {
     expect((screen.getByLabelText(/cv title/i) as HTMLInputElement).value).toBe('Backend CV')
   })
 
-  it('mounts the LaTeX editor with its source and its live preview instead', () => {
-    params('cv-2')
-    resolved(latexDraft())
-    const { container } = render(<Page />)
-    expect(screen.getByRole('heading', { name: 'LaTeX CV' })).toBeTruthy()
-    expect((screen.getByLabelText('LaTeX source') as HTMLTextAreaElement).value).toContain(
-      'documentclass'
-    )
-    expect(container.querySelector('iframe[title="LaTeX preview"]')).toBeTruthy()
-    expect(container.querySelector('.ProseMirror')).toBeNull()
-  })
-
-  it('offers Word or LaTeX at ?draft=new and opens what it creates', async () => {
-    params('new')
-    resolved(null)
-    render(<Page />)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /latex editor/i }))
-    })
-    expect(createMutate).toHaveBeenCalledWith(expect.objectContaining({ mode: 'latex' }))
-    expect(routerReplace).toHaveBeenCalledWith('/cv?draft=cv-new')
-  })
-
-  it('offers the mode chooser as a dialog at ?draft=new, not a bare page', () => {
-    // Task 4 (M5.5): restored as a dialog. This route only ever reaches
-    // ?draft=new as a deep link now (the trigger itself moved onto
-    // DocumentsPage), so it still has to work landed on directly.
-    params('new')
-    resolved(null)
-    render(<Page />)
-    expect(screen.getByRole('dialog', { name: 'new CV' })).toBeTruthy()
-  })
-
-  it('sends ?draft=new back to Documents when the dialog is dismissed without a choice', async () => {
-    params('new')
-    resolved(null)
-    const user = userEvent.setup()
-    render(<Page />)
-    await user.keyboard('{Escape}')
-    expect(routerReplace).toHaveBeenCalledWith('/documents')
-  })
 })
 
 describe('the editor still saves', () => {
@@ -267,25 +227,6 @@ describe('the editor still saves', () => {
     )
   })
 
-  it('saves LaTeX as latex-shaped content, not as a tiptap document', async () => {
-    vi.useFakeTimers()
-    params('cv-2')
-    resolved(latexDraft())
-    render(<Page />)
-
-    fireEvent.change(screen.getByLabelText('LaTeX source'), { target: { value: '\\section{New}' } })
-    await act(async () => {
-      vi.advanceTimersByTime(1200)
-    })
-    expect(updateMutate).toHaveBeenCalledWith({
-      id: 'cv-2',
-      patch: expect.objectContaining({
-        mode: 'latex',
-        content: { type: 'latex', source: '\\section{New}' },
-      }),
-    })
-  })
-
   it('saves on demand as well as on a timer', async () => {
     params('cv-1')
     resolved(wordDraft())
@@ -312,21 +253,6 @@ describe('the editor still saves', () => {
     )
   })
 
-  it('forces a checkpoint snapshot on an explicit Save for LaTeX too', async () => {
-    params('cv-2')
-    resolved(latexDraft())
-    render(<Page />)
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: /^save$/i }))
-    })
-    expect(maybeCreateSnapshotMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'cv-2',
-      'user-1',
-      expect.anything(),
-      { force: true }
-    )
-  })
 })
 
 describe('the editor chrome', () => {
@@ -360,48 +286,6 @@ describe('the editor chrome', () => {
     expect(screen.getByRole('link', { name: 'back to documents' }).getAttribute('href')).toBe(
       '/documents'
     )
-  })
-
-  it('gives the LaTeX editor the same chrome as the Word one', () => {
-    // Gabe, 2026-09-04: "applied the same layout changes to the LaTeX editor".
-    // Asserted as SAMENESS rather than by re-listing the parts, because the
-    // failure mode here is drift -- the two editors had already grown
-    // different headers once, which is why they now share DocumentWorkspace.
-    params('cv-1')
-    resolved(latexDraft())
-    const { container } = render(<Page />)
-
-    expect(container.querySelector('[data-document-workspace]')).toBeTruthy()
-    // The heading is the document's NAME and it is editable in place -- not a
-    // static category label with the name in a form field below it.
-    //
-    // This fixture is called "LaTeX CV", which is also what the old static
-    // header said, so a name check alone cannot tell the two apart. What
-    // distinguishes them is that the heading is now a field: the first draft
-    // of this test asserted the absence of a "LaTeX CV" heading and failed
-    // against correct code for exactly that reason.
-    const heading = screen.getByRole('heading', { level: 1 })
-    expect(heading.querySelector('input')).toBeTruthy()
-    expect((screen.getByLabelText(/cv title/i) as HTMLInputElement).value).toBe('LaTeX CV')
-    // The category is a plain label beside the back link now, not a crumb on
-    // a trail -- see the "leaves the drafts list reachable" test above.
-    expect(screen.getByRole('link', { name: 'back to documents' })).toBeTruthy()
-    expect(screen.getByText('latex')).toBeTruthy()
-    // ONE RAIL, ON THE LEFT (Gabe, 2026-09-05). Asserted as a COUNT rather
-    // than as presence: the change was moving the analysis out of the right
-    // rail so the source and the preview could have that 320px, and a presence
-    // check passes either way.
-    //
-    // It was two markers in here until 2026-09-13 -- `data-tailoring-target`
-    // for the picker panel and `data-tailoring-analysis` for the score -- and
-    // the assertion was that they shared a parent. There is one section now,
-    // so there is nothing left to share: the picker, the match and the rewrite
-    // are one heading. See components/cv/CvTailoring.
-    const rails = container.querySelectorAll('aside')
-    expect(rails).toHaveLength(1)
-    expect(
-      within(rails[0] as HTMLElement).getByRole('heading', { name: /tailor to a job/i })
-    ).toBeTruthy()
   })
 
   it('keeps the Word editor\'s rails on OPPOSITE sides', () => {
@@ -484,7 +368,8 @@ describe('deleting a CV from the editor', () => {
     const user = userEvent.setup()
     render(<Page />)
 
-    await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
+    await openActions()
+    await user.click(screen.getByRole('button', { name: /delete this cv/i }))
     expect(screen.getByRole('alertdialog', { name: /delete this cv/i })).toBeTruthy()
     await user.click(screen.getByRole('button', { name: 'cancel' }))
     expect(deleteMutate).not.toHaveBeenCalled()
@@ -496,7 +381,8 @@ describe('deleting a CV from the editor', () => {
     const user = userEvent.setup()
     render(<Page />)
 
-    await user.click(screen.getByRole('button', { name: /delete backend cv/i }))
+    await openActions()
+    await user.click(screen.getByRole('button', { name: /delete this cv/i }))
     await user.click(screen.getByRole('button', { name: 'delete' }))
     expect(deleteMutate).toHaveBeenCalledWith('cv-1')
     expect(routerReplace).toHaveBeenCalledWith('/documents')
@@ -554,34 +440,6 @@ describe('keystrokes during an in-flight save are not lost', () => {
     })
   })
 
-  it('keeps the LaTeX editor dirty on the same race', async () => {
-    vi.useFakeTimers()
-    params('cv-2')
-    resolved(latexDraft())
-    const inFlight = deferred<ReturnType<typeof wordDraft>>()
-    updateMutate.mockReturnValueOnce(inFlight.promise)
-    render(<Page />)
-
-    const source = screen.getByLabelText('LaTeX source')
-    fireEvent.change(source, { target: { value: '\\section{A}' } })
-    await act(async () => {
-      vi.advanceTimersByTime(1200)
-    })
-
-    fireEvent.change(source, { target: { value: '\\section{AB}' } })
-    await act(async () => {
-      inFlight.resolve(wordDraft())
-    })
-    expect(screen.getByText(/unsaved changes/i)).toBeTruthy()
-
-    await act(async () => {
-      vi.advanceTimersByTime(1200)
-    })
-    expect(updateMutate).toHaveBeenLastCalledWith({
-      id: 'cv-2',
-      patch: expect.objectContaining({ content: { type: 'latex', source: '\\section{AB}' } }),
-    })
-  })
 })
 
 describe('the Word autosave keeps running after a failure', () => {
@@ -603,6 +461,7 @@ describe('the Word autosave keeps running after a failure', () => {
     })
     expect(updateMutate).toHaveBeenCalledTimes(1)
 
+    await openActions()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /reset/i }))
     })
@@ -663,6 +522,7 @@ describe('PDF export does not paper over a failed save', () => {
     const fetchMock = exportFetch()
     render(<Page />)
 
+    await openActions()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /export pdf/i }))
     })
@@ -679,6 +539,7 @@ describe('PDF export does not paper over a failed save', () => {
     global.URL.revokeObjectURL = vi.fn()
     render(<Page />)
 
+    await openActions()
     await act(async () => {
       fireEvent.click(screen.getByRole('button', { name: /export pdf/i }))
     })
@@ -737,52 +598,6 @@ describe('an overlapping pair of saves cannot un-save the newer one', () => {
     expect(updateMutate).toHaveBeenCalledTimes(2)
   })
 
-  it('leaves the LaTeX editor clean on the same overlap', async () => {
-    await overlap(latexDraft(), 'source', (value) =>
-      fireEvent.change(screen.getByLabelText('LaTeX source'), { target: { value } })
-    )
-    expect(screen.queryByText(/unsaved changes/i)).toBeNull()
-
-    await act(async () => {
-      vi.advanceTimersByTime(1200)
-    })
-    expect(updateMutate).toHaveBeenCalledTimes(2)
-  })
-})
-
-describe('the LaTeX editor snapshots on the same schedule as the Word editor', () => {
-  it('still snapshots when the save resolves before the 5s timer', async () => {
-    // The Word half of this fix was pinned; this half was not, so reverting the
-    // LaTeX snapshot effect to its pre-fix shape left the whole suite green.
-    // Both editors carry the identical fix for the identical bug.
-    vi.useFakeTimers()
-    params('cv-2')
-    resolved(latexDraft())
-    render(<Page />)
-
-    fireEvent.change(screen.getByLabelText('LaTeX source'), {
-      target: { value: '\\section{Edited}' },
-    })
-    await act(async () => {
-      vi.advanceTimersByTime(1200)
-    })
-    expect(updateMutate).toHaveBeenCalledTimes(1)
-    expect(maybeCreateSnapshotMock).not.toHaveBeenCalled()
-
-    await act(async () => {
-      vi.advanceTimersByTime(3800)
-    })
-    expect(maybeCreateSnapshotMock).toHaveBeenCalledWith(
-      expect.anything(),
-      'cv-2',
-      'user-1',
-      {
-        type: 'latex',
-        source: '\\section{Edited}',
-      },
-      {}
-    )
-  })
 })
 
 describe('restoring a version persists the version that was restored', () => {
@@ -803,31 +618,6 @@ describe('restoring a version persists the version that was restored', () => {
       fireEvent.click(screen.getAllByRole('button', { name: /restore/i })[1])
     })
   }
-
-  it('writes the restored LaTeX source, not the source it replaced', async () => {
-    // saveDraft used to read `latexSource` from the render that preceded the
-    // restore, so the write carried the OLD source. It only ever reached the
-    // database because the restore also left the editor dirty by accident and
-    // the debounce re-sent it 1200ms later.
-    await restore(latexDraft(), { type: 'latex', source: '\\section{Restored}' })
-    expect(updateMutate).toHaveBeenCalledWith({
-      id: 'cv-2',
-      patch: expect.objectContaining({
-        content: { type: 'latex', source: '\\section{Restored}' },
-      }),
-    })
-  })
-
-  it('leaves the editor clean rather than re-sending the same content 1200ms later', async () => {
-    await restore(latexDraft(), { type: 'latex', source: '\\section{Restored}' })
-    expect(updateMutate).toHaveBeenCalledTimes(1)
-    expect(screen.queryByText(/unsaved changes/i)).toBeNull()
-
-    await act(async () => {
-      vi.advanceTimersByTime(1200)
-    })
-    expect(updateMutate).toHaveBeenCalledTimes(1)
-  })
 
   it('does the same for a restored Word document', async () => {
     await restore(wordDraft(), {

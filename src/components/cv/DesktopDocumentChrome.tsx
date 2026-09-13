@@ -3,11 +3,11 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { Separator } from '@/components/ui/separator'
-import { AnalyticsIcon, ApplicationsIcon, ChevronLeftIcon } from '@/components/icons'
-import { Button } from '@/components/ui/button'
+import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
+import { RailLayoutProvider } from './railLayout'
 import type { DocumentWorkspaceProps } from './DocumentWorkspace'
 
 /* The toggles point at these with `aria-controls`, so the ids have to be the
@@ -19,19 +19,31 @@ const RIGHT_RAIL_ID = 'document-right-rail'
 /**
  * WHERE BOTH RAILS START OPEN, in pixels of workspace width.
  *
- * The arithmetic rather than a taste: the rails are 320 and 400, so they take
- * 720px between them. At 1024 -- the narrowest width this chrome renders at --
- * that leaves the page 304px, which is a sliver of a sheet flanked by two
- * panels, and the thing being edited is the smallest thing on screen. At 1280
- * the page well gets 560px, which `useFitToWidth` scales an 816px letter page
- * into legibly, so that is where the default flips.
+ * 1700, WHICH IS THE WIDE TIER THIS FILE ALREADY HAS, and it is deliberately
+ * the same number as the `min-[1700px]:` rules below rather than a second
+ * threshold sitting near them. Above it the rails widen to 380 and 500 because
+ * there is room to spare; that is the same statement as "both rails are
+ * comfortable here", so it should not be made twice with different numbers.
  *
- * 1280 is also Tailwind's `xl`, which is not a coincidence: it is the width
- * the three-column layout was originally gated on, and it was the right number
- * for "both rails are comfortable here". What was wrong was making it the
- * width at which the layout existed AT ALL.
+ * IT WAS 1280 AND THAT WAS TOO EAGER (Gabe, 2026-09-13: "rail should collapse
+ * in smaller laptop screens"). The arithmetic, which is what settles it: the
+ * rails take 720px between them. A 1440 laptop -- the commonest there is --
+ * was opening both and leaving the page 720px, so the document was the
+ * smallest of the three panels on a screen whose entire purpose is the
+ * document. At 1700 the page keeps 820, which is an 816px letter page at very
+ * nearly 1:1.
+ *
+ * A DEFAULT, NEVER A BINDING. Below 1700 the rails are one click from open and
+ * stay wherever they are put; see the measurement effect for why no observer
+ * survives to argue with that click.
  */
-const RAILS_OPEN_AT = 1280
+const RAILS_OPEN_AT = 1700
+
+/* THE DRAWER IS NAMED FOR WHAT IT HOLDS, not for the rail the handle is on.
+   One control moves both panels, so "document tools" (the left rail's own
+   title) would under-report what the click does. */
+const COLLAPSE_LABEL = 'Collapse document panels'
+const EXPAND_LABEL = 'Expand document panels'
 
 /**
  * The editor at `lg` and above: breadcrumb, name, save state, actions, a
@@ -55,6 +67,143 @@ const RAILS_OPEN_AT = 1280
  * fallback below `xl` was serving a 1024-1280 band that now looks like the
  * large screens, and nothing narrower ever gets here at all.
  */
+/**
+ * ONE RAIL, WHICH IS ALSO A DRAWER.
+ *
+ * IT IS ONE DRAWER HOLDING TWO RAILS, NOT TWO SIDEBARS (Gabe, 2026-09-13:
+ * "left drawer should open both left and right rail; remove the collapsed
+ * version of right rail"). The two rails used to fold independently, which
+ * gave the frame four states and two edges to hunt controls along. They are
+ * one state now: the left edge is the only handle, and it puts both panels
+ * away or brings both back.
+ *
+ * SO ONLY THE ANCHOR RAIL KEEPS AN EDGE WHEN SHUT. The other simply leaves --
+ * no 44px strip, no second control - and the grid gives its track back to the
+ * page. `onToggle` is what marks the anchor: the rail that has it draws the
+ * handle and the chevron, the rail without it is carried by that decision.
+ *
+ * THE HANDLE IS A LARGE ARROWHEAD, CENTRED ON THE EDGE, and it is a drawer
+ * pull rather than an icon button. A rail's own glyph named WHAT would open,
+ * which is the right answer when each rail opens separately and you are
+ * choosing between them; with one drawer there is nothing to choose, so the
+ * edge should say only "pull". 28px against the 18px glyph it replaces, and
+ * vertically centred where a hand would take it.
+ *
+ * THE CONTENT IS `hidden`, NEVER UNMOUNTED, and the difference is a person's
+ * work. These subtrees hold per-section edit state and whatever request is in
+ * flight -- a rewrite being reviewed, a tailoring run half returned. Throwing
+ * that away on a LAYOUT toggle would re-ask the model for it, which is a bill
+ * as well as a surprise. `display:none` also takes the subtree out of the
+ * accessibility tree, so a screen reader never finds two copies of one control
+ * while the drawer is shut.
+ */
+function Rail({
+  id,
+  side,
+  open,
+  column,
+  onToggle,
+  label,
+  children,
+}: {
+  id: string
+  side: 'left' | 'right'
+  open: boolean
+  /** Explicit grid column, so placement never depends on sibling count. */
+  column: string
+  /** Given only to the rail that owns the drawer; the other has no control. */
+  onToggle?: () => void
+  /** Names the panel, not the verb: "document tools", "tailoring". */
+  label: string
+  children: React.ReactNode
+}) {
+  const Chevron = side === 'left' ? ChevronLeftIcon : ChevronRightIcon
+
+  return (
+    <aside
+      id={id}
+      className={cn(
+        'min-w-0 border-border-default bg-bg-surface',
+        side === 'left'
+          ? 'border-b lg:border-b-0 lg:border-r'
+          : 'border-t lg:border-t-0 lg:border-l',
+        column,
+        open
+          ? 'p-5 lg:overflow-y-auto'
+          : // The handle has no padding of its own -- its button fills the
+            // strip, so the whole 44px column is the target rather than a
+            // glyph with dead margin around it. A rail that is not the drawer's
+            // anchor has no strip at all and leaves the grid entirely.
+            onToggle
+            ? 'overflow-hidden p-0'
+            : 'hidden'
+      )}
+    >
+      {!open && onToggle && (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={false}
+          aria-controls={id}
+          aria-label={EXPAND_LABEL}
+          title={EXPAND_LABEL}
+          className={cn(
+            'grid h-full w-full place-items-center',
+            'text-text-muted transition-colors hover:bg-bg-inset hover:text-accent-default',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30'
+          )}
+        >
+          <ChevronRightIcon size={28} aria-hidden />
+        </button>
+      )}
+
+      <div className={cn('flex flex-col gap-4', !open && 'hidden')}>
+        {/* THE FOLD CONTROL IS CONDITIONAL WHERE THE CONTENT IS MERELY HIDDEN,
+            and the asymmetry is deliberate. The content has state to protect,
+            so it stays mounted behind `display:none`. This button has none --
+            and if it stayed, a shut drawer would carry TWO controls with the
+            same accessible name (the handle and this one), which is a duplicate
+            in the tree for anyone not looking at the pixels. Caught by a test
+            that found both. */}
+        {open && (
+        // TITLE LEADING, CONTROL TRAILING (Gabe, 2026-09-13: "add title to left
+        // and right rail"). The title is a column label, not a heading: the
+        // rails' own panels already carry `heading-s` titles inside them, and a
+        // second, larger one above would out-rank the thing it introduces.
+        //
+        // ONLY THE ANCHOR GETS A CHEVRON, so the right rail's row is a title
+        // and nothing else. It closes with the drawer, and a second control
+        // saying "collapse tailoring" while collapsing the outline too would be
+        // lying about its own scope.
+        <div className="flex items-center justify-between gap-2 border-b border-border-subtle pb-3">
+          <h2 className="min-w-0 truncate text-label-caps uppercase text-text-secondary">
+            {label}
+          </h2>
+          {onToggle && (
+            <button
+              type="button"
+              onClick={onToggle}
+              aria-expanded
+              aria-controls={id}
+              aria-label={COLLAPSE_LABEL}
+              title={COLLAPSE_LABEL}
+              className={cn(
+                'grid size-7 place-items-center rounded-md text-text-muted',
+                'transition-colors hover:bg-bg-inset hover:text-text-primary',
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30'
+              )}
+            >
+              <Chevron size={16} aria-hidden />
+            </button>
+          )}
+        </div>
+        )}
+        {children}
+      </div>
+    </aside>
+  )
+}
+
 export function DesktopDocumentChrome({
   kindLabel,
   documentsHref,
@@ -67,13 +216,19 @@ export function DesktopDocumentChrome({
   tools,
   leftRail,
   rightRail,
+  railNav,
   children,
   footnote,
 }: DocumentWorkspaceProps) {
   const displayTitle = title.trim() || 'untitled CV'
 
   /**
-   * ONE BOOLEAN PER RAIL, and they both start OPEN.
+   * ONE BOOLEAN FOR BOTH RAILS, and it starts OPEN.
+   *
+   * IT WAS TWO UNTIL 2026-09-13, one per rail. Gabe: "left drawer should open
+   * both left and right rail." Two booleans is four states, and the two mixed
+   * ones were never chosen deliberately -- they were what you landed in on the
+   * way to one of the other two.
    *
    * DESKTOP-FIRST for the same reason `useBelowDesktop` is: the server cannot
    * measure anything, so the first client render must agree with the markup it
@@ -81,8 +236,18 @@ export function DesktopDocumentChrome({
    * open; a narrow one corrects itself in the same frame as mount, which is
    * the cheaper of the two wrong first paints.
    */
-  const [leftOpen, setLeftOpen] = React.useState(true)
-  const [rightOpen, setRightOpen] = React.useState(true)
+  const [railsOpen, setRailsOpen] = React.useState(true)
+  /**
+   * WHETHER THERE IS ROOM FOR THE RAILS BESIDE THE PAGE, tracked for the life
+   * of the component rather than settled once like the default above.
+   *
+   * It has to keep up, because it decides HOW the rails open (beside the page
+   * or over it) rather than WHETHER they start open -- and a window dragged
+   * across 1700 with the drawer already out would otherwise keep whichever
+   * answer happened to be true at mount.
+   */
+  const [wide, setWide] = React.useState(true)
+  const defaulted = React.useRef(false)
   const rootRef = React.useRef<HTMLDivElement>(null)
 
   /**
@@ -102,18 +267,17 @@ export function DesktopDocumentChrome({
    * cannot be starved, so it goes first and the observer is the fallback for
    * the case where there was no layout to read yet.
    *
-   * IT IS A DEFAULT, NOT A BINDING. Once a real width has been read the
-   * observer is never even created, so there is no resize handler left to
-   * argue with a person who closed a rail on purpose -- a toggle is final by
-   * construction rather than by a flag guarding it.
+   * THE OPEN/SHUT DEFAULT IS TAKEN ONCE; THE WIDTH IS NOT. `defaulted` is what
+   * separates them: a person who opens the drawer keeps it open across a
+   * resize, while `wide` -- which decides whether the rails sit beside the page
+   * or float over it -- has to stay current for as long as the window can
+   * change.
    */
   React.useEffect(() => {
     const el = rootRef.current
     if (!el) return
 
-    let settled = false
     const measure = () => {
-      if (settled) return
       const width = el.getBoundingClientRect().width
       // ZERO IS "UNMEASURED", NOT "NARROW". jsdom lays nothing out and reports
       // 0 for every element, and a `display:none` subtree does the same in a
@@ -122,46 +286,72 @@ export function DesktopDocumentChrome({
       // rendered without a layout. Keeping the default is the honest answer to
       // a measurement that did not happen.
       if (width === 0) return
-      settled = true
-      const open = width >= RAILS_OPEN_AT
-      setLeftOpen(open)
-      setRightOpen(open)
+      const roomForBoth = width >= RAILS_OPEN_AT
+      setWide(roomForBoth)
+      // THE DEFAULT IS TAKEN ONCE AND NEVER RE-ARGUED. `wide` goes on tracking
+      // the window; this does not, so a person who opened the drawer keeps it
+      // open through a resize instead of having it shut under them.
+      if (!defaulted.current) {
+        defaulted.current = true
+        setRailsOpen(roomForBoth)
+      }
     }
 
     measure()
 
-    if (settled || typeof ResizeObserver === 'undefined') return
+    if (typeof ResizeObserver === 'undefined') return
     const observer = new ResizeObserver(measure)
     observer.observe(el)
     return () => observer.disconnect()
   }, [])
 
-  const showLeftRail = !!leftRail && leftOpen
-  const showRightRail = !!rightRail && rightOpen
-
-  const leftToggleLabel = leftOpen ? 'Hide document tools' : 'Show document tools'
-  const rightToggleLabel = rightOpen ? 'Hide tailoring rail' : 'Show tailoring rail'
+  // THE LEFT RAIL IS THE DRAWER'S ANCHOR, so a workspace with no left rail has
+  // no handle -- and a rail you cannot reopen is worse than one that never
+  // folds. The right rail is therefore only collapsible in the company of a
+  // left one, which is every editor there is: Word passes both, LaTeX passes
+  // left alone.
+  const drawerOpen = railsOpen || !leftRail
+  const showLeftRail = !!leftRail && drawerOpen
+  const showRightRail = !!rightRail && drawerOpen
 
   /**
-   * THE COLUMN TEMPLATE FOLLOWS WHICH RAILS EXIST *AND* WHICH ARE OPEN.
+   * BELOW `RAILS_OPEN_AT` THE TWO RAILS BECOME ONE COLUMN.
    *
-   * A closed rail contributes no track. It would be tidier to leave the track
-   * and let a `hidden` child collapse it, but a grid track sized `320px` is
-   * 320px whether anything is in it or not -- the page would keep paying for a
-   * rail nobody can see.
+   * THE ARITHMETIC IS WHY. The rails want 880px between them at their proper
+   * widths, so on a 1100px window opening both leaves the document 220 -- and
+   * now that the zoom actually tracks its well, the page honestly shrinks to
+   * fit it. Gabe, 2026-09-13, on seeing that: "another problem", and then the
+   * answer: "how about no left and right rails? implement two column layout in
+   * smaller laptop screens."
    *
-   * Four cases, and the fourth is not hypothetical: the LaTeX editor passes no
-   * right rail at all (it puts source beside preview inside the content column
-   * instead), so "left only" is a shipping arrangement rather than a transient
-   * state of the Word editor.
+   * SO A SMALL LAPTOP GETS TWO COLUMNS, NOT THREE. One 320px rail carrying
+   * both panels, stacked, with the document beside it. That is not a
+   * compromise arrangement -- the left rail is a TAB LIST and the right rail
+   * is the pane those tabs select, so putting them in one column restores the
+   * adjacency they always had in the compact dock, where the same two things
+   * are one panel with tabs across the top.
+   *
+   * Above 1700 there is room for three columns and they separate again, which
+   * is the arrangement that wants the width: the posting you are tailoring TO
+   * on the left, how well you match it on the right, the document between them.
    */
+  const oneColumn = drawerOpen && !wide && !!leftRail && !!rightRail
+
   const railColumns =
-    showLeftRail && showRightRail
-      ? 'lg:grid-cols-[320px_minmax(0,1fr)_400px] min-[1700px]:grid-cols-[380px_minmax(0,1fr)_500px]'
-      : showLeftRail
-        ? 'lg:grid-cols-[320px_minmax(0,1fr)] min-[1700px]:grid-cols-[380px_minmax(0,1fr)]'
-        : showRightRail
-          ? 'lg:grid-cols-[minmax(0,1fr)_400px] min-[1700px]:grid-cols-[minmax(0,1fr)_500px]'
+    leftRail && rightRail
+      ? !drawerOpen
+        ? 'lg:grid-cols-[44px_minmax(0,1fr)]'
+        : wide
+          ? 'lg:grid-cols-[380px_minmax(0,1fr)_500px]'
+          : 'lg:grid-cols-[320px_minmax(0,1fr)]'
+      : leftRail
+        ? !drawerOpen
+          ? 'lg:grid-cols-[44px_minmax(0,1fr)]'
+          : wide
+            ? 'lg:grid-cols-[380px_minmax(0,1fr)]'
+            : 'lg:grid-cols-[320px_minmax(0,1fr)]'
+        : rightRail
+          ? 'lg:grid-cols-[minmax(0,1fr)_400px]'
           : 'lg:grid-cols-[minmax(0,1fr)]'
 
   return (
@@ -335,55 +525,7 @@ export function DesktopDocumentChrome({
             )}>
             <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">{tools}</div>
             <div className="ml-auto flex shrink-0 items-center gap-1.5 border-l border-border-subtle pl-3">
-              {/* THE RAIL TOGGLES LEAD THE GROUP, BEFORE THE VERBS. They are
-                  view state, not actions on the document, and the separator
-                  says so -- the same idiom the destructive actions use at the
-                  other end, for the same reason: a rule marks a change of
-                  category, where a wider gap would only read as the end of a
-                  row.
-
-                  A toggle exists only where its rail does, so the LaTeX editor
-                  gets one and the Word editor two, and neither gets a control
-                  that points at nothing.
-
-                  ICONS, NOT LABELS, and these two in particular: the outline
-                  glyph for the tools rail (it is the tab list and Word's
-                  navigation pane), and the chart glyph for the tailoring rail
-                  -- which is already what the compact chrome puts on its own
-                  tailoring control, so the same panel has the same mark on a
-                  phone and on a laptop. */}
-              {leftRail && (
-                <Button
-                  variant="ghost"
-                  size="s"
-                  className="px-2"
-                  aria-expanded={leftOpen}
-                  aria-controls={LEFT_RAIL_ID}
-                  aria-label={leftToggleLabel}
-                  title={leftToggleLabel}
-                  onClick={() => setLeftOpen((open) => !open)}
-                >
-                  <ApplicationsIcon size={16} aria-hidden />
-                </Button>
-              )}
-              {rightRail && (
-                <Button
-                  variant="ghost"
-                  size="s"
-                  className="px-2"
-                  aria-expanded={rightOpen}
-                  aria-controls={RIGHT_RAIL_ID}
-                  aria-label={rightToggleLabel}
-                  title={rightToggleLabel}
-                  onClick={() => setRightOpen((open) => !open)}
-                >
-                  <AnalyticsIcon size={16} aria-hidden />
-                </Button>
-              )}
-              {(leftRail || rightRail) && (
-                <Separator orientation="vertical" className="mx-1 h-6" />
-              )}
-              {actions}
+                            {actions}
               {destructiveActions && (
                 <>
                   {/* A real gap, not a bigger margin: the separator says these
@@ -397,12 +539,12 @@ export function DesktopDocumentChrome({
           </div>
         )}
         {/*
-          THREE COLUMNS FROM `lg`, AND COLLAPSIBLE ONES. The rails want ~300px
-          each beside an 816px page, which is more than a 1366 laptop has to
-          give all three at once -- so the answer is which panels are open
-          rather than which layout is in force. Below 1280 of workspace both
-          start closed and the page has the screen to itself; the toggles in
-          the ribbon are how you get a rail back, one at a time.
+          THREE COLUMNS FROM `lg`, AND A DRAWER. The rails want ~300px each
+          beside an 816px page, which is more than a 1366 laptop has to give
+          all three at once -- so the answer is whether the panels are open
+          rather than which layout is in force. Below `RAILS_OPEN_AT` of
+          workspace they start shut and the page has the screen to itself; the
+          handle on the left edge is how you get both back.
 
           The page itself is a PRINT PROOF, not app chrome: it keeps its own
           white sheet and letter geometry and deliberately does not follow the
@@ -443,25 +585,33 @@ export function DesktopDocumentChrome({
           )}
         >
           {leftRail && (
-            <aside
+            <Rail
               id={LEFT_RAIL_ID}
-              // A CLOSED RAIL IS `hidden`, NOT UNMOUNTED, and the difference
-              // is a person's work. The rails hold per-section edit state and
-              // whatever request is in flight -- a rewrite being reviewed, a
-              // tailoring run half returned -- all of it React state inside
-              // these subtrees. Unmounting on a LAYOUT toggle would throw that
-              // away and re-ask the model for it, which is a bill as well as a
-              // surprise. `display:none` also takes the subtree out of the
-              // accessibility tree, so a screen reader never finds two copies
-              // of the same control while a rail is put away.
-              className={cn(
-                'min-w-0 border-b border-border-default bg-bg-surface p-5',
-                'lg:order-1 lg:overflow-y-auto lg:border-b-0 lg:border-r',
-                !leftOpen && 'hidden'
-              )}
+              side="left"
+              open={showLeftRail}
+              column="lg:col-start-1"
+              onToggle={() => setRailsOpen((value) => !value)}
+              label={oneColumn ? 'document tools & tailoring' : 'document tools'}
             >
+              {/* STRIP, THEN WHAT IT SELECTS, THEN THE REST. In one column the
+                  pane has to follow the tabs immediately or the click reads as
+                  having done nothing; the outline and the statistics are
+                  reference material and can sit under both.
+
+                  THE SECOND PANEL IS MOUNTED HERE, not merely moved: crossing
+                  1700 re-parents it, which React answers with a remount -- and
+                  that is survivable only because the tailoring state lives up
+                  in the editor and is handed down as props. If a pane ever
+                  grows state of its own, this is the line that spends it. */}
+              {/* THE STRIP FOLLOWS THE ARRANGEMENT: a vertical list while it
+                  has a column to itself, one 45px row while it is sharing one
+                  with the pane it opens. See railLayout.tsx. */}
+              <RailLayoutProvider layout={oneColumn ? 'row' : 'column'}>
+                {railNav}
+              </RailLayoutProvider>
+              {oneColumn && rightRail}
               {leftRail}
-            </aside>
+            </Rail>
           )}
           {/* `id` IS LOAD-BEARING: the formatting ribbon points at this region
               with `aria-controls`, which is what tells a screen reader that a
@@ -476,26 +626,31 @@ export function DesktopDocumentChrome({
               // Word leaves most of a screen below the final page. `pb-24`
               // is that breathing room.
               'min-w-0 overflow-x-auto bg-bg-inset p-4 pb-24 md:p-8 md:pb-24',
-              'lg:order-2 lg:overflow-auto'
+              'lg:overflow-auto',
+              /* PLACED EXPLICITLY, NOT LEFT TO AUTO-PLACEMENT, and that is not
+                 tidiness. An overlaid rail is `position: absolute` and so out
+                 of flow, which leaves the grid ONE in-flow child -- and auto
+                 placement duly put the document in the drawer's 44px track.
+                 Measured: the page wrapper reported a clientWidth of 0 with
+                 the drawer open, which `useFitToWidth` correctly refused to
+                 believe, so the page kept its old zoom and hung 784px past its
+                 own well. The column a thing belongs in does not depend on how
+                 many of its siblings happen to be floating. */
+              leftRail ? 'lg:col-start-2' : 'lg:col-start-1'
             )}
           >
             {children}
           </div>
-          {rightRail && (
-            <aside
+          {rightRail && !oneColumn && (
+            <Rail
               id={RIGHT_RAIL_ID}
-              // Hidden rather than unmounted -- see the left rail above. This
-              // is the one that makes the rule non-negotiable: the tailoring
-              // pane is where the in-flight request and the per-section edit
-              // state actually live.
-              className={cn(
-                'min-w-0 border-t border-border-default bg-bg-surface p-5',
-                'lg:order-3 lg:overflow-y-auto lg:border-t-0 lg:border-l',
-                !rightOpen && 'hidden'
-              )}
+              side="right"
+              open={showRightRail}
+              column={leftRail ? 'lg:col-start-3' : 'lg:col-start-2'}
+              label="tailoring"
             >
               {rightRail}
-            </aside>
+            </Rail>
           )}
         </div>
       </div>

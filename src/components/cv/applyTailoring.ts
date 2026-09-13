@@ -80,9 +80,6 @@ function walk(node: JSONContent, suggestions: TailoringSuggestion[]): JSONConten
   return next
 }
 
-function isLatex(content: ResumeContent): content is { type: 'latex'; source: string } {
-  return content.type === 'latex' && typeof (content as { source?: unknown }).source === 'string'
-}
 
 /**
  * Apply every suggestion to a COPY of the document.
@@ -97,10 +94,6 @@ export function applySuggestions(
   suggestions: TailoringSuggestion[]
 ): ResumeContent {
   if (suggestions.length === 0) return content
-  if (isLatex(content)) {
-    const source = rewrite(content.source, suggestions)
-    return source === content.source ? content : { ...content, source }
-  }
   return walk(content, suggestions)
 }
 

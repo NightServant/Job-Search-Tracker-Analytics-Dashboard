@@ -5,7 +5,22 @@ import { EditorContent, useEditor } from '@tiptap/react'
 import { WORD_EDITOR_EXTENSIONS } from './editorExtensions'
 import type { Editor, JSONContent } from '@tiptap/core'
 import { Button } from '@/components/ui/button'
-import { CheckIcon, DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  DownloadIcon,
+  RotateCcwIcon,
+  SettingsIcon,
+  TrashIcon,
+} from '@/components/icons'
+import {
+  Popover,
+  PopoverContent,
+  PopoverDescription,
+  PopoverHeader,
+  PopoverTitle,
+  PopoverTrigger,
+} from '@/components/ui/popover'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { iconMotion } from '@/components/icons/motion'
 import { useAuth } from '@/contexts/AuthContext'
@@ -171,7 +186,13 @@ function PageSheet({
     */
     <div
       data-page-sheet={view}
-      className={cn('bg-white', scroll ? 'w-full [&_[data-page-spacer]]:hidden' : 'mx-auto')}
+      className={cn(
+        'bg-white',
+        // `grow` only in scroll view: it fills the canvas the wrapper stretched
+        // to, so a half-page CV still ends at the bottom of the screen instead
+        // of on a band of well. Print keeps its own page height.
+        scroll ? 'w-full grow [&_[data-page-spacer]]:hidden' : 'mx-auto'
+      )}
       style={
         scroll
           ? undefined
@@ -256,6 +277,70 @@ function PageSheet({
   )
 }
 
+/**
+ * One row of the document-actions panel.
+ *
+ * A ROW, NOT A MENU ITEM, and that is the whole difference Gabe asked for
+ * ("a better looking dropdown like version history"). A menu item is a label;
+ * these carry a second line saying what the command costs -- which matters
+ * most for the two that are hard to take back, `reset` and `delete`. The
+ * density and the hairline are `ResumeVersionHistory`'s, because the two
+ * panels open from adjacent controls in the same bar.
+ */
+function ActionRow({
+  icon,
+  label,
+  hint,
+  onClick,
+  disabled,
+  destructive,
+  className,
+}: {
+  icon: React.ReactNode
+  label: string
+  hint: string
+  onClick: () => void
+  disabled?: boolean
+  destructive?: boolean
+  className?: string
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={cn(
+        'group flex w-full items-start gap-3 border-b border-border-subtle p-3 text-left last:border-b-0',
+        'transition-colors duration-(--duration-fast)',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30',
+        'disabled:pointer-events-none disabled:opacity-50',
+        destructive ? 'hover:bg-status-rejected-mark/10' : 'hover:bg-bg-inset',
+        className
+      )}
+    >
+      <span
+        className={cn(
+          'mt-0.5 shrink-0',
+          destructive ? 'text-status-rejected-mark' : 'text-text-muted'
+        )}
+      >
+        {icon}
+      </span>
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span
+          className={cn(
+            'text-body-s',
+            destructive ? 'text-status-rejected-mark' : 'text-text-primary'
+          )}
+        >
+          {label}
+        </span>
+        <span className="text-body-s text-text-muted">{hint}</span>
+      </span>
+    </button>
+  )
+}
+
 export function WordResumeEditor({
   draft,
   backHref,
@@ -268,6 +353,7 @@ export function WordResumeEditor({
   const { success, error: showError, info } = useToast()
   const [title, setTitle] = useState(draft.title)
   const [isSaving, setIsSaving] = useState(false)
+  const [actionsOpen, setActionsOpen] = useState(false)
   /**
    * Dirtiness is a comparison between two counters, not a boolean.
    *
@@ -606,29 +692,142 @@ export function WordResumeEditor({
           {user && !compact && (
             <ResumeVersionHistory resumeId={draft.id} userId={user.id} onRestore={restoreSnapshot} />
           )}
-          {/* THE "sent to N applications" DROPDOWN WAS HERE, and it is gone
-              (Gabe, Worktrack Revisions item 6). It listed every application
-              this CV had been pinned to, which on an account that pins one CV
-              to everything is a dropdown of every job in the tracker sitting
-              in the editor's toolbar -- "it displays all the job positions".
-              The same relationship is still readable from the other end, on
-              the application record's `cv submitted` field, which is where a
-              person asks the question that way round.
 
-              Removed rather than hidden: a `display:none` dropdown still
-              mounts, still fetches, and is still in the tab order. */}
-          <Button variant="ghost" size="s" onClick={resetTemplate} disabled={!editor}>
-            <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
-            reset
-          </Button>
-          <Button variant="ghost" size="s" onClick={exportState.exportDocx} disabled={!editor || exportState.isExportingDocx}>
-            <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
-            {exportState.isExportingDocx ? 'exporting' : 'export .docx'}
-          </Button>
-          <Button variant="secondary" size="s" onClick={exportState.exportPdf} disabled={!editor || exportState.isExportingPdf}>
-            <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
-            {exportState.isExportingPdf ? 'exporting' : 'export PDF'}
-          </Button>
+          {/*
+            EVERYTHING BUT SAVE IS BEHIND ONE ICON ON A DESKTOP (Gabe,
+            2026-09-13: "compress this into a settings/avatar icon with
+            dropdown to desktop and laptop screens", and in the same breath
+            "unwanted space in the toolbar, allow properties to breathe").
+            Those are one change: the row was six labelled controls --
+            versions, reset, export .docx, export PDF, save, delete -- taking
+            about 560px off the right of a ribbon whose own bands were being
+            dropped by `visibility` rules for want of width. The formatting
+            controls are what the toolbar is FOR; the file commands are what
+            a menu is for.
+
+            SAVE STAYS OUT. It is the editor's verb, it is the one control
+            here anyone presses more than once a session, and it is the only
+            one that reports state -- burying a spinner that says `saving` in
+            a closed menu hides the answer to the question the menu would be
+            covering. Word keeps Save in the quick-access bar for the same
+            reason.
+
+            COMPACT IS UNCHANGED: below `lg` these already live in the dock's
+            action sheet, which is the same idea arrived at earlier, and
+            nesting a menu inside that sheet would be two taps to reach what
+            is currently one.
+          */}
+          {!compact && (
+            <Popover open={actionsOpen} onOpenChange={setActionsOpen}>
+              <PopoverTrigger
+                render={
+                  <Button variant="secondary" size="s" aria-label="Document actions">
+                    <SettingsIcon size={14} aria-hidden />
+                    <ChevronDownIcon
+                      size={14}
+                      aria-hidden
+                      className={actionsOpen ? 'rotate-180' : undefined}
+                    />
+                  </Button>
+                }
+              />
+              {/* THE SAME PANEL VERSION HISTORY USES, deliberately (Gabe,
+                  2026-09-13: "extend the width and I want a better looking
+                  dropdown like version history"). The two controls sit next to
+                  each other in the same bar, so a compact menu beside a titled
+                  panel read as two different kinds of thing. `w-80`, `p-0` and
+                  rows that carry their own padding and hairline -- exactly the
+                  shape next door.
+
+                  `align="end"`, where versions uses `start`: this trigger is
+                  the last control before the bar's right edge, so a panel
+                  opening rightwards would run off it. */}
+              <PopoverContent align="end" className="w-80 gap-0 p-0">
+                <PopoverHeader className="border-b border-border-subtle p-4">
+                  <PopoverTitle className="text-heading-s text-text-primary">
+                    document actions
+                  </PopoverTitle>
+                  <PopoverDescription className="text-body-s text-text-muted">
+                    export a copy, start over, or remove this CV. saving stays on the bar.
+                  </PopoverDescription>
+                </PopoverHeader>
+
+                <div>
+                  <ActionRow
+                    icon={<RotateCcwIcon size={16} aria-hidden className={iconMotion('back')} />}
+                    label="reset to the template"
+                    hint="replaces everything you have written"
+                    disabled={!editor}
+                    onClick={() => {
+                      setActionsOpen(false)
+                      resetTemplate()
+                    }}
+                  />
+                  <ActionRow
+                    icon={<DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />}
+                    label={exportState.isExportingDocx ? 'exporting .docx…' : 'export .docx'}
+                    hint="opens in Word, Pages and Google Docs"
+                    disabled={!editor || exportState.isExportingDocx}
+                    onClick={() => {
+                      setActionsOpen(false)
+                      void exportState.exportDocx()
+                    }}
+                  />
+                  <ActionRow
+                    icon={<DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />}
+                    label={exportState.isExportingPdf ? 'exporting PDF…' : 'export PDF'}
+                    hint="what a recruiter should receive"
+                    disabled={!editor || exportState.isExportingPdf}
+                    onClick={() => {
+                      setActionsOpen(false)
+                      void exportState.exportPdf()
+                    }}
+                  />
+                  {/* A destructive action does not sit flush against the
+                      exports: the heavier rule is the pause before it. */}
+                  <ActionRow
+                    icon={<TrashIcon size={16} aria-hidden className={iconMotion('lid')} />}
+                    label="delete this CV"
+                    hint="cannot be undone"
+                    destructive
+                    className="border-t-2 border-t-border-default"
+                    onClick={() => {
+                      setActionsOpen(false)
+                      onDelete(draft.id)
+                    }}
+                  />
+                </div>
+              </PopoverContent>
+            </Popover>
+          )}
+
+          {compact && (
+            <>
+              <Button variant="ghost" size="s" onClick={resetTemplate} disabled={!editor}>
+                <RotateCcwIcon size={14} aria-hidden className={iconMotion('back')} />
+                reset
+              </Button>
+              <Button
+                variant="ghost"
+                size="s"
+                onClick={exportState.exportDocx}
+                disabled={!editor || exportState.isExportingDocx}
+              >
+                <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
+                {exportState.isExportingDocx ? 'exporting' : 'export .docx'}
+              </Button>
+              <Button
+                variant="secondary"
+                size="s"
+                onClick={exportState.exportPdf}
+                disabled={!editor || exportState.isExportingPdf}
+              >
+                <DownloadIcon size={14} aria-hidden className={iconMotion('drop')} />
+                {exportState.isExportingPdf ? 'exporting' : 'export PDF'}
+              </Button>
+            </>
+          )}
+
           {/*
             SAVE IS PRIMARY, and Export is not. Before this, Export PDF was the
             only filled control on the screen while Save was plain text --
@@ -641,20 +840,36 @@ export function WordResumeEditor({
           </Button>
         </>
       }
+      /* DELETE IS IN THE MENU ON A DESKTOP, so only the compact sheet still
+         needs its own slot for it. */
       destructiveActions={
-        <Button
-          variant="ghost"
-          size="s"
-          aria-label={`Delete ${draft.title}`}
-          onClick={() => onDelete(draft.id)}
-        >
-          <TrashIcon size={14} aria-hidden className={iconMotion('lid')} />
-          delete
-        </Button>
+        compact ? (
+          <Button
+            variant="ghost"
+            size="s"
+            aria-label={`Delete ${draft.title}`}
+            onClick={() => onDelete(draft.id)}
+          >
+            <TrashIcon size={14} aria-hidden className={iconMotion('lid')} />
+            delete
+          </Button>
+        ) : undefined
       }
-      tools={<DocumentToolbar editor={editor} />}
-      leftRail={
-        <div className="flex flex-col gap-6">
+      /* THE RIBBON IS NOT A RIBBON ON A PHONE. Below `lg` the toolbar is a
+         docked panel, and the ribbon's per-band `visibility` rules -- written
+         to drop bands before a horizontal bar overflows -- left exactly ONE
+         of its four bands rendered there (history, paragraph and styles all
+         measured 0x0 at 390px). `stacked` ignores them; see DocumentToolbar.
+
+         DECIDED HERE RATHER THAN IN THE CHROME because `tools` crosses that
+         seam as a built node: CompactDocumentChrome receives the toolbar, it
+         does not construct it. `compact` is already on hand for the version
+         history below. */
+      tools={<DocumentToolbar editor={editor} layout={compact ? 'stacked' : 'ribbon'} />}
+      /* THE STRIP IS ITS OWN SLOT so the chrome can keep it next to the pane
+         it selects in both arrangements -- beside the document above 1700,
+         stacked with it below. See `railNav` in DocumentWorkspace. */
+      railNav={
         <DocumentRailTabs
           active={tab}
           onSelect={selectTab}
@@ -667,12 +882,11 @@ export function WordResumeEditor({
               : null,
           }}
         />
-        {/* WORD'S NAVIGATION PANE AND WORD COUNT, under the tabs. The rail
-            was two buttons and a column of nothing; these are the two things
-            Word puts there, and both read straight off the editor. */}
-        <DocumentNavigator editor={editor} />
-        </div>
       }
+      /* WORD'S NAVIGATION PANE AND WORD COUNT. The rail was two buttons and a
+         column of nothing; these are the two things Word puts there, and both
+         read straight off the editor. */
+      leftRail={<DocumentNavigator editor={editor} />}
       rightRail={
         <DocumentRailPane
           active={tab}
@@ -684,7 +898,22 @@ export function WordResumeEditor({
       footnote="letter-style layout preview with 0.8in margins for a print-ready CV."
       paged
     >
-      <div ref={fit.ref} className="w-full">
+      {/* THE PAPER REACHES THE BOTTOM OF THE CANVAS IN SCROLL VIEW.
+          Measured at 390x844 with the dock closed: a 711px canvas under a
+          640px sheet, so 71px of dark well sat beneath the white -- which on a
+          short CV reads as the document having been cut off rather than as
+          having ended. `min-h-full` here plus `grow` on the sheet (see
+          `PageSheet`) is the pair that does it: a percentage min-height needs
+          a parent with a resolved height, which the canvas has (`h-full`) and
+          this wrapper did not, and flex-grow is what lets the sheet take the
+          slack without a measured number anywhere.
+
+          PRINT VIEW IS UNTOUCHED, and measured identical either way (449x581
+          in a 390x844 canvas, same offset, same scroll extents). It keeps its
+          own `minHeight` and never grows: a zoomed page ending above the fold
+          with well below it is what print layout IS. Scroll view has no page
+          to end, which is why the band of dark read as damage only there. */}
+      <div ref={fit.ref} className="flex min-h-full w-full flex-col">
         <PageSheet
           editor={editor}
           geometry={geometry}

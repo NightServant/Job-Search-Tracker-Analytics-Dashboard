@@ -89,6 +89,20 @@ export interface DocumentWorkspaceProps {
    */
   leftRail?: React.ReactNode
   rightRail?: React.ReactNode
+  /**
+   * The rail's tab strip -- what SELECTS the pane, as opposed to the panels
+   * themselves.
+   *
+   * ITS OWN SLOT BECAUSE THE TWO RAILS COLLAPSE INTO ONE COLUMN (Gabe,
+   * 2026-09-13: "and render the clicked navigation"). Below 1700 the chrome
+   * stacks `leftRail` and `rightRail` in a single column, and the strip used to
+   * be buried inside `leftRail` above an outline and a statistics table -- so
+   * clicking a tab changed a pane two screens further down, which reads as the
+   * click having done nothing. Named separately, the chrome can put the strip
+   * and the pane it selects next to each other in every arrangement, which is
+   * the only thing that makes the selection legible.
+   */
+  railNav?: React.ReactNode
   /** The page: an editor, or a compiled preview. */
   children: React.ReactNode
   /** A compile log or an unconfigured-integration notice, under the page. */

@@ -102,6 +102,27 @@ describe('the docked panel below lg', () => {
     expect(screen.queryByRole('button', { name: 'bold' })).toBeNull()
   })
 
+  it('sizes the open panel to its content, under a cap', async () => {
+    // THE DOCK USED TO BE `h-[45svh]` FLAT. Measured at 390x844 with `format`
+    // open: a 379px panel holding a 94px toolbar -- 261px of nothing, below
+    // the controls and above a document that wanted the room. A fixed height
+    // on a dock that holds three surfaces of three different sizes is a
+    // promise only the tallest of them can keep.
+    //
+    // jsdom does no layout, so what is asserted is the RULE: a max, not a
+    // height, and `flex-none` -- without which the vendored `TabsContent`'s
+    // own `flex-1` (`flex-basis: 0%`) decides the height on this axis instead.
+    const user = userEvent.setup()
+    renderWorkspace()
+    await user.click(screen.getByRole('tab', { name: 'format' }))
+
+    const panel = screen.getByRole('tabpanel')
+    expect(panel.className).toContain('max-h-[45svh]')
+    expect(panel.className).not.toMatch(/(^|\s)h-\[45svh\]/)
+    expect(panel.className).toContain('flex-none')
+    expect(panel.className).toContain('overflow-y-auto')
+  })
+
   it('swaps one surface for another without closing', async () => {
     const user = userEvent.setup()
     renderWorkspace()

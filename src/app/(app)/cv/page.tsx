@@ -9,12 +9,9 @@ import { useToast } from '@/contexts/ToastContext'
 import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button-variants'
-import { AppDialog } from '@/components/ui/app-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { ModeChooser } from '@/components/cv/ModeChooser'
 import { WordResumeEditor } from '@/components/cv/WordResumeEditor'
-import { LatexResumeEditor } from '@/components/cv/LatexResumeEditor'
-import { DEFAULT_LATEX_SOURCE, DEFAULT_WORD_CONTENT } from '@/components/cv/content'
+import { DEFAULT_WORD_CONTENT } from '@/components/cv/content'
 import type { ResumeContent, ResumeMode } from '@/services/resumeService'
 
 const DOCUMENTS = '/documents'
@@ -67,21 +64,29 @@ function CvRoute() {
     if (!draftParam) router.replace(DOCUMENTS)
   }, [draftParam, router])
 
-  const createDraft = async (mode: ResumeMode) => {
-    const content: ResumeContent =
-      mode === 'latex' ? { type: 'latex', source: DEFAULT_LATEX_SOURCE } : DEFAULT_WORD_CONTENT
+  const createDraft = async () => {
     try {
       const created = await createResume.mutateAsync({
-        mode,
-        title: mode === 'latex' ? 'Untitled LaTeX CV' : 'Untitled CV',
-        content,
+        mode: 'word',
+        title: 'Untitled CV',
+        content: DEFAULT_WORD_CONTENT,
       })
-      info('Draft created', `${mode === 'latex' ? 'LaTeX' : 'Word'} CV ready.`)
+      info('Draft created', 'Word CV ready.')
       router.replace(`/cv?draft=${created.id}`)
     } catch (err) {
       showError('Create failed', err instanceof Error ? err.message : 'Could not create the CV')
     }
   }
+
+  // `?draft=new` CREATES ON ARRIVAL. It used to open a dialog asking Word or
+  // LaTeX; with one editor that dialog is a modal with a single button. The
+  // param survives because `+ new cv` in the Documents header is a plain link
+  // and every write to `resumes` still happens on this route.
+  useEffect(() => {
+    if (isNew && !createResume.isPending) void createDraft()
+    // Once: `createDraft` replaces the URL, which is what ends this state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNew])
 
   const deleteDraft = (draftId: string) => setPendingDeleteId(draftId)
 
@@ -109,15 +114,10 @@ function CvRoute() {
    * from is where the back button should land, since comparing the two is the
    * first thing anyone does.
    *
-   * The mode comes from the open draft rather than being chosen again -- a
-   * LaTeX CV tailored into a Word document would not compile.
    */
-  const tailorIntoNewDraft = async (
-    mode: ResumeMode,
-    input: { title: string; content: ResumeContent }
-  ) => {
+  const tailorIntoNewDraft = async (input: { title: string; content: ResumeContent }) => {
     try {
-      const created = await createResume.mutateAsync({ mode, ...input })
+      const created = await createResume.mutateAsync({ mode: 'word', ...input })
       success('Tailored CV created', `${input.title} is ready.`)
       router.push(`/cv?draft=${created.id}`)
     } catch (err) {
@@ -146,23 +146,8 @@ function CvRoute() {
   if (!draftParam) return <RouteSkeleton variant="detail" />
 
   if (isNew) {
-    // Nothing else on this route has anything behind it -- /cv?draft=new is
-    // only ever reached as a deep link (a bookmark, a back button) once the
-    // trigger itself moved onto DocumentsPage as a dialog opened without
-    // navigating away. Closing this one has nowhere to return to but
-    // Documents, so it replaces the URL instead of leaving /cv?draft=new
-    // sitting in history with nothing open.
-    return (
-      <AppDialog
-        open
-        onOpenChange={(open) => {
-          if (!open) router.replace(DOCUMENTS)
-        }}
-        title="new CV"
-      >
-        <ModeChooser creating={createResume.isPending} onChoose={(mode) => void createDraft(mode)} />
-      </AppDialog>
-    )
+    // The effect above is already creating it; this is the frame in between.
+    return <RouteSkeleton variant="detail" />
   }
 
   if (draftQuery.isLoading) return <RouteSkeleton variant="detail" />
@@ -199,10 +184,9 @@ function CvRoute() {
     )
   }
 
-  const Editor = draft.mode === 'latex' ? LatexResumeEditor : WordResumeEditor
   return (
     <>
-      <Editor
+      <WordResumeEditor
         key={draft.id}
         draft={draft}
         // The tailoring rail's application picker. Read here rather than in
@@ -211,7 +195,7 @@ function CvRoute() {
         backHref={DOCUMENTS}
         onDelete={(id) => deleteDraft(id)}
         onPersistDraft={persistDraft}
-        onTailored={(input) => tailorIntoNewDraft(draft.mode, input)}
+        onTailored={(input) => tailorIntoNewDraft(input)}
       />
       <ConfirmDialog
         open={pendingDeleteId !== null}
