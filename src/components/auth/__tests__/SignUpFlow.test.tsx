@@ -227,7 +227,14 @@ describe('registration rate limiting', () => {
     // No clearing round to round: `setField` REPLACES each value, so the
     // accumulation that used to need three clears cannot happen. See its note
     // for what that accumulation broke.
+    // THE LOOP STOPS WHEN THE FORM DOES, rather than counting to six blind.
+    // The budget is spent after five, and what happens on the sixth is the
+    // point: the submit is gone. Pressing on regardless made this the one red
+    // test on CI -- a slower runner reached the lockout before the last
+    // iteration and `getByRole` threw on a button the test had just proved
+    // should not be there.
     for (let i = 0; i < 6; i += 1) {
+      if (!screen.queryByRole('button', { name: 'Create account' })) break
       await fillDetails('a@b.co')
     }
     expect(await screen.findByText(/Too many attempts/i)).toBeInTheDocument()

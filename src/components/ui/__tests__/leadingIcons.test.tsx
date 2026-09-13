@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
-import { globSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { Card, CardHeader, CardTitle } from '../card'
@@ -302,6 +303,14 @@ describe('the glyphs drawn for this app', () => {
   })
 })
 
+function walk(dir: string): string[] {
+  return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) return walk(full)
+    return entry.name.endsWith('.tsx') ? [full] : []
+  })
+}
+
 describe('every panel in the app is named', () => {
   it('has no PanelSection without an icon', () => {
     // THIS TEST EXISTS BECAUSE THE CHECK I RAN BY HAND COULD NOT SEE THE BUG.
@@ -313,7 +322,11 @@ describe('every panel in the app is named', () => {
     //
     // So this parses the tag across newlines. A single-line grep is a
     // single-line answer; the rule is about the tag.
-    const files = globSync('src/components/**/*.tsx').filter(
+    // WALKED RATHER THAN GLOBBED. `fs.globSync` landed in Node 22 and CI runs
+    // 20, so this suite was the one red test on every run -- green locally,
+    // `globSync is not a function` on the runner. Ten lines of readdir is
+    // cheaper than pinning a Node version to a convenience function.
+    const files = walk('src/components').filter(
       (f) => !f.includes('__tests__') && !f.endsWith('panel-section.tsx')
     )
     const bare: string[] = []
