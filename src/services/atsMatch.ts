@@ -131,10 +131,55 @@ function mentions(cvTokens: Set<string>, term: string): boolean {
 }
 
 /**
+ * The most a posting is allowed to ask for.
+ *
+ * A HUNDRED, AND IT IS GABE'S NUMBER (2026-09-13: "reduce the number of terms
+ * in posting. I prefer 100 terms"). An uncapped read of a real advert returned
+ * 130, and the tail of that list is where the value runs out: by the hundredth
+ * term a posting is down to words it used once, in passing, in a sentence
+ * about the office. Counting them as requirements moves the score without
+ * telling the reader anything they can act on.
+ */
+const MAX_TERMS = 100
+
+/**
+ * The terms a posting actually leans on, most-used first.
+ *
+ * BY FREQUENCY, NOT BY POSITION, and that is the whole reason this is a
+ * function rather than a `.slice(0, 100)`. Document order would hand the cap
+ * to whichever paragraph happens to come first -- usually the one about the
+ * company -- and drop the requirements at the bottom of the advert. How often
+ * a posting says a word is the best cheap signal of how much it means it.
+ *
+ * FIRST APPEARANCE BREAKS THE TIE, so the order is stable for the same input
+ * and a reader sees the terms in the order the posting introduced them.
+ *
+ * THE RESULT STAYS IN FREQUENCY ORDER for display too. The record's chip lists
+ * fold at 32; showing the most-repeated terms first means what survives the
+ * fold is the part worth reading.
+ */
+function requiredTerms(jobDescription: string): string[] {
+  const counts = new Map<string, { count: number; first: number }>()
+  tokenize(jobDescription)
+    .filter(isRequirementCandidate)
+    .forEach((token, index) => {
+      const seen = counts.get(token)
+      if (seen) seen.count += 1
+      else counts.set(token, { count: 1, first: index })
+    })
+
+  return [...counts.entries()]
+    .sort(([, a], [, b]) => b.count - a.count || a.first - b.first)
+    .slice(0, MAX_TERMS)
+    .map(([term]) => term)
+}
+
+/**
  * Scores a CV against a job posting.
  *
  * Terms come from the posting, not the CV: the question is what the employer
  * asked for and whether the CV answers it, not how much the CV happens to say.
+ * At most `MAX_TERMS` of them, the ones it repeats most -- see `requiredTerms`.
  *
  * Matching is whole-token, so "Java" in a posting is not satisfied by
  * "JavaScript" in the CV — the substring match that would allow is exactly the
@@ -144,7 +189,7 @@ function mentions(cvTokens: Set<string>, term: string): boolean {
  * CV is unscored, and reporting a perfect match would be a lie the user acts on.
  */
 export function matchKeywords(cvText: string, jobDescription: string): KeywordMatch {
-  const required = [...new Set(tokenize(jobDescription).filter(isRequirementCandidate))]
+  const required = requiredTerms(jobDescription)
   if (required.length === 0) {
     return { score: 0, matched: [], missing: [] }
   }

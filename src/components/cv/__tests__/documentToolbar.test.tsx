@@ -2,6 +2,7 @@ import { describe, it, expect, afterEach } from 'vitest'
 import { render, screen, cleanup } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { Editor } from '@tiptap/core'
+import { chooseOption, selectedLabel } from '@/test/select'
 import { DocumentToolbar } from '../DocumentToolbar'
 import { WORD_EDITOR_EXTENSIONS } from '../editorExtensions'
 
@@ -86,11 +87,31 @@ describe('the formatting ribbon', () => {
     editor.commands.selectAll()
     render(<DocumentToolbar editor={editor} />)
 
-    await userEvent.selectOptions(screen.getByLabelText('font'), 'Georgia, serif')
+    const user = userEvent.setup({ delay: null })
+    await chooseOption(user, screen.getByLabelText('font'), 'Georgia')
     // Asserted on the DOCUMENT, not on the mark under the cursor: `focus()`
     // moves the selection, so `getAttributes` can read a caret that is no
     // longer inside the text that changed.
     expect(editor.getHTML()).toContain('Georgia, serif')
+  })
+
+  it('sets line spacing, and shows the spacing the caret is already in', async () => {
+    // The control used to be uncontrolled with a bare ↕ option, so it never
+    // reported anything -- it could only send. Being controlled is the part
+    // worth a test: the value has to come back out of the document.
+    editor = editorWith()
+    editor.commands.selectAll()
+    render(<DocumentToolbar editor={editor} />)
+
+    const user = userEvent.setup({ delay: null })
+    const spacing = screen.getByLabelText('line spacing')
+    await chooseOption(user, spacing, '1.5')
+    expect(editor.getHTML()).toContain('line-height: 1.5')
+    expect(selectedLabel(spacing)).toBe('1.5')
+
+    // `spacing` is the paragraph's own, which means unsetting the mark.
+    await chooseOption(user, spacing, 'spacing')
+    expect(editor.getHTML()).not.toContain('line-height')
   })
 
   it('names every group, which is what makes a ribbon findable', () => {

@@ -4,6 +4,7 @@ import * as React from 'react'
 import type { Editor } from '@tiptap/core'
 import { cn } from '@/lib/utils'
 import { icons } from '@/components/icons'
+import { Select } from '@/components/ui/select'
 import {
   FONT_FAMILIES,
   FONT_SIZES,
@@ -11,6 +12,7 @@ import {
   RIBBON_GROUPS,
   STYLE_PRESETS,
   currentFontPx,
+  currentLineHeight,
   type RibbonCommand,
 } from './ribbonCommands'
 
@@ -44,11 +46,22 @@ import {
  * current action without turning a state into a filled block.
  */
 
-const CONTROL =
-  'h-7 rounded-[4px] border border-border-default bg-bg-canvas px-1 text-body-s ' +
-  'text-text-primary transition-colors duration-(--duration-fast) ' +
-  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default/30 ' +
-  'disabled:cursor-not-allowed disabled:opacity-40'
+/**
+ * The ribbon's dropdowns are `ui/select`, and the height is the only thing
+ * this has to say about them.
+ *
+ * NO NATIVE `<select>` IN HERE ANY MORE. Three of them survived the 2026-09-05
+ * move because they are small and the ribbon is dense -- but the option list
+ * of a native select is drawn by macOS, so clicking font or size in a Word
+ * ribbon rendered in black, white and orange opened a dark grey system panel
+ * with system checkmarks. `ui/select` already owns that popup; these were the
+ * last three controls that did not use it.
+ *
+ * The trigger ships at `h-10` for form rows. The ribbon runs at 28px, so each
+ * one is handed the row height and the tighter padding, and wrapped in a fixed
+ * width because the component is `w-full` by design.
+ */
+const TRIGGER = 'h-7 rounded-[4px] px-2 pr-2 text-body-s'
 
 const BUTTON =
   'inline-flex h-7 min-w-7 items-center justify-center rounded-[4px] border px-1.5 ' +
@@ -166,39 +179,43 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
           Word's arrangement exactly. */}
       <Band id="font" visibility="flex">
         <div className={ROW}>
-          <select
-            aria-label="font"
-            value={currentFamily}
-            disabled={!editor}
-            onChange={(event) =>
-              event.target.value
-                ? editor?.chain().focus().setFontFamily(event.target.value).run()
-                : editor?.chain().focus().unsetFontFamily().run()
-            }
-            className={cn(CONTROL, 'w-[124px]')}
-          >
-            <option value="">(default)</option>
-            {FONT_FAMILIES.map((font) => (
-              <option key={font.label} value={font.value}>
-                {font.label}
-              </option>
-            ))}
-          </select>
-          <select
-            aria-label="font size"
-            value={String(fontPx)}
-            disabled={!editor}
-            onChange={(event) =>
-              editor?.chain().focus().setFontSize(`${event.target.value}px`).run()
-            }
-            className={cn(CONTROL, 'w-[52px]')}
-          >
-            {FONT_SIZES.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
+          <div className="w-[128px]">
+            {/* THE PLACEHOLDER IS THE DOCUMENT'S OWN VALUE (found in review,
+                2026-09-13). `Select` shows `placeholder` whenever `value`
+                matches no item, and its default is the word `select` -- so a
+                caret in imported text set in a face this list does not carry
+                (mammoth hands back whatever the .docx declared) made the
+                control read "select", which looks like an instruction rather
+                than a report. Naming the face is the truth: this ribbon cannot
+                offer it as an option, but it can say what it is. */}
+            <Select
+              aria-label="font"
+              value={currentFamily}
+              placeholder={currentFamily ? currentFamily.split(',')[0].replace(/["']/g, '') : '(default)'}
+              disabled={!editor}
+              onValueChange={(value) =>
+                value
+                  ? editor?.chain().focus().setFontFamily(value).run()
+                  : editor?.chain().focus().unsetFontFamily().run()
+              }
+              items={[{ value: '', label: '(default)' }, ...FONT_FAMILIES]}
+              className={TRIGGER}
+            />
+          </div>
+          <div className="w-[76px]">
+            {/* Same reason as the face above: `FONT_SIZES` is Word's list and
+                an imported document is under no obligation to use it. 13pt and
+                11.5pt are ordinary in a .docx; both would have read "select". */}
+            <Select
+              aria-label="font size"
+              value={String(fontPx)}
+              placeholder={String(fontPx)}
+              disabled={!editor}
+              onValueChange={(value) => editor?.chain().focus().setFontSize(`${value}px`).run()}
+              items={FONT_SIZES.map((size) => ({ value: size, label: size }))}
+              className={TRIGGER}
+            />
+          </div>
           {fontRow.map((command) => (
             <CommandButton key={command.id} command={command} editor={editor} />
           ))}
@@ -221,24 +238,27 @@ export function DocumentToolbar({ editor }: { editor: Editor | null }) {
           {paragraph.rows[1].map((command) => (
             <CommandButton key={command.id} command={command} editor={editor} />
           ))}
-          <select
-            aria-label="line spacing"
-            disabled={!editor}
-            defaultValue=""
-            onChange={(event) =>
-              event.target.value
-                ? editor?.chain().focus().setLineHeight(event.target.value).run()
-                : editor?.chain().focus().unsetLineHeight().run()
-            }
-            className={cn(CONTROL, 'w-[52px]')}
-          >
-            <option value="">↕</option>
-            {LINE_SPACINGS.map((value) => (
-              <option key={value} value={value}>
-                {value}
-              </option>
-            ))}
-          </select>
+          {/* `spacing` rather than the old bare ↕, which was a glyph chosen to
+              fit a 52px native control and read as nothing at all to a screen
+              reader. It means the paragraph's own spacing, so choosing it
+              unsets the mark rather than setting a number. */}
+          <div className="w-[76px]">
+            <Select
+              aria-label="line spacing"
+              value={currentLineHeight(editor)}
+              disabled={!editor}
+              onValueChange={(value) =>
+                value
+                  ? editor?.chain().focus().setLineHeight(value).run()
+                  : editor?.chain().focus().unsetLineHeight().run()
+              }
+              items={[
+                { value: '', label: 'spacing' },
+                ...LINE_SPACINGS.map((value) => ({ value, label: value })),
+              ]}
+              className={TRIGGER}
+            />
+          </div>
         </div>
       </Band>
 

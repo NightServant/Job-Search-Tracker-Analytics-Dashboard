@@ -627,22 +627,48 @@ body,
   transition: background-color 300ms ease, color 300ms ease, border-color 300ms ease, box-shadow 300ms ease;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
+/* THE SCROLLBAR, IN THE APP'S OWN COLOURS RATHER THAN ZINC'S.
 
-::-webkit-scrollbar-track {
-  @apply bg-zinc-100 dark:bg-zinc-900;
-}
+   It was `bg-zinc-100 dark:bg-zinc-900` over `bg-zinc-300 dark:bg-zinc-700`,
+   which is theme-AWARE in the sense that it had a dark variant and theme-blind
+   in the sense that those five greys belong to no palette this app defines.
+   The semantic tokens already flip in `.dark` (see the block at the top of this
+   file), so naming them here means one rule for both themes and a scrollbar
+   that moves when the palette does.
 
-::-webkit-scrollbar-thumb {
-  @apply bg-zinc-300 dark:bg-zinc-700 rounded-full;
-}
+   `--color-*` DIRECTLY, NOT `@apply`. These rules sit outside `@layer base`,
+   where Tailwind's `dark:` variant has no element to hang off -- the variant is
+   declared as `&:where(.dark, .dark *)` and a scrollbar is not a descendant
+   selector you can qualify. Reading the custom property is the same answer
+   without the indirection, and it is what makes the light/dark switch free.
 
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-400 dark:bg-zinc-600;
+   THE `::-webkit-scrollbar` BLOCK THAT WAS HERE HAS BEEN DELETED, and the
+   measurement is why. It set a 10px track, a 4px radius, a 2px inset and a
+   hover colour, and in Chromium NONE of it was reaching the page: setting
+   `scrollbar-color` to anything other than `auto` makes Chromium ignore the
+   legacy pseudo-elements for that scroller, and `scrollbar-color` INHERITS, so
+   one declaration on `html` switched them off everywhere. Measured in the app
+   on 2026-09-13: a nested scrollport came back 15px wide (the platform
+   default) while a probe with `scrollbar-color: auto` came back 10px (the
+   pseudo-element). Two mechanisms, one of them dead, and the dead one was the
+   one carrying the design.
+
+   `scrollbar-width` ON `*`, NOT ON `html`, and that is the other half of the
+   same measurement. `scrollbar-color` inherits; `scrollbar-width` does not
+   (CSS Scrollbars L1) -- verified by reading `scrollbarWidth` off a nested div
+   and getting `auto` back. So the page scrollbar was thin and every inner one
+   -- the record dialog's columns, the CV rail, the ribbon's overflow, a Select
+   popup -- was platform-width. The universal selector is what makes "the
+   entire system" true rather than "the window".
+
+   WHAT THIS GIVES UP is the 4px radius and the hover colour, which the
+   standard properties have no way to express. Both were already invisible;
+   consistent geometry in every engine is worth more than a corner nobody was
+   seeing. */
+*,
+::backdrop {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-default) transparent;
 }
 
 @layer base {

@@ -3,11 +3,35 @@
 import * as React from 'react'
 import Link from 'next/link'
 import { Separator } from '@/components/ui/separator'
-import { ChevronLeftIcon } from '@/components/icons'
+import { AnalyticsIcon, ApplicationsIcon, ChevronLeftIcon } from '@/components/icons'
+import { Button } from '@/components/ui/button'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { cn } from '@/lib/utils'
 import type { DocumentWorkspaceProps } from './DocumentWorkspace'
+
+/* The toggles point at these with `aria-controls`, so the ids have to be the
+   same two strings in both places -- a dangling reference is worse than none,
+   which is the same rule `document-sheet` below is written under. */
+const LEFT_RAIL_ID = 'document-left-rail'
+const RIGHT_RAIL_ID = 'document-right-rail'
+
+/**
+ * WHERE BOTH RAILS START OPEN, in pixels of workspace width.
+ *
+ * The arithmetic rather than a taste: the rails are 320 and 400, so they take
+ * 720px between them. At 1024 -- the narrowest width this chrome renders at --
+ * that leaves the page 304px, which is a sliver of a sheet flanked by two
+ * panels, and the thing being edited is the smallest thing on screen. At 1280
+ * the page well gets 560px, which `useFitToWidth` scales an 816px letter page
+ * into legibly, so that is where the default flips.
+ *
+ * 1280 is also Tailwind's `xl`, which is not a coincidence: it is the width
+ * the three-column layout was originally gated on, and it was the right number
+ * for "both rails are comfortable here". What was wrong was making it the
+ * width at which the layout existed AT ALL.
+ */
+const RAILS_OPEN_AT = 1280
 
 /**
  * The editor at `lg` and above: breadcrumb, name, save state, actions, a
@@ -16,9 +40,20 @@ import type { DocumentWorkspaceProps } from './DocumentWorkspace'
  * THE OTHER HALF of the split described in `CompactDocumentChrome` -- see that
  * file for why this is two components rather than one with `lg:` classes.
  *
- * THREE COLUMNS ONLY WHERE THREE COLUMNS FIT: the rails need ~300px each
- * beside an 816px page, so they sit beside it from `xl` and stack above it
- * below that.
+ * THE THREE-COLUMN FRAME STARTS AT `lg`, AND IT STARTED AT `xl` UNTIL
+ * 2026-09-13 (Gabe: "make left and right rail collapsible and maintain the
+ * layout of large screens to the small laptop screens"). Between 1024 and 1280
+ * this file had a SECOND layout -- rails stacked above and below the page, the
+ * whole window scrolling -- and 1280 is above every 13" laptop there is, so
+ * the arrangement most people saw was the fallback. It is gone: one layout at
+ * every width this component renders at, and the rails COLLAPSE rather than
+ * stack when there is no room for them.
+ *
+ * That also retires rules that were already unreachable. `DocumentWorkspace`
+ * hands this component only widths >= 1024 (`useBelowDesktop` switches at
+ * `lg`), so every un-prefixed class here that existed to serve the stacked
+ * fallback below `xl` was serving a 1024-1280 band that now looks like the
+ * large screens, and nothing narrower ever gets here at all.
  */
 export function DesktopDocumentChrome({
   kindLabel,
@@ -37,8 +72,101 @@ export function DesktopDocumentChrome({
 }: DocumentWorkspaceProps) {
   const displayTitle = title.trim() || 'untitled CV'
 
+  /**
+   * ONE BOOLEAN PER RAIL, and they both start OPEN.
+   *
+   * DESKTOP-FIRST for the same reason `useBelowDesktop` is: the server cannot
+   * measure anything, so the first client render must agree with the markup it
+   * hydrates. Starting open means a wide screen never flashes a collapsed rail
+   * open; a narrow one corrects itself in the same frame as mount, which is
+   * the cheaper of the two wrong first paints.
+   */
+  const [leftOpen, setLeftOpen] = React.useState(true)
+  const [rightOpen, setRightOpen] = React.useState(true)
+  const rootRef = React.useRef<HTMLDivElement>(null)
+
+  /**
+   * THE DEFAULT IS MEASURED, NOT ASKED OF A MEDIA QUERY, and once only.
+   *
+   * A media query answers about the VIEWPORT; what decides whether two rails
+   * and a page fit is the width of this workspace, which is the viewport minus
+   * whatever chrome is beside it. They agree today because `useDocumentFocus`
+   * hides the sidebar -- and that is exactly the kind of agreement that stops
+   * being true the first time something is docked next to the editor.
+   *
+   * MEASURED DIRECTLY, THEN OBSERVED ONLY IF THAT FAILED. A ResizeObserver is
+   * delivered as part of the rendering lifecycle, so an environment that is
+   * not painting never calls it: a hidden browser pane gave a laid-out element
+   * zero callbacks in 1.5s (2026-09-13), and a background tab or a headless
+   * capture does the same. `getBoundingClientRect` asks layout directly and
+   * cannot be starved, so it goes first and the observer is the fallback for
+   * the case where there was no layout to read yet.
+   *
+   * IT IS A DEFAULT, NOT A BINDING. Once a real width has been read the
+   * observer is never even created, so there is no resize handler left to
+   * argue with a person who closed a rail on purpose -- a toggle is final by
+   * construction rather than by a flag guarding it.
+   */
+  React.useEffect(() => {
+    const el = rootRef.current
+    if (!el) return
+
+    let settled = false
+    const measure = () => {
+      if (settled) return
+      const width = el.getBoundingClientRect().width
+      // ZERO IS "UNMEASURED", NOT "NARROW". jsdom lays nothing out and reports
+      // 0 for every element, and a `display:none` subtree does the same in a
+      // real browser. There is no such thing as a 0px workspace; collapsing
+      // both rails on that reading would hide half the editor wherever it is
+      // rendered without a layout. Keeping the default is the honest answer to
+      // a measurement that did not happen.
+      if (width === 0) return
+      settled = true
+      const open = width >= RAILS_OPEN_AT
+      setLeftOpen(open)
+      setRightOpen(open)
+    }
+
+    measure()
+
+    if (settled || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
+
+  const showLeftRail = !!leftRail && leftOpen
+  const showRightRail = !!rightRail && rightOpen
+
+  const leftToggleLabel = leftOpen ? 'Hide document tools' : 'Show document tools'
+  const rightToggleLabel = rightOpen ? 'Hide tailoring rail' : 'Show tailoring rail'
+
+  /**
+   * THE COLUMN TEMPLATE FOLLOWS WHICH RAILS EXIST *AND* WHICH ARE OPEN.
+   *
+   * A closed rail contributes no track. It would be tidier to leave the track
+   * and let a `hidden` child collapse it, but a grid track sized `320px` is
+   * 320px whether anything is in it or not -- the page would keep paying for a
+   * rail nobody can see.
+   *
+   * Four cases, and the fourth is not hypothetical: the LaTeX editor passes no
+   * right rail at all (it puts source beside preview inside the content column
+   * instead), so "left only" is a shipping arrangement rather than a transient
+   * state of the Word editor.
+   */
+  const railColumns =
+    showLeftRail && showRightRail
+      ? 'lg:grid-cols-[320px_minmax(0,1fr)_400px] min-[1700px]:grid-cols-[380px_minmax(0,1fr)_500px]'
+      : showLeftRail
+        ? 'lg:grid-cols-[320px_minmax(0,1fr)] min-[1700px]:grid-cols-[380px_minmax(0,1fr)]'
+        : showRightRail
+          ? 'lg:grid-cols-[minmax(0,1fr)_400px] min-[1700px]:grid-cols-[minmax(0,1fr)_500px]'
+          : 'lg:grid-cols-[minmax(0,1fr)]'
+
   return (
     <div
+      ref={rootRef}
       // FULL BLEED AND FULL HEIGHT, NOT A CARD IN A PAGE. It was centred at
       // max-w-1600 inside the app's gutters, so a word processor sat in a
       // reading column -- the one layout Word never has.
@@ -50,16 +178,18 @@ export function DesktopDocumentChrome({
       // to reach is a formatting bar you stop using. `dvh` rather than `vh`
       // because mobile browsers change the viewport as their chrome hides, and
       // `vh` would leave the foot of the document under the address bar.
-      // THE LOCKED FRAME IS `xl` AND UP ONLY, and that is a fix rather than a
-      // caveat. Below xl the grid collapses to one column and the rails stack
-      // around the document -- three auto rows inside a fixed height, which
-      // CSS Grid SQUEEZES rather than overflows. Measured at 900x600: the left
-      // rail rendered 154px tall instead of its natural 500, so the layout was
-      // three crushed strips each with its own scrollbar and a document about
-      // 160px tall. Below xl the page scrolls, which is the only sane
-      // behaviour for a stacked layout; from xl the frame locks and only the
-      // document moves, which is what was asked for.
-      className="flex w-full flex-col xl:h-[100dvh] xl:overflow-hidden"
+      //
+      // THE LOCKED FRAME IS NOW EVERY WIDTH THIS CHROME RENDERS AT, which it
+      // was not until 2026-09-13. It used to lock from `xl` only, because
+      // below that the rails stacked into three auto rows inside a fixed
+      // height -- which CSS Grid SQUEEZES rather than overflows. Measured at
+      // 900x600 back then: the left rail rendered 154px tall instead of its
+      // natural 500, so the layout was three crushed strips each with its own
+      // scrollbar over a document about 160px tall. The rails collapse instead
+      // of stacking now, so there is never a third row to crush and the frame
+      // can lock from `lg` -- the `lg:` prefix stays only because this file is
+      // still nominally a `lg`-and-up component.
+      className="flex w-full flex-col lg:h-[100dvh] lg:overflow-hidden"
       data-document-workspace
     >
       {/*
@@ -81,13 +211,13 @@ export function DesktopDocumentChrome({
         content. It keeps h1 semantics for screen readers regardless.
       */}
       <div className={cn(
-          // STICKY BELOW `xl`, WHERE THE PAGE ITSELF SCROLLS. From xl the frame
-          // is locked and only the document moves, so this is a no-op there.
-          // Below it the rails stack and the page scrolls -- and without this
-          // the title bar and the ribbon scroll away with it, which is what
-          // Gabe saw: half a ribbon at the top of the window and the actions
-          // stranded beside it. A formatting bar you have to scroll back up to
-          // reach is one you stop using.
+          // `sticky` IS INERT HERE NOW and is kept because it costs nothing to
+          // keep and something to rediscover. It mattered while this file had
+          // a 1024-1280 arrangement where the whole page scrolled: without it
+          // the title bar and the ribbon scrolled away with the document,
+          // which is what Gabe saw -- half a ribbon at the top of the window
+          // and the actions stranded beside it. The frame is locked at every
+          // width this component renders at now, so nothing scrolls past it.
           'sticky top-0 z-30 flex shrink-0 items-center gap-2',
           'border-b border-border-default bg-bg-surface px-4 py-2'
         )}>
@@ -159,7 +289,7 @@ export function DesktopDocumentChrome({
         </div>
       </div>
 
-      <div className="flex flex-col xl:min-h-0 xl:flex-1">
+      <div className="flex flex-col lg:min-h-0 lg:flex-1">
         {/*
           THE RIBBON SITS ON ITS OWN GROUND (Gabe, 2026-09-11: "there is no
           real dividers between components"). A hairline alone was not enough
@@ -205,6 +335,54 @@ export function DesktopDocumentChrome({
             )}>
             <div className="flex min-w-0 flex-1 items-stretch overflow-x-auto">{tools}</div>
             <div className="ml-auto flex shrink-0 items-center gap-1.5 border-l border-border-subtle pl-3">
+              {/* THE RAIL TOGGLES LEAD THE GROUP, BEFORE THE VERBS. They are
+                  view state, not actions on the document, and the separator
+                  says so -- the same idiom the destructive actions use at the
+                  other end, for the same reason: a rule marks a change of
+                  category, where a wider gap would only read as the end of a
+                  row.
+
+                  A toggle exists only where its rail does, so the LaTeX editor
+                  gets one and the Word editor two, and neither gets a control
+                  that points at nothing.
+
+                  ICONS, NOT LABELS, and these two in particular: the outline
+                  glyph for the tools rail (it is the tab list and Word's
+                  navigation pane), and the chart glyph for the tailoring rail
+                  -- which is already what the compact chrome puts on its own
+                  tailoring control, so the same panel has the same mark on a
+                  phone and on a laptop. */}
+              {leftRail && (
+                <Button
+                  variant="ghost"
+                  size="s"
+                  className="px-2"
+                  aria-expanded={leftOpen}
+                  aria-controls={LEFT_RAIL_ID}
+                  aria-label={leftToggleLabel}
+                  title={leftToggleLabel}
+                  onClick={() => setLeftOpen((open) => !open)}
+                >
+                  <ApplicationsIcon size={16} aria-hidden />
+                </Button>
+              )}
+              {rightRail && (
+                <Button
+                  variant="ghost"
+                  size="s"
+                  className="px-2"
+                  aria-expanded={rightOpen}
+                  aria-controls={RIGHT_RAIL_ID}
+                  aria-label={rightToggleLabel}
+                  title={rightToggleLabel}
+                  onClick={() => setRightOpen((open) => !open)}
+                >
+                  <AnalyticsIcon size={16} aria-hidden />
+                </Button>
+              )}
+              {(leftRail || rightRail) && (
+                <Separator orientation="vertical" className="mx-1 h-6" />
+              )}
               {actions}
               {destructiveActions && (
                 <>
@@ -219,28 +397,17 @@ export function DesktopDocumentChrome({
           </div>
         )}
         {/*
-          THREE COLUMNS ONLY WHERE THREE COLUMNS FIT. The rails need ~300px
-          each beside an 816px page, so they sit beside it from `xl` and stack
-          around it below that -- posting first, then the document, then the
-          analysis, which is the order you read them in anyway.
+          THREE COLUMNS FROM `lg`, AND COLLAPSIBLE ONES. The rails want ~300px
+          each beside an 816px page, which is more than a 1366 laptop has to
+          give all three at once -- so the answer is which panels are open
+          rather than which layout is in force. Below 1280 of workspace both
+          start closed and the page has the screen to itself; the toggles in
+          the ribbon are how you get a rail back, one at a time.
 
           The page itself is a PRINT PROOF, not app chrome: it keeps its own
           white sheet and letter geometry and deliberately does not follow the
           app's theme, because what is on it has to match what comes out of a
           printer.
-        */}
-        {/*
-          THE GRID FOLLOWS WHICH RAILS EXIST.
-
-          Both rails -> three columns, the document between them: what the Word
-          editor wants, where the page is one block and the analysis flanks it.
-
-          Left rail only -> two columns, and the content column is free to
-          split itself. That is what the LaTeX editor wants: it puts source
-          beside preview inside that column, so the screen reads as three --
-          rail, editor, output -- and both panes get real width instead of the
-          ~470px they had when the analysis rail was still taking 320 on the
-          right.
         */}
         {/* `min-h-0` IS THE LOAD-BEARING HALF of "only the document scrolls".
             A flex child's automatic minimum size is its content height, so
@@ -249,7 +416,7 @@ export function DesktopDocumentChrome({
             whole layout exists to fix. Each region then scrolls itself. */}
         <div
           className={cn(
-            'grid gap-0 xl:min-h-0 xl:flex-1',
+            'grid gap-0 lg:min-h-0 lg:flex-1',
             /*
               THE RAILS NO LONGER TRADE AGAINST THE PAGE.
 
@@ -267,15 +434,32 @@ export function DesktopDocumentChrome({
               the left rail holds an outline, a statistics table with a label
               and a figure on one line, and the tab list; the right holds an
               ATS ring, two keyword lists, rewrites and the thesaurus.
+
+              Which is also why collapsing is a TOGGLE and not a narrower rail:
+              there is no width at which this content is merely smaller. It is
+              either there at the width it needs or it is out of the way.
             */
-            leftRail && rightRail &&
-              'xl:grid-cols-[320px_minmax(0,1fr)_400px] min-[1700px]:grid-cols-[380px_minmax(0,1fr)_500px]',
-            leftRail && !rightRail &&
-              'xl:grid-cols-[320px_minmax(0,1fr)] min-[1700px]:grid-cols-[380px_minmax(0,1fr)]'
+            railColumns
           )}
         >
           {leftRail && (
-            <aside className="min-w-0 border-b border-border-default bg-bg-surface p-5 xl:order-1 xl:overflow-y-auto xl:border-b-0 xl:border-r">
+            <aside
+              id={LEFT_RAIL_ID}
+              // A CLOSED RAIL IS `hidden`, NOT UNMOUNTED, and the difference
+              // is a person's work. The rails hold per-section edit state and
+              // whatever request is in flight -- a rewrite being reviewed, a
+              // tailoring run half returned -- all of it React state inside
+              // these subtrees. Unmounting on a LAYOUT toggle would throw that
+              // away and re-ask the model for it, which is a bill as well as a
+              // surprise. `display:none` also takes the subtree out of the
+              // accessibility tree, so a screen reader never finds two copies
+              // of the same control while a rail is put away.
+              className={cn(
+                'min-w-0 border-b border-border-default bg-bg-surface p-5',
+                'lg:order-1 lg:overflow-y-auto lg:border-b-0 lg:border-r',
+                !leftOpen && 'hidden'
+              )}
+            >
               {leftRail}
             </aside>
           )}
@@ -292,13 +476,24 @@ export function DesktopDocumentChrome({
               // Word leaves most of a screen below the final page. `pb-24`
               // is that breathing room.
               'min-w-0 overflow-x-auto bg-bg-inset p-4 pb-24 md:p-8 md:pb-24',
-              'xl:order-2 xl:overflow-auto'
+              'lg:order-2 lg:overflow-auto'
             )}
           >
             {children}
           </div>
           {rightRail && (
-            <aside className="min-w-0 border-t border-border-default bg-bg-surface p-5 xl:order-3 xl:overflow-y-auto xl:border-t-0 xl:border-l">
+            <aside
+              id={RIGHT_RAIL_ID}
+              // Hidden rather than unmounted -- see the left rail above. This
+              // is the one that makes the rule non-negotiable: the tailoring
+              // pane is where the in-flight request and the per-section edit
+              // state actually live.
+              className={cn(
+                'min-w-0 border-t border-border-default bg-bg-surface p-5',
+                'lg:order-3 lg:overflow-y-auto lg:border-t-0 lg:border-l',
+                !rightOpen && 'hidden'
+              )}
+            >
               {rightRail}
             </aside>
           )}

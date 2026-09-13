@@ -55,9 +55,30 @@ export interface RecordBasicsProps {
   form: UseRecordDraftResult
   /** Forces every field open. The add wizard's review step wants them all. */
   showAll?: boolean
+  /**
+   * `cv submitted` MOVED IN HERE (2026-09-13) and it is a layout fix, not a
+   * tidy-up. It was rendered by ApplicationRecordView directly under this
+   * component, which made it a block of its own in a flex column -- a whole
+   * 86px row for one dropdown, outside the grid that pairs everything else.
+   * Inside, it is a cell like any other and pairs with its neighbour.
+   *
+   * It is still not a column on `jobs` -- it lives in `application_documents`,
+   * keyed on a job id that does not exist yet while the wizard is creating one
+   * -- so it still leaves through its own callback rather than through the
+   * draft.
+   */
+  resumes?: { id: string; title: string }[]
+  resumeId?: string
+  onResumeIdChange?: (resumeId: string) => void
 }
 
-export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
+export function RecordBasics({
+  form,
+  showAll = false,
+  resumes = [],
+  resumeId = '',
+  onResumeIdChange,
+}: RecordBasicsProps) {
   const { draft, set, errorFor, blur } = form
   const [expanded, setExpanded] = React.useState(false)
   const open = expanded || showAll
@@ -107,7 +128,27 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
   )
 
   return (
-    <div className="flex flex-col gap-5" data-record-basics>
+    // ONE FIELD PER ROW (Gabe, 2026-09-13: "remove the two-column layout (not
+    // entirely) because it is a bad practice in UI/UX. Reserve the two column
+    // layout to the components needed it such as salary").
+    //
+    // IT WAS TWO-UP FOR TWO DAYS AND HE IS RIGHT TO TAKE IT BACK. The pairing
+    // was introduced to stop this column scrolling -- it got a full record from
+    // 1185px to 623px, which fitted -- and it bought that by asking the eye to
+    // track two label/field pairs across a row and by halving the width of a
+    // company name. A form is a single column of one question at a time; the
+    // scroll is the cheaper cost.
+    //
+    // THE ONE PAIR THAT STAYS is min/max salary, and it stays because it is not
+    // two fields. It is one value with two ends, the way a date range is, and
+    // splitting it over two rows reads as two unrelated numbers. That is the
+    // test for anything else that wants a row: does the pair say ONE thing.
+    //
+    // WHAT IT COSTS, measured so nobody has to wonder: the columns get 633px of
+    // frame at a 982px viewport, and a record with every optional field filled
+    // is about 1100px again. It scrolls. `add more details` still keeps the
+    // empty ones one click away rather than gone.
+    <div className="flex flex-col gap-4" data-record-basics>
       {text('company', { id: 'company', label: 'company', icon: 'Building', required: true, placeholder: 'acme' })}
       {text('role', { id: 'role', label: 'position', icon: 'UserRound', required: true, placeholder: 'frontend engineer' })}
 
@@ -120,6 +161,9 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
           items={STATUSES.map((value) => ({ value, label: STATUS_LABELS[value] }))}
         />
       </Field>
+
+      {shows('location') &&
+        text('location', { id: 'location', label: 'location', icon: 'MapPin', placeholder: 'manila / remote' })}
 
       {/* THE INTERVIEW DATE APPEARS WITH THE STATUS THAT NEEDS IT (Gabe,
           2026-09-10). It is the one field here whose relevance is conditional
@@ -136,7 +180,11 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
           IT WRITES TO `events`, NOT TO `jobs` (see useRecordDraft's
           `interviewAt`), and only when it CHANGES -- so moving an application
           on to `offer` afterwards leaves the interview that happened sitting
-          on the calendar rather than quietly deleting it. */}
+          on the calendar rather than quietly deleting it.
+
+          A `datetime-local` renders "09/09/2026, 10:00 AM" plus its own picker
+          glyph behind this form's leading icon, which is most of a row -- one
+          of several reasons the two-up experiment did not survive. */}
       {draft.status === 'interviewing' &&
         text('interviewAt', {
           id: 'interview_at',
@@ -148,6 +196,9 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
 
       {shows('salary') && (
         <>
+          {/* THE ONE ROW THAT IS STILL TWO COLUMNS. A minimum and a maximum
+              are one value with two ends; stacked, they read as two unrelated
+              numbers with no hint that either bounds the other. */}
           <div className="grid grid-cols-2 gap-3">
             {text('salaryMin', { id: 'salary_min', label: 'min salary', icon: 'BankNote', type: 'number', inputMode: 'numeric', placeholder: '60000' })}
             {text('salaryMax', { id: 'salary_max', label: 'max salary', icon: 'BankNote', type: 'number', inputMode: 'numeric', placeholder: '90000' })}
@@ -155,7 +206,12 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
           <Field
             id="salary_currency"
             label="currency"
-            hint="figures are stored in this currency and never converted."
+            // SHORTENED FROM "figures are stored in this currency and never
+            // converted." A hint that wraps to a second line costs 19px on its
+            // whole ROW, not just its own cell, and this one wrapped at every
+            // width a half column has ever been. The fact worth keeping is
+            // that nothing converts.
+            hint="stored as entered; never converted."
           >
             <Select
               id="salary_currency"
@@ -167,9 +223,6 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
           </Field>
         </>
       )}
-
-      {shows('location') &&
-        text('location', { id: 'location', label: 'location', icon: 'MapPin', placeholder: 'manila / remote' })}
 
       {shows('workMode') && (
         <Field id="work_mode" label="work mode">
@@ -194,11 +247,37 @@ export function RecordBasics({ form, showAll = false }: RecordBasicsProps) {
       {shows('url') &&
         text('url', { id: 'url', label: 'posting url', icon: 'Link', type: 'url', placeholder: 'careers.acme.com/123' })}
 
+      {/* THE HINT IS GONE, not the field. "which CV you sent for this
+          application" restates the label in a sentence, and a redundant hint
+          costs a real 26px on its row. The one that is NOT redundant -- the
+          empty case, which says where CVs come from -- still shows. */}
+      <Field
+        id="resume_id"
+        label="cv submitted"
+        hint={resumes.length ? undefined : 'no CVs yet — write one in Documents and it will appear here.'}
+      >
+        <Select
+          id="resume_id"
+          icon="Documents"
+          disabled={resumes.length === 0}
+          value={resumeId}
+          onValueChange={(next) => onResumeIdChange?.(next)}
+          items={[
+            { value: '', label: resumes.length ? 'none' : 'no CVs yet' },
+            ...resumes.map((resume) => ({ value: resume.id, label: resume.title })),
+          ]}
+        />
+      </Field>
+
+      {/* NO "separated by commas." ON EITHER OF THESE ANY MORE. The
+          placeholders are `new-grad, fintech` and `react, postgres`, which
+          demonstrate the comma instead of describing it -- and each hint was
+          26px on its row. */}
       {shows('tags') &&
-        text('tags', { id: 'tags', label: 'tags', icon: 'Tag', hint: 'separated by commas.', placeholder: 'new-grad, fintech' })}
+        text('tags', { id: 'tags', label: 'tags', icon: 'Tag', placeholder: 'new-grad, fintech' })}
 
       {shows('techStack') &&
-        text('techStack', { id: 'tech_stack', label: 'tech stack', icon: 'Code', hint: 'separated by commas.', placeholder: 'react, postgres' })}
+        text('techStack', { id: 'tech_stack', label: 'tech stack', icon: 'Code', placeholder: 'react, postgres' })}
 
       {shows('isReferral') && (
         <div className="flex items-center gap-3">

@@ -84,10 +84,15 @@ describe('every demo route renders its screen from the fixture', () => {
     expect(container.textContent?.length).toBeGreaterThan(0)
   })
 
-  it('renders the documents screen with both CVs', () => {
+  it('renders the documents screen from the whole fixture, paged', () => {
+    // The list pages at five on desktop (2026-09-13), so the twelfth CV is not
+    // on screen and asserting a title from page three would be testing the
+    // pager rather than the route. What this is for is that the ROUTE handed
+    // the screen the fixture: the count says how many arrived, and the first
+    // row proves they are the right ones.
     render(<DemoDocuments />)
     expect(screen.getByText('Software Engineer CV')).toBeInTheDocument()
-    expect(screen.getByText('Software Engineer CV (LaTeX)')).toBeInTheDocument()
+    expect(screen.getByText(`1–5 of ${DEMO.resumes.length}`)).toBeInTheDocument()
   })
 })
 

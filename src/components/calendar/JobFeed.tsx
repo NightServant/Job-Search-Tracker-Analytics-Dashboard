@@ -19,6 +19,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel'
+import { EmptyState } from '@/components/ui/empty-state'
 import { Select } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ExternalIcon, PlusIcon } from '@/components/icons'
@@ -191,10 +192,15 @@ export function JobFeed({
                   />
                 </div>
               )}
-              <div className="flex shrink-0 items-center gap-2">
-                <CarouselPrevious className="static translate-y-0" />
-                <CarouselNext className="static translate-y-0" />
-              </div>
+              {/* ARROWS ONLY WHEN THERE IS A RAIL TO PAGE, which is how the
+                  band above already behaves. Two disabled chevrons over an
+                  empty state are controls for a list that is not there. */}
+              {jobs.length > 0 && (
+                <div className="flex shrink-0 items-center gap-2">
+                  <CarouselPrevious className="static translate-y-0" />
+                  <CarouselNext className="static translate-y-0" />
+                </div>
+              )}
             </div>
           </CardAction>
         </CardHeader>
@@ -217,10 +223,20 @@ export function JobFeed({
             </p>
           )}
 
+          {/* THE SAME EMPTY STATE THE BAND ABOVE GETS (Gabe, 2026-09-13). A
+              loose muted sentence is the shape this panel's ERROR takes too --
+              and the error is three lines up, in the same type, in the same
+              place. A glyph over centred copy is what tells the two apart at a
+              glance, and `EmptyState`'s docblock is explicit that it must
+              never be used for the failed read: that one keeps its own
+              wording, because "nothing posted" over a request that never
+              landed is a claim about the job market made out of a network
+              error. `py-10`, half its default: this is one band, not a
+              screen. */}
           {!loading && !error && jobs.length === 0 && (
-            <p className="text-body-s text-text-muted" data-job-feed-state="empty">
+            <EmptyState icon="Applications" className="py-10" data-job-feed-state="empty">
               nothing posted here right now. try another region or field.
-            </p>
+            </EmptyState>
           )}
 
           {!loading && !error && jobs.length > 0 && (

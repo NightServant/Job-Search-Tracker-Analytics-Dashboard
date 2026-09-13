@@ -119,4 +119,30 @@ describe('what counts as a requirement at all', () => {
     const { missing } = matchKeywords('Docker only.', 'Kubernetes required.')
     expect(missing).toContain('kubernetes')
   })
+
+  it('caps a long posting at a hundred terms, keeping the ones it repeats', () => {
+    // Gabe, 2026-09-13: "reduce the number of terms in posting. I prefer 100
+    // terms." A real advert read 130, and the tail was words used once in a
+    // sentence about the office -- they moved the score and told the reader
+    // nothing. Frequency decides what survives, because how often a posting
+    // says a word is the cheapest honest signal of how much it means it.
+    const filler = Array.from({ length: 150 }, (_, i) => `skillterm${i}`).join(' ')
+    const posting = `${filler} kubernetes kubernetes kubernetes kubernetes`
+    const result = matchKeywords('kubernetes', posting)
+
+    expect(result.matched.length + result.missing.length).toBe(100)
+    // The four-times word is first, not the one that opened the advert.
+    expect(result.matched).toEqual(['kubernetes'])
+    expect(result.missing).not.toContain('skillterm149')
+  })
+
+  it('is stable for the same posting, so a score does not move on its own', () => {
+    // Frequency ties break on first appearance. Without that the cap would
+    // fall wherever Map iteration happened to land and the same CV would score
+    // differently on a refresh.
+    const posting = 'alpha beta gamma delta epsilon zeta eta theta'
+    const once = matchKeywords('alpha', posting)
+    const twice = matchKeywords('alpha', posting)
+    expect(once.missing).toEqual(twice.missing)
+  })
 })

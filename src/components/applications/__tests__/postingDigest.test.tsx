@@ -253,13 +253,32 @@ describe('the job description at rest', () => {
     expect(screen.getByText('A closing paragraph.').tagName).toBe('P')
   })
 
-  it('becomes a field on the edit icon, and back again', async () => {
+  it('turns ONE SECTION into a field on its own edit icon, and back again', async () => {
+    // IT USED TO BE THE WHOLE POSTING (Gabe, 2026-09-13: "implement section
+    // layout for the job description with proper titles ... each title has an
+    // edit CTA at the farthest right"). A single textarea holding eight
+    // hundred words meant hunting for the bullet you wanted inside plain text,
+    // and risking the other nine sections on every keystroke. The field is now
+    // the section's, and it carries the section's body rather than the advert.
     const user = userEvent.setup()
     const { container } = renderRecord({ job: JOB })
-    await user.click(screen.getByRole('button', { name: /^edit$/i }))
-    expect(container.querySelector('textarea#description')).toBeTruthy()
-    await user.click(screen.getByRole('button', { name: /^done$/i }))
-    expect(container.querySelector('textarea#description')).toBeNull()
+
+    // The name carries the SECTION, because eight buttons all announcing
+    // "edit" is a list nobody can navigate.
+    await user.click(screen.getByRole('button', { name: /^edit Key Responsibilities$/i }))
+    const field = container.querySelector<HTMLTextAreaElement>('textarea#posting-section-0')
+    expect(field).toBeTruthy()
+    // The heading is NOT in the field: it is the title row the field sits
+    // under, and a field containing its own title would have to hide it.
+    expect(field!.value).not.toContain('Key Responsibilities:')
+    expect(field!.value).toContain('- Ship the editor')
+
+    await user.click(screen.getByRole('button', { name: /^done editing Key Responsibilities$/i }))
+    expect(container.querySelector('textarea#posting-section-0')).toBeNull()
+
+    // And its neighbour on the title row removes the section outright.
+    await user.click(screen.getByRole('button', { name: /^delete Key Responsibilities$/i }))
+    expect(screen.queryByRole('heading', { name: 'Key Responsibilities' })).toBeNull()
   })
 
   it('opens as a field when there is nothing to read', () => {

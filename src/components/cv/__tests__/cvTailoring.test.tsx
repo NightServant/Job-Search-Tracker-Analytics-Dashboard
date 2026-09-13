@@ -1,119 +1,155 @@
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, cleanup, waitFor } from '@testing-library/react'
+import { render, screen, cleanup, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import type { UserEvent } from '@testing-library/user-event'
+import type { JSONContent } from '@tiptap/core'
 import * as React from 'react'
-import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from '../CvTailoring'
+import { useCvTailoring, TailoringAnalysisRail } from '../CvTailoring'
 import { makeJob } from '@/test/fixtures'
-import { chooseOption } from '@/test/select'
+import type { ResumeContent } from '@/services/resumeService'
 
 afterEach(() => cleanup())
 
+/**
+ * The tailoring section: pick a posting, read the match, get a new document.
+ *
+ * THESE TESTS USED TO DRIVE TWO RAILS AND A `<Select>`. The picker was a
+ * `TailoringTargetRail` mounted opposite the analysis, and the result of
+ * tailoring was a list of suggestions with an `apply` button each. Both are
+ * gone: one section owns all three blocks, and the button produces a document
+ * rather than a to-do list. What is left is the three facts that actually
+ * matter -- which applications are offered, that the score is real, and that
+ * the rewrite lands somewhere other than the open editor.
+ */
 const JOBS = [
   makeJob({
-    id: 'j1',
-    status: 'applied',
+    id: 'w1',
+    status: 'wishlist',
     company: 'Initech',
     role: 'Frontend Engineer',
     description: 'We need React, TypeScript and Postgres experience.',
   }),
-  makeJob({ id: 'j2', status: 'applied', company: 'Globex', role: 'Backend Engineer', description: null }),
+  makeJob({ id: 'w2', status: 'wishlist', company: 'Globex', role: 'Backend Engineer', description: null }),
+  makeJob({
+    id: 'a1',
+    status: 'applied',
+    company: 'Hooli',
+    role: 'Platform Engineer',
+    description: 'We need React and Kubernetes experience.',
+  }),
+  makeJob({
+    id: 'r1',
+    status: 'rejected',
+    company: 'Vandelay',
+    role: 'Latex Engineer',
+    description: 'We need TeX.',
+  }),
 ]
 
-/** Both rails over one shared state, the way the editor mounts them. */
-function Harness({ cvText, fetchImpl }: { cvText: string; fetchImpl?: typeof fetch }) {
-  const state = useCvTailoring({ cvText, jobs: JOBS, fetchImpl })
-  return (
-    <>
-      <TailoringTargetRail state={state} jobs={JOBS} />
-      <TailoringAnalysisRail state={state} />
-    </>
-  )
+const DOC: JSONContent = {
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Shipped the rewrite' }] }],
 }
 
-describe('the tailoring rails', () => {
-  it('scores nothing until there is a posting to score against', () => {
+function Harness({
+  cvText,
+  fetchImpl,
+  content,
+  title,
+  onTailored,
+}: {
+  cvText: string
+  fetchImpl?: typeof fetch
+  content?: ResumeContent
+  title?: string
+  onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+}) {
+  const state = useCvTailoring({
+    cvText,
+    jobs: JOBS,
+    fetchImpl,
+    title,
+    getContent: content ? () => content : undefined,
+    onTailored,
+  })
+  return <TailoringAnalysisRail state={state} />
+}
+
+/** The picker is a combobox, not a select: click it open, then take an option. */
+async function pickApplication(user: UserEvent, name: RegExp) {
+  await user.click(screen.getByRole('combobox', { name: /application/i }))
+  const listbox = await screen.findByRole('listbox')
+  await user.click(await within(listbox).findByRole('option', { name }))
+  await waitFor(() => expect(screen.queryByRole('listbox')).toBeNull())
+}
+
+function okWith(suggestions: { before: string; after: string }[]): typeof fetch {
+  return vi.fn().mockResolvedValue({
+    json: async () => ({
+      ok: true,
+      summary: null,
+      suggestions: suggestions.map((s) => ({ section: 'summary', rationale: 'closer', ...s })),
+    }),
+  }) as unknown as typeof fetch
+}
+
+describe('the tailoring section', () => {
+  it('offers the wishlist and nothing else', async () => {
+    // Tailoring is work you do BEFORE applying, so an application already sent
+    // cannot be tailored to. Filtered in `useCvTailoring`, which is also what
+    // resolves the selection -- one list, so the hook cannot end up holding a
+    // job the picker refuses to show.
+    const user = userEvent.setup({ delay: null })
     render(<Harness cvText="React and TypeScript developer." />)
-    expect(screen.getByText(/pick an application or paste a posting/i)).toBeTruthy()
+
+    await user.click(screen.getByRole('combobox', { name: /application/i }))
+    const options = (await screen.findByRole('listbox')).textContent ?? ''
+
+    expect(options).toContain('Frontend Engineer')
+    expect(options).toContain('Backend Engineer')
+    expect(options).not.toContain('Platform Engineer')
+    expect(options).not.toContain('Latex Engineer')
+  })
+
+  it('says so when the wishlist is empty, rather than claiming there are no applications', () => {
+    // The account in this fixture is full of applications; none of them are
+    // wishlisted. "no applications yet" would be a lie about the account when
+    // the truth is about the filter.
+    function Empty() {
+      const state = useCvTailoring({ cvText: 'anything', jobs: [] })
+      return <TailoringAnalysisRail state={state} />
+    }
+    render(<Empty />)
+    expect(
+      screen.getByRole('combobox', { name: /application/i }).getAttribute('placeholder')
+    ).toMatch(/wishlist/i)
   })
 
   it('scores the CV against the selected application', async () => {
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="React and TypeScript developer." />)
 
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
+    await pickApplication(user, /Frontend Engineer/)
+
     // A real percentage from the deterministic scorer, not a model's opinion.
-    // The score is a ring now, and its number is an SVG tspan the chart
-    // draws. Matched against the panel's TEXT summary, which exists so a
-    // screen reader -- and a test -- can read the score at all.
+    // The number itself is an SVG tspan the ring draws; this is the panel's
+    // TEXT summary, which exists so a screen reader -- and a test -- can read
+    // the score at all.
     expect(await screen.findByText(/\d+% match\./)).toBeTruthy()
-    expect(screen.getByText(/missing keywords/i)).toBeTruthy()
-  })
-
-  it('shows what the CV already covers under the missing list, not just what it lacks', async () => {
-    // Added 2026-09-09 "for positive reinforcement": the rail used to show
-    // only the missing terms, which is a list of failures beside a score with
-    // nothing saying which of the posting's requirements the CV had already
-    // earned. `AtsKeywords` renders it muted and second, same as `AtsPanel`
-    // gives the equivalent list -- the missing one is the work, this one is
-    // the reassurance.
-    const user = userEvent.setup({ delay: null })
-    render(<Harness cvText="React and TypeScript developer." />)
-
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
-    // Job j1's posting: "We need React, TypeScript and Postgres experience."
-    // Against this CV that is matched = [react, typescript], missing =
-    // [need, postgres] -- see src/services/atsMatch.ts's stopword list for
-    // why "need" survives as a requirement candidate and "experience" does not.
-    const missing = await screen.findByText(/missing keywords/i)
-    // BY ITS OWN ATTRIBUTE, not by the word. `AtsDonut`'s legend beside the
-    // ring also says "matched", so a text query finds two nodes and cannot
-    // say which one is the list -- which is the whole thing being asserted.
-    const matched = document.querySelector('[data-ats-keywords="matched"]')!
-    expect(matched).toBeTruthy()
-    expect(screen.getByText('react, typescript')).toBeTruthy()
-    // Under the missing list, not above it -- DOCUMENT_POSITION_FOLLOWING is
-    // true when `matched` comes after `missing` in source order.
-    expect(
-      missing.compareDocumentPosition(matched) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy()
-  })
-
-  it('omits the matched list entirely rather than rendering it empty', async () => {
-    // AtsKeywords only renders when its own `matched.length > 0` check
-    // passes; a posting the CV misses completely should not draw a "matched"
-    // heading over nothing.
-    const user = userEvent.setup({ delay: null })
-    render(<Harness cvText="a project manager with no relevant background" />)
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
-    await screen.findByText(/missing keywords/i)
-    expect(document.querySelector('[data-ats-keywords="matched"]')).toBeNull()
-  })
-
-  it('takes the posting from the application, with no second place to put one', async () => {
-    // THE PASTE BOX IS GONE (Gabe, 2026-09-05). It was a second home for a
-    // posting, and a second home is a fork: this test used to assert which of
-    // the two won and that the rail said so. An application already has a
-    // `description`, and it is the field the ATS panel, the record view and
-    // the autofill all read -- so there is one posting and one place it lives.
-    const user = userEvent.setup({ delay: null })
-    render(<Harness cvText="React and TypeScript developer." />)
-
-    expect(screen.queryByLabelText(/paste a posting/i)).toBeNull()
-    expect(screen.queryByText(/using the pasted posting/i)).toBeNull()
-
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
-    // The score is a ring now, and its number is an SVG tspan the chart
-    // draws. Matched against the panel's TEXT summary, which exists so a
-    // screen reader -- and a test -- can read the score at all.
-    expect(await screen.findByText(/\d+% match\./)).toBeTruthy()
+    // The verdict in words and both inventories, the same pieces the
+    // application record's third column draws.
+    expect(document.querySelector('[data-ats-verdict]')).toBeTruthy()
+    expect(document.querySelector('[data-ats-terms="matched"]')).toBeTruthy()
+    expect(document.querySelector('[data-ats-terms="missing"]')).toBeTruthy()
+    expect(screen.getByText('react')).toBeTruthy()
   })
 
   it('says when the chosen application has no description stored', async () => {
-    // Otherwise the rail sits blank and reads as broken, when the real answer
+    // Otherwise the block sits blank and reads as broken, when the real answer
     // is that there is nothing on that application to score against.
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="anything" />)
-    await chooseOption(user, screen.getByLabelText(/application/i), /Backend Engineer/)
+    await pickApplication(user, /Backend Engineer/)
     expect(await screen.findByText(/no job description saved/i)).toBeTruthy()
   })
 
@@ -122,79 +158,70 @@ describe('the tailoring rails', () => {
     expect(screen.getByRole('button', { name: /tailor this cv/i })).toBeDisabled()
   })
 
-  it('goes through the app route, never straight at the provider', async () => {
-    // The API key lives on the server. A rail that called the provider
-    // directly would need the key in the browser, where anyone can read it
-    // out of the network tab and spend it.
-    const fetchImpl = vi.fn().mockResolvedValue({
-      json: async () => ({ ok: true, summary: null, suggestions: [] }),
-    }) as unknown as typeof fetch
+  it('hands a new title and a rewritten copy to onTailored, and leaves the open document alone', async () => {
+    // THE POINT OF THE WHOLE CHANGE (Gabe, 2026-09-13: "AI tailor button must
+    // create a new version of the document"). Nothing is applied to the editor
+    // on screen -- the rewrite goes to the route, which creates the CV and
+    // navigates to it.
+    const onTailored = vi.fn().mockResolvedValue(undefined)
+    const fetchImpl = okWith([{ before: 'Shipped the rewrite', after: 'Shipped the React rewrite' }])
     const user = userEvent.setup({ delay: null })
-    render(<Harness cvText="React developer" fetchImpl={fetchImpl} />)
+    render(
+      <Harness
+        cvText="Shipped the rewrite"
+        fetchImpl={fetchImpl}
+        content={DOC}
+        title="Backend CV"
+        onTailored={onTailored}
+      />
+    )
 
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
+    await pickApplication(user, /Frontend Engineer/)
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
-    await waitFor(() => expect(fetchImpl).toHaveBeenCalled())
+    await waitFor(() => expect(onTailored).toHaveBeenCalledTimes(1))
+    const handed = onTailored.mock.calls[0][0] as { title: string; content: JSONContent }
+
+    // `<original> — <company>`, which is what tells nine tailored copies of
+    // one CV apart in /documents.
+    expect(handed.title).toBe('Backend CV — Initech')
+    expect(handed.content.content![0].content![0].text).toBe('Shipped the React rewrite')
+    // A copy: the document the editor is holding still says what it said.
+    expect(handed.content).not.toBe(DOC)
+    expect(DOC.content![0].content![0].text).toBe('Shipped the rewrite')
+
+    // Through the app's own route, never straight at the provider -- the API
+    // key lives on the server and must not reach the browser.
     expect((fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0]).toBe('/api/tailor')
-  })
-
-  it('sends the deterministic missing keywords, so the model is told rather than guessing', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue({
-      json: async () => ({ ok: true, summary: null, suggestions: [] }),
-    }) as unknown as typeof fetch
-    const user = userEvent.setup({ delay: null })
-    render(<Harness cvText="React developer" fetchImpl={fetchImpl} />)
-
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
-    await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
-
-    await waitFor(() => expect(fetchImpl).toHaveBeenCalled())
+    // And the model is told what is missing rather than guessing it.
     const body = JSON.parse(
       (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string
     )
     expect(Array.isArray(body.missingKeywords)).toBe(true)
-    expect(body.role).toBe('Frontend Engineer')
     expect(body.company).toBe('Initech')
   })
 
-  it('renders a suggestion with its before, after and reason -- and applies nothing on its own', async () => {
-    // A tool that silently rewrote someone's employment history would be
-    // producing a claim they have to defend in an interview. Every suggestion
-    // is a proposal with an explicit control.
-    const onApply = vi.fn()
-    const fetchImpl = vi.fn().mockResolvedValue({
-      json: async () => ({
-        ok: true,
-        summary: null,
-        suggestions: [
-          { section: 'summary', before: 'old line', after: 'new line', rationale: 'matches posting' },
-        ],
-      }),
-    }) as unknown as typeof fetch
-
-    function Applying() {
-      const state = useCvTailoring({ cvText: 'React developer', jobs: JOBS, fetchImpl })
-      return (
-        <>
-          <TailoringTargetRail state={state} jobs={JOBS} />
-          <TailoringAnalysisRail state={state} onApply={onApply} />
-        </>
-      )
-    }
-
+  it('creates nothing when the model returns no change this CV can take', async () => {
+    // A second byte-identical CV is worse than a sentence: it is a document
+    // the user has to notice, open, compare and delete.
+    const onTailored = vi.fn().mockResolvedValue(undefined)
+    const fetchImpl = okWith([{ before: 'a line that is not in this CV', after: 'anything' }])
     const user = userEvent.setup({ delay: null })
-    render(<Applying />)
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
+    render(
+      <Harness
+        cvText="Shipped the rewrite"
+        fetchImpl={fetchImpl}
+        content={DOC}
+        title="Backend CV"
+        onTailored={onTailored}
+      />
+    )
+
+    await pickApplication(user, /Frontend Engineer/)
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
-    expect(await screen.findByText('new line')).toBeTruthy()
-    expect(screen.getByText('old line')).toBeTruthy()
-    expect(screen.getByText('matches posting')).toBeTruthy()
-    // Nothing happened until the user asked.
-    expect(onApply).not.toHaveBeenCalled()
-    await user.click(screen.getByRole('button', { name: /apply/i }))
-    expect(onApply).toHaveBeenCalledTimes(1)
+    expect(await screen.findByText(/no changes this CV could take/i)).toBeTruthy()
+    expect(onTailored).not.toHaveBeenCalled()
   })
 
   it('reports an unconfigured integration quietly, not as an error', async () => {
@@ -210,12 +237,25 @@ describe('the tailoring rails', () => {
     const user = userEvent.setup({ delay: null })
     render(<Harness cvText="React developer" fetchImpl={fetchImpl} />)
 
-    await chooseOption(user, screen.getByLabelText(/application/i), /Frontend Engineer/)
+    await pickApplication(user, /Frontend Engineer/)
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
     const notice = await screen.findByRole('alert')
     expect(notice.textContent).toMatch(/not configured/i)
     expect(notice.className).toContain('text-text-muted')
     expect(notice.className).not.toContain('rejected')
+  })
+
+  it('still runs, and says what came back, when nothing is wired to receive the document', async () => {
+    // The editors are rendered in tests with no `onTailored`. The button has
+    // to report rather than throw.
+    const fetchImpl = okWith([{ before: 'Shipped the rewrite', after: 'Shipped the React rewrite' }])
+    const user = userEvent.setup({ delay: null })
+    render(<Harness cvText="Shipped the rewrite" fetchImpl={fetchImpl} />)
+
+    await pickApplication(user, /Frontend Engineer/)
+    await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
+
+    expect(await screen.findByText(/nowhere to save a new document/i)).toBeTruthy()
   })
 })

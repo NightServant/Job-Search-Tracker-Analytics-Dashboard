@@ -19,53 +19,69 @@ const AtsDonut = dynamic(() => import('@/components/ui/ats-donut').then((m) => m
   loading: () => <LazyPanel height="h-40" label="the ATS score" />,
 })
 import { Button } from '@/components/ui/button'
-import { Select } from '@/components/ui/select'
 import { PanelSection } from '@/components/ui/panel-section'
-import { type AtsResult } from '@/components/ui/ats-check'
-import { AtsKeywords } from '@/components/ui/ats-keywords'
+import { AtsTermChips, AtsVerdict } from '@/components/ui/ats-verdict'
+import { verdictFor } from '@/components/ui/ats-verdict-copy'
 import { CssSpinner } from '@/components/ui/css-spinner'
-import { iconMotion } from '@/components/icons/motion'
-import { ArrowRightIcon } from '@/components/icons'
 import { authedFetch } from '@/lib/authedFetch'
 import { matchKeywords, type KeywordMatch } from '@/services/atsMatch'
-import type { TailoringResult, TailoringSuggestion } from '@/services/integrations/tailoring'
+import type { TailoringResult } from '@/services/integrations/tailoring'
+import type { ResumeContent } from '@/services/resumeService'
 import type { Job } from '@/types'
+import { ApplicationPicker } from './ApplicationPicker'
+import { applySuggestions, tailoredTitle } from './applyTailoring'
 
 /**
- * AI CV tailoring, as the two rails either side of the document (Gabe,
- * 2026-09-04).
+ * AI CV tailoring: one section, from the posting to the tailored document.
  *
- * WHY TWO RAILS AND NOT ONE PANEL. They answer different questions at
- * different moments. The left is what you are tailoring TO -- a posting,
- * picked from the applications you are already tracking or pasted in. The
- * right is how well the document currently matches it and what to do about
- * that. On one side you would be scrolling between a requirement and the
- * score for the same document; either side of the page, both are in view
- * while you edit between them.
+ * WHY THIS IS ONE SECTION AND NOT THREE (Gabe, 2026-09-13: "AI tailoring
+ * section must be merged with ATS scoring"). It was a "tailor to" panel with
+ * the picker, an "ATS match" panel with the score, and an "AI tailoring" panel
+ * with the button -- three headings for one question asked once. They share an
+ * input (the posting on the selected application) and they read in a single
+ * order: what am I tailoring to, how does the CV do against it, rewrite it.
+ * Three panel headings made that look like three features you configure
+ * separately. One section with hairline rules between the blocks says the
+ * opposite, and it is what the rest of the app already does with grouped
+ * content -- rules, never cards and never filled boxes.
  *
  * THE SCORE IS NOT COMPUTED BY THE MODEL. `matchKeywords` is deterministic,
  * in-repo and tested, and a number the user is going to act on should not come
  * back different every time they ask for it. The model is used only for the
  * part that genuinely needs language -- rewriting a line so it says the thing
- * the posting asks for -- and every suggestion arrives with a rationale and a
- * before/after so it can be judged rather than trusted.
+ * the posting asks for -- and the prompt forbids invention.
  *
- * NOTHING IS APPLIED AUTOMATICALLY. Each suggestion is a proposal with an
- * explicit `apply`. A tool that silently rewrote someone's employment history
- * to match a posting would be producing a claim they have to defend in an
- * interview, and the prompt forbids invention for the same reason.
+ * NOTHING IS APPLIED TO THE OPEN DOCUMENT. It used to be: every suggestion
+ * carried an `apply` that edited the CV on screen, so accepting the model's
+ * work destroyed the version you were comparing it against. The rewrites now
+ * land in a NEW document and the open one is never touched -- which is also
+ * the honest answer to "a tool that silently rewrote someone's employment
+ * history". The original survives the experiment.
  */
 
-/** Same thresholds as the application record's ATS panel, so one score reads one way. */
-function verdictFor(score: number): AtsResult {
-  if (score >= 80) return 'pass'
-  if (score >= 50) return 'review'
-  return 'fail'
-}
+export type TailoringOutcome =
+  /** Handed to `onTailored`; the route is creating the document and leaving. */
+  | { kind: 'created' }
+  /** Every suggestion missed. Deliberately NOT a new document -- see below. */
+  | { kind: 'unchanged' }
+  /**
+   * The rail was mounted without anywhere to put a new document (the editors
+   * render like this in tests, and `onTailored` is optional so they can). The
+   * request still ran, so say what it produced rather than silently doing nothing.
+   */
+  | { kind: 'unsaved'; count: number }
 
 export interface CvTailoringState {
   jobId: string
   setJobId: (id: string) => void
+  /**
+   * THE WISHLIST, AND ONLY THE WISHLIST (Gabe, 2026-09-13). Tailoring is work
+   * you do BEFORE applying; a posting you have already sent this CV to cannot
+   * be tailored to any more. Filtered here rather than at the picker because
+   * this hook also resolves `selectedJob` out of the same list, and two lists
+   * is how the hook ends up holding a selection the picker cannot show.
+   */
+  jobs: Job[]
   /**
    * The posting being tailored against -- always the selected application's
    * stored description.
@@ -82,30 +98,54 @@ export interface CvTailoringState {
   match: KeywordMatch | null
   running: boolean
   result: TailoringResult | null
+  outcome: TailoringOutcome | null
   run: () => Promise<void>
   selectedJob: Job | null
+}
+
+export interface CvTailoringOptions {
+  cvText: string
+  /** Every application the account has; the wishlist is taken out of it here. */
+  jobs: Job[]
+  /**
+   * The document as it stands, read ONLY when the button is pressed.
+   *
+   * A getter rather than a value: `cvText` is re-read on every render because
+   * a score against a stale copy is worse than no score, but serialising the
+   * whole Tiptap tree on every keystroke to feed a button nobody has clicked
+   * is a different trade entirely.
+   */
+  getContent?: () => ResumeContent | null
+  /** The open document's title; the new one is named from it. */
+  title?: string
+  /**
+   * Where a tailored document goes. Optional because the route owns every
+   * write in this app and the editors have to stay renderable without one.
+   */
+  onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+  fetchImpl?: typeof fetch
 }
 
 /**
  * Owns the tailoring state for one document.
  *
- * A hook rather than state inside either rail, because both rails read the
- * same posting and the same score -- and two copies of that is how a left
- * rail ends up describing a different job than the right one is scoring.
+ * A hook rather than state inside the rail, because the score and the rewrite
+ * are one pass over one posting and the editor needs the selected job for the
+ * new document's name.
  */
-export function useCvTailoring(options: {
-  cvText: string
-  jobs: Job[]
-  fetchImpl?: typeof fetch
-}): CvTailoringState {
+export function useCvTailoring(options: CvTailoringOptions): CvTailoringState {
   const [jobId, setJobId] = React.useState('')
   const [running, setRunning] = React.useState(false)
+  const runningRef = React.useRef(false)
   const [result, setResult] = React.useState<TailoringResult | null>(null)
+  const [outcome, setOutcome] = React.useState<TailoringOutcome | null>(null)
 
-  const selectedJob = React.useMemo(
-    () => options.jobs.find((job) => job.id === jobId) ?? null,
-    [options.jobs, jobId]
+  const jobs = React.useMemo(
+    () => options.jobs.filter((job) => job.status === 'wishlist'),
+    [options.jobs]
   )
+
+  const selectedJob = React.useMemo(() => jobs.find((job) => job.id === jobId) ?? null, [jobs, jobId])
 
   const description = selectedJob?.description?.trim() ?? ''
 
@@ -116,245 +156,292 @@ export function useCvTailoring(options: {
 
   const run = React.useCallback(async () => {
     if (!description.trim() || !options.cvText.trim()) return
+    // A REF, NOT THE STATE FLAG. `disabled={running}` is the visible guard and
+    // it is a render behind: two clicks inside one frame both see `running`
+    // false and both spend the metered allowance. This is the guard that
+    // actually holds.
+    if (runningRef.current) return
+    runningRef.current = true
     setRunning(true)
     setResult(null)
+    setOutcome(null)
+    /**
+     * Whether the new document has been handed to the route.
+     *
+     * ONCE IT HAS, THIS BUTTON IS NOT COMING BACK (found in review,
+     * 2026-09-13). The route answers `onTailored` with `router.push`, which
+     * RETURNS before the navigation lands -- so re-enabling in `finally` left
+     * a live `tailor this CV` sitting under the words "opening the new
+     * document" for as long as the route took to settle. A press in that
+     * window spends the allowance again and can file a duplicate document
+     * under the identical title. The editor is about to unmount; there is
+     * nothing to re-enable it for.
+     */
+    let handedOff = false
     // authedFetch, not fetch: the route is authenticated because tailoring
     // spends a metered LLM allowance.
     const doFetch = options.fetchImpl ?? authedFetch
     try {
-      // Through the app's own route, never straight at the provider: the key
-      // lives on the server and must not reach the browser.
-      const response = await doFetch('/api/tailor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          cvText: options.cvText,
-          jobDescription: description,
-          missingKeywords: match?.missing ?? [],
-          role: selectedJob?.role,
-          company: selectedJob?.company,
-        }),
-      })
-      setResult((await response.json()) as TailoringResult)
-    } catch {
-      setResult({ ok: false, reason: 'network', message: 'Could not reach the tailoring service.' })
+      let payload: TailoringResult
+      try {
+        // Through the app's own route, never straight at the provider: the key
+        // lives on the server and must not reach the browser.
+        const response = await doFetch('/api/tailor', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            cvText: options.cvText,
+            jobDescription: description,
+            missingKeywords: match?.missing ?? [],
+            role: selectedJob?.role,
+            company: selectedJob?.company,
+          }),
+        })
+        payload = (await response.json()) as TailoringResult
+      } catch {
+        setResult({
+          ok: false,
+          reason: 'network',
+          message: 'Could not reach the tailoring service.',
+        })
+        return
+      }
+
+      setResult(payload)
+      if (!payload.ok) return
+
+      const current = options.getContent?.() ?? null
+      if (!current || !options.onTailored) {
+        setOutcome({ kind: 'unsaved', count: payload.suggestions.length })
+        return
+      }
+
+      // A COPY. `applySuggestions` returns the input by reference when nothing
+      // matched, which is how a run that changed nothing is told apart from
+      // one that changed everything -- without that, a model answering "no
+      // notes" would file a byte-identical second CV under a new name.
+      const content = applySuggestions(current, payload.suggestions)
+      if (content === current) {
+        setOutcome({ kind: 'unchanged' })
+        return
+      }
+
+      try {
+        await options.onTailored({
+          title: tailoredTitle(options.title ?? '', selectedJob?.company),
+          content,
+        })
+        handedOff = true
+        setOutcome({ kind: 'created' })
+      } catch (err) {
+        // The rewrite is not the part that failed, and saying "tailoring
+        // failed" would send someone to re-run a request that costs allowance.
+        //
+        // THE THROWN MESSAGE WINS WHERE THERE IS ONE. Two different things
+        // reach this branch -- the new CV could not be written, or the OPEN
+        // one could not be flushed first (see the editors' `onTailored`) --
+        // and only the second one has anything to do with unsaved edits.
+        setResult({
+          ok: false,
+          reason: 'network',
+          message:
+            err instanceof Error && err.message
+              ? err.message
+              : 'The rewrite worked, but the new CV could not be saved. Try again.',
+        })
+      }
     } finally {
-      setRunning(false)
+      // See `handedOff` above for the one case that stays disabled.
+      if (!handedOff) {
+        runningRef.current = false
+        setRunning(false)
+      }
     }
-  }, [description, options.cvText, options.fetchImpl, match, selectedJob])
+  }, [description, options, match, selectedJob])
+
+  /**
+   * Choosing a different application drops the previous run's answer.
+   *
+   * FOUND IN REVIEW (2026-09-13). `setJobId` only set the id, and `result` /
+   * `outcome` were cleared at the top of `run`. So a rate-limit error raised
+   * against Initech stayed on screen, in the error colour, under a score and a
+   * chip list that had already updated to Globex -- a sentence about one
+   * posting presented as a fact about another. Same for a stale "tailored --
+   * opening the new document" if the navigation never landed.
+   */
+  const selectJob = React.useCallback((next: string) => {
+    setJobId(next)
+    setResult(null)
+    setOutcome(null)
+  }, [])
 
   return {
     jobId,
-    setJobId,
+    setJobId: selectJob,
+    jobs,
     description,
     match,
     running,
     result,
+    outcome,
     run,
     selectedJob,
   }
 }
 
-/** What this CV is being tailored to. */
-export function TailoringTargetRail({ state, jobs }: { state: CvTailoringState; jobs: Job[] }) {
-  return (
-    <div className="flex flex-col gap-6" data-tailoring-target>
-      <PanelSection title="tailor to" icon="Briefcase" className="border-t-0 pt-0">
-        <div className="flex flex-col gap-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-label-caps uppercase text-text-secondary">application</span>
-            <Select
-              aria-label="application"
-              value={state.jobId}
-              onValueChange={state.setJobId}
-              items={[
-                { value: '', label: 'none selected' },
-                ...jobs.map((job) => ({
-                  value: job.id,
-                  label: `${job.role} — ${job.company}`,
-                })),
-              ]}
-            />
-          </label>
-
-          {state.selectedJob && !state.selectedJob.description && (
-            // Not an error, and not a dead end: the description lives on the
-            // application, and putting it there is what makes the ATS panel,
-            // the record view and this rail all work at once.
-            <p className="text-body-s text-text-muted">
-              that application has no job description saved, so there is nothing to score
-              against. add one on the application.
-            </p>
-          )}
-        </div>
-      </PanelSection>
-    </div>
-  )
-}
-
-/** One proposed rewrite: before, after, why, and a way to take it. */
-function Suggestion({
-  suggestion,
-  onApply,
-}: {
-  suggestion: TailoringSuggestion
-  onApply?: (suggestion: TailoringSuggestion) => void
-}) {
-  return (
-    <li className="flex flex-col gap-2 border-b border-border-subtle py-4 last:border-b-0">
-      <p className="text-label-caps uppercase text-text-secondary">{suggestion.section}</p>
-      <p className="text-body-s text-text-muted line-through decoration-text-muted/40">
-        {suggestion.before}
-      </p>
-      <p className="text-body-m text-text-primary">{suggestion.after}</p>
-      <p className="text-body-s text-text-muted">{suggestion.rationale}</p>
-      {onApply && (
-        <Button variant="secondary" size="s" className="w-fit" onClick={() => onApply(suggestion)}>
-          apply
-          <ArrowRightIcon size={14} aria-hidden className={iconMotion('forward')} />
-        </Button>
-      )}
-    </li>
-  )
-}
-
-/** RIGHT RAIL: how well it matches, and what to change. */
 /**
- * `emphasis` IS WHAT MAKES TWO TABS OUT OF ONE RAIL (Gabe, 2026-09-11).
+ * `TailoringTargetRail` WAS HERE and it is gone (2026-09-13). It was a second
+ * component holding a `<Select>` of every application, mounted opposite this
+ * one so the editor had a "tailor to" panel on one side and a score on the
+ * other. Once the picker moved into this section there was nothing left in it
+ * but a heading, and a component that renders one control belonging to another
+ * component's section is just a place for the two to disagree.
  *
- * ATS match and AI tailoring come from the same pass over the same posting, so
- * they stay one component and one request. They are two TABS because they
- * answer different questions -- "will a screener read this" and "what should
- * it say instead" -- and a tab that shows both is not a tab, it is the old
- * rail with a heading on top.
- *
- * THE ATS TAB IS DELIBERATELY RICHER THAN THE RECORD DIALOG, which is what was
- * asked for. Both draw the same `AtsDonut` and `AtsKeywords` -- one ATS score
- * should not have two appearances -- but the dialog is a panel someone opened
- * to glance at, while this is a tab they chose. It lists twice the keywords,
- * and shows the matched terms at full length rather than as reassurance.
+ * `AnalysisEmphasis` went with it. It existed to serve two tabs -- one showing
+ * the match, one showing the rewrites -- out of one rail, and the tabs were
+ * merged on 2026-09-11. A prop with one live value is a branch nobody reads.
  */
-export type AnalysisEmphasis = 'match' | 'rewrites' | 'both'
 
-export function TailoringAnalysisRail({
-  state,
-  onApply,
-  emphasis = 'both',
-}: {
-  state: CvTailoringState
-  onApply?: (suggestion: TailoringSuggestion) => void
-  emphasis?: AnalysisEmphasis
-}) {
-  const { match, result, running } = state
-  const showMatch = emphasis === 'match' || emphasis === 'both'
-  const showRewrites = emphasis === 'rewrites' || emphasis === 'both'
-  // Focused tab, so the rail can afford the fuller list; `both` keeps the
-  // original 12 because it is stacking two sections in one 320px column.
-  const keywordLimit = emphasis === 'match' ? 24 : 12
+/** The whole tailoring pane: pick a posting, read the match, rewrite the CV. */
+export function TailoringAnalysisRail({ state }: { state: CvTailoringState }) {
+  const { match, result, running, outcome } = state
 
   return (
-    <div className="flex flex-col gap-6" data-tailoring-analysis data-emphasis={emphasis}>
-      {showMatch && (
-      <PanelSection title="ATS match" icon="ShieldCheck" className="border-t-0 pt-0">
+    // `border-t-0 pt-0`: it is the first thing in the rail, so the section's
+    // own rule would be a line under the tab strip.
+    <PanelSection title="tailor to a job" icon="ShieldCheck" className="border-t-0 pt-0">
+      {/* ONE: WHAT IT IS BEING TAILORED TO. */}
+      <div className="flex flex-col gap-3">
+        <ApplicationPicker
+          jobs={state.jobs}
+          value={state.jobId}
+          onChange={state.setJobId}
+        />
+        {state.selectedJob && !state.selectedJob.description && (
+          // Not an error and not a dead end: the description lives on the
+          // application, and adding it there is what makes this rail, the ATS
+          // panel and the record view all work at once.
+          <p className="text-body-s text-text-muted">
+            that application has no job description saved, so there is nothing to score against.
+            add one on the application.
+          </p>
+        )}
+      </div>
+
+      {/* TWO: HOW IT SCORES. Read like the application record's third column
+          -- verdict in words, then the ring, then the two inventories -- from
+          the same `ui/ats-verdict` pieces, because one score with two
+          appearances is how two surfaces start disagreeing about a threshold.
+          `limit={12}`, not the record's 24: this is a 320px rail, and both
+          lists fold honestly with the count in the heading.
+
+          MATCHED BEFORE MISSING, same as the record. The revision asked for
+          the matched list "for positive reinforcement", and a list of failures
+          above a list of wins reverses the point of showing them at all. */}
+      <div className="flex flex-col gap-4 border-t border-border-subtle pt-5">
         {match === null ? (
           <p className="text-body-s text-text-muted">
-            pick an application or paste a posting to score this CV against it.
+            pick an application above to score this CV against its posting.
           </p>
         ) : (
-          <div className="flex flex-col gap-4">
-            {/* THE SAME RING AS THE APPLICATION RECORD, and it sizes itself
-                by its CONTAINER rather than the viewport -- this rail is
-                320px on the same wide screen where the record dialog is
-                roomy, and a viewport query cannot tell those apart. */}
+          <>
+            <AtsVerdict score={match.score} />
+            {/* Sizes itself by its CONTAINER rather than the viewport -- this
+                rail is 320px on the same wide screen where the record dialog
+                is roomy, and a viewport query cannot tell those apart. */}
             <AtsDonut
               score={match.score}
               matched={match.matched.length}
               missing={match.missing.length}
               verdict={verdictFor(match.score)}
             />
-            <AtsKeywords
-              label="missing keywords"
-              terms={match.missing}
-              emptyText="none — every term in the posting shows up in this CV."
-              limit={keywordLimit}
+            <AtsTermChips
+              label="matched"
+              tone="matched"
+              terms={match.matched}
+              limit={12}
+              emptyText="none of the posting’s terms appear in this CV yet."
             />
-            {/* THE OTHER HALF OF THE SPLIT, absent from this rail until
-                2026-09-09. It showed only what the CV lacked -- a list of
-                failures beside a score, with nothing saying which of the
-                posting's terms the CV had already earned. Gabe asked for the
-                matched list "for positive reinforcement".
-
-                Muted and second, the same treatment `AtsPanel` gives it: the
-                missing list is the work, this one is the reassurance, and
-                two lists at equal weight in a 320px rail is a wall. */}
-            {match.matched.length > 0 && (
-              <AtsKeywords
-                label="matched"
-                terms={match.matched}
-                limit={keywordLimit}
-                muted={emphasis !== 'match'}
-              />
-            )}
-          </div>
+            <AtsTermChips
+              label="missing"
+              tone="missing"
+              terms={match.missing}
+              limit={12}
+              emptyText="none — every term in the posting shows up in this CV."
+            />
+          </>
         )}
-      </PanelSection>
-      )}
+      </div>
 
-      {showRewrites && (
-      <PanelSection title="AI tailoring" icon="CircleCheck" className={showMatch ? undefined : 'border-t-0 pt-0'}>
-        <div className="flex flex-col gap-4">
-          <Button
-            size="s"
-            className="w-fit"
-            onClick={() => void state.run()}
-            disabled={running || !state.description.trim()}
+      {/* THREE: THE REWRITE.
+
+          THE SUGGESTION LIST WAS HERE. Each rewrite came back as a
+          before/after card with its own `apply` button that edited the open
+          document, which made taking the model's work a click per suggestion
+          and left no copy of what the CV said before. The button now produces
+          the tailored CV as a new document; that document IS the result, so
+          there is nothing left to list. `result.summary` went with the list --
+          it was a "suggested summary" printed under the rewrites with no way
+          to take it, which is a suggestion in the sense that a poster is. */}
+      <div className="flex flex-col gap-3 border-t border-border-subtle pt-5">
+        <p className="text-body-s text-text-muted">
+          rewrites this CV against the posting and saves the result as a new document. the one
+          you have open is left exactly as it is.
+        </p>
+
+        <Button
+          size="s"
+          className="w-fit"
+          onClick={() => void state.run()}
+          disabled={running || !state.description.trim()}
+        >
+          {running && <CssSpinner size={14} />}
+          {running ? 'tailoring' : 'tailor this CV'}
+        </Button>
+
+        {!state.description.trim() && (
+          <p className="text-body-s text-text-muted">needs a posting to tailor against.</p>
+        )}
+
+        {result && !result.ok && (
+          <p
+            role="alert"
+            className={
+              // `unconfigured` is not an error: the capability was never set
+              // up, and shouting about it in the error colour would say the
+              // app failed at something it was never asked to do.
+              result.reason === 'unconfigured'
+                ? 'text-body-s text-text-muted'
+                : 'text-body-s text-status-rejected-mark'
+            }
           >
-            {running && <CssSpinner size={14} />}
-            {running ? 'tailoring' : 'tailor this CV'}
-          </Button>
+            {result.message}
+          </p>
+        )}
 
-          {!state.description.trim() && (
-            <p className="text-body-s text-text-muted">
-              needs a posting to tailor against.
-            </p>
-          )}
+        {outcome?.kind === 'unchanged' && (
+          // NO DOCUMENT FOR THIS ONE. Every suggestion missed -- either the
+          // model had no notes, or it quoted text that spans nodes and could
+          // not be found. Creating a second identical CV to report that would
+          // leave the user deleting the evidence of a no-op.
+          <p role="status" className="text-body-s text-text-muted">
+            the model returned no changes this CV could take, so nothing was created.
+          </p>
+        )}
 
-          {result && !result.ok && (
-            <p
-              role="alert"
-              className={
-                result.reason === 'unconfigured'
-                  ? 'text-body-s text-text-muted'
-                  : 'text-body-s text-status-rejected-mark'
-              }
-            >
-              {result.message}
-            </p>
-          )}
+        {outcome?.kind === 'created' && (
+          <p role="status" className="text-body-s text-text-muted">
+            tailored — opening the new document.
+          </p>
+        )}
 
-          {result?.ok && result.summary && (
-            <div className="flex flex-col gap-1">
-              <p className="text-label-caps uppercase text-text-secondary">suggested summary</p>
-              <p className="text-body-m text-text-primary">{result.summary}</p>
-            </div>
-          )}
-
-          {result?.ok && result.suggestions.length > 0 && (
-            <ul className="flex flex-col">
-              {result.suggestions.map((suggestion, i) => (
-                <Suggestion key={`${suggestion.section}-${i}`} suggestion={suggestion} onApply={onApply} />
-              ))}
-            </ul>
-          )}
-
-          {result?.ok && result.suggestions.length === 0 && !result.summary && (
-            <p className="text-body-s text-text-muted">
-              nothing to change — the CV already covers what the posting asks for.
-            </p>
-          )}
-        </div>
-      </PanelSection>
-      )}
-    </div>
+        {outcome?.kind === 'unsaved' && (
+          <p role="status" className="text-body-s text-text-muted">
+            {outcome.count} rewrites came back, but this editor has nowhere to save a new
+            document.
+          </p>
+        )}
+      </div>
+    </PanelSection>
   )
 }

@@ -11,7 +11,7 @@ import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
 import { useLatexCompile } from './useLatexCompile'
 import { CssSpinner } from '@/components/ui/css-spinner'
-import { useCvTailoring, TailoringTargetRail, TailoringAnalysisRail } from './CvTailoring'
+import { useCvTailoring, TailoringAnalysisRail } from './CvTailoring'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import {
   DEFAULT_LATEX_SOURCE,
@@ -40,6 +40,14 @@ export interface LatexResumeEditorProps {
    */
   jobs?: Job[]
 
+  /**
+   * Where a tailored CV goes. Handed a finished title and a finished
+   * `{ type: 'latex', source }`; creating the row and navigating to it is the
+   * route's job, the same as every other write in this app. Optional so the
+   * editor still mounts with nothing wired.
+   */
+  onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+
   draft: ResumeDraft
   backHref: string
   onDelete: (draftId: string) => void
@@ -57,6 +65,7 @@ export function LatexResumeEditor({
   onDelete,
   onPersistDraft,
   jobs = [],
+  onTailored,
 }: LatexResumeEditorProps) {
   const { user } = useAuth()
   const { success, error: showError, info } = useToast()
@@ -286,7 +295,34 @@ export function LatexResumeEditor({
   // honest input: it is what the author is editing and what compiles, and the
   // scorer counts words rather than parsing TeX -- a control sequence is not a
   // keyword either way.
-  const tailoring = useCvTailoring({ cvText: latexSource, jobs })
+  const tailoring = useCvTailoring({
+    cvText: latexSource,
+    jobs,
+    title,
+    // THROUGH A REF, NOT THE STATE VARIABLE, and it is not a formality (found
+    // in review, 2026-09-13). `run` is captured at click time and calls this
+    // getter AFTER awaiting the model, so a closure over `latexSource` hands
+    // back the source as it was when the button was pressed -- everything
+    // typed during the request is missing from the tailored copy. The Word
+    // editor did not have the bug only because `editor` is a stable instance
+    // whose `getJSON()` always reads the live document; the ref is how this
+    // editor gets the same guarantee rather than the same wording. The ref
+    // already existed for a sibling defect -- see its note above.
+    getContent: () => ({ type: 'latex', source: latexSourceRef.current }),
+    // The open document is flushed before the new one is created; see the
+    // matching note in WordResumeEditor for what the navigation would
+    // otherwise throw away.
+    onTailored: onTailored
+      ? async (input) => {
+          if (isDirty && !(await saveDraft(false))) {
+            throw new Error(
+              'Your unsaved edits could not be saved, so the tailored copy was not created.'
+            )
+          }
+          await onTailored(input)
+        }
+      : undefined,
+  })
 
   // Real compilation through FormaTeX, replacing the JS "readable preview"
   // that had been standing in for a renderer. The fallback stays: it is what
@@ -363,21 +399,22 @@ export function LatexResumeEditor({
       leftRail={
         <div className="flex flex-col gap-8">
           {/*
-            ONE RAIL, BOTH PANELS, STACKED (Gabe, 2026-09-05).
+            ONE RAIL, ON THE LEFT (Gabe, 2026-09-05).
 
             The analysis used to sit opposite the document, which is right for
             the Word editor -- the page is a single block and the score belongs
             beside it. The LaTeX editor is already two panes, so a rail on each
             side left the source and the preview about 470px apart in the
             middle: narrower than the preamble lines the source has to show,
-            and too narrow to judge a rendered page.
+            and too narrow to judge a rendered page. On the left, the 320px
+            that was on the right goes to the editor and the preview, which are
+            what this screen is for.
 
-            Collapsed into the left rail they read in the order they are used
-            anyway -- pick the target, then see how the document scores against
-            it -- and the 320px that was on the right goes to the editor and
-            the preview, which are what this screen is for.
+            It was TWO panels stacked in here until 2026-09-13 -- a "tailor to"
+            picker above the analysis -- and they are now one section, because
+            the picker, the score and the rewrite are one question asked once.
+            See CvTailoring.
           */}
-          <TailoringTargetRail state={tailoring} jobs={jobs} />
           <TailoringAnalysisRail state={tailoring} />
         </div>
       }

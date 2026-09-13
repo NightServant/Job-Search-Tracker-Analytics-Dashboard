@@ -48,7 +48,11 @@ describe('AppDialog', () => {
       </AppDialog>
     )
     await userEvent.keyboard('{Escape}')
-    expect(onOpenChange).toHaveBeenCalledWith(false)
+    // WITH THE REASON. The application record reads a posting in a second
+    // panel of the same dialog and needs Escape there to mean `back` rather
+    // than `close`, which it can only tell from `close-press` and
+    // `outside-press` by asking.
+    expect(onOpenChange).toHaveBeenCalledWith(false, 'escape-key')
   })
 
   it('carries no shadow and no radius above the 4px cap', () => {

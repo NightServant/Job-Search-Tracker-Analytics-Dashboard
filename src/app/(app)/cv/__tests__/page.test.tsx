@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ResumeDraft } from '@/services/resumeService'
 
@@ -387,19 +387,20 @@ describe('the editor chrome', () => {
     // a trail -- see the "leaves the drafts list reachable" test above.
     expect(screen.getByRole('link', { name: 'back to documents' })).toBeTruthy()
     expect(screen.getByText('latex')).toBeTruthy()
-    // ONE RAIL, BOTH PANELS (Gabe, 2026-09-05). Asserted as a shared ancestor
-    // rather than as mere presence: the change was moving the analysis OUT of
-    // the right rail so the source and preview could have that 320px, and a
-    // presence check passes either way.
-    const target = container.querySelector('[data-tailoring-target]') as HTMLElement
-    const analysis = container.querySelector('[data-tailoring-analysis]') as HTMLElement
-    expect(target).toBeTruthy()
-    expect(analysis).toBeTruthy()
-    expect(target.parentElement).toBe(analysis.parentElement)
-    // And the target comes first: pick what you are tailoring to, then read
-    // how it scores.
+    // ONE RAIL, ON THE LEFT (Gabe, 2026-09-05). Asserted as a COUNT rather
+    // than as presence: the change was moving the analysis out of the right
+    // rail so the source and the preview could have that 320px, and a presence
+    // check passes either way.
+    //
+    // It was two markers in here until 2026-09-13 -- `data-tailoring-target`
+    // for the picker panel and `data-tailoring-analysis` for the score -- and
+    // the assertion was that they shared a parent. There is one section now,
+    // so there is nothing left to share: the picker, the match and the rewrite
+    // are one heading. See components/cv/CvTailoring.
+    const rails = container.querySelectorAll('aside')
+    expect(rails).toHaveLength(1)
     expect(
-      target.compareDocumentPosition(analysis) & Node.DOCUMENT_POSITION_FOLLOWING
+      within(rails[0] as HTMLElement).getByRole('heading', { name: /tailor to a job/i })
     ).toBeTruthy()
   })
 

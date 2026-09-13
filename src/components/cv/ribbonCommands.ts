@@ -100,6 +100,20 @@ export function currentFontPx(editor: Editor | null): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_FONT_PX
 }
 
+/**
+ * The spacing under the caret, or `''` for the document's own.
+ *
+ * READ OFF THE `textStyle` MARK, because that is where the LineHeight
+ * extension writes it: a global attribute on `textStyle`, rendered as an
+ * inline `line-height`, not an attribute on the paragraph. Empty means no mark
+ * sets one, so the sheet's own spacing applies -- which is a real choice in
+ * the dropdown and not merely "nothing selected".
+ */
+export function currentLineHeight(editor: Editor | null): string {
+  const raw = editor?.getAttributes('textStyle').lineHeight as string | undefined
+  return raw ? String(raw) : ''
+}
+
 /** Word's A↑ / A↓ walk the size list rather than adding a fixed amount. */
 function stepFontSize(editor: Editor, direction: 1 | -1) {
   const sizes = FONT_SIZES.map(Number)

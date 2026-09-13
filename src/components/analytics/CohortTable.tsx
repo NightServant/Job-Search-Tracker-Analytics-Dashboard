@@ -35,7 +35,21 @@ function monthLabel(cohort: string): string {
  * A plain `<table>` in its own `overflow-x-auto` wrapper, per the global
  * constraint that a wide table scrolls inside its own container rather than
  * the page body scrolling horizontally. The panel itself is the Card.
+ *
+ * FIVE ROWS, AND ONLY FIVE (Gabe, 2026-09-13: "cohort analysis must implement
+ * a 5-row accent table only"). An account that has been applying for two years
+ * has twenty-four cohorts, and the table grew without limit -- twenty-four
+ * seven-column rows is a spreadsheet dropped into an analytics panel, and the
+ * rows at the bottom are the ones nobody is asking about.
+ *
+ * THE FIVE MOST RECENT, because `analyticsService` already sorts most-recent
+ * first and recency is what makes a cohort actionable: last month's conversion
+ * is something you can still do something about, and 2024's is history. The
+ * caption under the table says so rather than letting the cut be silent -- a
+ * table that quietly stops at five is one somebody will read as "I have only
+ * ever applied in five months".
  */
+const MAX_ROWS = 5
 export function CohortTable({ data }: CohortTableProps) {
   if (data.length === 0) {
     return (
@@ -44,6 +58,9 @@ export function CohortTable({ data }: CohortTableProps) {
       </EmptyState>
     )
   }
+
+  const rows = data.slice(0, MAX_ROWS)
+  const hidden = data.length - rows.length
 
   return (
     // `min-w-0` so this scroll container can be narrower than the 560px table
@@ -74,7 +91,7 @@ export function CohortTable({ data }: CohortTableProps) {
           </tr>
         </thead>
         <tbody>
-          {data.map((row, i) => (
+          {rows.map((row, i) => (
             <tr
               key={row.cohort}
               className={cn(
@@ -99,6 +116,17 @@ export function CohortTable({ data }: CohortTableProps) {
           ))}
         </tbody>
       </table>
+
+      {/* THE CUT, STATED. Not a `show more`: this panel is a summary inside a
+          dashboard, and the honest thing is to say how many months it is not
+          showing rather than to grow a table that is already the widest thing
+          on the screen. */}
+      {hidden > 0 && (
+        <p className="pt-3 text-body-s text-text-muted" data-cohort-cut>
+          the five most recent cohorts. {hidden} older {hidden === 1 ? 'month is' : 'months are'} not
+          shown.
+        </p>
+      )}
     </div>
   )
 }

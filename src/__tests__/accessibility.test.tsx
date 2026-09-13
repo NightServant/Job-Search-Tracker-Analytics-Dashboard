@@ -85,13 +85,19 @@ describe('accessibility checks', () => {
       expect(name.trim().length, 'Buttons should have accessible names').toBeGreaterThan(0)
     }
 
-    // The dialog names itself, and the two columns that are not a run of
-    // fields name themselves too. Asserted by name rather than by count: a
+    // The dialog names itself, and the two surfaces beside the form name
+    // themselves too -- as TABS since 2026-09-13 rather than as headings.
+    // A tab is a heading that also switches, and printing `job description`
+    // under a tab reading `job description` was the duplicate this dialog has
+    // had removed from it twice. Asserted by name rather than by count: a
     // number is something nobody can read a reason into.
     expect(screen.getByRole('heading', { level: 2, name: 'Frontend Engineer' })).toBeTruthy()
-    for (const column of ['job description', 'ATS match']) {
-      expect(screen.getByRole('heading', { name: column })).toBeTruthy()
+    expect(screen.getByRole('tablist')).toBeTruthy()
+    for (const panel of ['job description', 'ATS match']) {
+      expect(screen.getByRole('tab', { name: panel })).toBeTruthy()
     }
+    // Exactly one panel is on screen, which is the point of a tab.
+    expect(screen.getAllByRole('tabpanel')).toHaveLength(1)
 
     // The pipeline bar is an ordered list with a name, not a row of coloured
     // rules a screen reader walks past in silence.

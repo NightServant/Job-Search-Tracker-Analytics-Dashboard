@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
+import { Input } from '@/components/ui/input'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { AppDialog } from '@/components/ui/app-dialog'
@@ -54,13 +55,25 @@ const DOC_FILTERS = [
 type DocFilter = (typeof DOC_FILTERS)[number]['value']
 
 /**
- * Ten a page, matching /applications.
+ * Five a page, and only where there is a pager to turn (Gabe, 2026-09-13:
+ * "pagination should display 5 documents only in larger screens and laptop
+ * screens. Remove the pagination and maintain the scroll in tablet and mobile
+ * screens").
  *
- * The same argument as there, and it is about DISCOVERABILITY rather than
- * performance: at twenty, somebody with a dozen CVs never sees pagination and
- * cannot tell the list is paged at all.
+ * IT WAS TEN, on a discoverability argument borrowed from /applications: at
+ * twenty, somebody with a dozen CVs never sees a pager and cannot tell the
+ * list is paged. Five keeps that and buys something else -- the desktop
+ * screen opens with the template gallery above this list, and ten rows pushed
+ * the pager itself under the fold, so the control that proves the list
+ * continues was the part you had to scroll to find.
+ *
+ * BELOW `lg` THERE IS NO PAGER AT ALL and the list runs to its full length.
+ * A phone scrolls; that is what a phone does. Paging a scrolling surface asks
+ * somebody to tap a number to see the eleventh of twelve CVs when a thumb
+ * would have got there on its own -- and it puts a row of tap targets between
+ * them and the thing they came for.
  */
-const PAGE_SIZE = 10
+const PAGE_SIZE = 5
 
 /**
  * The Documents screen, laid out the way Microsoft Word lays out its start
@@ -136,21 +149,48 @@ export function DocumentsPage({
   const hasDocs = docs.length > 0
 
   const [filter, setFilter] = React.useState<DocFilter>('all')
+  const [query, setQuery] = React.useState('')
   const [page, setPage] = React.useState(1)
 
-  const filtered = filter === 'all' ? docs : docs.filter((doc) => doc.mode === filter)
+  /**
+   * SEARCH BY NAME, and it is the control this screen was missing: the list
+   * pages at five, so an account with twenty CVs reached the one it wanted by
+   * turning pages and reading titles. A format filter narrows by KIND; it
+   * cannot answer "where is the Northwind one".
+   *
+   * EVERY TERM MUST MATCH, in any order -- `engineer north` finds "Software
+   * Engineer — Northwind Pay". Substring rather than prefix, because a CV is
+   * named after a company as often as after a role and nobody remembers which
+   * word came first. The same rule the CV editor's application picker uses;
+   * two search boxes in one app should not disagree about what a match is.
+   */
+  const terms = React.useMemo(
+    () => query.toLowerCase().split(/\s+/).filter(Boolean),
+    [query]
+  )
+  const filtered = React.useMemo(() => {
+    const byMode = filter === 'all' ? docs : docs.filter((doc) => doc.mode === filter)
+    if (terms.length === 0) return byMode
+    return byMode.filter((doc) => {
+      const title = doc.title.toLowerCase()
+      return terms.every((term) => title.includes(term))
+    })
+  }, [docs, filter, terms])
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   // CLAMPED, NOT STORED. Deleting the last row of page 3, or narrowing to
   // LaTeX when only page 1 has any, would otherwise strand the reader on an
   // empty page with no control that leads anywhere.
   const current = Math.min(page, pageCount)
-  const paged = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
+  // COMPACT TAKES THE WHOLE LIST. Slicing it and then hiding the pager would
+  // be worse than either: the rows past the fifth would exist, be filtered,
+  // be counted -- and be unreachable, with no control on screen admitting it.
+  const paged = compact ? filtered : filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE)
 
-  // The filter changes the result set, so the page index it was valid for is
-  // meaningless afterwards.
+  // Either control changes the result set, so the page index it was valid for
+  // is meaningless afterwards.
   React.useEffect(() => {
     setPage(1)
-  }, [filter])
+  }, [filter, query])
 
   // ONE CTA, TWO BEHAVIOURS. Below `lg` it is a link to the Templates page;
   // on desktop it opens the mode chooser exactly as before. A link and a
@@ -259,18 +299,37 @@ export function DocumentsPage({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-heading-s text-text-primary">your documents</h2>
           {hasDocs && (
-            // Width on a wrapper, not on the Select: `Select`'s own root is
-            // `w-full` and only its trigger takes `className`. Same trap the
-            // calendar's country picker hit.
-            <div className="w-44 max-sm:w-full">
-              <Select
-                id="document-filter"
-                icon="Documents"
-                aria-label="Filter documents"
-                value={filter}
-                onValueChange={(next) => setFilter(next as DocFilter)}
-                items={DOC_FILTERS.map((option) => ({ ...option }))}
-              />
+            <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
+              {/* SEARCH FIRST, THEN THE FORMAT. They are not the same kind of
+                  control: one finds a document you already have in mind, the
+                  other changes which kind of documents the list is about. The
+                  finder goes first because it is the one somebody arrives
+                  wanting, and it is wider because a title is longer than a
+                  format. */}
+              <div className="w-56 max-sm:w-full">
+                <Input
+                  id="document-search"
+                  type="search"
+                  icon="Search"
+                  aria-label="Search documents by name"
+                  placeholder="search documents"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
+              {/* Width on a wrapper, not on the Select: `Select`'s own root is
+                  `w-full` and only its trigger takes `className`. Same trap the
+                  calendar's country picker hit. */}
+              <div className="w-44 max-sm:w-full">
+                <Select
+                  id="document-filter"
+                  icon="Documents"
+                  aria-label="Filter documents"
+                  value={filter}
+                  onValueChange={(next) => setFilter(next as DocFilter)}
+                  items={DOC_FILTERS.map((option) => ({ ...option }))}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -329,10 +388,25 @@ export function DocumentsPage({
                 a false claim about the account whenever somebody picks LaTeX
                 and owns only Word documents. */}
             {filtered.length === 0 && (
+              // WHICH CONTROL EMPTIED THE LIST IS THE WHOLE MESSAGE. There are
+              // two narrowers now, and the old copy named the format whatever
+              // had happened -- so searching for a word that matches nothing
+              // while the filter said `all` announced "no LaTeX documents",
+              // which is a false claim about the account. The search is
+              // reported first because it is the one the reader just typed.
               <p className="py-8 text-body-m text-text-muted" data-documents-filter-empty>
-                no {filter === 'word' ? 'Word' : 'LaTeX'} documents. there
-                {docs.length === 1 ? ' is ' : ' are '}
-                {docs.length} in the other format.
+                {terms.length > 0 ? (
+                  <>
+                    nothing matches “{query.trim()}”
+                    {filter === 'all' ? '' : filter === 'word' ? ' in Word documents' : ' in LaTeX documents'}.
+                  </>
+                ) : (
+                  <>
+                    no {filter === 'word' ? 'Word' : 'LaTeX'} documents. there
+                    {docs.length === 1 ? ' is ' : ' are '}
+                    {docs.length} in the other format.
+                  </>
+                )}
               </p>
             )}
 
@@ -340,10 +414,26 @@ export function DocumentsPage({
               // `pt-5` clears the last row's own hairline. At `pt-4` the
               // count and the pager crowded a rule they are not part of.
               <div className="flex flex-wrap items-center justify-between gap-4 pt-5">
-                <p className="text-body-s text-text-muted">
-                  {(current - 1) * PAGE_SIZE + 1}&ndash;
-                  {Math.min(current * PAGE_SIZE, filtered.length)} of {filtered.length}
+                {/* THE COUNT SURVIVES THE PAGER, and says a different thing on
+                    each surface because a different thing is true. Paged, it
+                    is which slice you are looking at; scrolling, there is no
+                    slice -- so it states the total rather than pretending to
+                    describe a window that does not exist. */}
+                <p className="text-body-s text-text-muted" data-documents-count>
+                  {compact ? (
+                    <>
+                      {filtered.length} {filtered.length === 1 ? 'document' : 'documents'}
+                    </>
+                  ) : (
+                    <>
+                      {(current - 1) * PAGE_SIZE + 1}&ndash;
+                      {Math.min(current * PAGE_SIZE, filtered.length)} of {filtered.length}
+                    </>
+                  )}
                 </p>
+                {/* NO PAGER BELOW `lg`. See PAGE_SIZE: the list is whole there
+                    and a phone scrolls it. */}
+                {!compact && (
                 <Pagination className="mx-0 w-auto justify-end">
                   <PaginationContent>
                     <PaginationItem>
@@ -387,6 +477,7 @@ export function DocumentsPage({
                     </PaginationItem>
                   </PaginationContent>
                 </Pagination>
+                )}
               </div>
             )}
           </div>

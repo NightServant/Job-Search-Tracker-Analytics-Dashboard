@@ -26,10 +26,28 @@ export interface TextareaProps extends React.TextareaHTMLAttributes<HTMLTextArea
   error?: string
   /** A glyph inside the leading edge of the box, on the first line. */
   icon?: IconName
+  /**
+   * The box is the height of its text, and has no scrollbar of its own.
+   *
+   * WHY IT IS A MODE AND NOT THE DEFAULT. A fixed box with an inner scrollbar
+   * is right for a field whose content has no natural end -- the notes on an
+   * application -- and wrong for one that is showing you a whole document.
+   * The posting editor is the second kind: it lives inside a dialog that
+   * already scrolls, and a scrollport inside a scrollport means finding the
+   * paragraph you want by dragging a 40px bar (Gabe, 2026-09-13: "change the
+   * text area component with a better component").
+   *
+   * `field-sizing: content` IS THE PLATFORM DOING IT, which is why there is no
+   * resize observer and no ref juggling here. Where it is unsupported the box
+   * simply stays at its `min-h` and remains user-resizable, which is exactly
+   * what it does today -- so the failure mode is the old behaviour rather than
+   * a broken field.
+   */
+  autoSize?: boolean
 }
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
-  ({ className, error, icon, id, disabled, ...props }, ref) => {
+  ({ className, error, icon, id, disabled, autoSize, ...props }, ref) => {
     const describedBy = error && id ? `${id}-error` : undefined
     const Icon = icon ? icons[icon] : null
     return (
@@ -51,7 +69,8 @@ export const Textarea = React.forwardRef<HTMLTextAreaElement, TextareaProps>(
             aria-describedby={describedBy}
             data-error={error ? '' : undefined}
             className={cn(
-              'min-h-24 w-full resize-y rounded-md border bg-bg-canvas py-2',
+              'min-h-24 w-full rounded-md border bg-bg-canvas py-2',
+              autoSize ? 'resize-none [field-sizing:content]' : 'resize-y',
               Icon ? 'pl-10 pr-3' : 'px-3',
               'text-body-m text-text-primary placeholder:text-text-muted',
               'transition-colors duration-(--duration-fast)',

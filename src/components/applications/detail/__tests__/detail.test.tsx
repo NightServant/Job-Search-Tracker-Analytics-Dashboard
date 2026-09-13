@@ -215,7 +215,13 @@ describe('LinkedCv', () => {
  * `LinkedCv` still exist and are still covered directly, above.
  */
 describe('ApplicationRecordView', () => {
-  it('shows the three columns the record is specified to carry', () => {
+  it('shows the form beside a tab for each of the other two surfaces', async () => {
+    // THE SECOND COLUMN IS TABS NOW (Gabe, 2026-09-13). The posting and the
+    // score are alternatives rather than a sequence -- you are reading the
+    // advert or you are checking the match -- and stacked they were more than
+    // the frame held. The tab is the heading, which is why neither panel
+    // prints one of its own any more.
+    const user = userEvent.setup()
     render(
       <ApplicationRecordView
         job={JOB}
@@ -224,12 +230,19 @@ describe('ApplicationRecordView', () => {
         onSubmit={() => {}}
       />
     )
-    // Column 1 is fields, not headings -- it is the record's identity, typed
-    // in place -- so it is asserted by its two required labels.
+    // The form is a column, not a tab, whenever there is room for one -- so it
+    // is on screen at the same time as whichever tab is open.
     expect(screen.getByLabelText('company *')).toBeTruthy()
     expect(screen.getByLabelText('position *')).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'job description' })).toBeTruthy()
-    expect(screen.getByRole('heading', { name: 'ATS match' })).toBeTruthy()
+
+    expect(screen.getByRole('tab', { name: 'job description' })).toBeTruthy()
+    const ats = screen.getByRole('tab', { name: 'ATS match' })
+    expect(screen.getByRole('tabpanel')).toContainElement(
+      document.querySelector('[data-posting-body], textarea#description')
+    )
+
+    await user.click(ats)
+    expect(document.querySelector('[data-record-ats]')).toBeTruthy()
   })
 
   it('carries no notes or contact section', () => {
@@ -249,7 +262,8 @@ describe('ApplicationRecordView', () => {
     expect(screen.queryByRole('heading', { name: 'contact' })).toBeNull()
   })
 
-  it('keeps a failed ATS read distinct from having nothing to compare', () => {
+  it('keeps a failed ATS read distinct from having nothing to compare', async () => {
+    const user = userEvent.setup()
     render(
       <ApplicationRecordView
         job={JOB}
@@ -258,6 +272,8 @@ describe('ApplicationRecordView', () => {
         onSubmit={() => {}}
       />
     )
+    // The panel lives behind its tab now; the distinction it draws does not.
+    await user.click(screen.getByRole('tab', { name: 'ATS match' }))
     expect(screen.getByText(/could not load your cv/i)).toBeTruthy()
     expect(screen.queryByText(/see how closely they match/i)).toBeNull()
   })
@@ -332,13 +348,16 @@ describe('ApplicationRecordView', () => {
         onSubmit={onSubmit}
       />
     )
+    // NO RECORD-LEVEL `delete`. The one on screen belongs to a job-description
+    // SECTION -- its name says which -- and delete for the application itself
+    // is on the row in the table beside the row it destroys.
     expect(screen.queryByRole('button', { name: /^delete$/i })).toBeNull()
-    // The one `edit` left is the job description's own toggle, which turns
-    // that column back into a field -- not a mode switch over the whole
-    // record. It is identifiable by the `aria-expanded` the old one never had.
-    expect(screen.getByRole('button', { name: /^edit$/i }).getAttribute('aria-expanded')).toBe(
-      'false'
-    )
+    // The `edit` controls left are the posting's, one per section, each naming
+    // the section it opens. They are toggles over a field rather than a mode
+    // switch over the whole record, which is what `aria-expanded` says.
+    const sectionEdits = screen.getAllByRole('button', { name: /^edit / })
+    expect(sectionEdits.length).toBeGreaterThan(0)
+    expect(sectionEdits[0].getAttribute('aria-expanded')).toBe('false')
     // DISABLED UNTIL SOMETHING CHANGES. An untouched record has nothing to
     // save, and a live button over a no-op invites the click that teaches you
     // it was one.

@@ -8,6 +8,7 @@ import { FunnelChart, normalizeFunnel, STAGE_FILL } from '../FunnelChart'
 import { TimeInStage } from '../TimeInStage'
 import { SalaryInsights } from '../SalaryInsights'
 import { RangePicker } from '../RangePicker'
+import { CohortTable } from '../CohortTable'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
 import type {
   TimeInStageMetric,
@@ -629,5 +630,44 @@ describe('normalizeFunnel', () => {
     expect(byStage.interviewing).toBe(false)
     expect(byStage.offer).toBe(false)
     expect(byStage.rejected).toBe(true)
+  })
+})
+
+describe('the cohort table', () => {
+  const cohorts = (count: number): CohortAnalysis[] =>
+    // Most recent first, which is the order `analyticsService` returns.
+    Array.from({ length: count }, (_, i) => ({
+      cohort: `2026-${String(12 - i).padStart(2, '0')}`,
+      jobsApplied: 10 + i,
+      jobsInterviewing: 4,
+      jobsOffered: 1,
+      jobsRejected: 2,
+      conversionRate: 10,
+      avgTimeToOffer: 21,
+    })) as CohortAnalysis[]
+
+  it('draws five rows at most, and says how many months it left out', () => {
+    // Gabe, 2026-09-13: "a 5-row accent table only". Two years of applying is
+    // twenty-four cohorts, and twenty-four seven-column rows is a spreadsheet
+    // dropped into an analytics panel. The caption matters as much as the cut:
+    // a table that quietly stops at five reads as "I have only ever applied in
+    // five months".
+    const { container } = render(<CohortTable data={cohorts(9)} />)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(5)
+    expect(screen.getByText(/four older months are not shown|4 older months are not shown/i)).toBeTruthy()
+  })
+
+  it('keeps the most RECENT five, not the first five it was handed', () => {
+    // Recency is what makes a cohort actionable: last month's conversion is
+    // something you can still do something about.
+    render(<CohortTable data={cohorts(9)} />)
+    expect(screen.getByText('Dec 2026')).toBeTruthy()
+    expect(screen.queryByText('Apr 2026')).toBeNull()
+  })
+
+  it('says nothing about a cut when there is none', () => {
+    const { container } = render(<CohortTable data={cohorts(3)} />)
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(3)
+    expect(container.querySelector('[data-cohort-cut]')).toBeNull()
   })
 })

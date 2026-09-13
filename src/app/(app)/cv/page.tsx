@@ -99,6 +99,43 @@ function CvRoute() {
     }
   }
 
+  /**
+   * A TAILORED CV IS A NEW DOCUMENT, and this is where it gets made.
+   *
+   * The rail produces a title and a rewritten body; everything after that is
+   * route work -- `useCreateResume` wants a QueryClient, the redirect wants
+   * the router, and the editors are kept clear of both so they stay
+   * renderable with plain props. `push`, not `replace`: the CV you tailored
+   * from is where the back button should land, since comparing the two is the
+   * first thing anyone does.
+   *
+   * The mode comes from the open draft rather than being chosen again -- a
+   * LaTeX CV tailored into a Word document would not compile.
+   */
+  const tailorIntoNewDraft = async (
+    mode: ResumeMode,
+    input: { title: string; content: ResumeContent }
+  ) => {
+    try {
+      const created = await createResume.mutateAsync({ mode, ...input })
+      success('Tailored CV created', `${input.title} is ready.`)
+      router.push(`/cv?draft=${created.id}`)
+    } catch (err) {
+      // NOT "Tailoring failed" (found in review, 2026-09-13). The rewrite is
+      // the expensive half and it succeeded; the rail says so in as many
+      // words, and a louder toast claiming the opposite sent people back to
+      // re-run a request that costs metered allowance.
+      showError(
+        'Could not save the tailored CV',
+        err instanceof Error ? err.message : 'The rewrite is still on screen. Try again.'
+      )
+      // Rethrown so the rail can say the rewrite survived and only the save
+      // failed -- a swallowed failure here leaves it claiming success over a
+      // document that was never written.
+      throw err
+    }
+  }
+
   const persistDraft = (
     draftId: string,
     title: string,
@@ -174,6 +211,7 @@ function CvRoute() {
         backHref={DOCUMENTS}
         onDelete={(id) => deleteDraft(id)}
         onPersistDraft={persistDraft}
+        onTailored={(input) => tailorIntoNewDraft(draft.mode, input)}
       />
       <ConfirmDialog
         open={pendingDeleteId !== null}

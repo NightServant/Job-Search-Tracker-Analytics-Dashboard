@@ -30,6 +30,27 @@ import type { Job, JobFormData } from '@/types'
  *
  * A NEW APPLICATION DOES NOT COME HERE. It goes through `AddApplicationDialog`,
  * which is four steps and a model, so `job` is never null.
+ *
+ * TWO VIEWS, ONE DIALOG (Gabe, 2026-09-13: "when I open the job desc, overview
+ * dialog must be replaced ... when I close the job desc dialog, the
+ * application dialog must appear, do not close the entire section"). The
+ * posting gets the whole surface, and coming back from it lands on the record
+ * rather than on the table.
+ *
+ * IT IS NOT TWO DIALOGS, and that is the load-bearing decision here. Base UI
+ * unmounts a closed dialog's children, so a second `AppDialog` beside this one
+ * would tear `ApplicationRecordView` down every time somebody read the posting
+ * -- and with it the draft: every typed-but-unsaved field, the pending CV
+ * pick, which fields `add more details` had revealed. That is precisely the
+ * silent loss the discard confirmation in ApplicationsPage exists to prevent,
+ * except it would happen on a button that only promised to show more text.
+ *
+ * So the state is here and the panels are both inside the one dialog. The
+ * record's columns hide behind the `hidden` attribute rather than unmounting
+ * (see ApplicationRecordView), the posting's own panel renders from inside the
+ * record's form because that is where the draft lives, and what changes at
+ * this level is the chrome: the title, the glyph, the back control, and what
+ * Escape means.
  */
 export interface ApplicationRecordDialogProps {
   open: boolean
@@ -70,10 +91,29 @@ export function ApplicationRecordDialog({
   linkedResumeId,
   onLinkedResumeChange,
 }: ApplicationRecordDialogProps) {
+  const [view, setView] = React.useState<'record' | 'description'>('record')
+
+  // Back to the record when the dialog closes, and when the row underneath it
+  // changes -- reopening on the posting of the application you looked at last
+  // time is a surface nobody asked for. Cheaper than resetting from the close
+  // handler, which the discard guard can decline to honour.
+  React.useEffect(() => setView('record'), [open, job?.id])
+
   return (
     <AppDialog
       open={open}
-      onOpenChange={onOpenChange}
+      onOpenChange={(next, reason) => {
+        // ESCAPE MEANS BACK WHILE THE POSTING IS OPEN, and only Escape: the
+        // header's close button and a click on the overlay still mean close,
+        // because both are aimed at the dialog rather than at the panel. The
+        // guard in ApplicationsPage then does what it always does with a dirty
+        // record.
+        if (!next && reason === 'escape-key' && view === 'description') {
+          setView('record')
+          return
+        }
+        onOpenChange(next)
+      }}
       size="xl"
       // THE HEADING NAMES THE SCREEN, NOT THE ROW (Gabe, 2026-09-10). It was
       // the job title, and above it an eyebrow repeating the company and the
@@ -90,8 +130,18 @@ export function ApplicationRecordDialog({
       // The record keeps its own chrome still and scrolls only its columns.
       bodyScroll={false}
       headerSeparator={false}
-      title="application overview"
-      icon="Briefcase"
+      title={view === 'record' ? 'application overview' : 'job description'}
+      icon={view === 'record' ? 'Briefcase' : 'Documents'}
+      // THE WAY BACK IS IN THE HEADER, opposite the title it replaced, which
+      // is where the thing it undoes happened. `autoFocus` because the control
+      // that opened this view has just been hidden: without it focus falls to
+      // the body, and a keyboard or screen reader lands nowhere.
+      // NO ACTIONS IN THE HEADER (Gabe, 2026-09-13: the posting's controls
+      // "must be a new row"). `back to application` and `show posting` lived
+      // here, opposite the title. They belong to the POSTING rather than to
+      // the dialog, and `add a new section` could never have joined them in a
+      // title bar -- so all three moved into a control row inside the view.
+      // See RecordDescription.
       // NO DESCRIPTION (Gabe, 2026-09-11: "remove the description of the
       // description"). It was four lines explaining that the bar below tracks
       // progress and the three columns hold the job, the posting and the ATS
@@ -118,6 +168,9 @@ export function ApplicationRecordDialog({
           resumes={resumes}
           linkedResumeId={linkedResumeId}
           onLinkedResumeChange={onLinkedResumeChange}
+          postingOpen={view === 'description'}
+          onReadMore={() => setView('description')}
+          onBack={() => setView('record')}
         />
       )}
     </AppDialog>

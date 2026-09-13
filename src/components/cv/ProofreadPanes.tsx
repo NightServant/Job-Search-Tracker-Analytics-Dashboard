@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { PanelSection } from '@/components/ui/panel-section'
 import { CssSpinner } from '@/components/ui/css-spinner'
 import { contextOf, type GrammarIssue } from '@/services/grammar'
+import { writingMetrics, type WritingMetric } from './writingMetrics'
 import type { ProofreadState } from './useProofread'
 import type { ThesaurusState } from './useThesaurus'
 
@@ -44,6 +45,15 @@ import type { ThesaurusState } from './useThesaurus'
  * THE SCORE IS DERIVED, NOT FETCHED, from correction and refinement density
  * against word count -- the same two inputs Word uses. `proofreadScore`
  * documents the floor and why style weighs less.
+ *
+ * AND SO ARE THE WRITING SIGNALS (Gabe, 2026-09-13). Formality, clarity,
+ * readability and conciseness sit under the score as percentages with a line
+ * each, because density alone says how much is wrong and nothing about how the
+ * document reads -- a CV can come back with no findings and still read like a
+ * text message. They are computed from the checked text, locally, with no
+ * model and no second request: a number somebody edits their CV against has to
+ * be the same number when they ask again. `writingMetrics` documents each
+ * formula and every threshold it turns on.
  *
  * ONE ISSUE AT A TIME, BY DESIGN. Applying a correction invalidates every
  * offset after it, so the list empties on accept and the pane asks for a
@@ -104,6 +114,56 @@ function CountRow({
       ) : (
         <span className="text-body-m tabular-nums text-text-primary">{count}</span>
       )}
+    </div>
+  )
+}
+
+/**
+ * ONE WRITING SIGNAL: the percentage, the rule that fills, and a line saying
+ * what the number means.
+ *
+ * THE LINE IS THE POINT, not the percentage. "formality 62%" on its own is the
+ * two counters again in a different font -- a fact with nothing to do about
+ * it. The comment changes with the band, so the row reads as a note from an
+ * editor rather than a gauge. `writingMetrics` holds the wording and the
+ * thresholds it switches on.
+ */
+function MetricRow({ metric, ran }: { metric: WritingMetric; ran: boolean }) {
+  // Unchecked shows an em-dash and an empty rule, matching the score block
+  // above it: no number has been earned yet, so none is drawn.
+  const value = ran ? metric.value : 0
+
+  return (
+    <div className="flex flex-col gap-2 border-b border-border-subtle py-3 last:border-b-0">
+      <div className="flex items-baseline justify-between gap-4">
+        <span className="text-body-m text-text-secondary">{metric.label}</span>
+        <span className="text-body-m tabular-nums text-text-primary">
+          {ran ? `${metric.value}%` : '—'}
+        </span>
+      </div>
+
+      {/* The same filling rule the editor score draws, for the same reason:
+          this design system shows progress as a line, never a bar in a box. */}
+      {/* `aria-valuetext` RATHER THAN A BARE 0 BEFORE A CHECK HAS RUN. A
+          sighted reader sees an em-dash and "not checked yet"; without this a
+          screen reader was told "formality, 0 percent", which is a measurement
+          nobody took. */}
+      <div
+        className="h-[2px] w-full bg-border-subtle"
+        role="progressbar"
+        aria-valuenow={value}
+        aria-valuetext={ran ? undefined : 'not checked yet'}
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-label={metric.label}
+      >
+        <div
+          className="h-full bg-accent-default transition-[width] duration-(--duration-slow)"
+          style={{ width: `${value}%` }}
+        />
+      </div>
+
+      <p className="text-body-s text-text-muted">{ran ? metric.comment : 'not checked yet'}</p>
     </div>
   )
 }
@@ -250,6 +310,14 @@ export function GrammarCheckPane({
 }) {
   const { score } = state
 
+  // COMPUTED FROM `state.text`, which is the text the current findings came
+  // back against and is empty until a check has run. Reading the editor
+  // directly would score a document the counts above do not describe.
+  const metrics = React.useMemo(
+    () => writingMetrics(state.text, [...state.grammar, ...state.style]),
+    [state.text, state.grammar, state.style]
+  )
+
   return (
     // A MINIMUM HEIGHT so the rail holds its shape before a check has run and
     // when one comes back clean, rather than collapsing to one button.
@@ -271,6 +339,8 @@ export function GrammarCheckPane({
             className="h-[2px] w-full bg-border-subtle"
             role="progressbar"
             aria-valuenow={state.ran ? score.value : 0}
+            // As on the signal rows below: an unrun check is not a zero score.
+            aria-valuetext={state.ran ? undefined : 'not checked yet'}
             aria-valuemin={0}
             aria-valuemax={100}
             aria-label="editor score"
@@ -283,6 +353,20 @@ export function GrammarCheckPane({
 
           <RunButton state={state} />
           <Unavailable state={state} />
+        </div>
+      </PanelSection>
+
+      {/* WHAT THE SCORE CANNOT SAY. The number above is issue density: it
+          answers "how much is wrong" and nothing about how the document
+          reads. These four are derived from the text itself -- register,
+          sentence length, reading ease, padding -- so a CV with no findings
+          at all still gets told something useful. All four are computed
+          locally and deterministically; see `writingMetrics`. */}
+      <PanelSection title="writing signals" icon="Info">
+        <div className="flex flex-col">
+          {metrics.map((metric) => (
+            <MetricRow key={metric.id} metric={metric} ran={state.ran} />
+          ))}
         </div>
       </PanelSection>
 

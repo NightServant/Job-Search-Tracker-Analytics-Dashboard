@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { WORD_EDITOR_EXTENSIONS } from './editorExtensions'
-import type { JSONContent } from '@tiptap/core'
+import type { Editor, JSONContent } from '@tiptap/core'
 import { Button } from '@/components/ui/button'
 import { CheckIcon, DownloadIcon, RotateCcwIcon, TrashIcon } from '@/components/icons'
 import { CssSpinner } from '@/components/ui/css-spinner'
@@ -23,11 +23,19 @@ import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './docum
 import { useProofread } from './useProofread'
 import { useThesaurus } from './useThesaurus'
 import { useFitToWidth } from './useFitToWidth'
-import { cssLineHeight, normalizeGeometry, normalizeTypography } from '@/lib/pageGeometry'
+import {
+  cssLineHeight,
+  normalizeGeometry,
+  normalizeTypography,
+  type DocumentTypography,
+  type PageGeometry,
+} from '@/lib/pageGeometry'
 import { useNaturalLineHeight } from './useNaturalLineHeight'
 import { Pagination } from './pagination'
 import { useResumeExport } from './useResumeExport'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
+import { cn } from '@/lib/utils'
+import { useDocumentView } from './documentView'
 import { ResumeVersionHistory } from './ResumeVersionHistory'
 import { DEFAULT_WORD_CONTENT, formatSaveTime, normalizeWordContent } from './content'
 import { maybeCreateSnapshot } from '@/services/resumeSnapshotService'
@@ -62,6 +70,20 @@ export interface WordResumeEditorProps {
    */
   jobs?: Job[]
 
+  /**
+   * Where a tailored CV goes.
+   *
+   * THE ROUTE CREATES IT, not this editor, for the same reason the route does
+   * every other write: `useCreateResume` needs a QueryClient and the router
+   * needs the app's navigation, and an editor that reached for either stops
+   * being renderable with plain props. This hands over a finished title and a
+   * finished document; what happens to it is /cv's business.
+   *
+   * Optional, so the editor still mounts in a test with nothing wired -- the
+   * tailor button then says what came back rather than throwing.
+   */
+  onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+
   draft: ResumeDraft
   backHref: string
   onDelete: (draftId: string) => void
@@ -87,10 +109,9 @@ export function WordResumeEditor({
   onDelete,
   onPersistDraft,
   jobs = [],
+  onTailored,
 }: WordResumeEditorProps) {
   const { user } = useAuth()
-  // Which applications this CV was submitted to. Read here rather than passed
-  // down because the editor already owns every other read keyed on draft.id.
   const { success, error: showError, info } = useToast()
   const [title, setTitle] = useState(draft.title)
   const [isSaving, setIsSaving] = useState(false)
@@ -321,7 +342,43 @@ export function WordResumeEditor({
   // useResumeExport on why that dependency belongs in the signature.
   const exportState = useResumeExport({ editor, title, saveDraft, authedFetch })
 
-  const tailoring = useCvTailoring({ cvText: editor?.getText() ?? '', jobs })
+  const tailoring = useCvTailoring({
+    cvText: editor?.getText() ?? '',
+    jobs,
+    title,
+    // A GETTER, not `editor?.getJSON()` inline. The plain text above is read
+    // on every render on purpose; serialising the whole node tree on every
+    // keystroke for a button nobody has pressed is not the same trade. This
+    // one runs once, when the rewrite is actually being built.
+    getContent: () => editor?.getJSON() ?? null,
+    // THE OPEN DOCUMENT IS SAVED BEFORE THE NEW ONE IS CREATED, and this
+    // wrapper is the whole fix for a real data loss (found in review,
+    // 2026-09-13).
+    //
+    // The route answers `onTailored` by navigating to the new CV. That changes
+    // `?draft=`, which changes this editor's `key`, which UNMOUNTS it -- and
+    // the autosave effect's cleanup clears the pending 1200ms timer on the way
+    // out. Worse, that timer is re-armed on every keystroke, so somebody
+    // typing while the model works (and it works for seconds) never reaches a
+    // quiet 1200ms at all. Everything typed since the last pause was on its
+    // way to Supabase and went nowhere, under a rail promising "the one you
+    // have open is left exactly as it is."
+    //
+    // A FAILED FLUSH STOPS THE HANDOFF rather than navigating anyway: leaving
+    // is what destroys the edits, so if they cannot be stored the honest
+    // answer is to stay put and say so. `saveDraft` has already raised its own
+    // toast by then; this message is what the rail prints.
+    onTailored: onTailored
+      ? async (input) => {
+          if (isDirty && !(await saveDraft(false))) {
+            throw new Error(
+              'Your unsaved edits could not be saved, so the tailored copy was not created.'
+            )
+          }
+          await onTailored(input)
+        }
+      : undefined,
+  })
   const proofread = useProofread(editor)
   // Follows the caret; see useThesaurus for why it is not behind a button.
   const thesaurus = useThesaurus(editor)
@@ -466,96 +523,22 @@ export function WordResumeEditor({
       rightRail={
         <DocumentRailPane
           active={tab}
-          jobs={jobs}
           proofread={proofread}
           thesaurus={thesaurus}
           tailoring={tailoring}
         />
       }
       footnote="letter-style layout preview with 0.8in margins for a print-ready CV."
+      paged
     >
       <div ref={fit.ref} className="w-full">
-      {/*
-        `zoom`, NOT `transform: scale()`, and the difference is layout.
-        A transform is painted only: a page drawn at 0.7 still occupies its
-        full 11in in the flow, so the well ends in a third of a page of nothing
-        and the scrollbar promises more document than exists. Correcting that
-        by hand means measuring the sheet and multiplying its height, which is
-        a second source of truth for a number the browser already knows.
-
-        `zoom` participates in layout -- measured here: a 1000px child at 0.7
-        gives a 700px wrapper, where the transform leaves it at 1000 -- so the
-        flow, the scroll height and the caret all agree with what is drawn,
-        with no correction and no wrapper. Supported in every current browser
-        (`CSS.supports('zoom', '0.7')` verified true in the app).
-      */}
-      <div
-        className="mx-auto bg-white"
-        style={{
-          zoom: fit.scale,
-          width: `${geometry.width}in`,
-          minHeight: `${geometry.height}in`,
-          // NO PAINTED PAGE EDGE HERE ANY MORE. Two versions of it were
-          // drawn as a background -- a hairline, then a band of the well's
-          // colour -- and both sat BEHIND the text, so a break falling
-          // mid-paragraph struck a stripe through a line of it. Nothing about
-          // a background can avoid that; the content flows over it regardless.
-          // `Pagination` pushes the content past the edge instead, which is
-          // what Word does. See components/cv/pagination.
-        }}
-      >
-        <EditorContent
+        <PageSheet
           editor={editor}
-          style={{
-            padding: `${geometry.margin.top}in ${geometry.margin.right}in ${geometry.margin.bottom}in ${geometry.margin.left}in`,
-            // THE TYPING AREA DERIVES FROM THE PAGE, rather than the 9.4in
-            // that was hard-coded for Letter at 0.8in margins. On A4 that
-            // number is wrong by a third of an inch and on Legal by three,
-            // so the editable region either fell short of the page or ran
-            // past it -- both of which look like the sheet is the wrong size.
-            '--page-margin-left': `${geometry.margin.left}in`,
-            '--page-margin-right': `${geometry.margin.right}in`,
-            '--page-body-height': `${Math.max(
-              1,
-              geometry.height - geometry.margin.top - geometry.margin.bottom
-            )}in`,
-            // THE DOCUMENT'S OWN TYPE, where it had any. mammoth converts a
-            // .docx to semantic HTML and drops every run property, so without
-            // this an imported CV renders in the editor's stylesheet rather
-            // than the face its author chose -- Garamond 11pt arriving as
-            // sans-serif 15px on the file that reported this.
-            ...(type.fontFamily ? { fontFamily: type.fontFamily } : {}),
-            ...(type.fontSize ? { fontSize: `${type.fontSize}pt` } : {}),
-            // `w:line="235"` is 0.98 of SINGLE spacing, and single is the
-            // font's own line box -- not 0.98 of the font size, which is what
-            // handing the raw number to CSS meant and what set every line on
-            // the reported CV about 15% tight.
-            ...(cssLineHeight(type.lineHeight, naturalLineHeight)
-              ? { lineHeight: cssLineHeight(type.lineHeight, naturalLineHeight)! }
-              : {}),
-            ...(type.paragraphSpacing !== null
-              ? { '--doc-para-space': `${type.paragraphSpacing}pt` }
-              : {}),
-            // HEADING SIZES THE DOCUMENT STATES, rather than em multiples of
-            // the body guessed at. On the reported CV the name is 16pt and a
-            // section heading 11pt against a 9.5pt body; guessing 1.45em and
-            // 1.05em rendered them at 13.8 and 10. Null falls through to the
-            // editor's own scale, which is right for a CV typed here.
-            ...(type.titleSize ? { '--doc-h1-size': `${type.titleSize}pt` } : {}),
-            ...(type.sectionSize ? { '--doc-h2-size': `${type.sectionSize}pt` } : {}),
-            // AND THE SPACE AROUND THEM. `mt-4` is 12pt against the 6.5pt the
-            // reported CV sets, which repeated over eight headings is most of
-            // a visible margin error down the page.
-            ...(type.headingSpaceBefore !== null
-              ? { '--doc-h-before': `${type.headingSpaceBefore}pt` }
-              : {}),
-            ...(type.headingSpaceAfter !== null
-              ? { '--doc-h-after': `${type.headingSpaceAfter}pt` }
-              : {}),
-          } as React.CSSProperties}
-          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:[margin-block:0_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h1]:text-[length:var(--doc-h1-size,1.45em)] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:[margin-block:var(--doc-h-before,1rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h2]:text-[length:var(--doc-h2-size,1.05em)] [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h3]:[margin-block:var(--doc-h-before,0.75rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h3]:font-bold [&_.ProseMirror_h3]:text-[length:var(--doc-h2-size,1em)] [&_.ProseMirror_[data-ruled]]:border-b [&_.ProseMirror_[data-ruled]]:border-current [&_.ProseMirror_[data-ruled]]:pb-0.5 [&_.ProseMirror_p]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:[margin-block:0] [&_.ProseMirror_li_p]:[margin-block:0_var(--doc-para-space,0.25rem)]"
+          geometry={geometry}
+          type={type}
+          naturalLineHeight={naturalLineHeight}
+          scale={fit.scale}
         />
-      </div>
       </div>
     </DocumentWorkspace>
   )

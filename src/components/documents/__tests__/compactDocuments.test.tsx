@@ -162,4 +162,31 @@ describe('the documents notice', () => {
     )
     expect(container.querySelector('[data-documents-notice]')!.className).toContain('lg:hidden')
   })
+
+  it('drops the pager and lists every document, because a phone scrolls', () => {
+    // Gabe, 2026-09-13: "remove the pagination and maintain the scroll in
+    // tablet and mobile screens". Paging a scrolling surface asks somebody to
+    // tap a number to reach the eleventh of twelve CVs when a thumb would have
+    // got there on its own -- and it puts a row of tap targets between them and
+    // the thing they came for.
+    //
+    // THE ROWS HAVE TO BE ALL OF THEM, not five with the pager hidden: that
+    // would leave the rest filtered, counted and unreachable, with no control
+    // on screen admitting it.
+    setViewport(true)
+    const many = Array.from({ length: 11 }, (_, i) => ({
+      ...DOCS[0],
+      id: `m${i}`,
+      title: `CV ${i}`,
+    })) as ResumeSummary[]
+
+    render(<DocumentsPage docs={many} />)
+
+    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(11)
+    expect(screen.queryByRole('navigation', { name: /pagination/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: '2' })).toBeNull()
+    // The count stays, and states the total rather than describing a window
+    // that does not exist.
+    expect(screen.getByText('11 documents')).toBeTruthy()
+  })
 })

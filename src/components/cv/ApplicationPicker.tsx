@@ -22,12 +22,16 @@ import type { Job } from '@/types'
  *   a list you scroll past. Typing "stripe" is one action; finding Stripe in
  *   an alphabetical select is several.
  *
- *   RELEVANCE ORDER, because the applications this CV was ACTUALLY SENT TO are
- *   the realistic targets and everything else is a long tail.
- *   `application_documents` already records exactly that relationship -- it is
- *   read here through `linkedJobIds` -- so those rows sort first and carry a
- *   marker. The CV knows where it has been; the picker should not make you
- *   remember.
+ *   A PREDICTABLE ORDER, by company, because insertion order is not one.
+ *
+ * IT USED TO SORT BY "ALREADY SENT" FIRST, reading `application_documents`
+ * through a `linkedJobIds` prop, on the reasoning that the applications this
+ * CV had actually gone to were the realistic targets. That reasoning died with
+ * the wishlist filter below: a CV is linked to applications you have SENT, and
+ * this list now holds only ones you have NOT. The two sets cannot intersect,
+ * so the sort could never fire and the `already sent` marker could never
+ * render. No caller had passed the prop in any case. Removed rather than left
+ * as a feature that reads as if it works.
  *
  * BUILT HERE RATHER THAN ON `ui/combobox`. That component is vendored, unused
  * anywhere in the app, and wraps Base UI's combobox with its own filtering and
@@ -36,6 +40,13 @@ import type { Job } from '@/types'
  * design system that caps radius at 4px. This is a text input and a filtered
  * list with the combobox ARIA pattern written out, which is the part that
  * actually has to be right.
+ *
+ * IT LISTS THE WISHLIST, AND IT DOES NOT DO THAT FILTERING ITSELF. Tailoring
+ * is work you do before applying, so `useCvTailoring` hands `jobs` in already
+ * narrowed to `status === 'wishlist'` -- one filter, in the place that also
+ * resolves which job is selected. A picker that filtered on its own would be a
+ * second opinion about which applications exist, and the hook would go on
+ * happily holding a selection this list cannot show.
  *
  * THE KEYBOARD CONTRACT IS THE REASON THIS IS NOT A DIV WITH AN ONCLICK:
  * `role="combobox"` with `aria-expanded` and `aria-activedescendant`, the list
@@ -46,17 +57,10 @@ import type { Job } from '@/types'
 
 export interface ApplicationPickerProps {
   jobs: Job[]
-  /** Applications this CV has already been pinned to. Sorted first. */
-  linkedJobIds?: readonly string[]
   value: string
   onChange: (jobId: string) => void
   label?: string
   className?: string
-}
-
-interface Option {
-  job: Job
-  linked: boolean
 }
 
 /** Match on role, company or location, because people search by any of them. */
@@ -72,7 +76,6 @@ function matches(job: Job, query: string): boolean {
 
 export function ApplicationPicker({
   jobs,
-  linkedJobIds = [],
   value,
   onChange,
   label = 'application',
@@ -84,19 +87,16 @@ export function ApplicationPicker({
   const listId = React.useId()
   const rootRef = React.useRef<HTMLDivElement | null>(null)
 
-  const linked = React.useMemo(() => new Set(linkedJobIds), [linkedJobIds])
   const selected = jobs.find((job) => job.id === value) ?? null
 
-  const options = React.useMemo<Option[]>(() => {
-    const visible = jobs.filter((job) => matches(job, query))
-    // Linked first, then by company so the long tail is at least predictable.
-    return visible
-      .map((job) => ({ job, linked: linked.has(job.id) }))
-      .sort((a, b) => {
-        if (a.linked !== b.linked) return a.linked ? -1 : 1
-        return a.job.company.localeCompare(b.job.company)
-      })
-  }, [jobs, query, linked])
+  const options = React.useMemo<Job[]>(
+    () =>
+      jobs
+        .filter((job) => matches(job, query))
+        // By company, so the long tail is at least predictable.
+        .sort((a, b) => a.company.localeCompare(b.company)),
+    [jobs, query]
+  )
 
   React.useEffect(() => {
     setHighlight(0)
@@ -112,8 +112,8 @@ export function ApplicationPicker({
     return () => document.removeEventListener('pointerdown', onPointerDown)
   }, [open])
 
-  function choose(option: Option) {
-    onChange(option.job.id)
+  function choose(option: Job) {
+    onChange(option.id)
     setQuery('')
     setOpen(false)
   }
@@ -153,6 +153,11 @@ export function ApplicationPicker({
         >
           <SearchIcon size={14} />
         </span>
+        {/* THE EMPTY STATE HAS TO BE TRUE ABOUT THE FILTER, not about the
+            account. `jobs` is the wishlist now (see `useCvTailoring`), so
+            "no applications yet" was a lie on a tracker full of applied ones
+            -- it sent the reader looking for a bug in the picker when the
+            answer is that nothing is waiting to be applied to. */}
         <input
           id={`${listId}-input`}
           role="combobox"
@@ -160,10 +165,14 @@ export function ApplicationPicker({
           aria-controls={listId}
           aria-autocomplete="list"
           aria-activedescendant={
-            open && options[highlight] ? `${listId}-option-${options[highlight].job.id}` : undefined
+            open && options[highlight] ? `${listId}-option-${options[highlight].id}` : undefined
           }
           value={open ? query : selected ? `${selected.role} — ${selected.company}` : ''}
-          placeholder={jobs.length ? `search ${jobs.length} applications` : 'no applications yet'}
+          placeholder={
+            jobs.length
+              ? `search ${jobs.length} wishlisted ${jobs.length === 1 ? 'role' : 'roles'}`
+              : 'nothing on the wishlist to tailor to'
+          }
           disabled={jobs.length === 0}
           onChange={(event) => {
             setQuery(event.target.value)
@@ -205,12 +214,12 @@ export function ApplicationPicker({
           )}
 
           {options.map((option, index) => {
-            const isSelected = option.job.id === value
+            const isSelected = option.id === value
             return (
-              <li key={option.job.id}>
+              <li key={option.id}>
                 <button
                   type="button"
-                  id={`${listId}-option-${option.job.id}`}
+                  id={`${listId}-option-${option.id}`}
                   role="option"
                   aria-selected={isSelected}
                   onMouseEnter={() => setHighlight(index)}
@@ -224,19 +233,8 @@ export function ApplicationPicker({
                     {isSelected && <CheckIcon size={14} aria-hidden />}
                   </span>
                   <span className="flex min-w-0 flex-col">
-                    <span className="truncate text-body-m text-text-primary">
-                      {option.job.role}
-                    </span>
-                    <span className="truncate text-body-s text-text-muted">
-                      {option.job.company}
-                      {option.linked && (
-                        // A label against a rule, not a filled tag: this is
-                        // status, and status is never a pill in this app.
-                        <span className="ml-2 border-b border-accent-default text-text-secondary">
-                          already sent
-                        </span>
-                      )}
-                    </span>
+                    <span className="truncate text-body-m text-text-primary">{option.role}</span>
+                    <span className="truncate text-body-s text-text-muted">{option.company}</span>
                   </span>
                 </button>
               </li>

@@ -1,8 +1,6 @@
 'use client'
 
 import * as React from 'react'
-import Link from 'next/link'
-import { useAppHref } from '@/components/shell/routeBase'
 import {
   Table,
   TableBody,
@@ -31,9 +29,10 @@ export interface ApplicationsTableProps {
    * button in this table that opened it -- are gone (Gabe, Worktrack
    * Revisions: "remove the edit button and preserve the danger icon").
    *
-   * When it is absent the company cell stays an ordinary link to
-   * `/applications/<id>` and the whole row falls back to navigation, which is
-   * what a no-JS render does anyway.
+   * IT IS REACHED FROM THE `view` BUTTON ONLY (Gabe, 2026-09-13: "company name
+   * must not be clickable and add view CTA button before the delete button").
+   * When it is absent the actions column loses that button and the row is
+   * read-only, which is what a table rendered without handlers should be.
    */
   onOpen?: (job: Job) => void
   onDelete?: (job: Job) => void
@@ -68,6 +67,17 @@ export interface ApplicationsTableProps {
  * `date_applied` is a bare DATE, so it goes through `formatAppliedDate` (UTC).
  * A wishlist row has none -- it says so rather than borrowing `created_at`,
  * which would print the row's signup time as though it were an applied date.
+ *
+ * THE COMPANY CELL IS TEXT, NOT A LINK (Gabe, 2026-09-13). It was an anchor to
+ * `/applications/<id>` whose plain left-click was intercepted to open the
+ * dialog, which bought cmd-click and "open in new tab" on a shareable address.
+ * That is a real thing to give up and it is worth naming rather than quietly
+ * dropping: what it cost was a row with TWO affordances of different kinds --
+ * a text link that opens a modal, and an explicit button beside delete that
+ * does the same -- so the same click did one thing in the first column and
+ * another everywhere else along the row. One control, in the actions column,
+ * where the other row-level action already lives. The route still exists and
+ * still redirects, so an address someone already has keeps working.
  */
 export function ApplicationsTable({
   jobs,
@@ -78,7 +88,6 @@ export function ApplicationsTable({
   role,
   'aria-labelledby': ariaLabelledBy,
 }: ApplicationsTableProps) {
-  const appHref = useAppHref()
   if (jobs.length === 0) {
     return (
       <div data-list id={id} role={role} aria-labelledby={ariaLabelledBy}>
@@ -147,16 +156,19 @@ export function ApplicationsTable({
                 widening the table -- but to the auto-layout it also reads as
                 "these two want no width at all", so the surplus went to
                 salary, which needs none of it. The header row is where a table
-                states its proportions; these five add up to 92% and the
-                remainder is the actions column's fixed w-28. */}
+                states its proportions; these five add up to 86% and the
+                remainder is the actions column's fixed w-44. Status and salary
+                gave the six points back, because the actions column grew by a
+                whole button and neither of those two was using what it had. */}
             <TableHead sticky className="w-[24%]">company</TableHead>
-            <TableHead className="w-[22%]">position</TableHead>
-            <TableHead className="w-[14%]">status</TableHead>
-            <TableHead className="w-[20%]">salary</TableHead>
+            <TableHead className="w-[20%]">position</TableHead>
+            <TableHead className="w-[12%]">status</TableHead>
+            <TableHead className="w-[18%]">salary</TableHead>
             <TableHead className="w-[12%] text-right">applied on</TableHead>
-            {/* `w-28`, up from `w-20`: the delete control is a labelled
-                button now and 80px cropped it. */}
-            {(onOpen || onDelete) && <TableHead className="w-28 text-right">actions</TableHead>}
+            {/* `w-44`, up from `w-28`: the column carries TWO labelled buttons
+                at every width now, not one plus a phone-only extra, and 112px
+                put `view` and `delete` on separate lines. */}
+            {(onOpen || onDelete) && <TableHead className="w-44 text-right">actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -175,32 +187,11 @@ export function ApplicationsTable({
               className={cn(i % 2 === 1 ? 'row-zebra' : 'bg-bg-canvas')}
             >
               <TableCell label="company" sticky className="max-w-0 truncate text-text-primary">
-                {/*
-                  STILL A REAL LINK, even on desktop where clicking it opens
-                  the dialog instead of navigating. Rendering a <button> here
-                  would take away cmd-click, middle-click and "open in new
-                  tab" on a row whose href is a genuine, shareable address --
-                  so the anchor stays and the plain left-click is what gets
-                  intercepted. Every modified click falls through to the
-                  browser untouched.
-                */}
-                <Link
-                  href={appHref(`/applications/${job.id}`)}
-                  onClick={(e) => {
-                    // AT EVERY WIDTH NOW. This used to fall through to
-                    // navigation on a phone, because `/applications/<id>` was
-                    // the mobile record. The record is a bottom sheet below
-                    // 640 instead, so the same click opens the same surface
-                    // everywhere and that route is a redirect.
-                    if (!onOpen) return
-                    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return
-                    e.preventDefault()
-                    onOpen(job)
-                  }}
-                  className="rounded-md hover:text-accent-default focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default"
-                >
-                  {job.company}
-                </Link>
+                {/* `title` because the cell truncates at 24% of the table and a
+                    company name is the one string in the row somebody scans
+                    for -- what the ellipsis hides has to stay readable without
+                    opening the record to find out whose row it is. */}
+                <span title={job.company}>{job.company}</span>
               </TableCell>
               <TableCell label="position" className="max-w-0 truncate text-text-secondary">
                 {job.role}
@@ -221,21 +212,29 @@ export function ApplicationsTable({
               {(onOpen || onDelete) && (
                 <TableCell className="text-right">
                   <div className="flex items-center justify-end gap-1">
-                    {/* VIEW IS A PHONE CONTROL ONLY. On a pointer the company
-                        cell is the affordance and a second one beside delete
-                        is noise; on a stacked card there is no row to click
-                        and the two things you can do to an application are a
-                        pair of thumb targets. `sm:hidden` rather than a
-                        width hook: display:none takes it out of the
-                        accessibility tree too, so a desktop test never finds
-                        two ways to open the same record. */}
+                    {/* VIEW AT EVERY WIDTH (Gabe, 2026-09-13). It used to be
+                        `sm:hidden` -- a phone-only control, because on a
+                        pointer the company cell was the affordance and a
+                        second one beside delete was noise. The company cell is
+                        text now, so this is the only way into the record and
+                        hiding it from a pointer would leave a desktop row with
+                        nothing but `delete`.
+
+                        SECONDARY, NOT PRIMARY. It sits beside a destructive
+                        control; a filled accent button here would make the
+                        pair read as "the current action, and the dangerous
+                        one", when opening a record is neither.
+
+                        THE ACCESSIBLE NAME CARRIES THE ROW, as delete's does:
+                        ten buttons announcing "view" is a list nobody can
+                        navigate, and the label opens with the visible word so
+                        the name still contains it (WCAG 2.5.3). */}
                     {onOpen && (
                       <Button
                         variant="secondary"
                         size="s"
                         aria-label={`View ${job.role} at ${job.company}`}
                         onClick={() => onOpen(job)}
-                        className="sm:hidden"
                       >
                         <EyeIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('none')}`} />
                         view

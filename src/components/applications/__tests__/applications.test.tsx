@@ -62,7 +62,7 @@ describe('opening one application', () => {
     render(<ApplicationsPage jobs={JOBS} />)
     expect(screen.queryByRole('dialog')).toBeNull()
 
-    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    fireEvent.click(screen.getByRole('button', { name: `View ${JOBS[0].role} at Initech` }))
 
     const dialog = await screen.findByRole('dialog')
     // THE HEADING NAMES THE SCREEN, not the row: company, position and status
@@ -78,16 +78,17 @@ describe('opening one application', () => {
     expect(within(dialog).getByLabelText(/^company/)).toHaveValue('Initech')
   })
 
-  it('leaves the row a real link, so cmd-click still opens a new tab', () => {
-    // The interception is on the plain left-click only. Rendering a <button>
-    // here would take away cmd-click, middle-click and "open in new tab" on a
-    // row whose href is a genuine, shareable address.
+  it('leaves the company name as plain text, with no second way into the record', () => {
+    // Gabe, 2026-09-13: "company name must not be clickable". It used to be an
+    // anchor to `/applications/<id>` whose plain left-click was intercepted --
+    // which meant one row carried two affordances of different kinds for the
+    // same destination. The route still redirects for anyone holding the old
+    // address; the row no longer offers it.
     useIsMobileMock.mockReturnValue(false)
     render(<ApplicationsPage jobs={JOBS} />)
-    const link = screen.getByRole('link', { name: 'Initech' })
-    expect(link).toHaveAttribute('href', '/applications/1')
 
-    fireEvent.click(link, { metaKey: true })
+    expect(screen.queryByRole('link', { name: 'Initech' })).toBeNull()
+    expect(screen.getByText('Initech')).toBeTruthy()
     expect(screen.queryByRole('dialog')).toBeNull()
   })
 
@@ -100,22 +101,22 @@ describe('opening one application', () => {
     useIsMobileMock.mockReturnValue(true)
     render(<ApplicationsPage jobs={JOBS} />)
 
-    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    fireEvent.click(screen.getByRole('button', { name: `View ${JOBS[0].role} at Initech` }))
     expect(await screen.findByRole('dialog')).toBeTruthy()
   })
 
-  it('gives a phone its own view button beside delete, and hides it from a pointer', () => {
-    // "CTAs for the mobile must have the view and delete buttons only." On a
-    // stacked card there is no row to click; on a pointer the company cell is
-    // the affordance and a second one beside delete is noise. `sm:hidden`
-    // rather than a width hook, so display:none takes it out of the
-    // accessibility tree too.
+  it('puts view before delete in the actions column, at every width', () => {
+    // It was `sm:hidden` -- a phone-only control, back when the company cell
+    // was the pointer affordance. With that cell now plain text this is the
+    // only way into the record, so hiding it from a pointer would leave a
+    // desktop row offering nothing but `delete`.
     render(<ApplicationsPage jobs={JOBS} onDelete={vi.fn()} />)
-    const view = screen.getByRole('button', {
-      name: `View ${JOBS[0].role} at Initech`,
-    })
-    expect(view.className).toContain('sm:hidden')
-    expect(screen.getByRole('button', { name: `Delete ${JOBS[0].role} at Initech` })).toBeTruthy()
+    const view = screen.getByRole('button', { name: `View ${JOBS[0].role} at Initech` })
+    const remove = screen.getByRole('button', { name: `Delete ${JOBS[0].role} at Initech` })
+
+    expect(view.className).not.toContain('sm:hidden')
+    // View comes FIRST: the safe action leads, the destructive one follows.
+    expect(view.compareDocumentPosition(remove) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     // The edit button that used to sit beside them is gone.
     expect(screen.queryByRole('button', { name: /^edit /i })).toBeNull()
   })
@@ -128,7 +129,7 @@ describe('opening one application', () => {
     const onOpenJobChange = vi.fn()
     render(<ApplicationsPage jobs={JOBS} onOpenJobChange={onOpenJobChange} />)
 
-    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    fireEvent.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     expect(onOpenJobChange).toHaveBeenLastCalledWith(JOBS[0])
 
     await screen.findByRole('dialog')
@@ -143,7 +144,7 @@ describe('opening one application', () => {
     // covers a row deleted in another tab and arriving through a refetch.
     useIsMobileMock.mockReturnValue(false)
     const { rerender } = render(<ApplicationsPage jobs={JOBS} />)
-    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    fireEvent.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     await screen.findByRole('dialog')
 
     rerender(<ApplicationsPage jobs={JOBS.filter((job) => job.id !== '1')} />)
@@ -156,7 +157,7 @@ describe('opening one application', () => {
     // refetched.
     useIsMobileMock.mockReturnValue(false)
     const { rerender } = render(<ApplicationsPage jobs={JOBS} />)
-    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    fireEvent.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     await screen.findByRole('dialog')
 
     rerender(<ApplicationsPage jobs={JOBS.filter((job) => job.id !== '5')} />)
@@ -168,7 +169,7 @@ describe('opening one application', () => {
     // otherwise make a read-only record refuse to close.
     useIsMobileMock.mockReturnValue(false)
     render(<ApplicationsPage jobs={JOBS} />)
-    fireEvent.click(screen.getByRole('link', { name: 'Initech' }))
+    fireEvent.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     await screen.findByRole('dialog')
 
     fireEvent.keyDown(document.activeElement ?? document.body, { key: 'Escape' })
@@ -384,14 +385,14 @@ describe('ApplicationsPage', () => {
     // the record is editable the moment it opens.
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    await user.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     expect(await screen.findByLabelText(/^company/)).toHaveFocus()
   })
 
   it('returns focus to the row that opened the dialog once it closes', async () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} />)
-    const trigger = screen.getByRole('link', { name: 'Initech' })
+    const trigger = screen.getByRole('button', { name: /^View .* at Initech$/ })
     await user.click(trigger)
     expect(await screen.findByLabelText(/^company/)).toHaveFocus()
     await user.keyboard('{Escape}')
@@ -426,7 +427,7 @@ describe('ApplicationsPage', () => {
     // which reads as "it did not save".
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} onUpdate={vi.fn().mockResolvedValue(true)} />)
-    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    await user.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     await screen.findByRole('dialog')
     await user.type(screen.getByLabelText(/^company/), '!')
     await user.click(screen.getByRole('button', { name: /save application/i }))
@@ -439,7 +440,7 @@ describe('ApplicationsPage', () => {
   it('still asks when the save was rejected, because the values are only here', async () => {
     const user = userEvent.setup()
     render(<ApplicationsPage jobs={JOBS} onUpdate={vi.fn().mockResolvedValue(false)} />)
-    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    await user.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     await screen.findByRole('dialog')
     await user.type(screen.getByLabelText(/^company/), '!')
     await user.click(screen.getByRole('button', { name: /save application/i }))
@@ -927,7 +928,8 @@ describe('the open record follows the list', () => {
    */
   const openFirst = async (jobs: Job[]) => {
     const view = render(<ApplicationsPage jobs={jobs} />)
-    await userEvent.click(screen.getByText('Initech'))
+    // The row's `view` button: the company cell is plain text since 2026-09-13.
+    await userEvent.click(screen.getByRole('button', { name: /^View .* at Initech$/ }))
     return view
   }
 

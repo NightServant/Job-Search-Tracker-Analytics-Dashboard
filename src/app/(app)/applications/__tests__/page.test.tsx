@@ -184,9 +184,11 @@ describe('Applications route wrapper', () => {
     const user = userEvent.setup()
     render(<Page />)
 
-    // OPENED FROM THE ROW. The table's `edit` button is gone: the record shows
-    // and edits one surface, so there is no second mode to switch into.
-    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    // OPENED FROM THE ROW'S `view` BUTTON. The table's `edit` button is gone
+    // (the record shows and edits one surface), and since 2026-09-13 the
+    // company cell is plain text rather than a link -- so the actions column
+    // is the only way in.
+    await user.click(screen.getByRole('button', { name: /^View / }))
     // SOMETHING HAS TO CHANGE FIRST. Save is disabled on an untouched record
     // (Gabe, 2026-09-10) -- there is nothing to write, and a live button over
     // a no-op invites the click that teaches you it was one.
@@ -221,7 +223,7 @@ describe('Applications route wrapper', () => {
     const user = userEvent.setup()
     render(<Page />)
 
-    await user.click(screen.getByRole('link', { name: 'Initech' }))
+    await user.click(screen.getByRole('button', { name: /^View / }))
     fireEvent.change(await screen.findByLabelText(/^company/), {
       target: { value: 'Initech Two' },
     })

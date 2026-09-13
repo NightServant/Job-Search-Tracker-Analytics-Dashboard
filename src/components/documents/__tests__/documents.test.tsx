@@ -435,16 +435,20 @@ describe('narrowing and paging the document list', () => {
     hasVersions: false,
   }))
 
-  it('shows one page at a time and pages to the rest', async () => {
+  it('shows five at a time and pages to the rest', async () => {
+    // FIVE, DOWN FROM TEN (Gabe, 2026-09-13). The desktop screen opens with
+    // the template gallery above this list, and ten rows pushed the pager
+    // itself under the fold -- so the control that proves the list continues
+    // was the part you had to scroll to find.
     const user = userEvent.setup()
     render(<DocumentsPage docs={MANY} />)
-    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(10)
-    expect(screen.getByText('1–10 of 11')).toBeTruthy()
+    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(5)
+    expect(screen.getByText('1–5 of 11')).toBeTruthy()
 
     // `role: 'button'` -- `PaginationLink` renders an anchor that carries an
     // explicit button role, which is right for a control that pages in place
     // rather than navigating.
-    await user.click(screen.getByRole('button', { name: '2' }))
+    await user.click(screen.getByRole('button', { name: '3' }))
     expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(1)
     expect(screen.getByText('11–11 of 11')).toBeTruthy()
   })
@@ -453,7 +457,7 @@ describe('narrowing and paging the document list', () => {
     const user = userEvent.setup()
     render(<DocumentsPage docs={MANY} />)
     await chooseOption(user, screen.getByLabelText('Filter documents'), 'LaTeX only')
-    // 0, 3, 6, 9 -- four of the eleven.
+    // 0, 3, 6, 9 -- four of the eleven, which still fits one page of five.
     expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(4)
     expect(screen.getByText('1–4 of 4')).toBeTruthy()
   })
@@ -485,5 +489,50 @@ describe('narrowing and paging the document list', () => {
   it('offers no filter at all on an empty account', () => {
     render(<DocumentsPage docs={[]} />)
     expect(screen.queryByLabelText('Filter documents')).toBeNull()
+  })
+
+  it('finds a document by name, in any word order', () => {
+    // THE CONTROL THIS SCREEN WAS MISSING. The list pages at five, so an
+    // account with twenty CVs reached the one it wanted by turning pages and
+    // reading titles -- and the format filter cannot answer "where is the
+    // Northwind one", because it narrows by KIND.
+    //
+    // Every term must match, in any order: a CV is named after a company as
+    // often as after a role, and nobody remembers which word came first.
+    render(<DocumentsPage docs={MANY} />)
+    const search = screen.getByLabelText('Search documents by name')
+
+    fireEvent.change(search, { target: { value: 'cv 7' } })
+    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(1)
+    expect(screen.getByRole('link', { name: 'CV 7' })).toBeTruthy()
+
+    fireEvent.change(search, { target: { value: '7 cv' } })
+    expect(screen.getByRole('link', { name: 'CV 7' })).toBeTruthy()
+  })
+
+  it('blames the search rather than the format when a query matches nothing', () => {
+    // The old copy named the format whatever had happened, so a query that
+    // matched nothing while the filter said `all` announced "no LaTeX
+    // documents" -- a false claim about the account.
+    render(<DocumentsPage docs={MANY} />)
+    fireEvent.change(screen.getByLabelText('Search documents by name'), {
+      target: { value: 'kubernetes' },
+    })
+    const empty = screen.getByText(/nothing matches/i)
+    expect(empty.textContent).toContain('kubernetes')
+    expect(empty.textContent).not.toMatch(/LaTeX|Word/)
+  })
+
+  it('returns to the first page when the query changes', () => {
+    // Page 3 of "all" may not exist once a search narrows the list; staying
+    // there would strand the reader on an empty page.
+    render(<DocumentsPage docs={MANY} />)
+    fireEvent.click(screen.getByRole('button', { name: '3' }))
+    expect(screen.getByText('11–11 of 11')).toBeTruthy()
+
+    fireEvent.change(screen.getByLabelText('Search documents by name'), {
+      target: { value: 'cv' },
+    })
+    expect(screen.getByText('1–5 of 11')).toBeTruthy()
   })
 })

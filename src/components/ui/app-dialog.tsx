@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
+import type { DialogRootChangeEventReason } from '@base-ui/react/dialog'
 import { icons, type IconName } from '@/components/icons'
 import { cn } from '@/lib/utils'
 
@@ -61,7 +62,18 @@ import { cn } from '@/lib/utils'
  */
 export interface AppDialogProps {
   open: boolean
-  onOpenChange: (open: boolean) => void
+  /**
+   * `reason` IS BASE UI'S OWN, PASSED STRAIGHT THROUGH, and it is here for one
+   * caller: the application record, which reads a posting in a second panel of
+   * this same dialog and has to tell `Escape from the posting` (go back) from
+   * `Escape from the record` (close, after the discard guard). Every other
+   * caller takes one argument and is unaffected.
+   *
+   * Not `event`, not the whole details object: a reason is a string a caller
+   * can compare, and handing out `cancel()` would let a caller keep a dialog
+   * open behind Base UI's back.
+   */
+  onOpenChange: (open: boolean, reason?: DialogRootChangeEventReason) => void
   title: React.ReactNode
   /** A muted glyph before the title, outside its accessible name. */
   icon?: IconName
@@ -72,17 +84,25 @@ export interface AppDialogProps {
   actions?: React.ReactNode
   /**
    * `m` is 480px (the mode chooser); `l` is 720px (the add wizard's first two
-   * steps); `xl` is 1400px -- the whole application record.
+   * steps); `xl` is 1280px -- the whole application record.
    *
-   * `xl` WAS 1040px AND GABE ASKED FOR IT WIDER (2026-09-09, on seeing the
-   * three-column record: "widen the dialog is the solution"). The record's
-   * middle column is a textarea holding a job posting and its third is a
-   * keyword inventory; at 1040 minus gutters that is about 300px each, which
-   * is a column of slivers for the same reason `l` was for two.
+   * 1280 IS THE STANDARD LARGE CONTAINER and that is the argument for it
+   * (Gabe, 2026-09-13: "reduce the overall width of the application dialog,
+   * align to the standard format for large dialogs"). It is Tailwind's
+   * `max-w-7xl`, the width every other wide surface in this app tops out at,
+   * and the point at which a centred dialog stops reading as a page with a
+   * border round it.
    *
-   * `sm:w-[calc(100%-2rem)]` below still caps it at the viewport, so this is a
-   * ceiling rather than a width -- a 1280px laptop gets 1248 and nothing
-   * overflows.
+   * THE ROUTE HERE WAS 1040 -> 1400 -> 1680 -> 1280, and the overshoot is
+   * worth recording because each step was answering a real complaint with the
+   * wrong lever. 1040 gave a three-column record 300px columns; 1400 fixed
+   * that; 1680 was bought to make a two-up FORM legible and to fill a
+   * newspaper-column posting. Both of those are gone -- the form is one column
+   * again and the posting is a document -- so the width they were paying for
+   * went with them.
+   *
+   * IT IS A CEILING, NOT A WIDTH. `sm:w-[calc(100%-2rem)]` below still caps it
+   * at the viewport, so a 1280px laptop gets 1248 and nothing overflows.
    */
   size?: 'm' | 'l' | 'xl'
   /**
@@ -114,7 +134,7 @@ export interface AppDialogProps {
 const MAX_WIDTH = {
   m: 'sm:max-w-[480px]',
   l: 'sm:max-w-[720px]',
-  xl: 'sm:max-w-[1400px]',
+  xl: 'sm:max-w-[1280px]',
 } as const
 
 export function AppDialog({
@@ -132,7 +152,7 @@ export function AppDialog({
 }: AppDialogProps) {
   const Icon = icon ? icons[icon] : null
   return (
-    <Dialog open={open} onOpenChange={(next) => onOpenChange(next)}>
+    <Dialog open={open} onOpenChange={(next, details) => onOpenChange(next, details.reason)}>
       <DialogContent
         className={cn(
           'gap-0 border border-border-subtle bg-bg-canvas p-0 ring-0',
@@ -150,6 +170,15 @@ export function AppDialog({
           'inset-x-0 bottom-0 left-0 top-auto flex max-h-[92dvh] w-full max-w-none translate-x-0 translate-y-0 flex-col overflow-hidden rounded-md rounded-b-none border-b-0',
           // From 640 up it is a centred dialog again, unchanged.
           'sm:inset-x-auto sm:bottom-auto sm:left-1/2 sm:top-1/2 sm:max-h-[85vh] sm:w-[calc(100%-2rem)] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-md sm:border-b',
+          // NINETY-TWO FOR `xl` ONLY, and tied to the size rather than to a
+          // prop because `xl` has exactly one caller: the application record.
+          // Its first column is a form of ten fields, and at 85vh on a 900px
+          // laptop the last two sat under the fold -- so the column Gabe edits
+          // in scrolled while the two beside it had room to spare. The extra
+          // 7vh is about 63px there, which is the two fields. The sheet below
+          // 640 is already 92dvh, so this only brings the desktop into line
+          // with it.
+          size === 'xl' && 'sm:max-h-[92vh]',
           MAX_WIDTH[size]
         )}
       >

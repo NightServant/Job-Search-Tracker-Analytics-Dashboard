@@ -1,15 +1,11 @@
 'use client'
 
 import * as React from 'react'
-import { PanelSection } from '@/components/ui/panel-section'
-import type { Job } from '@/types'
-import { ApplicationPicker } from './ApplicationPicker'
 import { GrammarCheckPane } from './ProofreadPanes'
 import { TailoringAnalysisRail, type CvTailoringState } from './CvTailoring'
 import type { DocumentTabId } from './documentTabs'
 import type { ProofreadState } from './useProofread'
 import type { ThesaurusState } from './useThesaurus'
-import type { TailoringSuggestion } from '@/services/integrations/tailoring'
 
 /**
  * The right rail: whichever pane the left rail has selected.
@@ -20,36 +16,30 @@ import type { TailoringSuggestion } from '@/services/integrations/tailoring'
  * left drives the thing on the right -- the relationship a sighted user reads
  * out of the layout for free.
  *
- * THE PICKER LIVES HERE, ONCE, above the two panes that need it, rather than
- * inside each of them. ATS match and AI tailoring both score this CV against
- * one application; two copies of the control would be two places to change the
- * answer and a question about which one wins. The proofreading panes do not
- * show it at all, because grammar does not depend on where the CV is going.
+ * THE PICKER USED TO BE ASSEMBLED HERE, in a "tailor to" PanelSection of its
+ * own above the analysis. That made the tailoring pane two sections built in
+ * two files, and it made this component the only place that knew which list of
+ * applications the picker should show -- a second list beside the one
+ * `useCvTailoring` was resolving the selection out of. Both moved into
+ * `TailoringAnalysisRail`, which is why the tailor branch below is one line:
+ * the pane switch should choose a pane, not lay one out.
  */
 
 export interface DocumentRailPaneProps {
   active: DocumentTabId
   id?: string
-  jobs: Job[]
-  linkedJobIds?: readonly string[]
   proofread: ProofreadState
   thesaurus?: ThesaurusState
   tailoring: CvTailoringState
-  onApplySuggestion?: (suggestion: TailoringSuggestion) => void
 }
 
 export function DocumentRailPane({
   active,
   id = 'document-rail',
-  jobs,
-  linkedJobIds = [],
   proofread,
   thesaurus,
   tailoring,
-  onApplySuggestion,
 }: DocumentRailPaneProps) {
-  const isTailor = active === 'tailor'
-
   return (
     <div
       id={`${id}-pane`}
@@ -59,40 +49,10 @@ export function DocumentRailPane({
       className="flex flex-col gap-6 focus-visible:outline-none"
       data-document-pane={active}
     >
-      {isTailor && (
-        <PanelSection title="tailor to" icon="Briefcase" className="border-t-0 pt-0">
-          <div className="flex flex-col gap-3">
-            <ApplicationPicker
-              jobs={jobs}
-              linkedJobIds={linkedJobIds}
-              value={tailoring.jobId}
-              onChange={tailoring.setJobId}
-            />
-            {tailoring.selectedJob && !tailoring.selectedJob.description && (
-              // Not an error and not a dead end: the description lives on the
-              // application, and adding it there is what makes this rail, the
-              // ATS panel and the record view all work at once.
-              <p className="text-body-s text-text-muted">
-                that application has no job description saved, so there is nothing to score
-                against. add one on the application.
-              </p>
-            )}
-          </div>
-        </PanelSection>
-      )}
-
       {active === 'grammar' && <GrammarCheckPane state={proofread} thesaurus={thesaurus} />}
 
-      {/* ONE PANE, BOTH HALVES, in the order you use them: the score says
-          what a screener will miss, the rewrites are what to do about it.
-          `emphasis="both"` is the whole point of the merge -- see
-          documentTabs for why two tabs was the wrong shape. */}
-      {isTailor && (
-        <TailoringAnalysisRail
-          state={tailoring}
-          onApply={onApplySuggestion}
-          emphasis="both"
-        />
+      {active === 'tailor' && (
+        <TailoringAnalysisRail state={tailoring} />
       )}
     </div>
   )

@@ -6,6 +6,7 @@ import { Calendar } from '../Calendar'
 import { Agenda } from '../Agenda'
 import { MonthGrid } from '../MonthGrid'
 import { JobFeed } from '../JobFeed'
+import { UpNext } from '../UpNext'
 import { buildMonthGrid } from '@/lib/calendar'
 
 afterEach(() => cleanup())
@@ -300,6 +301,28 @@ describe('the fresh-roles feed', () => {
     const { container } = render(<JobFeed error />)
     expect(container.querySelector('[data-job-feed-state="error"]')).toBeTruthy()
     expect(container.querySelector('[data-job-feed-state="empty"]')).toBeNull()
+  })
+
+  it('gives both rails a real empty state, and keeps the failed read out of it', () => {
+    // Gabe, 2026-09-13: "implement a proper empty state to the two carousel
+    // sections". Both were a loose muted sentence -- which is also the shape
+    // the FAILED read takes, three lines up in the same type. `EmptyState` is
+    // the glyph-over-copy component the rest of the app uses, and its own
+    // docblock forbids using it for an error, so this pins both halves: the
+    // empty rails get one, the error does not.
+    const { container: empty } = render(<JobFeed jobs={[]} />)
+    expect(empty.querySelector('[data-job-feed-state="empty"][data-empty-state]')).toBeTruthy()
+    // No arrows either: two chevrons over nothing are controls for a list that
+    // is not there.
+    expect(empty.querySelector('[data-slot="carousel-previous"]')).toBeNull()
+
+    cleanup()
+    const { container: failed } = render(<JobFeed error />)
+    expect(failed.querySelector('[data-empty-state]')).toBeNull()
+
+    cleanup()
+    const { container: quiet } = render(<UpNext items={[]} />)
+    expect(quiet.querySelector('[data-up-next-empty][data-empty-state]')).toBeTruthy()
   })
 
   it('renders the calendar without a feed at all', () => {

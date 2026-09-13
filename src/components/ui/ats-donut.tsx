@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { cn } from '@/lib/utils'
 import { Label, Pie, PieChart } from 'recharts'
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
 import type { AtsResult } from '@/components/ui/ats-check'
@@ -73,9 +74,61 @@ export interface AtsDonutProps {
   matched: number
   missing: number
   verdict: AtsResult
+  /**
+   * The counts beside the ring. Default true.
+   *
+   * `false` IS FOR A CALLER THAT PLACES THEM ITSELF, and there is one: the
+   * application record's band puts the ring on the left and everything that
+   * reads as words on the right, so the counts belong over there with the
+   * verdict rather than under the picture. `AtsLegend` is exported for exactly
+   * that -- the alternative was a second copy of this markup, which is how two
+   * surfaces start disagreeing about what a slice is called.
+   */
+  legend?: boolean
 }
 
-export function AtsDonut({ score, matched, missing, verdict }: AtsDonutProps) {
+/**
+ * The counts under the ring: matched, missing, and the total they come out of.
+ *
+ * SEPARATE FROM THE CHART so it can be placed apart from it. The slice colours
+ * come from the same `ARC` map the arc is drawn with, so the swatch beside
+ * `matched` is the colour of the arc it names rather than a colour that
+ * happens to look similar.
+ */
+export function AtsLegend({
+  matched,
+  missing,
+  verdict,
+  className,
+}: {
+  matched: number
+  missing: number
+  verdict: AtsResult
+  className?: string
+}) {
+  const total = matched + missing
+  return (
+    // `min-w-0` so a count never widens the track and squeezes the ring.
+    <ul data-ats-legend className={cn('flex min-w-0 flex-col gap-1', className)}>
+      {[
+        { key: 'matched', label: 'matched', count: matched, fill: ARC[verdict] },
+        { key: 'missing', label: 'missing', count: missing, fill: 'var(--color-verdict-track)' },
+      ].map((slice) => (
+        <li key={slice.key} className="flex items-center gap-2 text-body-s">
+          <span aria-hidden className="size-2 shrink-0" style={{ background: slice.fill }} />
+          <span className="min-w-0 flex-1 truncate text-text-secondary">{slice.label}</span>
+          <span className="tabular shrink-0 text-text-primary">{slice.count}</span>
+        </li>
+      ))}
+      <li className="mt-1 flex items-center gap-2 border-t border-border-subtle pt-2 text-body-s">
+        <span className="min-w-0 flex-1 truncate text-text-muted">terms in posting</span>
+        <span className="tabular shrink-0 text-text-muted">{total}</span>
+      </li>
+    </ul>
+  )
+}
+
+export function AtsDonut({ score, matched, missing, verdict, legend = true }: AtsDonutProps) {
   // DRAWN FROM THE COUNTS, not from `score`. The two must agree, and the
   // counts are the thing the lists below are built from -- deriving the arc
   // from the percentage instead would let a rounding difference put a ring at
@@ -88,15 +141,13 @@ export function AtsDonut({ score, matched, missing, verdict }: AtsDonutProps) {
     [matched, missing, verdict]
   )
 
-  const total = matched + missing
-
   return (
     // The container is the OUTER element and the grid is inside it: an
     // element cannot query its own container, so declaring both on one div
     // would resolve `@sm/ats` against some ancestor instead -- silently, and
     // looking correct in whichever layout happened to match.
     <div className="@container/ats">
-     <div className="grid items-center gap-4 @sm/ats:grid-cols-2">
+     <div className={cn('grid items-center gap-4', legend && '@sm/ats:grid-cols-2')}>
       {/* THE NUMBER IN TEXT, not only in the ring.
           The score is drawn as an SVG `<tspan>` inside the chart, which a
           screen reader does not announce and which does not exist at all
@@ -161,20 +212,7 @@ export function AtsDonut({ score, matched, missing, verdict }: AtsDonutProps) {
         </PieChart>
       </ChartContainer>
 
-      {/* `min-w-0` so a count never widens the track and squeezes the ring. */}
-      <ul data-ats-legend className="flex min-w-0 flex-col gap-1">
-        {slices.map((slice) => (
-          <li key={slice.key} className="flex items-center gap-2 text-body-s">
-            <span aria-hidden className="size-2 shrink-0" style={{ background: slice.fill }} />
-            <span className="min-w-0 flex-1 truncate text-text-secondary">{slice.label}</span>
-            <span className="tabular shrink-0 text-text-primary">{slice.count}</span>
-          </li>
-        ))}
-        <li className="mt-1 flex items-center gap-2 border-t border-border-subtle pt-2 text-body-s">
-          <span className="min-w-0 flex-1 truncate text-text-muted">terms in posting</span>
-          <span className="tabular shrink-0 text-text-muted">{total}</span>
-        </li>
-      </ul>
+      {legend && <AtsLegend matched={matched} missing={missing} verdict={verdict} />}
      </div>
     </div>
   )

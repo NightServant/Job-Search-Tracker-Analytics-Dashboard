@@ -4,6 +4,8 @@ import * as React from 'react'
 import Link from 'next/link'
 
 import { cn } from '@/lib/utils'
+import { CardDescription, CardTitle } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   Carousel,
   CarouselContent,
@@ -11,7 +13,6 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel'
-import { ClockIcon } from '@/components/icons'
 import { ICON_MOTION_GROUP } from '@/components/icons/motion'
 import { useAppHref } from '@/components/shell/routeBase'
 import { QUIET_AFTER_DAYS, type UpNextItem } from '@/lib/upNext'
@@ -75,15 +76,23 @@ export function UpNext({ items = [], className }: UpNextProps) {
         opts={{ align: 'start', dragFree: true, containScroll: 'trimSnaps' }}
         className="flex flex-col gap-3"
       >
+        {/* THE SAME TITLE AND SUBTITLE AS `fresh remote roles` BELOW IT (Gabe,
+            2026-09-13: "match the 'up next' title and description typography to
+            fresh remote jobs"). These were hand-set here -- `text-heading-s`
+            over `text-body-s text-text-muted` -- while the roles band used
+            `CardTitle` / `CardDescription`, so two sibling bands on one screen
+            announced themselves at two different weights and sizes. Borrowing
+            the components rather than copying their classes is what keeps them
+            matched the next time either one moves; `CardTitle` and
+            `CardDescription` are plain styled boxes with no Card required. */}
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-col gap-1">
-            <h2 className="flex items-center gap-2 text-heading-s text-text-primary">
-              <ClockIcon size={16} aria-hidden className="shrink-0 text-text-muted" />
-              up next
-            </h2>
-            <p className="text-body-s text-text-muted">
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <CardTitle icon="Clock">
+              <h2>up next</h2>
+            </CardTitle>
+            <CardDescription>
               what is booked, and what has gone quiet for more than {QUIET_AFTER_DAYS} days.
-            </p>
+            </CardDescription>
           </div>
           {items.length > 0 && (
             <div className="flex shrink-0 items-center gap-2">
@@ -95,13 +104,20 @@ export function UpNext({ items = [], className }: UpNextProps) {
 
         {/* AN EMPTY ACCOUNT IS A REAL STATE AND IT IS GOOD NEWS. Nothing booked
             and nothing overdue is the state somebody wants to be in, so it
-            gets a sentence rather than an apology or an invented placeholder
-            card. */}
+            says so rather than apologising or inventing a placeholder card.
+
+            IT IS `EmptyState` NOW, not a loose muted sentence (Gabe,
+            2026-09-13). One line of grey type under a heading is the shape a
+            FAILED read takes as well, so the rail's best state and its worst
+            one rendered identically -- the exact confusion `EmptyState` was
+            built to end. The glyph gives the eye something to land on in a
+            band that is otherwise 120px of nothing. `py-10`, half its default:
+            this is one band on a page, not the whole screen. */}
         {items.length === 0 ? (
-          <p className="text-body-s text-text-muted" data-up-next-empty>
+          <EmptyState icon="Calendar" className="py-10" data-up-next-empty>
             nothing booked, and nothing waiting longer than {QUIET_AFTER_DAYS} days. the month
             below is clear.
-          </p>
+          </EmptyState>
         ) : (
           <CarouselContent className="-ml-4">
             {items.map((item) => {

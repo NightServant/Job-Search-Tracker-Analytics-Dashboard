@@ -91,11 +91,36 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
   )
 }
 
+/**
+ * `[&[inert]]:hidden` IS LOAD-BEARING AND IT WAS MISSING.
+ *
+ * Base UI keeps every panel MOUNTED and marks the ones that are not current
+ * with `inert` (plus `data-ending-style` while it waits for an exit
+ * transition). It does not set `hidden` and it does not set `display: none` --
+ * hiding the inactive panel is the stylesheet's job, and this vendored copy
+ * never did it.
+ *
+ * Nothing caught it for two reasons. In jsdom `getAllByRole('tabpanel')`
+ * returns one, because `inert` takes the other out of the accessibility tree --
+ * so every test agreed there was one panel while the browser painted two. And
+ * the two surfaces already using this (the CV editor's compact sheet, Settings)
+ * stack short panels, where two visible at once reads as a long page rather
+ * than as a broken tab.
+ *
+ * It surfaced on the application record, where the panels are a job advert and
+ * an ATS report: both drew at once, and each got `flex-1` of the frame, so the
+ * one you chose was half the height it should have been. Found 2026-09-13 by
+ * measuring the panel and finding 273px inside a 609px parent.
+ *
+ * `inert` RATHER THAN `data-ending-style`, because ending-style is only set
+ * during the exit transition; `inert` is on the panel for as long as it is not
+ * the current one, which is exactly the condition being styled.
+ */
 function TabsContent({ className, ...props }: TabsPrimitive.Panel.Props) {
   return (
     <TabsPrimitive.Panel
       data-slot="tabs-content"
-      className={cn("flex-1 text-sm outline-none", className)}
+      className={cn("flex-1 text-sm outline-none [&[inert]]:hidden", className)}
       {...props}
     />
   )
