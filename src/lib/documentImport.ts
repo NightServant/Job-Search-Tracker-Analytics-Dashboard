@@ -162,9 +162,10 @@ export async function importDocument(file: File): Promise<ImportedDocument> {
 
   const text = await readText(file)
 
-  if (extension === '.tex') {
-    return { mode: 'latex', title, content: { type: 'latex', source: text } as ResumeContent }
-  }
+  // `.tex` STILL IMPORTS, as text. The LaTeX editor is gone (2026-09-13), so
+  // there is nothing to hand source to -- but refusing the extension outright
+  // would turn "we dropped an editor" into "your file is not supported", and
+  // the text of a CV is still the useful half of a .tex file.
 
   return { mode: 'word', title, content: textToWordContent(text) }
 }

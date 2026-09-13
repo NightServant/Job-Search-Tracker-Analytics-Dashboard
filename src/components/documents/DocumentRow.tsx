@@ -20,7 +20,6 @@ import type { ResumeSummary } from '@/services/resumeService'
 
 const MODE_LABELS: Record<ResumeSummary['mode'], string> = {
   word: 'Word',
-  latex: 'LaTeX',
 }
 
 /**

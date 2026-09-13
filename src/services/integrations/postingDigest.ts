@@ -87,8 +87,13 @@ function normalise(text: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9+#.\s]/g, ' ')
     // Protect an internal dot, drop every other one, then restore.
+    /* NUL is the sentinel on purpose: the one character a job posting cannot
+       contain, which is what makes it safe to park an intra-word dot on while
+       every other dot is spaced out. */
+    // eslint-disable-next-line no-control-regex
     .replace(/([a-z0-9])\.(?=[a-z0-9])/g, '$1\u0000')
     .replace(/\./g, ' ')
+    // eslint-disable-next-line no-control-regex
     .replace(/\u0000/g, '.')
     .replace(/\s+/g, ' ')
     .trim()

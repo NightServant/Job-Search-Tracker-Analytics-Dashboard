@@ -10,7 +10,6 @@ import type { IntegrationConfig } from '../config'
 
 function configWith(tailoring: Partial<IntegrationConfig['tailoring']> = {}): IntegrationConfig {
   return {
-    formatex: { baseUrl: 'https://formatex.test/api/v1' },
     tailoring: {
       baseUrl: 'https://llm.test/v1',
       apiKey: 'k',

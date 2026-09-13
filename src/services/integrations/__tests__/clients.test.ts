@@ -1,16 +1,13 @@
 import { describe, it, expect, vi } from 'vitest'
 import {
-  readIntegrationConfig,
   capabilitiesOf,
   configProblems,
   type IntegrationConfig,
 } from '../config'
-import { compileLatex } from '../formatex'
 import { parseTailoringReply, tailorCv } from '../tailoring'
 
 function configWith(overrides: Partial<IntegrationConfig> = {}): IntegrationConfig {
   return {
-    formatex: { baseUrl: 'https://formatex.test/api/v1' },
     tailoring: { model: '' },
     esco: { baseUrl: 'https://esco.test/api', enabled: true },
     ...overrides,
@@ -23,7 +20,6 @@ describe('what this deployment can do', () => {
     // documented fallback rather than throwing, so this is the normal case
     // and not an error one.
     const caps = capabilitiesOf(configWith())
-    expect(caps.compileLatex).toBe(false)
     expect(caps.tailorCv).toBe(false)
     // ESCO needs no key at all, so it is on unless explicitly disabled.
     expect(caps.expandSkills).toBe(true)
@@ -86,74 +82,6 @@ describe('what this deployment can do', () => {
   it('defaults FormaTeX to the base URL that was actually probed', () => {
     // `/api/v1` is not a guess: POST /api/v1/compile answered 401 while
     // /v1/compile answered 404, which is how the path was established.
-    expect(readIntegrationConfig().formatex.baseUrl).toBe('https://api.formatex.io/api/v1')
-  })
-})
-
-describe('compiling LaTeX', () => {
-  it('says it is not configured, rather than failing at the request', () => {
-    // "Add a key" and "fix line 42" are different problems and must not share
-    // a message. `unconfigured` is its own reason for exactly that.
-    return expect(compileLatex({ latex: 'x' }, { config: configWith() })).resolves.toMatchObject({
-      ok: false,
-      reason: 'unconfigured',
-    })
-  })
-
-  it('sends the key in the header the service actually reads', async () => {
-    // `X-API-Key` was confirmed by the error changing from "missing API key"
-    // to "invalid API key" when it was supplied -- not by reading docs, which
-    // 404. If this header is renamed, every compile 401s.
-    const fetchImpl = vi.fn().mockResolvedValue({
-      ok: true,
-      status: 200,
-      blob: async () => new Blob(['%PDF']),
-    }) as unknown as typeof fetch
-    const config = configWith({ formatex: { baseUrl: 'https://formatex.test/api/v1', apiKey: 'secret' } })
-
-    await compileLatex({ latex: '\\documentclass{article}' }, { config, fetchImpl })
-
-    const [url, init] = (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(url).toBe('https://formatex.test/api/v1/compile')
-    expect((init.headers as Record<string, string>)['X-API-Key']).toBe('secret')
-  })
-
-  it('passes the TeX log through instead of replacing it', async () => {
-    // The log is the only useful thing to show someone whose document did not
-    // build. A generic "compilation failed" throws away the line number.
-    const fetchImpl = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 422,
-      text: async () => '! Undefined control sequence. l.42 \\badmacro',
-    }) as unknown as typeof fetch
-    const config = configWith({ formatex: { baseUrl: 'https://formatex.test/api/v1', apiKey: 'k' } })
-
-    const result = await compileLatex({ latex: 'x' }, { config, fetchImpl })
-    expect(result).toMatchObject({ ok: false, reason: 'compile' })
-    expect(result.ok === false && result.message).toContain('l.42')
-  })
-
-  it('tells a bad key apart from a broken document', async () => {
-    const fetchImpl = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 401,
-      text: async () => 'nope',
-    }) as unknown as typeof fetch
-    const config = configWith({ formatex: { baseUrl: 'https://formatex.test/api/v1', apiKey: 'k' } })
-    await expect(compileLatex({ latex: 'x' }, { config, fetchImpl })).resolves.toMatchObject({
-      reason: 'auth',
-    })
-  })
-
-  it('never rejects, whatever the network does', async () => {
-    // It sits behind a button with a spinner. A rejected promise there is an
-    // unhandled rejection and a control stuck on "exporting".
-    const fetchImpl = vi.fn().mockRejectedValue(new Error('boom')) as unknown as typeof fetch
-    const config = configWith({ formatex: { baseUrl: 'https://formatex.test/api/v1', apiKey: 'k' } })
-    await expect(compileLatex({ latex: 'x' }, { config, fetchImpl })).resolves.toMatchObject({
-      ok: false,
-      reason: 'network',
-    })
   })
 })
 

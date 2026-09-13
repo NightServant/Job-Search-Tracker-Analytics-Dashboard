@@ -238,7 +238,7 @@ function buildResumes(now: Date): ResumeSummary[] {
   const cv = (
     id: string,
     title: string,
-    mode: 'word' | 'latex',
+    mode: 'word',
     daysAgo: number,
     version: number
   ): ResumeSummary => ({
@@ -262,10 +262,10 @@ function buildResumes(now: Date): ResumeSummary[] {
     cv('demo-cv-backend', 'Backend Engineer CV', 'word', 24, 1),
     cv('demo-cv-junior', 'Junior Developer CV', 'word', 33, 1),
     cv('demo-cv-ats', 'ATS-safe plain CV', 'word', 41, 2),
-    cv('demo-cv-latex', 'Software Engineer CV (LaTeX)', 'latex', 21, 2),
-    cv('demo-cv-latex-academic', 'Academic CV (LaTeX)', 'latex', 29, 3),
-    cv('demo-cv-latex-compact', 'Compact one-page CV (LaTeX)', 'latex', 47, 1),
-    cv('demo-cv-latex-halcyon', 'Frontend Engineer — Halcyon (LaTeX)', 'latex', 55, 2),
+    cv('demo-cv-engineer', 'Software Engineer CV', 'word', 21, 2),
+    cv('demo-cv-academic', 'Academic CV', 'word', 29, 3),
+    cv('demo-cv-compact', 'Compact one-page CV', 'word', 47, 1),
+    cv('demo-cv-halcyon', 'Frontend Engineer — Halcyon', 'word', 55, 2),
   ]
 }
 

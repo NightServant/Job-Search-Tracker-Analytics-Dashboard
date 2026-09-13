@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { DocumentsPage } from '../DocumentsPage'
 import { TemplatesScreen } from '../TemplatesScreen'
 import { DocumentsNotice } from '../DocumentsNotice'
@@ -41,7 +41,7 @@ const DOCS: ResumeSummary[] = [
   {
     id: 'l1',
     title: 'LaTeX CV',
-    mode: 'latex',
+    mode: 'word',
     updated_at: new Date().toISOString(),
     sections: null,
     version: 1,
@@ -73,21 +73,6 @@ describe('documents below lg', () => {
     expect(cta).toHaveAttribute('href', '/documents/templates')
   })
 
-  it('lists a LaTeX CV but refuses to open it', () => {
-    // Gabe, 2026-09-06: the row SHOWS, and says it cannot be opened. Hiding it
-    // would read as data loss to the one person who knows it exists.
-    const { container } = render(<DocumentsPage docs={DOCS} />)
-    const rows = [...container.querySelectorAll('[data-document-row]')]
-    const latex = rows.find((r) => within(r as HTMLElement).queryByText('LaTeX CV'))!
-    expect(latex.querySelector('[data-document-unavailable]')).not.toBeNull()
-    expect(latex.querySelector('a[href*="/cv?draft="]')).toBeNull()
-    expect(within(latex as HTMLElement).getByText(/larger screen/i)).toBeInTheDocument()
-
-    // Positive companion: the Word row beside it is still a working link, so
-    // the absence above is about LaTeX and not about a broken list.
-    const word = rows.find((r) => within(r as HTMLElement).queryByText('Word CV'))!
-    expect(word.querySelector('a[href*="/cv?draft="]')).not.toBeNull()
-  })
 })
 
 describe('documents at desktop', () => {

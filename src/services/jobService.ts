@@ -8,6 +8,15 @@ import {
   JobStatusHistoryEntry,
 } from '@/types'
 import { assertJobFormDataValid, jobValidation } from './jobValidation'
+import type { ValidationError, ValidationFailure } from './jobValidation'
+
+/**
+ * The bulk insert's own failure shape: which ROW failed as well as why, since
+ * one bad line in an import should name itself rather than the whole file.
+ */
+type BulkValidationFailure = Error & {
+  validationErrors: Array<{ index: number; errors: ValidationError[] }>
+}
 
 export const jobService = {
   // Convert Supabase/Postgrest error-like objects into standard Error
@@ -16,7 +25,7 @@ export const jobService = {
     if (err instanceof Error) return err
     try {
       // Supabase/Postgrest errors usually have a `message` property
-      const anyErr = err as any
+      const anyErr = err as { message?: unknown; details?: unknown }
       if (typeof anyErr.message === 'string' && anyErr.message.length > 0) {
         return new Error(anyErr.message)
       }
@@ -118,7 +127,7 @@ export const jobService = {
     if (!user) throw new Error('Not authenticated')
 
     // Validate all jobs before bulk insert
-    const validationErrors: Array<{ index: number; errors: any[] }> = []
+    const validationErrors: Array<{ index: number; errors: ValidationError[] }> = []
     jobDatas.forEach((jobData, idx) => {
       const errors = jobValidation.validateJobFormData(jobData)
       if (errors.length > 0) {
@@ -128,9 +137,9 @@ export const jobService = {
 
     if (validationErrors.length > 0) {
       const message = validationErrors
-        .map((e) => `Row ${e.index + 1}: ${e.errors.map((err: any) => `${err.field}: ${err.message}`).join('; ')}`).join('\n')
+        .map((e) => `Row ${e.index + 1}: ${e.errors.map((err) => `${err.field}: ${err.message}`).join('; ')}`).join('\n')
       const error = new Error(`Validation errors in bulk insert:\n${message}`)
-      ;(error as any).validationErrors = validationErrors
+      ;(error as BulkValidationFailure).validationErrors = validationErrors
       throw error
     }
 
@@ -170,7 +179,7 @@ export const jobService = {
       if (relevantErrors.length > 0) {
         const message = relevantErrors.map((e) => `${e.field}: ${e.message}`).join('; ')
         const error = new Error(message)
-        ;(error as any).validationErrors = relevantErrors
+        ;(error as ValidationFailure).validationErrors = relevantErrors
         throw error
       }
     }
@@ -280,7 +289,7 @@ export const jobService = {
 
     if (jobsErr) throw this._toError(jobsErr)
 
-    const ids = (jobs || []).map((j: any) => j.id)
+    const ids = (jobs || []).map((j: { id: string }) => j.id)
 
     if (ids.length === 0) return []
 

@@ -47,11 +47,9 @@ describe('the demo fixture as a dataset', () => {
     }
   })
 
-  it('gives Documents two CVs with history, one per editor', () => {
+  it('gives Documents more than one CV, and history on at least one', () => {
     expect(DEMO.resumes.length).toBeGreaterThanOrEqual(2)
-    const modes = new Set(DEMO.resumes.map((r) => r.mode))
-    expect(modes).toContain('word')
-    expect(modes).toContain('latex')
+    expect(new Set(DEMO.resumes.map((r) => r.mode))).toEqual(new Set(['word']))
     expect(DEMO.resumes.some((r) => r.hasVersions)).toBe(true)
   })
 

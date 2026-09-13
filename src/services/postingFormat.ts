@@ -45,7 +45,11 @@ const DECORATIVE_RULE = /^[\s]*[=~*_·—–-]{3,}[\s]*$/
 
 /** Emoji and symbol decoration, at either end of a line. */
 const EMOJI = '[\\u{1F300}-\\u{1FAFF}\\u{2600}-\\u{27BF}\\u{FE0F}\\u{2B00}-\\u{2BFF}]'
+/* The class is a set of RANGES, not combined characters. The rule cannot see
+   that through the interpolation and flags the variation selector in EMOJI. */
+// eslint-disable-next-line no-misleading-character-class
 const LEADING_DECORATION = new RegExp(`^[\\s]*(?:${EMOJI}+[\\s]*)+`, 'u')
+// eslint-disable-next-line no-misleading-character-class
 const TRAILING_DECORATION = new RegExp(`(?:[\\s]*${EMOJI}+)+[\\s]*$`, 'u')
 
 /**
@@ -91,7 +95,7 @@ function collapseWhitespace(text: string): string {
     text
       .replace(/\r\n?/g, '\n')
       // Non-breaking and zero-width space, both common in scraped markup.
-      .replace(/[ ​]/g, ' ')
+      .replace(/[\u00a0\u200b]/g, ' ')
       .replace(/[ \t]+/g, ' ')
       .replace(/ *\n */g, '\n')
       // `word ,word` and `word :` -- an artefact of pulling text out of

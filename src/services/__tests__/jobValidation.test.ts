@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { jobValidation, assertJobFormDataValid } from '../jobValidation'
+import type { ValidationFailure } from '../jobValidation'
 import type { JobFormData } from '@/types'
 
 describe('jobValidation', () => {
@@ -111,7 +112,7 @@ describe('jobValidation', () => {
     })
 
     it('rejects invalid work mode', () => {
-      const error = jobValidation.validateWorkMode('flexible' as any)
+      const error = jobValidation.validateWorkMode('flexible' as JobFormData['work_mode'])
       expect(error).not.toBeNull()
       expect(error?.field).toBe('work_mode')
     })
@@ -318,7 +319,7 @@ describe('jobValidation', () => {
         company: 'Google',
         role: 'Software Engineer',
         status: 'applied',
-        work_mode: 'flexible' as any,
+        work_mode: 'flexible' as JobFormData['work_mode'],
       }
 
       const errors = jobValidation.validateJobFormData(data)
@@ -347,9 +348,10 @@ describe('jobValidation', () => {
       try {
         assertJobFormDataValid(data)
         expect.fail('Should have thrown')
-      } catch (err: any) {
-        expect(err.validationErrors).toBeDefined()
-        expect(Array.isArray(err.validationErrors)).toBe(true)
+      } catch (err) {
+        const failure = err as ValidationFailure
+        expect(failure.validationErrors).toBeDefined()
+        expect(Array.isArray(failure.validationErrors)).toBe(true)
       }
     })
 

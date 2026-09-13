@@ -9,6 +9,7 @@ import {
 import { mergeSecurityHeaders } from '../_shared/edgeHeaders.ts'
 import { createClient } from 'npm:@supabase/supabase-js@2'
 import { generateHTML } from 'npm:@tiptap/html@3.22.5'
+import type { JSONContent } from 'npm:@tiptap/core@3.22.5'
 import StarterKit from 'npm:@tiptap/starter-kit@3.22.5'
 import puppeteer from 'npm:puppeteer-core@23.11.1'
 import chromium from 'npm:@sparticuz/chromium@132.0.0'
@@ -202,7 +203,9 @@ Deno.serve(async (req: Request) => {
       return jsonResponse({ error: 'content JSON is required' }, 400)
     }
 
-    const htmlContent = generateHTML(payload.content as any, [StarterKit])
+    // The Tiptap document, whose node types this function does not model --
+    // it renders whatever the editor saved rather than validating it.
+    const htmlContent = generateHTML(payload.content as JSONContent, [StarterKit])
     const fullHtml = renderResumeHtml(htmlContent, title)
 
     const executablePath = await chromium.executablePath()

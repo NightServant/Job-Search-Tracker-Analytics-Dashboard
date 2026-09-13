@@ -211,7 +211,7 @@ export const SOLUTION: { heading: string; lede: string; claims: ValueClaim[] } =
       title: 'the cv editor',
       icon: 'Documents',
       body:
-        'Word-style and LaTeX editors with version snapshots, plus an ATS check that reads ' +
+        'A Word-style editor with version snapshots, plus an ATS check that reads ' +
         'the document rather than guessing at it.',
     },
   ],

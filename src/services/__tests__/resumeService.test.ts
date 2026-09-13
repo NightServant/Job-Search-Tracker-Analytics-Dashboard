@@ -79,16 +79,18 @@ describe('resumeService.list', () => {
     expect(doc.hasVersions).toBe(true)
   })
 
-  it('reads latex mode through and settles every other value on word', async () => {
+  it('settles every stored mode on word, including the retired latex one', async () => {
     const { client } = fakeClient({
       data: [
-        { ...ROW, id: 'a', mode: 'latex', resume_snapshots: [] },
+        { ...ROW, id: 'a', mode: 'word', resume_snapshots: [] },
         { ...ROW, id: 'b', mode: null, resume_snapshots: [] },
         { ...ROW, id: 'c', mode: 'structured', resume_snapshots: [] },
       ],
       error: null,
     })
-    expect((await resumeService.list(client)).map((d) => d.mode)).toEqual(['latex', 'word', 'word'])
+    // One editor since 2026-09-13. A row written before that still says
+    // `latex`; it opens in the only editor there is rather than nowhere.
+    expect((await resumeService.list(client)).map((d) => d.mode)).toEqual(['word', 'word', 'word'])
   })
 
   it('names an untitled CV rather than rendering an empty row', async () => {
@@ -123,11 +125,14 @@ describe('resumeService.get', () => {
   })
 
   it('carries the stored content through untouched for the editor to normalize', async () => {
+    // Content is passed through verbatim -- including the shape a retired
+    // editor wrote -- because normalising it is the editor's job, not the
+    // service's.
     const content = { type: 'latex', source: '\\documentclass{article}' }
-    const { client } = fakeClient({ data: { ...ROW, mode: 'latex', content }, error: null })
+    const { client } = fakeClient({ data: { ...ROW, mode: 'word', content }, error: null })
     const draft = await resumeService.get(client, 'cv-1')
     expect(draft?.content).toEqual(content)
-    expect(draft?.mode).toBe('latex')
+    expect(draft?.mode).toBe('word')
   })
 })
 

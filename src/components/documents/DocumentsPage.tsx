@@ -10,7 +10,6 @@ import { IconButton } from '@/components/ui/icon-button'
 import { PlusIcon, TrashIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Select } from '@/components/ui/select'
 import {
   Pagination,
   PaginationContent,
@@ -19,7 +18,6 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from '@/components/ui/pagination'
-import { ModeChooser } from '@/components/cv/ModeChooser'
 import { DocumentRow, DOCUMENT_GRID } from './DocumentRow'
 import { TemplateGallery, type TemplateChoice } from './TemplateGallery'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
@@ -46,13 +44,6 @@ export const NEW_CV_HREF = '/cv?draft=new'
  * `DocumentRow` already labels every row with one. So the filter is a closed
  * set rather than a search over a free-text field.
  */
-const DOC_FILTERS = [
-  { value: 'all', label: 'all documents' },
-  { value: 'word', label: 'Word only' },
-  { value: 'latex', label: 'LaTeX only' },
-] as const
-
-type DocFilter = (typeof DOC_FILTERS)[number]['value']
 
 /**
  * Five a page, and only where there is a pager to turn (Gabe, 2026-09-13:
@@ -111,8 +102,8 @@ export interface DocumentsPageProps {
   versions?: VersionEntry[]
   versionsLoading?: boolean
   versionsError?: boolean
-  /** Fires once a mode is chosen in the New CV dialog; the caller owns the write and the navigation. */
-  onCreateDraft?: (mode: 'word' | 'latex') => void
+  /** Fires when a blank CV is asked for; the caller owns the write and the navigation. */
+  onCreateDraft?: () => void
   /** Fires when a template card is picked. A null template means a blank document. */
   onChooseTemplate?: (choice: TemplateChoice) => void
   /** Fires with the picked file; the caller parses it and owns the write. */
@@ -144,18 +135,15 @@ export function DocumentsPage({
   const compact = useBelowDesktop()
   const appHref = useAppHref()
   const openDoc = docs.find((doc) => doc.id === openVersionsFor) ?? null
-  const [newCvOpen, setNewCvOpen] = React.useState(false)
   const fileInput = React.useRef<HTMLInputElement>(null)
   const hasDocs = docs.length > 0
 
-  const [filter, setFilter] = React.useState<DocFilter>('all')
   const [query, setQuery] = React.useState('')
   const [page, setPage] = React.useState(1)
 
   /**
    * SEARCH BY NAME, and it is the control this screen was missing: the list
    * pages at five, so an account with twenty CVs reached the one it wanted by
-   * turning pages and reading titles. A format filter narrows by KIND; it
    * cannot answer "where is the Northwind one".
    *
    * EVERY TERM MUST MATCH, in any order -- `engineer north` finds "Software
@@ -169,13 +157,12 @@ export function DocumentsPage({
     [query]
   )
   const filtered = React.useMemo(() => {
-    const byMode = filter === 'all' ? docs : docs.filter((doc) => doc.mode === filter)
-    if (terms.length === 0) return byMode
-    return byMode.filter((doc) => {
+    if (terms.length === 0) return docs
+    return docs.filter((doc) => {
       const title = doc.title.toLowerCase()
       return terms.every((term) => title.includes(term))
     })
-  }, [docs, filter, terms])
+  }, [docs, terms])
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   // CLAMPED, NOT STORED. Deleting the last row of page 3, or narrowing to
   // LaTeX when only page 1 has any, would otherwise strand the reader on an
@@ -190,7 +177,7 @@ export function DocumentsPage({
   // is meaningless afterwards.
   React.useEffect(() => {
     setPage(1)
-  }, [filter, query])
+  }, [query])
 
   // ONE CTA, TWO BEHAVIOURS. Below `lg` it is a link to the Templates page;
   // on desktop it opens the mode chooser exactly as before. A link and a
@@ -210,7 +197,7 @@ export function DocumentsPage({
       new CV
     </Link>
   ) : (
-    <Button size="s" onClick={() => setNewCvOpen(true)}>
+    <Button size="s" disabled={creatingDraft} onClick={() => onCreateDraft?.()}>
       <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
       new CV
     </Button>
@@ -317,19 +304,6 @@ export function DocumentsPage({
                   onChange={(event) => setQuery(event.target.value)}
                 />
               </div>
-              {/* Width on a wrapper, not on the Select: `Select`'s own root is
-                  `w-full` and only its trigger takes `className`. Same trap the
-                  calendar's country picker hit. */}
-              <div className="w-44 max-sm:w-full">
-                <Select
-                  id="document-filter"
-                  icon="Documents"
-                  aria-label="Filter documents"
-                  value={filter}
-                  onValueChange={(next) => setFilter(next as DocFilter)}
-                  items={DOC_FILTERS.map((option) => ({ ...option }))}
-                />
-              </div>
             </div>
           )}
         </div>
@@ -363,11 +337,6 @@ export function DocumentsPage({
               <DocumentRow
                 key={doc.id}
                 doc={doc}
-                unavailable={
-                  compact && doc.mode === 'latex'
-                    ? 'LaTeX — opens on a larger screen'
-                    : undefined
-                }
                 onOpenVersions={() => onToggleVersions?.(doc)}
                 // The same verb, twice, for two surfaces: `onDelete` builds
                 // the compact row's overflow menu item, `actions` fills the
@@ -395,18 +364,7 @@ export function DocumentsPage({
               // which is a false claim about the account. The search is
               // reported first because it is the one the reader just typed.
               <p className="py-8 text-body-m text-text-muted" data-documents-filter-empty>
-                {terms.length > 0 ? (
-                  <>
-                    nothing matches “{query.trim()}”
-                    {filter === 'all' ? '' : filter === 'word' ? ' in Word documents' : ' in LaTeX documents'}.
-                  </>
-                ) : (
-                  <>
-                    no {filter === 'word' ? 'Word' : 'LaTeX'} documents. there
-                    {docs.length === 1 ? ' is ' : ' are '}
-                    {docs.length} in the other format.
-                  </>
-                )}
+                nothing matches “{query.trim()}”.
               </p>
             )}
 
@@ -520,9 +478,6 @@ export function DocumentsPage({
         )}
       </AppDialog>
 
-      <AppDialog open={newCvOpen} onOpenChange={setNewCvOpen} title="new CV" icon="Documents">
-        <ModeChooser creating={creatingDraft} onChoose={(mode) => onCreateDraft?.(mode)} />
-      </AppDialog>
     </div>
   )
 }

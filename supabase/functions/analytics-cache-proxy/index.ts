@@ -19,8 +19,30 @@ function jsonResponse(body: unknown, status = 200, cacheControl?: string) {
   return new Response(JSON.stringify(body), { status, headers })
 }
 
+/**
+ * The shapes this function actually reads, rather than the Supabase client's
+ * full generated types -- which live in the app package and are not importable
+ * from an edge function. Each is the exact `select` list above it, so a column
+ * added to a query without being added here is a compile error, not a silent
+ * `undefined`.
+ */
+type QueryResult<T> = Promise<{ data: T[] | null; error: unknown }>
+type SupabaseLike = {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (column: string, value: string) => QueryResult<Record<string, string>>
+    } & QueryResult<Record<string, string>>
+  }
+}
+
+type StatusChange = { job_id: string; from_status: string; to_status: string; changed_at: string }
+type JobRow = { id: string; status: string; source?: string; created_at: string; date_applied?: string }
+
+type TrendBucket = { applied: number; interviewing: number; offer: number; rejected: number; total: number }
+type CohortBucket = { applied: number; interviewing: number; offered: number; rejected: number; timeToOffers: number[] }
+
 // Compute analytics by querying Supabase directly
-async function computeTimeInStage(supabase: any, userId: string) {
+async function computeTimeInStage(supabase: SupabaseLike, userId: string) {
   const { data: statusHistory, error } = await supabase
     .from('job_status_history')
     .select('*')
@@ -34,7 +56,7 @@ async function computeTimeInStage(supabase: any, userId: string) {
   for (const change of statusHistory) {
     const fromTime = new Date(change.changed_at)
     const nextChange = statusHistory.find(
-      (h: any) => h.job_id === change.job_id && h.from_status === change.to_status && new Date(h.changed_at) > fromTime
+      (h: StatusChange) => h.job_id === change.job_id && h.from_status === change.to_status && new Date(h.changed_at) > fromTime
     )
     const toTime = nextChange ? new Date(nextChange.changed_at) : new Date()
     const daysInStatus = (toTime.getTime() - fromTime.getTime()) / (1000 * 60 * 60 * 24)
@@ -61,16 +83,16 @@ async function computeTimeInStage(supabase: any, userId: string) {
   return metrics
 }
 
-async function computeConversionFunnel(supabase: any, userId: string) {
+async function computeConversionFunnel(supabase: SupabaseLike, userId: string) {
   const { data: jobs, error } = await supabase.from('jobs').select('id, status').eq('user_id', userId)
   if (error || !jobs) return null
 
   const jobList = jobs
   const totalJobs = jobList.length
   const stageCounts = {
-    applied: jobList.filter((j: any) => j.status !== 'wishlist').length,
-    interviewing: jobList.filter((j: any) => j.status === 'interviewing').length,
-    offer: jobList.filter((j: any) => j.status === 'offer').length,
+    applied: jobList.filter((j: JobRow) => j.status !== 'wishlist').length,
+    interviewing: jobList.filter((j: JobRow) => j.status === 'interviewing').length,
+    offer: jobList.filter((j: JobRow) => j.status === 'offer').length,
   }
 
   return [
@@ -80,11 +102,11 @@ async function computeConversionFunnel(supabase: any, userId: string) {
   ]
 }
 
-async function computeSourceConversionTrends(supabase: any, userId: string) {
+async function computeSourceConversionTrends(supabase: SupabaseLike, userId: string) {
   const { data: jobs, error } = await supabase.from('jobs').select('id, source, status, created_at').eq('user_id', userId)
   if (error || !jobs) return null
 
-  const trendMap = new Map<string, Map<string, any>>()
+  const trendMap = new Map<string, Map<string, TrendBucket>>()
   for (const job of jobs) {
     const source = job.source || 'Direct'
     const month = new Date(job.created_at).toISOString().slice(0, 7)
@@ -117,11 +139,11 @@ async function computeSourceConversionTrends(supabase: any, userId: string) {
   return trends
 }
 
-async function computeCohortAnalysis(supabase: any, userId: string) {
+async function computeCohortAnalysis(supabase: SupabaseLike, userId: string) {
   const { data: jobs, error } = await supabase.from('jobs').select('id, status, created_at, date_applied').eq('user_id', userId)
   if (error || !jobs) return null
 
-  const cohortMap = new Map<string, any>()
+  const cohortMap = new Map<string, CohortBucket>()
   for (const job of jobs) {
     const appliedDate = job.date_applied ? new Date(job.date_applied) : new Date(job.created_at)
     const cohort = appliedDate.toISOString().slice(0, 7)
@@ -153,12 +175,12 @@ async function computeCohortAnalysis(supabase: any, userId: string) {
   return analysis
 }
 
-async function computeConversionMetrics(supabase: any, userId: string) {
+async function computeConversionMetrics(supabase: SupabaseLike, userId: string) {
   const { data: jobs, error } = await supabase.from('jobs').select('id, status, source').eq('user_id', userId)
   if (error || !jobs) return null
 
   const jobList = jobs
-  const offeredJobs = jobList.filter((j: any) => j.status === 'offer')
+  const offeredJobs = jobList.filter((j: JobRow) => j.status === 'offer')
   const conversionBySource: Record<string, number> = {}
   for (const job of jobList) {
     const source = job.source || 'Direct'

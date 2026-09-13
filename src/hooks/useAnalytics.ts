@@ -2,6 +2,15 @@ import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@/contexts/AuthContext'
 import { analyticsService } from '@/services/analyticsService'
+
+/**
+ * What `analytics-cache-proxy` returns.
+ *
+ * IT IS CHECKED, NOT ASSERTED. The function is ours but the response crosses a
+ * network boundary, so `cached` is read before `payload` is trusted -- a warm
+ * entry and an error both come back as a 200 with a body.
+ */
+type CachedEnvelope<T> = { cached?: boolean; payload?: T }
 import { supabase } from '@/lib/supabase'
 
 /**
@@ -18,6 +27,7 @@ import { supabase } from '@/lib/supabase'
  */
 const cacheable = (since: string | null) => since === null
 import type {
+
   TimeInStageMetric,
   ConversionFunnelMetric,
   SourceConversionTrend,
@@ -34,8 +44,9 @@ export function useTimeInStage(userId?: string, since: string | null = null) {
       if (cacheable(since)) {
         try {
           const { data, error } = await supabase.functions.invoke('analytics-cache-proxy', { body: { metric: 'timeInStage' } })
-          if (!error && data && (data as any).cached && (data as any).payload) {
-            return (data as any).payload as TimeInStageMetric[]
+          const envelope = data as CachedEnvelope<TimeInStageMetric[]> | null
+            if (!error && envelope?.cached && envelope.payload) {
+              return envelope.payload
           }
         } catch {
           // ignore cache errors and fall back to live compute
@@ -60,8 +71,9 @@ export function useConversionFunnel(userId?: string, since: string | null = null
       if (cacheable(since)) {
         try {
           const { data, error } = await supabase.functions.invoke('analytics-cache-proxy', { body: { metric: 'conversionFunnel' } })
-          if (!error && data && (data as any).cached && (data as any).payload) {
-            return (data as any).payload as ConversionFunnelMetric[]
+          const envelope = data as CachedEnvelope<ConversionFunnelMetric[]> | null
+            if (!error && envelope?.cached && envelope.payload) {
+              return envelope.payload
           }
         } catch {
           // ignore cache errors and fall back to live compute
@@ -86,8 +98,9 @@ export function useSourceConversionTrends(userId?: string, since: string | null 
       if (cacheable(since)) {
         try {
           const { data, error } = await supabase.functions.invoke('analytics-cache-proxy', { body: { metric: 'sourceConversionTrends' } })
-          if (!error && data && (data as any).cached && (data as any).payload) {
-            return (data as any).payload as SourceConversionTrend[]
+          const envelope = data as CachedEnvelope<SourceConversionTrend[]> | null
+            if (!error && envelope?.cached && envelope.payload) {
+              return envelope.payload
           }
         } catch {
           // ignore cache errors and fall back to live compute
@@ -112,8 +125,9 @@ export function useCohortAnalysis(userId?: string, since: string | null = null) 
       if (cacheable(since)) {
         try {
           const { data, error } = await supabase.functions.invoke('analytics-cache-proxy', { body: { metric: 'cohortAnalysis' } })
-          if (!error && data && (data as any).cached && (data as any).payload) {
-            return (data as any).payload as CohortAnalysis[]
+          const envelope = data as CachedEnvelope<CohortAnalysis[]> | null
+            if (!error && envelope?.cached && envelope.payload) {
+              return envelope.payload
           }
         } catch {
           // ignore cache errors and fall back to live compute
@@ -138,8 +152,9 @@ export function useConversionMetrics(userId?: string, since: string | null = nul
       if (cacheable(since)) {
         try {
           const { data, error } = await supabase.functions.invoke('analytics-cache-proxy', { body: { metric: 'conversionMetrics' } })
-          if (!error && data && (data as any).cached && (data as any).payload) {
-            return (data as any).payload as ConversionMetrics
+          const envelope = data as CachedEnvelope<ConversionMetrics> | null
+          if (!error && envelope?.cached && envelope.payload) {
+            return envelope.payload
           }
         } catch {
           // ignore cache errors and fall back to live compute

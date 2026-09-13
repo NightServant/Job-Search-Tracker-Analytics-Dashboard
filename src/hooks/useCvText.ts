@@ -44,10 +44,6 @@ function flattenTiptapText(node: unknown): string {
  */
 export function flattenResumeText(row: ResumeContentRow | null): string {
   if (!row) return ''
-  if (row.mode === 'latex') {
-    const source = (row.content as { source?: unknown } | null)?.source
-    return typeof source === 'string' ? source : ''
-  }
   return flattenTiptapText(row.content)
 }
 

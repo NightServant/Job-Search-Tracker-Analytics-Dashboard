@@ -19,7 +19,7 @@ describe('jobService', () => {
         insert: vi.fn().mockReturnValue({
           select: vi.fn().mockResolvedValue({ data: [{ id: '1', user_id: 'user123' }], error: null }),
         }),
-      } as any)
+      } as unknown as ReturnType<typeof mockSupabase.from>)
 
       const user = { id: 'user123' }
 

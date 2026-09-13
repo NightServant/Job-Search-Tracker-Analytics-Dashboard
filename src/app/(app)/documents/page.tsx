@@ -8,10 +8,10 @@ import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DocumentsPage } from '@/components/documents/DocumentsPage'
-import { DEFAULT_LATEX_SOURCE, DEFAULT_WORD_CONTENT } from '@/components/cv/content'
+import { DEFAULT_WORD_CONTENT } from '@/components/cv/content'
 import { importDocument, UnsupportedDocumentError } from '@/lib/documentImport'
 import type { TemplateChoice } from '@/components/documents/TemplateGallery'
-import type { ResumeContent, ResumeMode, ResumeSummary } from '@/services/resumeService'
+import type { ResumeContent, ResumeSummary } from '@/services/resumeService'
 
 /**
  * Thin route wrapper, the same split as `applications/page.tsx`: the screen
@@ -69,27 +69,22 @@ export default function Page() {
    * imported file. Three call sites creating resumes three slightly different
    * ways is how the title strings and the toast copy drift apart.
    */
-  const createDraft = async (mode: ResumeMode, title: string, content: ResumeContent) => {
+  const createDraft = async (title: string, content: ResumeContent) => {
     try {
-      const created = await createResume.mutateAsync({ mode, title, content })
-      notify('info', 'Draft created', `${mode === 'latex' ? 'LaTeX' : 'Word'} CV ready.`)
+      const created = await createResume.mutateAsync({ mode: 'word', title, content })
+      notify('info', 'Draft created', 'Word CV ready.')
       router.push(`/cv?draft=${created.id}`)
     } catch (err) {
       notify('error', 'Create failed', err instanceof Error ? err.message : 'Could not create the CV')
     }
   }
 
-  const createBlank = (mode: ResumeMode) =>
-    createDraft(
-      mode,
-      mode === 'latex' ? 'Untitled LaTeX CV' : 'Untitled CV',
-      mode === 'latex' ? { type: 'latex', source: DEFAULT_LATEX_SOURCE } : DEFAULT_WORD_CONTENT
-    )
+  const createBlank = () => createDraft('Untitled CV', DEFAULT_WORD_CONTENT)
 
   // Blank drafts do not come through here: the gallery carries templates only,
   // since `new CV` is already a primary button on that screen.
-  const createFromTemplate = ({ mode, template }: TemplateChoice) =>
-    createDraft(mode, `${template.name} CV`, template.content as ResumeContent)
+  const createFromTemplate = ({ template }: TemplateChoice) =>
+    createDraft(`${template.name} CV`, template.content as ResumeContent)
 
   /**
    * The import failure is shown, never swallowed. `.docx` is deliberately
@@ -100,7 +95,7 @@ export default function Page() {
   const importFile = async (file: File) => {
     try {
       const draft = await importDocument(file)
-      await createDraft(draft.mode, draft.title, draft.content)
+      await createDraft(draft.title, draft.content)
     } catch (err) {
       notify(
         'error',
@@ -141,7 +136,7 @@ export default function Page() {
         }))}
         versionsLoading={versionsQuery.isLoading}
         versionsError={!!versionsQuery.error}
-        onCreateDraft={(mode) => void createBlank(mode)}
+        onCreateDraft={() => void createBlank()}
         onChooseTemplate={(choice) => void createFromTemplate(choice)}
         onImport={(file) => void importFile(file)}
         creatingDraft={createResume.isPending}

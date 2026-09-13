@@ -9,7 +9,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from '@/components/ui/carousel'
-import { WORD_TEMPLATES, LATEX_TEMPLATES } from '@/services/resumeTemplateService'
+import { WORD_TEMPLATES } from '@/services/resumeTemplateService'
 import type { ResumeTemplate } from '@/services/resumeTemplateService'
 import type { ResumeMode } from '@/services/resumeService'
 
@@ -36,7 +36,7 @@ export interface TemplateGalleryProps {
   className?: string
 }
 
-const MODE_LABEL: Record<ResumeMode, string> = { word: 'word', latex: 'LaTeX' }
+const MODE_LABEL: Record<ResumeMode, string> = { word: 'word' }
 
 /**
  * The start-a-new-CV gallery, laid out the way Word's own start screen lays
@@ -81,7 +81,7 @@ const MODE_LABEL: Record<ResumeMode, string> = { word: 'word', latex: 'LaTeX' }
 export function TemplateGallery({
   onChoose,
   onChooseBlank,
-  modes = ['word', 'latex'],
+  modes = ['word'],
   variant = 'rail',
   busy = false,
   className,
@@ -91,12 +91,6 @@ export function TemplateGallery({
       ...(modes.includes('word') ? WORD_TEMPLATES : []).map((t) => ({
         key: t.id,
         mode: 'word' as const,
-        template: t,
-        name: t.name.toLowerCase(),
-      })),
-      ...(modes.includes('latex') ? LATEX_TEMPLATES : []).map((t) => ({
-        key: t.id,
-        mode: 'latex' as const,
         template: t,
         name: t.name.toLowerCase(),
       })),
@@ -149,7 +143,7 @@ export function TemplateGallery({
         'group/template'
       )}
     >
-      <Thumbnail id={card.template.id} mode={card.mode} />
+      <Thumbnail id={card.template.id} />
       <span className="flex flex-col">
         <span className="truncate text-body-s text-text-primary">{card.name}</span>
         <span className="text-caption text-text-muted">{MODE_LABEL[card.mode]}</span>
@@ -213,7 +207,7 @@ export function TemplateGallery({
 }
 
 /** A page-shaped diagram of the template's structure, in rules rather than type. */
-function Thumbnail({ id, mode }: { id: string; mode: ResumeMode }) {
+function Thumbnail({ id }: { id: string }) {
   return (
     <span
       aria-hidden
@@ -224,14 +218,14 @@ function Thumbnail({ id, mode }: { id: string; mode: ResumeMode }) {
         'group-hover/template:border-accent-default'
       )}
     >
-      <ThumbnailRules id={id} mode={mode} />
+      <ThumbnailRules id={id} />
     </span>
   )
 }
 
 /** Bar = heading, hairline = body. Ratios differ per template so the shapes do. */
-function ThumbnailRules({ id, mode }: { id: string; mode: ResumeMode }) {
-  const heading = mode === 'latex' ? 'bg-chart-2' : 'bg-accent-default'
+function ThumbnailRules({ id }: { id: string }) {
+  const heading = 'bg-accent-default'
   const body = 'bg-border-default'
   const rows: Array<[type: 'heading' | 'body', width: string]> =
     id.endsWith('compact')

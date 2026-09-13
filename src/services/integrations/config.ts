@@ -15,17 +15,6 @@
  *
  *   ESCO      free, keyless, live. `GET ec.europa.eu/esco/api/search?text=react`
  *             returned 200 with 93 skill matches and no credentials.
- *   FormaTeX  real REST API. `POST api.formatex.io/api/v1/compile` returns 401
- *             `{"error":"missing API key"}` with no key and
- *             `{"error":"invalid API key"}` with a bogus `X-API-Key`, which is
- *             how the header name below was confirmed rather than guessed.
- *             `GET /api/v1/health` returns `{"status":"ok"}`.
- *   Tailoring provider-agnostic on purpose. Any OpenAI-compatible chat
- *             endpoint works, so a free tier that changes its limits or
- *             disappears is a change of two env vars, not of this code.
- *   Novoresume NO API EXISTS. No developer docs, no endpoints, no developer
- *             programme -- its career AI tools are consumer web pages. It is
- *             absent from this file because there is nothing to configure.
  */
 
 /** Read an env var from whichever runtime this is executing in. */
@@ -47,7 +36,6 @@ function trimmed(name: string): string | undefined {
 
 export interface IntegrationConfig {
   /** LaTeX compilation. `undefined` key means the capability is off. */
-  formatex: { baseUrl: string; apiKey?: string }
   /**
    * CV tailoring over any OpenAI-compatible chat endpoint.
    *
@@ -63,10 +51,6 @@ export interface IntegrationConfig {
 
 export function readIntegrationConfig(): IntegrationConfig {
   return {
-    formatex: {
-      baseUrl: trimmed('FORMATEX_BASE_URL') ?? 'https://api.formatex.io/api/v1',
-      apiKey: trimmed('FORMATEX_API_KEY'),
-    },
     tailoring: {
       baseUrl: trimmed('TAILORING_BASE_URL'),
       apiKey: trimmed('TAILORING_API_KEY'),
@@ -89,7 +73,6 @@ export function readIntegrationConfig(): IntegrationConfig {
  * missing instead of failing at the request.
  */
 export interface IntegrationCapabilities {
-  compileLatex: boolean
   tailorCv: boolean
   expandSkills: boolean
 }
@@ -133,15 +116,11 @@ export function configProblems(config: IntegrationConfig): string[] {
     )
   }
 
-  if (config.formatex.baseUrl && !/^https?:\/\//i.test(config.formatex.baseUrl)) {
-    problems.push(`FORMATEX_BASE_URL should be a URL but is "${config.formatex.baseUrl}".`)
-  }
   return problems
 }
 
 export function capabilitiesOf(config: IntegrationConfig): IntegrationCapabilities {
   return {
-    compileLatex: !!config.formatex.apiKey,
     // Both, and neither alone: a base URL with no key cannot authenticate and
     // a key with no base URL has nowhere to go.
     // Shape-checked, not just presence-checked: three non-empty strings in the

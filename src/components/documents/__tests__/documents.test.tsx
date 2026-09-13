@@ -6,7 +6,6 @@ import { formatTouchedDate } from '@/services/date'
 import { DocumentRow, DOCUMENT_GRID } from '../DocumentRow'
 import { VersionHistory } from '../VersionHistory'
 import { DocumentsPage } from '../DocumentsPage'
-import { chooseOption } from '@/test/select'
 
 afterEach(() => cleanup())
 
@@ -184,8 +183,10 @@ describe('DocumentRow', () => {
   })
 
   it('names which editor a draft opens in', () => {
-    render(<DocumentRow doc={makeDoc({ mode: 'latex' })} />)
-    expect(screen.getByText('LaTeX')).toBeTruthy()
+    // One editor since 2026-09-13, so the label is a constant -- kept because
+    // it is what a reader scans the row for, not because it distinguishes.
+    render(<DocumentRow doc={makeDoc({ mode: 'word' })} />)
+    expect(screen.getByText('Word')).toBeTruthy()
   })
 })
 
@@ -249,28 +250,6 @@ describe('DocumentsPage', () => {
     expect(triggers).toHaveLength(1)
   })
 
-  it('opens the mode chooser as a dialog over the list, not a new page', async () => {
-    // Item 2's second half: M5 turned this into a full page at
-    // /cv?draft=new, reasoning a dialog would float over nothing. Gabe
-    // overruled that. Opening it here, without navigating away, is what
-    // makes the Documents list the thing the dialog actually sits over.
-    const user = userEvent.setup()
-    render(<DocumentsPage docs={[DOC]} />)
-    await user.click(screen.getByRole('button', { name: /new cv/i }))
-    expect(screen.getByRole('dialog', { name: 'new CV' })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /word editor/i })).toBeTruthy()
-    expect(screen.getByRole('button', { name: /latex editor/i })).toBeTruthy()
-  })
-
-  it('reports the chosen mode to the caller, which owns the write and the navigation', async () => {
-    const onCreateDraft = vi.fn()
-    const user = userEvent.setup()
-    render(<DocumentsPage docs={[DOC]} onCreateDraft={onCreateDraft} />)
-    await user.click(screen.getByRole('button', { name: /new cv/i }))
-    await user.click(screen.getByRole('button', { name: /latex editor/i }))
-    expect(onCreateDraft).toHaveBeenCalledWith('latex')
-  })
-
   it('renders one row per CV', () => {
     const { container } = render(
       <DocumentsPage docs={[DOC, makeDoc({ id: 'cv-2', title: 'Frontend CV' })]} />
@@ -310,7 +289,7 @@ describe('DocumentsPage', () => {
 })
 
 describe('the Word-style start screen', () => {
-  it('offers templates only, both engines in one row, and no blank card', () => {
+  it('offers templates only, and no blank card', () => {
     // The gallery is why the in-editor dropdown could go: templates are now a
     // starting point rather than an overwrite of what is already open.
     const { container } = render(<DocumentsPage docs={[]} />)
@@ -320,13 +299,10 @@ describe('the Word-style start screen', () => {
     // No blank card: `new CV` is already a primary button on this screen, so a
     // blank card would be a third route to the same blank document.
     expect(cards.some((c) => c!.startsWith('blank'))).toBe(false)
-    // Word and LaTeX in one row, not behind two tabs: the choice of engine and
-    // the choice of layout are the same decision made once.
     expect(cards.some((c) => c!.startsWith('word-'))).toBe(true)
-    expect(cards.some((c) => c!.startsWith('latex-'))).toBe(true)
   })
 
-  it('reports which template was picked, with its mode', async () => {
+  it('reports which template was picked', async () => {
     const onChooseTemplate = vi.fn()
     const user = userEvent.setup()
     const { container } = render(<DocumentsPage docs={[]} onChooseTemplate={onChooseTemplate} />)
@@ -335,9 +311,6 @@ describe('the Word-style start screen', () => {
     expect(onChooseTemplate.mock.calls[0][0].mode).toBe('word')
     expect(onChooseTemplate.mock.calls[0][0].template.id).toBe('word-classic')
 
-    await user.click(container.querySelector('[data-template-card="latex-compact"]')!)
-    expect(onChooseTemplate.mock.calls[1][0].mode).toBe('latex')
-    expect(onChooseTemplate.mock.calls[1][0].template.id).toBe('latex-compact')
   })
 
   it('keeps `new CV` out of the header until there is a list to act on', () => {
@@ -424,11 +397,11 @@ describe('column labels line up with the data under them', () => {
 })
 
 describe('narrowing and paging the document list', () => {
-  /** Eleven documents: one page of ten and one of one, seven Word, four LaTeX. */
+  /** Eleven documents: one page of ten and one of one. */
   const MANY: ResumeSummary[] = Array.from({ length: 11 }, (_, index) => ({
     id: `doc-${index}`,
     title: `CV ${index}`,
-    mode: index % 3 === 0 ? 'latex' : 'word',
+    mode: 'word',
     updated_at: new Date(2026, 8, 1 + index).toISOString(),
     sections: null,
     version: 1,
@@ -451,39 +424,6 @@ describe('narrowing and paging the document list', () => {
     await user.click(screen.getByRole('button', { name: '3' }))
     expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(1)
     expect(screen.getByText('11–11 of 11')).toBeTruthy()
-  })
-
-  it('narrows to one format, and counts what is left', async () => {
-    const user = userEvent.setup()
-    render(<DocumentsPage docs={MANY} />)
-    await chooseOption(user, screen.getByLabelText('Filter documents'), 'LaTeX only')
-    // 0, 3, 6, 9 -- four of the eleven, which still fits one page of five.
-    expect(screen.getAllByRole('link', { name: /^CV \d+$/ })).toHaveLength(4)
-    expect(screen.getByText('1–4 of 4')).toBeTruthy()
-  })
-
-  it('returns to the first page when the filter changes', async () => {
-    // Page 2 of "all" does not exist under "LaTeX only"; staying there would
-    // strand the reader on an empty page with no control that leads back.
-    const user = userEvent.setup()
-    render(<DocumentsPage docs={MANY} />)
-    // `role: 'button'` -- `PaginationLink` renders an anchor that carries an
-    // explicit button role, which is right for a control that pages in place
-    // rather than navigating.
-    await user.click(screen.getByRole('button', { name: '2' }))
-    await chooseOption(user, screen.getByLabelText('Filter documents'), 'LaTeX only')
-    expect(screen.getByText('1–4 of 4')).toBeTruthy()
-  })
-
-  it('says a filter matched nothing rather than claiming the account is empty', async () => {
-    // "no CVs yet" is a claim about the account. A filter has no basis for it.
-    const user = userEvent.setup()
-    const { container } = render(
-      <DocumentsPage docs={[{ ...MANY[1], mode: 'word' }]} />
-    )
-    await chooseOption(user, screen.getByLabelText('Filter documents'), 'LaTeX only')
-    expect(container.querySelector('[data-documents-filter-empty]')).toBeTruthy()
-    expect(screen.queryByText(/no CVs yet/i)).toBeNull()
   })
 
   it('offers no filter at all on an empty account', () => {

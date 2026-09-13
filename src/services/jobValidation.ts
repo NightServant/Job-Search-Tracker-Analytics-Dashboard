@@ -10,6 +10,16 @@ export interface ValidationError {
 }
 
 /**
+ * An Error carrying the field-level reasons it was thrown.
+ *
+ * A NAMED TYPE RATHER THAN `as any` AT EACH THROW SITE. Three call sites were
+ * attaching `validationErrors` to a plain Error through an `any` cast, which
+ * meant nothing downstream could read the field without casting back -- and
+ * the form does read it. This is the contract those throws were implying.
+ */
+export type ValidationFailure = Error & { validationErrors: ValidationError[] }
+
+/**
  * Comprehensive validation for job form data
  * Runs on client and server to catch errors early
  */
@@ -393,7 +403,7 @@ export function assertJobFormDataValid(data: JobFormData): void {
   if (errors.length > 0) {
     const message = errors.map((e) => `${e.field}: ${e.message}`).join('; ')
     const error = new Error(message)
-    ;(error as any).validationErrors = errors
+    ;(error as ValidationFailure).validationErrors = errors
     throw error
   }
 }

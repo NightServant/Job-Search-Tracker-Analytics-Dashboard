@@ -58,11 +58,13 @@ describe('textToWordContent', () => {
 })
 
 describe('importDocument', () => {
-  it('opens a .tex in the LaTeX editor with its source intact', async () => {
+  it('still accepts a .tex, as text, now that the LaTeX editor is gone', async () => {
+    // Refusing the extension outright would turn "we dropped an editor" into
+    // "your file is not supported", and the text of a CV is still the useful
+    // half of a .tex file.
     const source = '\\documentclass{article}\n\\begin{document}Hi\\end{document}'
     const draft = await importDocument(file('cv.tex', source))
-    expect(draft.mode).toBe('latex')
-    expect(draft.content).toEqual({ type: 'latex', source })
+    expect(draft.mode).toBe('word')
     expect(draft.title).toBe('cv')
   })
 

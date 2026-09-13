@@ -49,9 +49,9 @@ function fakeSupabase(tables: Record<string, FakeRow[]>) {
           return builder
         },
         order: () => builder,
-        then: (onFulfilled: any, onRejected?: any) =>
+        then: (onFulfilled: (value: unknown) => unknown, onRejected?: (reason: unknown) => unknown) =>
           Promise.resolve({ data: filtered, error: null }).then(onFulfilled, onRejected),
-      } as any
+      } as unknown as typeof builder
       return builder
     },
   }

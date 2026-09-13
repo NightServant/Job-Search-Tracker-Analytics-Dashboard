@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ResumeSummary } from '@/services/resumeService'
 
@@ -141,18 +141,4 @@ describe('Documents route wrapper', () => {
   // Task 4 (M5.5): New CV moved from a Link to /cv?draft=new into a dialog
   // opened right here, so choosing a mode has to create the draft and land
   // on its editor exactly as the old full-page ModeChooser did.
-  it('creates a CV in the chosen mode from the dialog and opens its editor', async () => {
-    useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
-    const user = userEvent.setup()
-    render(<Page />)
-
-    await user.click(screen.getByRole('button', { name: /new cv/i }))
-    await user.click(screen.getByRole('button', { name: /latex editor/i }))
-
-    expect(createMutate).toHaveBeenCalledWith(
-      expect.objectContaining({ mode: 'latex', title: 'Untitled LaTeX CV' })
-    )
-    await act(async () => {})
-    expect(routerPush).toHaveBeenCalledWith('/cv?draft=cv-new')
-  })
 })

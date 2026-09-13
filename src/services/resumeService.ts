@@ -2,11 +2,19 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { JSONContent } from '@tiptap/core'
 import { requireUserId, toError } from './supabaseHelpers'
 
-export type ResumeMode = 'word' | 'latex'
+/**
+ * ONE MODE. The LaTeX editor was dropped entirely on 2026-09-13 (Gabe: "drop
+ * the LaTeX editor feature entirely"), and the type went with it rather than
+ * becoming a single-member union that reads like a choice.
+ *
+ * THE COLUMN STAYS, because rows written before today still carry `'latex'`.
+ * `normaliseMode` below folds anything that is not `'word'` into `'word'`, so a
+ * legacy row opens in the only editor there is instead of a blank screen.
+ */
+export type ResumeMode = 'word'
 
-/** The LaTeX editor stores raw source; the Word editor stores a Tiptap tree. */
-export type LatexContent = { type: 'latex'; source: string }
-export type ResumeContent = JSONContent | LatexContent
+/** The Word editor stores a Tiptap tree. */
+export type ResumeContent = JSONContent
 
 export interface ResumeDraft {
   id: string
@@ -85,15 +93,17 @@ type SummaryRow = Omit<ResumeRow, 'content'> & {
  * Nothing in the app writes `structured` today, so no row can currently hit
  * it; whoever builds the structured editor must fix this before one can.
  */
-function normalizeMode(mode: string | null | undefined): ResumeMode {
-  return mode === 'latex' ? 'latex' : 'word'
+function normalizeMode(): ResumeMode {
+  // Rows written before 2026-09-13 may still say `latex` or `structured`.
+  // There is one editor now, so they all open in it.
+  return 'word'
 }
 
 function toDraft(row: ResumeRow): ResumeDraft {
   return {
     id: row.id,
     title: row.title || 'Untitled CV',
-    mode: normalizeMode(row.mode),
+    mode: normalizeMode(),
     content: row.content,
     updated_at: row.updated_at,
   }
@@ -125,7 +135,7 @@ export const resumeService = {
     return ((data ?? []) as SummaryRow[]).map((row) => ({
       id: row.id,
       title: row.title || 'Untitled CV',
-      mode: normalizeMode(row.mode),
+      mode: normalizeMode(),
       updated_at: row.updated_at,
       sections: row.sections ?? null,
       version: latestVersion(row.resume_snapshots),

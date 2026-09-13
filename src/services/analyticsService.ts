@@ -2,6 +2,27 @@ import { supabase } from '@/lib/supabase'
 import type { JobStatus } from '@/types'
 import * as Sentry from '@sentry/react'
 
+/**
+ * The running totals the two grouping loops below accumulate before they are
+ * turned into their public metric shapes. Named rather than `any` so a typo in
+ * a key is a compile error where it used to be a silent zero.
+ */
+type SourceTrendBucket = {
+  applied: number
+  interviewing: number
+  offer: number
+  rejected: number
+  total: number
+}
+
+type CohortBucket = {
+  applied: number
+  interviewing: number
+  offered: number
+  rejected: number
+  timeToOffers: number[]
+}
+
 export interface TimeInStageMetric {
   status: JobStatus
   avgDays: number
@@ -458,7 +479,7 @@ export const analyticsService = {
       if (jobsError) throw jobsError
 
       // Group by source and month
-      const trendMap = new Map<string, Map<string, any>>()
+      const trendMap = new Map<string, Map<string, SourceTrendBucket>>()
 
       for (const job of (jobs ?? []).filter((row) => withinRange(row, since))) {
         const source = job.source || 'Direct'
@@ -548,7 +569,7 @@ export const analyticsService = {
       if (jobsError) throw jobsError
 
       // Group by cohort (month of first application)
-      const cohortMap = new Map<string, any>()
+      const cohortMap = new Map<string, CohortBucket>()
 
       for (const job of (jobs ?? []).filter((row) => withinRange(row, since))) {
         // Use date_applied if available, otherwise created_at
