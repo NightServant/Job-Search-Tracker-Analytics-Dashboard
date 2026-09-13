@@ -66,7 +66,12 @@ async function fillDetails(email = 'Gabe@Example.com', password = STRONG, confir
   setField(/^Email/, email)
   setField(/^Password/, password)
   setField(/^Confirm password/, confirm)
-  await userEvent.click(screen.getByRole('button', { name: 'Create account' }))
+  // `findByRole`, NOT `getByRole`: the submit carries a spinner while busy, so
+  // between a rejected attempt and the next one there is a frame where this
+  // query does not match. Locally the gap closes before the next line runs; on
+  // a slower CI runner it does not, and the rate-limit test below -- which
+  // submits six times in a row -- was the one place that showed it.
+  await userEvent.click(await screen.findByRole('button', { name: 'Create account' }))
 }
 
 beforeEach(() => window.localStorage.clear())
@@ -227,14 +232,11 @@ describe('registration rate limiting', () => {
     // No clearing round to round: `setField` REPLACES each value, so the
     // accumulation that used to need three clears cannot happen. See its note
     // for what that accumulation broke.
-    // THE LOOP STOPS WHEN THE FORM DOES, rather than counting to six blind.
-    // The budget is spent after five, and what happens on the sixth is the
-    // point: the submit is gone. Pressing on regardless made this the one red
-    // test on CI -- a slower runner reached the lockout before the last
-    // iteration and `getByRole` threw on a button the test had just proved
-    // should not be there.
+    // SIX SUBMITS, AND EACH ONE WAITS FOR THE LAST TO SETTLE -- see
+    // `fillDetails`. The budget is spent by the fifth; the sixth is the one
+    // that has to be refused before it leaves the browser, so skipping it
+    // would be skipping the assertion.
     for (let i = 0; i < 6; i += 1) {
-      if (!screen.queryByRole('button', { name: 'Create account' })) break
       await fillDetails('a@b.co')
     }
     expect(await screen.findByText(/Too many attempts/i)).toBeInTheDocument()
