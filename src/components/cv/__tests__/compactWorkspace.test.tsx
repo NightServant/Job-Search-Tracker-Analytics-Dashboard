@@ -63,24 +63,36 @@ describe('the editor below lg', () => {
     expect(screen.getByLabelText('CV title')).toHaveValue('My CV')
   })
 
-  it('keeps a way out, the save state, and the formatting bar', () => {
+  it('keeps a way out, the save state, and the formatting controls', async () => {
+    // THE FORMATTING BAR IS NO LONGER PINNED (2026-09-13). It was 52px of
+    // ribbon under every document whether or not anybody was formatting, and
+    // it is now the `format` tab of the dock. The assertion that matters is
+    // unchanged -- the controls are still here, one tap away -- so this test
+    // takes the tap rather than being deleted.
+    const user = userEvent.setup()
     renderWorkspace()
     expect(screen.getByRole('link', { name: 'Done' })).toHaveAttribute('href', '/documents')
     expect(screen.getByText('saved 7:43 am')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'format' }))
     expect(screen.getByRole('button', { name: 'bold' })).toBeInTheDocument()
   })
 
-  it('reaches AI tailoring and the CV check from the command row', async () => {
-    // Gabe's requirement, and the one most easily lost. The control is its own
-    // button rather than an item three taps deep in the overflow: burying the
-    // app's one piece of real intelligence under a `...` is how a feature
-    // stops existing.
+  it('reaches AI tailoring and the CV check from the dock', async () => {
+    // Gabe's requirement, and the one most easily lost. It used to be a glyph
+    // in the command row that opened a bottom sheet; it is now a named tab in
+    // the dock, which is a better answer to the same requirement -- burying
+    // the app's one piece of real intelligence under a `...` is how a feature
+    // stops existing, and a word beats a chart icon at saying it is there.
+    //
+    // THE SHEET IS GONE, SO THE CONTROL THAT OPENED IT IS TOO. Asserted, so
+    // nobody restores a second route to the same surface by accident.
     const user = userEvent.setup()
     renderWorkspace()
-    await user.click(screen.getByRole('button', { name: /tailoring and cv check/i }))
-    expect(screen.getByRole('tab', { name: /the posting/i })).toBeInTheDocument()
-    expect(screen.getByRole('tab', { name: /the check/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /tailoring and cv check/i })).toBeNull()
+    await user.click(screen.getByRole('tab', { name: 'outline' }))
     expect(screen.getByText('pick a posting')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'tailor' }))
+    expect(screen.getByText('match analysis')).toBeInTheDocument()
   })
 
   it('keeps every other desktop action, in the overflow sheet', async () => {
@@ -144,12 +156,14 @@ describe('the editor below lg', () => {
     expect(grid.className).not.toMatch(/\[&_button\]:bg-/)
   })
 
-  it('renders one tree, not two', () => {
+  it('renders one tree, not two', async () => {
     // The reason the breakpoint is JS and not a `lg:` class. Two trees would
     // put two of every control in the accessibility tree; a screen reader
     // would read the whole toolbar twice.
+    const user = userEvent.setup()
     renderWorkspace()
     expect(screen.getAllByLabelText('CV title')).toHaveLength(1)
+    await user.click(screen.getByRole('tab', { name: 'format' }))
     expect(screen.getAllByRole('button', { name: 'bold' })).toHaveLength(1)
   })
 })

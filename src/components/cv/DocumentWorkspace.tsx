@@ -63,6 +63,19 @@ export interface DocumentWorkspaceProps {
   /** Formatting controls. Docked to the top of the page. */
   tools?: React.ReactNode
   /**
+   * Whether `children` draw a paper page -- fixed geometry, print margins,
+   * page-break seams -- rather than an arbitrary preview.
+   *
+   * IT EXISTS ONLY TO GATE THE COMPACT SCROLL/PRINT TOGGLE. Below `lg` that
+   * toggle is a floating button over the canvas, and the chrome has no way to
+   * look at `children` and find out whether there is a sheet in there to
+   * un-paginate. The Word editor says yes; the LaTeX editor's canvas is a
+   * source pane and a compiled PDF in an <iframe>, with no geometry, no zoom
+   * and no seams, so it says nothing and gets no button. Defaulting to `false`
+   * is what keeps that a non-change for every other caller.
+   */
+  paged?: boolean
+  /**
    * The AI tailoring rails, one either side of the page (Gabe, 2026-09-04).
    *
    * TWO RAILS RATHER THAN ONE PANEL because they answer different questions

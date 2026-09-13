@@ -103,6 +103,159 @@ export interface WordResumeEditorProps {
  */
 const PAGE_GAP_IN = 0.25
 
+/**
+ * THE SHEET, AND THE TWO WAYS IT IS DRAWN (Gabe, 2026-09-13: "floating icon
+ * button for scroll view and print view -- scroll view is the default").
+ *
+ * IT IS ITS OWN COMPONENT ONLY BECAUSE OF THE CONTEXT. `useDocumentView` has
+ * to be called from inside the provider, and the provider is in the compact
+ * chrome -- which is BELOW `WordResumeEditor` in the tree and receives this
+ * markup as `children`. A hook call in the editor itself would read the
+ * default and always answer "print". Nothing else moved: the geometry, the
+ * typography and that className are the same text they were inline.
+ *
+ * PRINT VIEW is what this editor has always drawn, unchanged: an 8.5in sheet
+ * at the document's own geometry, `zoom`-fitted to the canvas, letter margins
+ * as padding, and `Pagination`'s seams between pages.
+ *
+ * SCROLL VIEW is the same document as one continuous column:
+ *   - no `zoom`, and `w-full` instead of a fixed `8.5in`. Fit-to-width on a
+ *     375px phone is a scale of 0.46, which renders an 11pt body at about 5pt.
+ *     Full width at 1.0 renders it at 11pt in a 343px column.
+ *   - no `minHeight` of a page, so a half-page CV is half a page rather than
+ *     11 inches of white with a scrollbar promising more.
+ *   - 16px of reading padding instead of the 0.8in (77px) print margin, which
+ *     on that phone was 41% of the screen spent on paper that is not there.
+ *   - `[&_[data-page-spacer]]:hidden` -- the seams suppressed with a CSS rule
+ *     on this wrapper rather than by re-creating the editor without the
+ *     extension or mutating its options. Both of those rebuild the ProseMirror
+ *     view, and the undo history dies with it: toggling the view would throw
+ *     away every undo step, which is a far worse bug than a visible seam.
+ *     The widgets still compute and still sit in the document; they are simply
+ *     not painted.
+ *
+ * `--page-body-height` follows: a 9.4in floor under a full-width column is a
+ * screenful of empty white under a short CV, so scroll view asks for half the
+ * viewport instead -- enough to stay a tappable target for focusing the editor.
+ */
+function PageSheet({
+  editor,
+  geometry,
+  type,
+  naturalLineHeight,
+  scale,
+}: {
+  editor: Editor | null
+  geometry: PageGeometry
+  type: DocumentTypography
+  naturalLineHeight: number
+  scale: number
+}) {
+  const view = useDocumentView()
+  const scroll = view === 'scroll'
+
+  return (
+    /*
+      `zoom`, NOT `transform: scale()`, and the difference is layout.
+      A transform is painted only: a page drawn at 0.7 still occupies its
+      full 11in in the flow, so the well ends in a third of a page of nothing
+      and the scrollbar promises more document than exists. Correcting that
+      by hand means measuring the sheet and multiplying its height, which is
+      a second source of truth for a number the browser already knows.
+
+      `zoom` participates in layout -- measured here: a 1000px child at 0.7
+      gives a 700px wrapper, where the transform leaves it at 1000 -- so the
+      flow, the scroll height and the caret all agree with what is drawn,
+      with no correction and no wrapper. Supported in every current browser
+      (`CSS.supports('zoom', '0.7')` verified true in the app).
+    */
+    <div
+      data-page-sheet={view}
+      className={cn('bg-white', scroll ? 'w-full [&_[data-page-spacer]]:hidden' : 'mx-auto')}
+      style={
+        scroll
+          ? undefined
+          : {
+              zoom: scale,
+              width: `${geometry.width}in`,
+              minHeight: `${geometry.height}in`,
+              // NO PAINTED PAGE EDGE HERE ANY MORE. Two versions of it were
+              // drawn as a background -- a hairline, then a band of the well's
+              // colour -- and both sat BEHIND the text, so a break falling
+              // mid-paragraph struck a stripe through a line of it. Nothing about
+              // a background can avoid that; the content flows over it regardless.
+              // `Pagination` pushes the content past the edge instead, which is
+              // what Word does. See components/cv/pagination.
+            }
+      }
+    >
+      <EditorContent
+        editor={editor}
+        style={
+          {
+            padding: scroll
+              ? '1rem 1rem 4rem'
+              : `${geometry.margin.top}in ${geometry.margin.right}in ${geometry.margin.bottom}in ${geometry.margin.left}in`,
+            // THE TYPING AREA DERIVES FROM THE PAGE, rather than the 9.4in
+            // that was hard-coded for Letter at 0.8in margins. On A4 that
+            // number is wrong by a third of an inch and on Legal by three,
+            // so the editable region either fell short of the page or ran
+            // past it -- both of which look like the sheet is the wrong size.
+            '--page-margin-left': `${geometry.margin.left}in`,
+            '--page-margin-right': `${geometry.margin.right}in`,
+            '--page-body-height': scroll
+              ? '50svh'
+              : `${Math.max(
+                  1,
+                  geometry.height - geometry.margin.top - geometry.margin.bottom
+                )}in`,
+            // THE DOCUMENT'S OWN TYPE, where it had any. mammoth converts a
+            // .docx to semantic HTML and drops every run property, so without
+            // this an imported CV renders in the editor's stylesheet rather
+            // than the face its author chose -- Garamond 11pt arriving as
+            // sans-serif 15px on the file that reported this.
+            //
+            // IT IS NOT BRANCHED ON THE VIEW. Scroll view changes the page the
+            // document sits on, never the document: the face, the size and the
+            // spacing are what will be exported, and a "more readable" scroll
+            // view that types at a size the PDF will not use is a preview that
+            // lies.
+            ...(type.fontFamily ? { fontFamily: type.fontFamily } : {}),
+            ...(type.fontSize ? { fontSize: `${type.fontSize}pt` } : {}),
+            // `w:line="235"` is 0.98 of SINGLE spacing, and single is the
+            // font's own line box -- not 0.98 of the font size, which is what
+            // handing the raw number to CSS meant and what set every line on
+            // the reported CV about 15% tight.
+            ...(cssLineHeight(type.lineHeight, naturalLineHeight)
+              ? { lineHeight: cssLineHeight(type.lineHeight, naturalLineHeight)! }
+              : {}),
+            ...(type.paragraphSpacing !== null
+              ? { '--doc-para-space': `${type.paragraphSpacing}pt` }
+              : {}),
+            // HEADING SIZES THE DOCUMENT STATES, rather than em multiples of
+            // the body guessed at. On the reported CV the name is 16pt and a
+            // section heading 11pt against a 9.5pt body; guessing 1.45em and
+            // 1.05em rendered them at 13.8 and 10. Null falls through to the
+            // editor's own scale, which is right for a CV typed here.
+            ...(type.titleSize ? { '--doc-h1-size': `${type.titleSize}pt` } : {}),
+            ...(type.sectionSize ? { '--doc-h2-size': `${type.sectionSize}pt` } : {}),
+            // AND THE SPACE AROUND THEM. `mt-4` is 12pt against the 6.5pt the
+            // reported CV sets, which repeated over eight headings is most of
+            // a visible margin error down the page.
+            ...(type.headingSpaceBefore !== null
+              ? { '--doc-h-before': `${type.headingSpaceBefore}pt` }
+              : {}),
+            ...(type.headingSpaceAfter !== null
+              ? { '--doc-h-after': `${type.headingSpaceAfter}pt` }
+              : {}),
+          } as React.CSSProperties
+        }
+          className=" [&_.ProseMirror]:min-h-[var(--page-body-height)] [&_.ProseMirror]:outline-none [&_.ProseMirror]:ring-0 [&_.ProseMirror]:shadow-none [&_.ProseMirror]:border-0 [&_.ProseMirror:focus]:outline-none [&_.ProseMirror:focus-visible]:outline-none [&_.ProseMirror:focus]:ring-0 [&_.ProseMirror:focus-visible]:ring-0 [&_.ProseMirror_*:focus]:outline-none [&_.ProseMirror_*:focus-visible]:outline-none [&_.ProseMirror_a]:outline-none [&_.ProseMirror_a:focus]:outline-none [&_.ProseMirror_h1]:[margin-block:0_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h1]:text-[length:var(--doc-h1-size,1.45em)] [&_.ProseMirror_h1]:font-bold [&_.ProseMirror_h2]:[margin-block:var(--doc-h-before,1rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h2]:text-[length:var(--doc-h2-size,1.05em)] [&_.ProseMirror_h2]:font-bold [&_.ProseMirror_h3]:[margin-block:var(--doc-h-before,0.75rem)_var(--doc-h-after,0.25rem)] [&_.ProseMirror_h3]:font-bold [&_.ProseMirror_h3]:text-[length:var(--doc-h2-size,1em)] [&_.ProseMirror_[data-ruled]]:border-b [&_.ProseMirror_[data-ruled]]:border-current [&_.ProseMirror_[data-ruled]]:pb-0.5 [&_.ProseMirror_p]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:[margin-block:0_var(--doc-para-space,0.5rem)] [&_.ProseMirror_ul]:list-disc [&_.ProseMirror_ul]:pl-6 [&_.ProseMirror_li]:[margin-block:0] [&_.ProseMirror_li_p]:[margin-block:0_var(--doc-para-space,0.25rem)]"
+      />
+    </div>
+  )
+}
+
 export function WordResumeEditor({
   draft,
   backHref,
