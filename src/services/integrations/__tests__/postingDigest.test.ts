@@ -1,11 +1,11 @@
 import { describe, it, expect, vi } from 'vitest'
-import {
-  brochurePhrases,
-  digestPosting,
-  groundFields,
-  ungroundedWords,
-} from '../postingDigest'
-import { formatPostingText, extractiveSummary } from '../../postingFormat'
+import { digestPosting, groundFields, ungroundedNumbers } from '../postingDigest'
+/* THE RECORD'S OWN PARSER, imported into a service test on purpose: the
+   round-trip below is a contract BETWEEN the two, and proving it against a
+   local copy of the heading rule would prove only that the copy agrees with
+   itself. */
+import { parsePosting, serializePosting } from '@/components/applications/record/postingSections'
+import { formatPostingText } from '../../postingFormat'
 import type { IntegrationConfig } from '../config'
 
 function configWith(tailoring: Partial<IntegrationConfig['tailoring']> = {}): IntegrationConfig {
@@ -59,59 +59,6 @@ describe('formatting a scraped posting', () => {
     for (const word of ['Build', 'things', 'React', 'Ship']) expect(out).toContain(word)
   })
 
-  it('summarises extractively, so it cannot invent', () => {
-    const summary = extractiveSummary('First sentence here. Second one. Third one.')
-    expect(summary).toBe('First sentence here. Second one.')
-  })
-
-  describe('and does not run away with itself', () => {
-    /**
-     * THE 810-CHARACTER "SUMMARY", measured 2026-09-07 on a real posting. The
-     * first version flattened newlines to spaces and split on `.!?` -- but a
-     * posting is mostly bullets and bullets carry no full stop, so the first
-     * "sentence" ran from the top of the advert to the first period several
-     * paragraphs down.
-     */
-    const BULLETED = `Who Thrives Here:
-Strong understanding of DNS, SEO and accessibility
-Experience with GoDaddy, WIX and related website platforms
-Bachelor's degree in Computer Science or related fields
-Must be willing to work onsite in Taguig
-Job Responsibilities:
-Engage with customers by telephone, email and chat.`
-
-    it('treats a line break as the end of a unit', () => {
-      const summary = extractiveSummary(BULLETED, 2)
-      expect(summary.length).toBeLessThan(200)
-      expect(summary).not.toContain('Taguig')
-    })
-
-    it('skips a heading, which is a label rather than a fact', () => {
-      // A summary that opens "Who Thrives Here:" has spent its first line
-      // saying nothing.
-      expect(extractiveSummary(BULLETED, 2)).not.toContain('Who Thrives Here')
-      expect(extractiveSummary(BULLETED, 2)).not.toContain('Job Responsibilities')
-    })
-
-    it('punctuates the bullets it joins', () => {
-      // Two bullets joined by a space read as one run-on. The words are the
-      // posting's; the full stops are ours.
-      const summary = extractiveSummary(BULLETED, 2)
-      expect(summary).toContain('accessibility. Experience with')
-    })
-
-    it('caps a single enormous line rather than printing it whole', () => {
-      const long = `${'word '.repeat(200)}.`
-      const summary = extractiveSummary(long, 2)
-      expect(summary.length).toBeLessThanOrEqual(281)
-      expect(summary.endsWith('…')).toBe(true)
-    })
-
-    it('does not cut a word in half', () => {
-      const summary = extractiveSummary(`${'alpha '.repeat(120)}.`, 2)
-      expect(summary).not.toMatch(/alph…$/)
-    })
-  })
 })
 
 describe('grounding what the model returns', () => {
@@ -172,34 +119,6 @@ describe('grounding what the model returns', () => {
   })
 })
 
-describe('detecting an invented summary', () => {
-  it('finds words the posting never used', () => {
-    expect(ungroundedWords('Great Kubernetes opportunity', POSTING)).toContain('kubernetes')
-  })
-
-  it('tolerates a plural on either side, which is grammar not invention', () => {
-    // The posting says "interfaces"; a summary saying "interface" has
-    // invented nothing.
-    expect(ungroundedWords('build interface', POSTING)).toEqual([])
-  })
-
-  it('does not read sentence punctuation as part of a word', () => {
-    // "Acme Corp." at the end of a line must still match "Acme Corp" -- the
-    // failure this guards made grounding reject the truth while looking like
-    // it was working.
-    expect(ungroundedWords('Acme Corp', POSTING)).toEqual([])
-  })
-
-  it('still keeps a dot inside a name', () => {
-    expect(ungroundedWords('node.js', 'We use node.js here.')).toEqual([])
-  })
-
-  it('passes a summary built from the posting', () => {
-    expect(ungroundedWords('Senior Frontend Engineer at Acme Corp, hybrid in Pasig City', POSTING))
-      .toEqual([])
-  })
-})
-
 describe('the digest end to end', () => {
   it('formats and summarises with no model configured', () => {
     // The state of CI, a fresh clone, and any deployment with no provider --
@@ -210,7 +129,8 @@ describe('the digest end to end', () => {
     }).then((digest) => {
       expect(digest.usedModel).toBe(false)
       expect(digest.formatted).toContain('Senior Frontend Engineer')
-      expect(digest.summary).toBeTruthy()
+      // The description IS the tidied posting when nothing restructured it.
+      expect(digest.description).toBe(digest.formatted)
     })
   })
 
@@ -219,7 +139,6 @@ describe('the digest end to end', () => {
       config: configWith(),
       fetchImpl: vi.fn().mockResolvedValue(
         reply({
-          summary: 'Senior Frontend Engineer at Acme Corp.',
           role: 'Senior Frontend Engineer',
           company: 'Acme Corp',
           salary_min: 50000,
@@ -229,20 +148,10 @@ describe('the digest end to end', () => {
     })
     expect(digest.usedModel).toBe(true)
     expect(digest.fields.role).toBe('Senior Frontend Engineer')
-    expect(digest.summary).toBe('Senior Frontend Engineer at Acme Corp.')
-    expect(digest.dropped).toEqual([])
-  })
-
-  it('throws away an invented summary and says so', async () => {
-    const digest = await digestPosting(POSTING, {
-      config: configWith(),
-      fetchImpl: vi.fn().mockResolvedValue(
-        reply({ summary: 'A Kubernetes role at Google paying generously.' })
-      ) as unknown as typeof fetch,
-    })
-    // Falls back to the extractive summary, which cannot invent.
-    expect(digest.summary).not.toContain('Google')
-    expect(digest.dropped.join(' ')).toContain('summary (invented')
+    // None of the fields was dropped. The reply carries no restructured
+    // description, which is a drop of its own -- see "restructuring the
+    // posting" below.
+    expect(digest.dropped).toEqual(['description (missing)'])
   })
 
   it('survives a code fence the model added anyway', async () => {
@@ -267,51 +176,6 @@ describe('the digest end to end', () => {
     })
     expect(digest.usedModel).toBe(false)
     expect(digest.formatted).toBeTruthy()
-  })
-})
-
-describe('keeping the advert out of the summary', () => {
-  /**
-   * THE GAP GROUNDING CANNOT CLOSE. A posting that calls itself "an exciting
-   * opportunity" makes those words part of its own vocabulary, so a summary
-   * echoing them passes every grounding check and still reads like a brochure
-   * rather than like a person saying what the job is.
-   */
-  const SELLING = `An exciting opportunity for a rockstar Senior Frontend Engineer!
-    Join our dynamic team at Acme Corp in Pasig City. We are looking for someone
-    passionate about React and TypeScript. Salary: PHP 50,000 - 70,000.`
-
-  it('spots the advert phrases', () => {
-    expect(brochurePhrases('An exciting opportunity with a dynamic team'))
-      .toEqual(expect.arrayContaining(['exciting opportunity', 'dynamic team']))
-  })
-
-  it('leaves a plain factual summary alone', () => {
-    expect(brochurePhrases('Senior Frontend Engineer at Acme Corp, hybrid in Pasig.')).toEqual([])
-  })
-
-  it('rejects a grounded summary that is still selling', async () => {
-    const digest = await digestPosting(SELLING, {
-      config: configWith(),
-      fetchImpl: vi.fn().mockResolvedValue(
-        reply({ summary: 'An exciting opportunity for a rockstar engineer at Acme Corp.' })
-      ) as unknown as typeof fetch,
-    })
-    // Every one of those words IS in the posting, so grounding passes. This is
-    // the second gate.
-    expect(digest.summary).not.toContain('exciting opportunity')
-    expect(digest.dropped.join(' ')).toContain('advert copy')
-  })
-
-  it('keeps a summary that reports rather than sells', async () => {
-    const digest = await digestPosting(SELLING, {
-      config: configWith(),
-      fetchImpl: vi.fn().mockResolvedValue(
-        reply({ summary: 'Senior Frontend Engineer at Acme Corp in Pasig City. React and TypeScript, PHP 50,000 - 70,000.' })
-      ) as unknown as typeof fetch,
-    })
-    expect(digest.summary).toContain('Senior Frontend Engineer')
-    expect(digest.dropped).toEqual([])
   })
 })
 
@@ -369,5 +233,183 @@ describe('formatting text a page shouted', () => {
     for (const word of ['Urgent', 'Hiring', 'For', 'React', 'Developers']) {
       expect(out.toLowerCase()).toContain(word.toLowerCase())
     }
+  })
+})
+
+/**
+ * THE POSTING READ, NOT REPRODUCED (Gabe, 2026-09-14: "modify the
+ * job-description extraction system so it does not simply scrape and reproduce
+ * the source page ... read and understand the job posting first, then generate
+ * a structured job description").
+ *
+ * The check the whole feature rests on is the same one the rest of this file
+ * describes -- the model proposes and the code verifies -- but the rule had to
+ * change shape for this output, and these are the cases that say how. A
+ * restructure introduces words legitimately; it never introduces a figure, a
+ * company or a technology.
+ */
+describe('restructuring the posting', () => {
+  const STRUCTURED = [
+    'Role overview:',
+    '- Senior Frontend Engineer at Acme Corp, building interfaces with React and TypeScript.',
+    '',
+    'Technical skills:',
+    '- React',
+    '- TypeScript',
+    '',
+    'Compensation:',
+    '- PHP 50,000 - 70,000 per month.',
+  ].join('\n')
+
+  const structuredDigest = (description: string, source = POSTING) =>
+    digestPosting(source, {
+      config: configWith(),
+      fetchImpl: vi.fn().mockResolvedValue(reply({ description })) as unknown as typeof fetch,
+    })
+
+  it('keeps a structured description the posting can back up', async () => {
+    const digest = await structuredDigest(STRUCTURED)
+    expect(digest.dropped).toEqual([])
+    expect(digest.description).toContain('Role overview:')
+    expect(digest.description).toContain('- React')
+    // `formatted` is untouched: it is the evidence everything above was
+    // checked against, and overwriting it would mean checking the model's
+    // restructure against the model's restructure.
+    expect(digest.formatted).toContain('Senior Frontend Engineer at Acme Corp.')
+  })
+
+  it("round-trips through the record's own section parser", async () => {
+    // THE PROPERTY THE EDIT CTAs DEPEND ON. Each section is addressable only
+    // if the parser reads the description back exactly as it was written; a
+    // description that reshapes on the way through would make `edit` on one
+    // heading rewrite its neighbours.
+    const digest = await structuredDigest(STRUCTURED)
+    const sections = parsePosting(digest.description)
+    expect(serializePosting(sections)).toBe(digest.description)
+    expect(sections.map((section) => section.heading)).toEqual([
+      'Role overview:',
+      'Technical skills:',
+      'Compensation:',
+    ])
+  })
+
+  it('gives every section a heading that ends in a colon and fits in 80 characters', async () => {
+    const digest = await structuredDigest(STRUCTURED)
+    for (const section of parsePosting(digest.description)) {
+      expect(section.heading).not.toBeNull()
+      expect(section.heading!.endsWith(':')).toBe(true)
+      expect(section.heading!.length).toBeLessThanOrEqual(80)
+      expect(section.body.trim()).not.toBe('')
+    }
+  })
+
+  it('rejects a salary the posting does not state, and falls back', async () => {
+    // THE SHARPEST CASE. Every word here is the posting's; only the figure is
+    // invented, and a figure is the one thing reorganising can never produce.
+    const digest = await structuredDigest(
+      'Compensation:\n- PHP 90,000 - 120,000 per month.'
+    )
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.description).not.toContain('90,000')
+    expect(digest.dropped.join(' ')).toContain('invented figures')
+  })
+
+  it('rejects an invented company or technology', async () => {
+    const digest = await structuredDigest(
+      'Technical skills:\n- Kubernetes and Docker\n\nRole overview:\n- Engineer at Google.'
+    )
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.dropped.join(' ')).toContain('description (invented')
+  })
+
+  it('will not let an invented name in through a heading', async () => {
+    // Heading vocabulary is exempt from grounding -- a posting that never says
+    // "qualifications" must still be organisable under it. That exemption is a
+    // fixed list of words, not a licence for the whole line.
+    const digest = await structuredDigest('Working at Google:\n- React and TypeScript.')
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.dropped.join(' ')).toContain('google')
+  })
+
+  it('allows the connective words reorganising actually needs', async () => {
+    // The summary's rule would reject all of these, and rejecting all of them
+    // is how a restructure never ships: "including", "based" and "monthly"
+    // are how scattered facts get joined, not things being made up.
+    const digest = await structuredDigest(
+      [
+        'Role overview:',
+        '- Senior Frontend Engineer at Acme Corp, based in Pasig City.',
+        '',
+        'Technical skills:',
+        '- Building interfaces, including React and TypeScript.',
+      ].join('\n')
+    )
+    expect(digest.dropped).toEqual([])
+    expect(digest.description).toContain('including React and TypeScript')
+  })
+
+  it('rejects a description that is mostly its own words', async () => {
+    // Grounded on every name and figure, and still not this posting: the
+    // model stopped reorganising and started writing.
+    const digest = await structuredDigest(
+      [
+        'Benefits:',
+        '- Acme offers free catered lunches, gym membership and unlimited holiday.',
+        '- React engineers also get quarterly wellness retreats, learning budget and commuter allowance.',
+      ].join('\n')
+    )
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.dropped.join(' ')).toContain('description (rewritten')
+  })
+
+  it('rejects prose the record could not render as sections', async () => {
+    // No heading means one orphan block where a document was asked for, and
+    // the per-section editor has nothing to address.
+    const digest = await structuredDigest('A tidy paragraph about the role at Acme Corp.')
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.dropped.join(' ')).toContain('not headings and bullets')
+  })
+
+  it('rejects a heading with nothing under it', async () => {
+    const digest = await structuredDigest('Role overview:\n- React.\n\nBenefits:')
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.dropped.join(' ')).toContain('not headings and bullets')
+  })
+
+  it('says so when the model answered without one', async () => {
+    const digest = await digestPosting(POSTING, {
+      config: configWith(),
+      fetchImpl: vi.fn().mockResolvedValue(
+        reply({ role: 'Senior Frontend Engineer' })
+      ) as unknown as typeof fetch,
+    })
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.dropped).toContain('description (missing)')
+  })
+
+  it('still returns a usable description with no model configured', async () => {
+    // THE LOAD-BEARING CASE: CI, a fresh clone, and any deployment that has
+    // not bought a provider key. No restructure, no empty box either.
+    const digest = await digestPosting(POSTING, {
+      config: configWith({ apiKey: undefined }),
+      fetchImpl: vi.fn() as unknown as typeof fetch,
+    })
+    expect(digest.usedModel).toBe(false)
+    expect(digest.description).toBe(digest.formatted)
+    expect(digest.description).toContain('Senior Frontend Engineer')
+    expect(digest.dropped).toEqual([])
+  })
+})
+
+describe('grounding a number rather than a word', () => {
+  it('reads a thousands separator as one figure, not two', () => {
+    // Without closing the separator up, `50,000` is `50` and `000` -- and a
+    // check that passes anything built out of small numbers is no check.
+    expect(ungroundedNumbers('PHP 50,000 - 70,000', POSTING)).toEqual([])
+    expect(ungroundedNumbers('PHP 90,000', POSTING)).toEqual(['90000'])
+  })
+
+  it('finds a figure nothing in the posting supports', () => {
+    expect(ungroundedNumbers('- 15 days leave', POSTING)).toEqual(['15'])
   })
 })

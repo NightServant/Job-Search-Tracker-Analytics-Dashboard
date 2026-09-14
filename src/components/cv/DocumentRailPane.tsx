@@ -2,8 +2,15 @@
 
 import * as React from 'react'
 import { GrammarCheckPane } from './ProofreadPanes'
-import { TailoringAnalysisRail, type CvTailoringState } from './CvTailoring'
+import {
+  TailoringAnalysisRail,
+  useCvTailoring,
+  type CvTailoringOptions,
+  type CvTailoringState,
+} from './CvTailoring'
+import { LetterCheckPane } from './LetterCheckPane'
 import type { DocumentTabId } from './documentTabs'
+import type { LetterReview } from './letterSuggestions'
 import type { ProofreadState } from './useProofread'
 import type { ThesaurusState } from './useThesaurus'
 
@@ -23,6 +30,14 @@ import type { ThesaurusState } from './useThesaurus'
  * `useCvTailoring` was resolving the selection out of. Both moved into
  * `TailoringAnalysisRail`, which is why the tailor branch below is one line:
  * the pane switch should choose a pane, not lay one out.
+ *
+ * `tailoring` AND `letter` ARE BOTH OPTIONAL BECAUSE A DOCUMENT IS ONE KIND OR
+ * THE OTHER (2026-09-14). A CV has the tailor pane and no letter check; a
+ * cover letter has the letter check and no tailor pane. `asDocumentTab` makes
+ * it impossible to select a tab the open document does not have, so the two
+ * guards below are belt-and-braces rather than live branches -- what they
+ * actually buy is that a missing prop renders nothing instead of throwing
+ * inside a pane that was handed `undefined`.
  */
 
 export interface DocumentRailPaneProps {
@@ -30,7 +45,10 @@ export interface DocumentRailPaneProps {
   id?: string
   proofread: ProofreadState
   thesaurus?: ThesaurusState
-  tailoring: CvTailoringState
+  /** A CV's tailoring state. Absent in a cover-letter editor -- see below. */
+  tailoring?: CvTailoringState
+  /** A cover letter's findings. Absent in a CV editor. */
+  letter?: LetterReview
 }
 
 export function DocumentRailPane({
@@ -39,6 +57,7 @@ export function DocumentRailPane({
   proofread,
   thesaurus,
   tailoring,
+  letter,
 }: DocumentRailPaneProps) {
   return (
     <div
@@ -51,9 +70,39 @@ export function DocumentRailPane({
     >
       {active === 'grammar' && <GrammarCheckPane state={proofread} thesaurus={thesaurus} />}
 
-      {active === 'tailor' && (
+      {active === 'tailor' && tailoring && (
         <TailoringAnalysisRail state={tailoring} />
       )}
+
+      {active === 'suggestions' && letter && <LetterCheckPane review={letter} />}
     </div>
   )
+}
+
+/**
+ * The same pane, for a CV, WITH the tailoring hook called inside it.
+ *
+ * THIS COMPONENT EXISTS FOR ONE REASON: so that a cover-letter editor never
+ * calls `useCvTailoring` AT ALL (Gabe, 2026-09-14 -- the tailoring path "does
+ * not run", rather than running and being hidden). Hooks cannot be called
+ * conditionally, so as long as the call sat in `WordResumeEditor` a cover
+ * letter would have mounted the tailoring state, filtered the wishlist and
+ * held a selection for a pane that does not exist in its rail. Moving the call
+ * below the kind branch is what makes "not at all" true, and a component
+ * boundary is the only construct that can express it.
+ *
+ * WHY THE EDITOR STILL OWNS `jobId` (see `CvTailoringOptions`): the tab strip
+ * and this pane go into two different `DocumentWorkspace` slots, and the strip
+ * marks the tailor tab "needs an application" until one is picked. That one
+ * string is the only thing the two slots share, so it is lifted and everything
+ * else stays down here. Mirroring it back up with a callback was tried on
+ * paper and rejected -- a second copy of the selection is exactly the shape of
+ * bug the picker and the hook were merged to kill.
+ */
+export function TailoringRailPane({
+  tailoring,
+  ...pane
+}: Omit<DocumentRailPaneProps, 'tailoring' | 'letter'> & { tailoring: CvTailoringOptions }) {
+  const state = useCvTailoring(tailoring)
+  return <DocumentRailPane {...pane} tailoring={state} />
 }

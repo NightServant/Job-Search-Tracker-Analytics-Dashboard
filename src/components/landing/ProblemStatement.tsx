@@ -3,6 +3,7 @@ import { Reveal } from '@/components/motion/Reveal'
 import { AlertCircleIcon, ArrowRightIcon, icons } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
 import { LANDING_TYPE } from './typography'
+import { LANDING_RHYTHM } from './rhythm'
 import { PROBLEM } from './content'
 
 /**
@@ -50,7 +51,20 @@ export function ProblemStatement() {
           const Glyph = icons[pain.icon]
           return (
             <Reveal variant="zoom" key={pain.title} delay={i * 0.08}>
-              <li className="grid grid-cols-1 items-start gap-x-10 gap-y-6 border-b border-border-default py-10 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:py-14">
+              <li
+                className={cn(
+                  'grid grid-cols-1 items-start gap-x-10 gap-y-6 border-b border-border-default md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]',
+                  // Was `py-10 md:py-14` -- 40/56, the loosest rows on the page
+                  // and the only ones padded more than the proof entries three
+                  // sections above, which are the same thing: one hairline-
+                  // separated row carrying a title and two lines of body. Two
+                  // lists that look alike and measure differently is the drift
+                  // ./rhythm.ts exists to stop, and at 56px the three rows
+                  // occupied 668px of a section whose argument is three
+                  // sentences long.
+                  LANDING_RHYTHM.row
+                )}
+              >
                 <div className="flex flex-col gap-3">
                   <span className={cn('tabular', LANDING_TYPE.meta)}>
                     {String(i + 1).padStart(2, '0')}

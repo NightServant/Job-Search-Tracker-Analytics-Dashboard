@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ResumeSummary } from '@/services/resumeService'
+import { EMPTY_PROFILE } from '@/services/profile'
 
 /**
  * The Documents route wrapper. `DocumentsPage` itself is covered over plain
@@ -21,6 +22,13 @@ vi.mock('@/hooks/useResumes', () => ({
   useDeleteResume: () => ({ mutateAsync: deleteMutate, isPending: false }),
   useCreateResume: () => ({ mutateAsync: createMutate, isPending: false }),
 }))
+
+// `useCreateDocument` reads the stored LinkedIn profile so a template is
+// already personalised when it is written. The real hook reaches `@/lib/
+// supabase`, which throws at module load without env, so it is stubbed the way
+// the settings route's own test stubs it.
+const useUserProfileMock = vi.hoisted(() => vi.fn())
+vi.mock('@/hooks/useUserProfile', () => ({ useUserProfile: useUserProfileMock }))
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: routerPush, replace: vi.fn() }),
@@ -48,6 +56,7 @@ function makeDoc(overrides: Partial<ResumeSummary> = {}): ResumeSummary {
 beforeEach(() => {
   vi.clearAllMocks()
   useResumeVersionsMock.mockReturnValue({ data: [], isLoading: false, error: null })
+  useUserProfileMock.mockReturnValue({ data: { profile: null, fetchedAt: null } })
   deleteMutate.mockResolvedValue(undefined)
   createMutate.mockResolvedValue({ id: 'cv-new' })
 })
@@ -138,7 +147,58 @@ describe('Documents route wrapper', () => {
     expect(screen.queryByText(/no versions saved yet/i)).toBeNull()
   })
 
-  // Task 4 (M5.5): New CV moved from a Link to /cv?draft=new into a dialog
-  // opened right here, so choosing a mode has to create the draft and land
-  // on its editor exactly as the old full-page ModeChooser did.
+  it('creates the KIND of document the chooser was answered with', async () => {
+    // The header button no longer creates anything by itself; it asks first.
+    // This is the wiring from that answer to the row that gets written.
+    useResumesMock.mockReturnValue({ data: [makeDoc()], isLoading: false, error: null })
+    const user = userEvent.setup()
+    render(<Page />)
+
+    await user.click(screen.getByRole('button', { name: /new document/i }))
+    await user.click(screen.getByRole('button', { name: /cover letter/i }))
+
+    expect(createMutate).toHaveBeenCalledTimes(1)
+    expect(createMutate.mock.calls[0][0]).toMatchObject({
+      mode: 'cover_letter',
+      title: 'Untitled cover letter',
+    })
+    expect(routerPush).toHaveBeenCalledWith('/cv?draft=cv-new')
+  })
+
+  it('writes the user’s own details into a template instead of the specimen text', async () => {
+    // THE FEATURE, and the bug it is guarding: a template written straight to
+    // the database ships literal `{{name|Your Name}}` to a person, and a
+    // template that still says "Your Name" after this is the same failure
+    // wearing better punctuation.
+    useResumesMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    useUserProfileMock.mockReturnValue({
+      data: {
+        profile: { ...EMPTY_PROFILE, name: 'Gabe Cervantes', headline: 'Software Engineer' },
+        fetchedAt: null,
+      },
+    })
+    const user = userEvent.setup()
+    const { container } = render(<Page />)
+
+    await user.click(container.querySelector('[data-template-card="cover-standard"]')!)
+
+    const written = JSON.stringify(createMutate.mock.calls[0][0].content)
+    expect(written).toContain('Gabe Cervantes')
+    // No token survives: an unknown one is deleted rather than left visible.
+    expect(written).not.toContain('{{')
+  })
+
+  it('falls back to the template’s own wording when no profile is connected', async () => {
+    // `personalizeTemplate` is called unconditionally BECAUSE every token
+    // carries its own readable default -- skipping the call to "save" it is
+    // what would ship the raw markers.
+    useResumesMock.mockReturnValue({ data: [], isLoading: false, error: null })
+    const user = userEvent.setup()
+    const { container } = render(<Page />)
+
+    await user.click(container.querySelector('[data-template-card="word-classic"]')!)
+
+    const written = JSON.stringify(createMutate.mock.calls[0][0].content)
+    expect(written).not.toContain('{{')
+  })
 })

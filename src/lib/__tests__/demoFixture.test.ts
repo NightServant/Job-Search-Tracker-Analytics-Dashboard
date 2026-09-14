@@ -47,9 +47,15 @@ describe('the demo fixture as a dataset', () => {
     }
   })
 
-  it('gives Documents more than one CV, and history on at least one', () => {
+  it('gives Documents both kinds of document, and history on at least one', () => {
+    // It used to assert `word` and ONLY `word`, which was right while `mode`
+    // named an editor and the LaTeX one had been deleted. `mode` names the
+    // KIND of document now, and the documents list has a kind filter again --
+    // a fixture with one kind in it would leave a visitor picking "cover
+    // letters" and being told the demo account has none, which is a working
+    // control that looks broken.
     expect(DEMO.resumes.length).toBeGreaterThanOrEqual(2)
-    expect(new Set(DEMO.resumes.map((r) => r.mode))).toEqual(new Set(['word']))
+    expect(new Set(DEMO.resumes.map((r) => r.mode))).toEqual(new Set(['word', 'cover_letter']))
     expect(DEMO.resumes.some((r) => r.hasVersions)).toBe(true)
   })
 

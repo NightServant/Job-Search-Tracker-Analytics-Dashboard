@@ -36,9 +36,9 @@ import type { Job, JobFormData } from '@/types'
  *
  * ATS ABOVE THE POSTING, and that order is the argument for combining them at
  * all: the verdict is the SUMMARY of the posting-against-CV question and the
- * posting is the REFERENCE you drop into when the summary surprises you. The
+ * posting is the REFERENCE you drop into when the description surprises you. The
  * posting is cut to a few blocks with a `read more…` into its own view of this
- * dialog, so the reference cannot push the summary off the screen.
+ * dialog, so the reference cannot push the description off the screen.
  *
  * THE COLUMNS ARE A CONTAINER QUERY, NOT A VIEWPORT ONE, and that distinction
  * is load-bearing: this record renders inside a dialog capped at 1040px on a
@@ -119,15 +119,6 @@ export interface ApplicationRecordViewProps {
    * open; see the `hidden` below.
    */
   postingOpen?: boolean
-  /**
-   * The summary the add flow's digest produced.
-   *
-   * It arrives from upstream because that is the only place it is made: there
-   * is no `tidy and summarise` button any more (Gabe, 2026-09-10) and `jobs`
-   * has no column to store one in, so a record opened later shows the posting
-   * without it.
-   */
-  summary?: string
   /** Overrides the footer's label. The wizard saves a NEW application. */
   submitLabel?: string
   /** Lets the wizard drive the same draft it filled in. */
@@ -307,7 +298,6 @@ export function ApplicationRecordView({
   onReadMore,
   onBack,
   postingOpen = false,
-  summary,
   submitLabel,
   form: providedForm,
   footer,
@@ -473,8 +463,8 @@ export function ApplicationRecordView({
    * The three surfaces, built once and placed by the arrangement.
    *
    * As NODES rather than as a second copy of the JSX in each branch: they are
-   * the same panels either way, and two copies is two places for `summary` or
-   * `onReadMore` to be forgotten.
+   * the same panels either way, and two copies is two places for `onReadMore`
+   * or `onChange` to be forgotten.
    */
   const applicationPanel = (
     <>
@@ -512,7 +502,6 @@ export function ApplicationRecordView({
       showHeading={false}
       value={draft.description}
       onChange={(next) => set('description', next)}
-      summary={summary}
       onReadMore={onReadMore}
     />
   )
@@ -639,7 +628,6 @@ export function ApplicationRecordView({
               className="@2xl/record:border-l @2xl/record:border-border-subtle @2xl/record:pl-6"
               value={draft.description}
               onChange={(next) => set('description', next)}
-              summary={summary}
             />
           </>
         ) : wide ? (
@@ -739,7 +727,6 @@ export function ApplicationRecordView({
             showHeading={false}
             value={draft.description}
             onChange={(next) => set('description', next)}
-            summary={summary}
             onBack={onBack}
             postingUrl={draft.url || null}
           />

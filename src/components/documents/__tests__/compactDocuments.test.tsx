@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { DocumentsPage } from '../DocumentsPage'
 import { TemplatesScreen } from '../TemplatesScreen'
 import { DocumentsNotice } from '../DocumentsNotice'
@@ -40,8 +41,8 @@ const DOCS: ResumeSummary[] = [
   } as ResumeSummary,
   {
     id: 'l1',
-    title: 'LaTeX CV',
-    mode: 'word',
+    title: 'Northwind cover letter',
+    mode: 'cover_letter',
     updated_at: new Date().toISOString(),
     sections: null,
     version: 1,
@@ -65,11 +66,14 @@ describe('documents below lg', () => {
     expect(container.querySelectorAll('[data-document-row]')).toHaveLength(2)
   })
 
-  it('sends the CTA to the templates page instead of opening the mode chooser', () => {
+  it('sends the CTA to the templates page instead of opening the chooser', () => {
     // A navigation, so it is a link: middle-clickable, openable in a new tab,
     // and announced as a link rather than a button that happens to navigate.
+    //
+    // It does NOT ask which kind on the way: every card on the destination
+    // names its own kind, so the question would be answered better there.
     render(<DocumentsPage docs={DOCS} />)
-    const cta = screen.getByRole('link', { name: /new cv/i })
+    const cta = screen.getByRole('link', { name: /new document/i })
     expect(cta).toHaveAttribute('href', '/documents/templates')
   })
 
@@ -83,11 +87,15 @@ describe('documents at desktop', () => {
     // that, because every rule above is one `compact` flag away from leaking.
     const { container } = render(<DocumentsPage docs={DOCS} />)
     expect(container.querySelector('[data-template-gallery]')).not.toBeNull()
-    expect(screen.queryByRole('link', { name: /new cv/i })).toBeNull()
-    expect(screen.getByRole('button', { name: /new cv/i })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /new document/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /new document/i })).toBeInTheDocument()
   })
 
-  it('still opens a LaTeX CV', () => {
+  it('opens every row, whichever kind it is', () => {
+    // Was "still opens a LaTeX CV", from when one of these two rows was a
+    // LaTeX document that the compact tree refused to open. Nothing is
+    // withheld by kind any more -- a cover letter is the same row and the same
+    // editor as a CV -- so the guard is that both rows link into the editor.
     const { container } = render(<DocumentsPage docs={DOCS} />)
     expect(container.querySelector('[data-document-unavailable]')).toBeNull()
     expect(container.querySelectorAll('a[href*="/cv?draft="]')).toHaveLength(2)
@@ -97,16 +105,39 @@ describe('documents at desktop', () => {
 describe('the templates screen', () => {
   beforeEach(() => setViewport(true))
 
-  it('offers a blank document first, and no LaTeX at all', () => {
-    // A LaTeX template here would create a document that cannot be opened on
-    // the device that made it.
+  it('offers a blank document first, then both kinds of template', () => {
+    // Was "and no LaTeX at all": a LaTeX template here would have created a
+    // document that could not be opened on the device that made it. Cover
+    // letters have no such problem, so this screen carries both sets -- which
+    // is also what gives its search and dropdown something to narrow.
     const { container } = render(<TemplatesScreen />)
     const cards = [...container.querySelectorAll('[data-template-card]')].map((c) =>
       c.getAttribute('data-template-card')
     )
     expect(cards[0]).toBe('blank')
-    expect(cards.some((id) => id?.startsWith('latex'))).toBe(false)
-    expect(cards.some((id) => id?.startsWith('word'))).toBe(true)
+    expect(cards.some((id) => id?.startsWith('word-'))).toBe(true)
+    expect(cards.some((id) => id?.startsWith('cover-'))).toBe(true)
+  })
+
+  it('puts the search and the dropdown on the template page itself', () => {
+    // Gabe, verbatim: "In mobile and tablet screens, search bar and dropdown
+    // will appear at the template page." Below `lg` the gallery is not on
+    // /documents at all, so this is the only screen that can carry them.
+    render(<TemplatesScreen />)
+    expect(screen.getByLabelText(/search templates by name/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/filter templates by kind/i)).toBeInTheDocument()
+  })
+
+  it('asks which kind the blank card means rather than assuming a CV', async () => {
+    // Every other card names its kind under the thumbnail. A blank page is
+    // whichever kind you say it is, so it is the one card that has to ask.
+    const onChooseBlank = vi.fn()
+    const user = userEvent.setup()
+    const { container } = render(<TemplatesScreen onChooseBlank={onChooseBlank} />)
+
+    await user.click(container.querySelector('[data-template-card="blank"]')!)
+    await user.click(screen.getByRole('button', { name: /cover letter/i }))
+    expect(onChooseBlank).toHaveBeenCalledWith('cover_letter')
   })
 
   it('is a grid, not a rail: nothing is hidden behind a drag', () => {

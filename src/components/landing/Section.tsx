@@ -4,6 +4,7 @@ import * as React from 'react'
 import { cn } from '@/lib/utils'
 import { Reveal } from '@/components/motion/Reveal'
 import { LANDING_TYPE } from './typography'
+import { LANDING_RHYTHM } from './rhythm'
 
 /**
  * The landing page's layout grid, in one place.
@@ -24,6 +25,13 @@ import { LANDING_TYPE } from './typography'
  * design system separates with hairlines and surface changes, never with
  * borders and shadows, and a full-bleed surface change is what gives a long
  * page rhythm without adding chrome.
+ *
+ * VERTICAL RHYTHM COMES FROM ./rhythm.ts, HORIZONTAL FROM `px-gutter`. Both
+ * halves of the grid are now one decision each. The vertical half used to be a
+ * hardcoded `py-20 md:py-28` here and a hardcoded `mb-12` on the heading below,
+ * which is how the page ended up with ten spacing values doing three jobs; see
+ * that file for the measurements and for why the token is spent as a multiple
+ * rather than as a literal.
  *
  * EVERY SECTION GETS A REAL `id`, defaulting to its `name`. It used to be
  * optional and only two sections passed one, so the rail's `href="#problem"`
@@ -68,7 +76,8 @@ export function Section({
         // margin -- 80 + 24 - 112 -- to express. A fallback that clears the
         // bar is the right amount of fidelity for a path that only runs when
         // the handler could not.
-        'w-full scroll-mt-[60px] px-gutter py-20 md:scroll-mt-[80px] md:py-28',
+        'w-full scroll-mt-[60px] px-gutter md:scroll-mt-[80px]',
+        LANDING_RHYTHM.section,
         tone === 'surface' ? 'bg-bg-surface' : 'bg-bg-canvas',
         className
       )}
@@ -108,7 +117,7 @@ export function SectionHeading({ eyebrow, title, lede, icon: Icon }: SectionHead
   // A HEADER ARRIVES FROM THE LEADING EDGE, so it reads as the section opening
   // rather than as another block drifting up the page with everything else.
   return (
-    <Reveal variant="slideLeft" className="mb-12 flex flex-col gap-3">
+    <Reveal variant="slideLeft" className={cn('flex flex-col gap-3', LANDING_RHYTHM.headingGap)}>
       {eyebrow && (
         <p className={LANDING_TYPE.eyebrow}>{eyebrow}</p>
       )}

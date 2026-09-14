@@ -1,5 +1,6 @@
 'use client'
 
+import { AnalyzingDocument } from '@/components/ui/analyzing-document'
 import { Reveal } from '@/components/motion/Reveal'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { usePrefersReducedMotion } from '@/hooks/usePrefersReducedMotion'
@@ -39,6 +40,27 @@ export function Motion() {
           instantly -- the animation is decoration, the state change is the feature.
         </p>
         <ThemeToggle size={44} />
+      </div>
+
+      {/* THE ONE PIECE OF MOTION IN THIS APP THAT NOBODY CAN REACH TO LOOK AT.
+          It renders on step three of the add-application wizard, which needs a
+          session, a posting URL and a running extractor before it appears for
+          the few seconds a fetch takes -- so the catalogue is the only place it
+          can actually be reviewed, and reviewing motion is what this page is
+          for. It is also the component whose reduced-motion path is easiest to
+          get wrong: an infinite sweep is exactly what somebody who asked for
+          less motion asked to be spared. Flip the OS setting with this open and
+          the scan bar should vanish while the glyph stays whole. */}
+      <div className="rounded-md border border-border-subtle p-4">
+        <h3 className="text-heading-s text-text-primary">analysing a document</h3>
+        <p className="mb-3 text-body-s text-text-muted">
+          A scan line crosses the page and leaves its text behind it. Shown while the model reads
+          a job posting. Under reduced motion it settles as the finished document.
+        </p>
+        <div className="flex items-center gap-8">
+          <AnalyzingDocument className="size-12 text-text-muted" />
+          <AnalyzingDocument className="size-20 text-accent-default" />
+        </div>
       </div>
 
       <div className="rounded-md border border-border-subtle p-4">

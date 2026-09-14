@@ -32,7 +32,6 @@ export interface AutofillPostingOptions {
   replace: (next: Partial<RecordDraft>) => void
   setStep: (step: StepId) => void
   setReadNote: (note: string) => void
-  setSummary: (summary: string) => void
   onAutofill?: (url: string) => Promise<JobAutofillResult>
   onDigest?: (url: string) => Promise<PostingDigestResult>
 }
@@ -43,7 +42,6 @@ export async function autofillPosting({
   replace,
   setStep,
   setReadNote,
-  setSummary,
   onAutofill,
   onDigest,
 }: AutofillPostingOptions): Promise<void> {
@@ -111,13 +109,18 @@ export async function autofillPosting({
     // is the only place the digest runs now, so it also has to apply the
     // fields the digest mines out of the posting.
     //
-    // Its own try/catch: a failed summary must not throw away a description
-    // the fetch did recover.
+    // Its own try/catch: a failed restructure must not throw away a
+    // description the fetch did recover.
     if (onDigest && description.trim()) {
       try {
         const digest = await onDigest(description)
-        replace({ description: digest.formatted })
-        setSummary(digest.summary)
+        // `description`, NOT `formatted` (Gabe, 2026-09-14: "read and
+        // understand the job posting first, then generate a structured job
+        // description"). `formatted` is the advert with its decoration taken
+        // off; `description` is the same posting reorganised under headings,
+        // and it falls back to `formatted` on its own when the restructure
+        // could not be verified -- so there is nothing to choose between here.
+        replace({ description: digest.description })
         // EMPTY FIELDS ONLY, and through `fillEmpty` rather than a comparison
         // against `draft`: the auto-fill above has not landed in the closure
         // this is reading, so anything checked here would look empty and the

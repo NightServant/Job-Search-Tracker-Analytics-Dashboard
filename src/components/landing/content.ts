@@ -137,7 +137,24 @@ export const SOCIAL_PROOF: { heading: string; tiles: ProofTile[] } = {
       title: 'tested',
       icon: 'Check',
       body: 'Every screen is covered by tests, and the suite runs on every commit.',
-      href: `${REPO_URL}#testing`,
+      /*
+       * `#8-engineering` and `#11-stack`, NOT `#testing` and `#stack`
+       * (2026-09-14). GitHub derives a README anchor from the heading text it
+       * renders, and those headings are numbered -- "## 8. Engineering" is
+       * `#8-engineering`. The two invented anchors matched nothing, so both
+       * links dropped the reader at the top of a 450-line README having
+       * promised a specific section.
+       *
+       * Two of the four tiles in a section whose entire premise is "no
+       * marketing claims, just things you can check" did not lead to the
+       * check. That is the same defect class as a fabricated statistic, and it
+       * is the one an interviewer meets first, because these are the only
+       * outbound links above the fold's worth of page.
+       *
+       * They are checkable now: section 8 is where the testing discipline is
+       * written down and section 11 is the stack table.
+       */
+      href: `${REPO_URL}#8-engineering`,
       linkLabel: 'how the suite is run',
       external: true,
     },
@@ -145,7 +162,7 @@ export const SOCIAL_PROOF: { heading: string; tiles: ProofTile[] } = {
       title: 'a real stack',
       icon: 'Lock',
       body: 'Next.js and TypeScript over Postgres, with row-level security on every table.',
-      href: `${REPO_URL}#stack`,
+      href: `${REPO_URL}#11-stack`,
       linkLabel: 'see the stack',
       external: true,
     },

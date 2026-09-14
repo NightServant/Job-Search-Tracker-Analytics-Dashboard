@@ -17,7 +17,10 @@ const CURRENCY = resolveDefaultCurrency(null)
 
 const RESULT = (over: Partial<PostingDigestResult> = {}): PostingDigestResult => ({
   formatted: 'Senior Frontend Engineer at Acme Corp.\n\n- React\n- TypeScript',
-  summary: 'Senior Frontend Engineer at Acme Corp.',
+  // WHAT THE WIZARD WRITES INTO THE DRAFT is this, not `formatted` (Gabe,
+  // 2026-09-14) -- the posting reorganised under headings rather than the
+  // advert with its decoration taken off.
+  description: 'Role overview:\n- Senior Frontend Engineer at Acme Corp.\n\nTechnical skills:\n- React\n- TypeScript',
   fields: {},
   usedModel: true,
   dropped: [],
@@ -74,21 +77,24 @@ describe('the posting is tidied and summarised on the way in', () => {
     expect(screen.queryByRole('button', { name: /tidy and summarise/i })).toBeNull()
   })
 
-  it('replaces the description with the tidied text', async () => {
+  it('replaces the description with the RESTRUCTURED posting', async () => {
+    // Not `formatted`: whatever the reader ends up editing has to be the
+    // version the model organised, or the restructure is work nobody sees.
     await digestWith(RESULT())
+    expect(screen.getByRole('heading', { name: 'Role overview' })).toBeTruthy()
     expect(screen.getByText(/React/)).toBeInTheDocument()
   })
 
-  it('shows the summary above the posting it summarises', async () => {
-    // SCOPED TO THE SUMMARY BLOCK. The tidied posting opens with the same
-    // sentence -- that is what an extractive summary IS -- so a bare text
-    // query finds it twice and proves nothing about where it landed.
+  it('prints no summary block over the posting', async () => {
+    // Gabe, 2026-09-14: "I highly request to remove the job summary section
+    // specifically in the job description of the application preview dialog".
+    // The description now OPENS with `Role overview:`, which is the same two
+    // sentences from the same source -- a labelled blurb above it was the
+    // same information twice, 40px apart.
     await digestWith(RESULT())
-    const summary = document.querySelector('[data-posting-summary]')!
-    expect(summary.textContent).toContain('Senior Frontend Engineer at Acme Corp.')
-    const body = document.querySelector('[data-posting-body]')
-    expect(body && summary.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING)
-      .toBeTruthy()
+    expect(document.querySelector('[data-posting-summary]')).toBeNull()
+    expect(screen.queryByText('summary')).toBeNull()
+    expect(document.querySelector('[data-posting-body]')).toBeTruthy()
   })
 
   it('fills empty fields from what the digest mined out of the posting', async () => {

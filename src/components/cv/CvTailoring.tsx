@@ -108,6 +108,26 @@ export interface CvTailoringOptions {
   /** Every application the account has; the wishlist is taken out of it here. */
   jobs: Job[]
   /**
+   * WHICH APPLICATION IS SELECTED, OWNED BY THE EDITOR (2026-09-14).
+   *
+   * This was `React.useState('')` in here until cover letters arrived, and it
+   * moved out for a reason that has nothing to do with tailoring. A cover
+   * letter must not call this hook AT ALL -- see `TailoringRailPane` -- so the
+   * call had to drop below the kind branch, into the component that renders
+   * the pane. But the tab STRIP is a different `DocumentWorkspace` slot, and
+   * it marks the tailor tab "needs an application" until one is picked. One
+   * string crosses that seam, so one string is lifted; everything else the
+   * hook owns stays here.
+   *
+   * NOT MIRRORED, LIFTED. The cheap version was an `onJobId` notification with
+   * the state still living in here, and it is the same two-lists mistake this
+   * hook and the picker were merged to kill on 2026-09-13: two copies of a
+   * selection, one of which is a render behind. There is one copy, and this is
+   * the hook reading it rather than holding it.
+   */
+  jobId: string
+  onJobId: (id: string) => void
+  /**
    * The document as it stands, read ONLY when the button is pressed.
    *
    * A getter rather than a value: `cvText` is re-read on every render because
@@ -134,7 +154,7 @@ export interface CvTailoringOptions {
  * new document's name.
  */
 export function useCvTailoring(options: CvTailoringOptions): CvTailoringState {
-  const [jobId, setJobId] = React.useState('')
+  const { jobId, onJobId } = options
   const [running, setRunning] = React.useState(false)
   const runningRef = React.useRef(false)
   const [result, setResult] = React.useState<TailoringResult | null>(null)
@@ -268,12 +288,20 @@ export function useCvTailoring(options: CvTailoringOptions): CvTailoringState {
    * chip list that had already updated to Globex -- a sentence about one
    * posting presented as a fact about another. Same for a stale "tailored --
    * opening the new document" if the navigation never landed.
+   *
+   * STILL CLEARED HERE NOW THAT THE ID LIVES IN THE EDITOR. The editor holds
+   * the string; this hook holds what was computed FROM it, so the clearing
+   * belongs on this side of the seam. Pushing it up would make every caller
+   * responsible for remembering it, which is how the bug above came back.
    */
-  const selectJob = React.useCallback((next: string) => {
-    setJobId(next)
-    setResult(null)
-    setOutcome(null)
-  }, [])
+  const selectJob = React.useCallback(
+    (next: string) => {
+      onJobId(next)
+      setResult(null)
+      setOutcome(null)
+    },
+    [onJobId]
+  )
 
   return {
     jobId,

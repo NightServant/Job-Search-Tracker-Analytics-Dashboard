@@ -64,9 +64,18 @@ function Harness({
   title?: string
   onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
 }) {
+  // THE SELECTION LIVES OUTSIDE THE HOOK SINCE 2026-09-14, so the harness
+  // holds it -- which is exactly what `WordResumeEditor` does. It moved out
+  // because a cover letter must never call `useCvTailoring` at all, so the
+  // call had to drop below a component branch while the tab strip, in another
+  // workspace slot, still needs to know whether a posting is picked. Nothing
+  // about what these tests assert changed; see CvTailoringOptions.
+  const [jobId, setJobId] = React.useState('')
   const state = useCvTailoring({
     cvText,
     jobs: JOBS,
+    jobId,
+    onJobId: setJobId,
     fetchImpl,
     title,
     getContent: content ? () => content : undefined,
@@ -116,7 +125,8 @@ describe('the tailoring section', () => {
     // wishlisted. "no applications yet" would be a lie about the account when
     // the truth is about the filter.
     function Empty() {
-      const state = useCvTailoring({ cvText: 'anything', jobs: [] })
+      const [jobId, setJobId] = React.useState('')
+      const state = useCvTailoring({ cvText: 'anything', jobs: [], jobId, onJobId: setJobId })
       return <TailoringAnalysisRail state={state} />
     }
     render(<Empty />)

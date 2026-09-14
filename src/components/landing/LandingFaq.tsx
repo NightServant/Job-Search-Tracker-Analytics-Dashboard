@@ -25,6 +25,18 @@ import { FAQ } from './content'
  * the page. An accordion row is mostly whitespace anyway; the width costs
  * nothing and buys alignment with the rest of the grid.
  *
+ * ITS ROWS ARE THE ONE DOCUMENTED EXCEPTION TO ./rhythm.ts. Every other list on
+ * this page -- the proof entries, the problem rows, the product cells -- takes
+ * `LANDING_RHYTHM.row`, 32/40px. These stay at `py-5`, 20px, and that is not
+ * drift. A proof entry is a block of content that happens to sit in a list; an
+ * accordion trigger is a CONTROL, and its padding is its tap target rather than
+ * the space around a paragraph. Giving the five collapsed questions the list
+ * step would make each row ~100px tall and the closed accordion ~500px, which
+ * is taller than the section it sits in was before any of this -- the opposite
+ * of what Gabe asked for. 20px puts the row at 60px, comfortably over the 44px
+ * touch minimum, and the hairline between rows does the separating that padding
+ * does elsewhere.
+ *
  * The answers were checked against the code before they were written: the CSV
  * claim is buildJobsCsvText in src/lib/jobCsv.ts wired into ApplicationsPage,
  * and the deletion claim is delete_own_account, called from Settings. A FAQ

@@ -325,7 +325,17 @@ export function GrammarCheckPane({
       <PanelSection title="editor score" icon="Pencil" className="border-t-0 pt-0">
         <div className="flex flex-col gap-4">
           <div className="flex items-end justify-between gap-4">
-            <span className="text-display-s tabular-nums text-text-primary">
+            {/* `text-display-m`. From the day this pane shipped it asked for
+                a display step SMALLER than m, and the scale has never had one
+                -- it stops at xl, l and m. Tailwind emitted no rule, so the
+                score rendered at the inherited 14px body size: a headline the
+                same size as the caption beside it, which looked like a
+                deliberate choice for long enough that nobody questioned it.
+                `typeScale.test.ts` now fails on any scale class the stylesheet
+                does not declare, so the next one is caught at the commit.
+                (It greps source, comments included -- which is why this note
+                describes the dead class instead of naming it.) */}
+            <span className="text-display-m tabular-nums text-text-primary">
               {state.ran ? `${score.value}%` : '—'}
             </span>
             <span className="text-body-s text-text-muted">

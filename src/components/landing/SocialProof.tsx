@@ -4,6 +4,7 @@ import { Reveal } from '@/components/motion/Reveal'
 import { CheckIcon, ExternalIcon, icons } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
 import { LANDING_TYPE } from './typography'
+import { LANDING_RHYTHM } from './rhythm'
 import { SOCIAL_PROOF } from './content'
 
 /**
@@ -75,7 +76,15 @@ export function SocialProof() {
             <Reveal variant="zoom" key={tile.title} delay={i * 0.06}>
               <div
                 data-proof-entry={tile.title}
-                className="group grid grid-cols-1 gap-x-8 gap-y-4 border-b border-border-subtle py-8 transition-colors hover:bg-bg-surface md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-baseline md:py-10"
+                className={cn(
+                  'group grid grid-cols-1 gap-x-8 gap-y-4 border-b border-border-subtle transition-colors hover:bg-bg-surface md:grid-cols-[auto_minmax(0,1fr)_auto] md:items-baseline',
+                  // Was `py-8 md:py-10`, which happened to land on the same
+                  // 32/40 the shared row step resolves to -- this section was
+                  // the one the others should have been matching. Stated as the
+                  // step rather than as the pair it coincided with, so the next
+                  // edit to the rhythm moves all four lists together.
+                  LANDING_RHYTHM.row
+                )}
               >
                 {/*
                   aria-hidden: the term beside it already names the entry, and

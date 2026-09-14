@@ -4,6 +4,7 @@ import { Reveal } from '@/components/motion/Reveal'
 import { AnalyticsIcon, icons } from '@/components/icons'
 import { Section, SectionHeading } from './Section'
 import { LANDING_TYPE } from './typography'
+import { LANDING_RHYTHM } from './rhythm'
 import { SOLUTION } from './content'
 
 /**
@@ -35,10 +36,20 @@ import { SOLUTION } from './content'
  * from another. Stacking peers implies a ranking that does not exist.
  *
  * What they gained instead is room. The cells were `p-6` with 13px copy, which
- * is the density of a dashboard panel rather than a landing page; they are now
- * `p-10` with the shared item type, and each cell has a `min-h` so three
- * claims of unequal length do not leave one column short. The section fills
- * its space by making the tiles bigger, not by padding around them.
+ * is the density of a dashboard panel rather than a landing page; they carry
+ * the shared row step and the shared item type now. The section fills its space
+ * by making the tiles bigger, not by padding around them.
+ *
+ * THE `min-h-[260px]` ON EACH CELL IS GONE, and the reason it was there was
+ * never true. It was added "so three claims of unequal length do not leave one
+ * column short" -- but a grid row stretches its children to the tallest of them
+ * by default, so the equal heights were already guaranteed and the min-height
+ * was only ever a FLOOR under all three at once. At 1440 the tallest claim
+ * measured 262px, so on desktop it did nothing; below md the grid is one column
+ * and the floor applied to every cell separately, which is where it showed --
+ * three stacked boxes each holding two or three lines of copy in 260px of box.
+ * That is the specific kind of padded-out emptiness that reads as a template.
+ * The cells are now as tall as the tallest claim and no taller.
  */
 export interface SolutionValueProps {
   children?: React.ReactNode
@@ -59,7 +70,16 @@ export function SolutionValue({ children }: SolutionValueProps) {
           const Glyph = icons[claim.icon]
           return (
             <Reveal variant="zoom" key={claim.title} delay={i * 0.08} className="h-full">
-              <div className="flex h-full min-h-[260px] flex-col gap-4 bg-bg-canvas p-8 transition-colors hover:bg-bg-surface md:p-10">
+              <div
+                className={cn(
+                  'flex h-full flex-col gap-4 bg-bg-canvas transition-colors hover:bg-bg-surface',
+                  // A cell is a row turned on its side, so it takes the row
+                  // step on both axes. It was `p-8 md:p-10`, which landed on
+                  // the same 32/40 by coincidence rather than by rule.
+                  LANDING_RHYTHM.row,
+                  LANDING_RHYTHM.rowX
+                )}
+              >
                 {/*
                   The glyph leads on its own line here rather than sitting
                   inline with the title, which is the opposite of the problem
@@ -78,7 +98,12 @@ export function SolutionValue({ children }: SolutionValueProps) {
         })}
       </div>
 
-      {children && <div className="mt-16">{children}</div>}
+      {/*
+        The screens are the section's SECOND block, not a caption under the
+        first, so they sit one `blockGap` off the claims rather than the `mt-16`
+        this picked for itself.
+      */}
+      {children && <div className={LANDING_RHYTHM.blockGap}>{children}</div>}
     </Section>
   )
 }

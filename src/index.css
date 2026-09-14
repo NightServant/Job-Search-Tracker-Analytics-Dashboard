@@ -45,25 +45,46 @@
   --color-neutral-900: #18181b;
   --color-neutral-950: #09090b;
 
-  /* Warm dark ramp. THE DARK THEME'S OWN NEUTRALS, and the reason it has any:
-     dark mode ran on zinc (`neutral-950` #09090b down), which is the default
-     palette of every framework starter and every generated dashboard -- Gabe's
-     note was that the theme "is very familiar to the specific kind of users",
-     and he is right, it looked like a template. These are the same steps at
-     the same lightness, turned a few degrees warm and lifted off pure black,
-     so the ground belongs to the orange rather than merely tolerating it.
+  /* Navy dark ramp. THE DARK THEME'S OWN NEUTRALS, and it has been rebuilt
+     twice for the same reason both times: the ground was carrying the wrong
+     association.
 
-     Chroma is deliberately tiny. One step further and a dark UI reads sepia;
-     this reads as charcoal that happens to be warm, which is the point. */
-  --color-ink-50: #faf7f4;
-  --color-ink-200: #e9e3dd;
-  --color-ink-300: #d6cec5;
-  --color-ink-400: #a89e94;
-  --color-ink-600: #5c5148;
-  --color-ink-700: #443b33;
-  --color-ink-800: #2e2721;
-  --color-ink-900: #211b16;
-  --color-ink-950: #17120e;
+     ROUND ONE ran on zinc (`neutral-950` #09090b down), the default palette of
+     every framework starter, and it looked like a template.
+
+     ROUND TWO turned those steps a few degrees WARM, so the ground would
+     belong to the orange rather than merely tolerating it. That is defensible
+     colour theory and it was the wrong call in practice: near-black plus
+     saturated orange is one of the most strongly branded pairings on the web,
+     and Gabe's report (2026-09-14) was that the theme read as a specific adult
+     site rather than as this product. A palette that reminds people of
+     something else is not neutral, whatever the contrast numbers say.
+
+     ROUND THREE -- these values -- go the other way on the colour wheel.
+     Navy sits opposite orange, so the accent is a complement against the
+     ground instead of an analogous neighbour of it, which is what kills the
+     near-black/orange read. It is also the ground the legacy shadcn `.dark`
+     block further down this file has always used (222.2 84% 4.9%), so the two
+     palettes finally agree instead of one being blue and one being brown.
+
+     SAME LIGHTNESS STEPS AS BEFORE, so nothing that depended on the ramp's
+     contrast had to move: `ink-50` on `ink-950` is 17.2:1, `ink-400` (muted
+     text) is 6.5:1 on canvas and 5.8:1 on surface, and `accent-400` is 8.2:1
+     on canvas. The hue is ~218deg throughout and chroma stays modest -- one
+     step further and a dark UI reads as a corporate SaaS blue, which is the
+     other cliche this is trying to miss.
+
+     THE NAME STAYS `ink`. It never meant "warm", and renaming it would touch
+     every landing-page class for no change in what paints. */
+  --color-ink-50: #f5f7fa;
+  --color-ink-200: #dde3ec;
+  --color-ink-300: #c3cddb;
+  --color-ink-400: #8c9bb2;
+  --color-ink-600: #44536b;
+  --color-ink-700: #2f3c52;
+  --color-ink-800: #1e2a3d;
+  --color-ink-900: #16202f;
+  --color-ink-950: #0d1522;
 
   --color-accent-50: #fff7ed;
   --color-accent-100: #ffedd5;
@@ -77,6 +98,11 @@
   --color-accent-700: #c2410c;
   --color-accent-800: #9a3412;
   --color-accent-900: #7c2d12;
+  /* The step below 900, and it exists for exactly one token: dark mode's
+     `accent-surface`. See that token's note in the `.dark` block for the
+     measurement -- on the warm ground 900 read as a tinted band, on navy it
+     reads as a brick slab, because the ground moved and the band did not. */
+  --color-accent-950: #492620;
 
   --color-base-white: #ffffff;
   --color-base-black: #000000;
@@ -376,9 +402,23 @@
   --color-accent-hover: var(--color-accent-300);
   --color-accent-subtle: var(--color-ink-900);
   --color-accent-on-accent: var(--color-ink-950);
-  /* Deep, not bright: accent-900 is the darkest step, so a full-width band
-     reads as a tinted surface rather than a slab of signal colour. */
-  --color-accent-surface: var(--color-accent-900);
+  /* Deep, not bright: a full-width band has to read as a tinted surface
+     rather than as a slab of signal colour.
+
+     IT WAS `accent-900` AND THAT STOPPED WORKING WHEN THE GROUND WENT NAVY
+     (2026-09-14). The value never changed; what changed is what it sits on.
+     Against the old warm charcoal, #7c2d12 was a few steps deeper than the
+     page and read as a tint of it. Against #0d1522 it is a warm slab on a cool
+     ground -- measured on the dashboard's recent-applications table, where the
+     header band went from "tinted" to the loudest thing on the screen.
+
+     `accent-950` is the same hue carried one step further down and slightly
+     desaturated, which is what the 900 step used to BE relative to its ground.
+     Checked at three candidates in the running app rather than picked on
+     paper: 900 (#7c2d12) is the slab, #33221f disappears and stops announcing
+     the header row at all, and this one is a band you can see without it
+     competing with the accent marks in the same table. */
+  --color-accent-surface: var(--color-accent-950);
   --color-accent-on-surface: var(--color-accent-200);
   /* Inverted: on a near-black ground the LIGHT steps read strongest, so
      series 1 stays the most prominent rather than becoming the faintest. */
@@ -1395,37 +1435,88 @@ body,
 
    Radius caps at 4px here as everywhere; the vendor drew 25px slide corners.
 
-   The `content: none` matters. Swiper draws its arrows as an ::after glyph
-   from its own icon font, which is a second icon vocabulary and the Global
-   Constraint forbids it. Killing the pseudo-element is what lets the
-   @/components/icons chevrons show. */
+   THE OVERRIDE APPROACH WAS ABANDONED FOR THE CONTROLS (2026-09-14), AND IT
+   HAD NEVER WORKED. This block used to restyle `.swiper-button-next`,
+   `.swiper-button-prev` and `.swiper-pagination-bullet` in place. Measured in
+   the browser, none of those three rules was winning: the arrows rendered at
+   `rgb(0, 122, 255)` and the active dot with them -- Swiper's
+   `--swiper-theme-color`, iOS blue -- while the inactive dots sat on Swiper's
+   `#000` at 50% radius rather than on `text-muted` at `--radius-sm`. The cause
+   is source order, not specificity: `import 'swiper/css'` sits in a component
+   file, so Next injects it AFTER the global stylesheet, and two selectors of
+   equal specificity are settled by whoever comes last. The rules read as
+   though the vendor had been reconciled. It had not been, on the one section
+   of the landing page Gabe then called out for contradicting the design
+   system.
+
+   So the controls no longer use Swiper's class names at all -- see edits 8 and
+   9 in skiper51.tsx. Nothing here has to beat the vendor any more, because
+   nothing the vendor styles is on screen. What is left below is only the part
+   that genuinely belongs to Swiper's own layout: the slide.
+
+   The `::after` rules went with them. They killed an icon-font glyph Swiper
+   has not drawn since v11 -- it injects an <svg> now, and only into an element
+   matching its own arrow classes, which ours deliberately do not. */
 .swiper-slide {
   border-radius: var(--radius-md);
   overflow: hidden;
   background-position: center;
   background-size: cover;
 }
-.swiper-pagination-bullet {
+
+/* The pagination dots, and the geometry is NOT Swiper's 8px circle.
+   `SectionRail` draws this app's other small indicator -- the dot column
+   pinned to the right of this very page -- at 7px with a `text-muted` resting
+   state, `text-primary` on hover and `accent-default` for the current one.
+   Two dot vocabularies on one screen is the sort of thing nobody can name and
+   everybody feels, so these are that dot. A circle rather than the 4px cap for
+   the same reason `carousel.tsx` is allowlisted for one: the cap governs
+   corners on rectangles, and a 7px indicator is not a rectangle.
+
+   They are <button>s (renderBullet, skiper51.tsx), so they take a focus ring.
+   It is an outline rather than the `ring-2` utility because the element is
+   generated by Swiper as a string and never passes through Tailwind; 2px at
+   3px offset is what that utility resolves to on a control this small. */
+.landing-carousel-dot {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 9999px;
   background: var(--color-text-muted);
-  opacity: 1;
-  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color var(--duration-fast) ease;
 }
-.swiper-pagination-bullet-active {
+.landing-carousel-dot:hover {
+  background: var(--color-text-primary);
+}
+.landing-carousel-dot-active {
   background: var(--color-accent-default);
 }
-.swiper-button-next,
-.swiper-button-prev {
-  color: var(--color-text-secondary);
+.landing-carousel-dot:focus-visible {
+  outline: 2px solid var(--color-accent-default);
+  outline-offset: 3px;
 }
-.swiper-button-next::after,
-.swiper-button-prev::after {
-  content: none;
+
+/* Colour is not motion, so the transition stays where the rest of this file
+   keeps colour transitions under the setting -- but the indicator is small
+   enough that a cross-fade between two greys reads as a flicker, so it goes.
+   Same reasoning as the icon-motion gate above. */
+@media (prefers-reduced-motion: reduce) {
+  .landing-carousel-dot {
+    transition: none;
+  }
 }
 
 /* The carousel's own stage. `Carousal_005` is the vendor's spelling of the
    class it puts on the Swiper root -- kept as-is so the selector still matches
-   the copied source. The bottom padding is the gutter the pagination bullets
-   sit in; without it they overlap the last slide.
+   the copied source.
+
+   THE 44px BOTTOM PADDING IS GONE (2026-09-14). It was the gutter Swiper's
+   absolutely-positioned bullets sat in, so that they did not overlap the last
+   slide. The bullets are no longer in the stage -- they are in a control row
+   beneath it with the arrows, see skiper51.tsx edit 9 -- so the padding was
+   holding open a band with nothing in it, directly above the row that
+   replaced it.
 
    HEIGHT IS DERIVED FROM THE SLIDE ASPECT, NOT FIXED. The vendor hardcodes
    440px, which crops roughly a third of a screenshot -- the app's sidebar and
@@ -1454,7 +1545,6 @@ body,
 .Carousal_005 {
   width: 100%;
   height: auto;
-  padding-bottom: 44px;
 }
 .Carousal_005 .swiper-slide {
   width: 100%;

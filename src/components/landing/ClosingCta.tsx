@@ -6,6 +6,7 @@ import { EyeIcon, InfoIcon, LockIcon, UserRoundIcon } from '@/components/icons'
 import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { Section } from './Section'
 import { LANDING_TYPE } from './typography'
+import { LANDING_RHYTHM } from './rhythm'
 import { CLOSING_CTA } from './content'
 
 /**
@@ -59,10 +60,33 @@ import { CLOSING_CTA } from './content'
 export function ClosingCta() {
   return (
     <Section name="cta">
-      <Reveal variant="slideRight" className="grid grid-cols-1 items-start gap-x-16 gap-y-12 border-t border-border-default pt-14 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:pt-20">
+      {/*
+        `blockPad` off the rule rather than the `pt-14 lg:pt-20` this section
+        picked for itself: the hairline opens a block, and that is the same
+        distance the screens sit off the claims two sections up.
+      */}
+      <Reveal
+        variant="slideRight"
+        className={cn(
+          'grid grid-cols-1 items-start gap-x-16 gap-y-12 border-t border-border-default lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]',
+          LANDING_RHYTHM.blockPad
+        )}
+      >
         <div className="flex flex-col gap-8">
-          <h2 className={LANDING_TYPE.sectionTitle}>{CLOSING_CTA.heading}</h2>
-          <p className={cn('max-w-2xl', LANDING_TYPE.sectionLede)}>{CLOSING_CTA.body}</p>
+          {/*
+            THE TITLE AND ITS LEDE ARE ONE PAIR, at `gap-3`, and the 32px this
+            used to put between them was the single loosest coupling on the
+            page. Every other section states its name and then its sentence 12px
+            apart, because SectionHeading does -- this one writes its own <h2>
+            (no eyebrow, no glyph, see above) and so had nothing holding it to
+            that. Nesting the pair leaves the outer `gap-8` doing the job it is
+            actually good for: separating the ask from the buttons that answer
+            it.
+          */}
+          <div className="flex flex-col gap-3">
+            <h2 className={LANDING_TYPE.sectionTitle}>{CLOSING_CTA.heading}</h2>
+            <p className={cn('max-w-2xl', LANDING_TYPE.sectionLede)}>{CLOSING_CTA.body}</p>
+          </div>
 
           {/*
             ONE WRAPPING ROW. This was built as two rows -- new visitors above,
@@ -84,7 +108,9 @@ export function ClosingCta() {
             now `sm:items-start`, present exactly where it is wanted. From 640
             up nothing about this row has changed.
           */}
-          <div className="flex w-full flex-col gap-3 pt-2 sm:items-start">
+          {/* `pt-2` removed: the outer `gap-8` is the distance here, and an
+              extra 8px on top of it was a second opinion about the same gap. */}
+          <div className="flex w-full flex-col gap-3 sm:items-start">
             <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
               {/*
                 ICONS LEAD, AND THE PRIMARY'S TRAILING ARROW IS GONE

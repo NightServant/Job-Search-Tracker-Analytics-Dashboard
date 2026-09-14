@@ -11,6 +11,7 @@ import 'swiper/css/pagination'
 import 'swiper/css/navigation'
 
 import { ChevronLeftIcon, ChevronRightIcon } from '@/components/icons'
+import { buttonVariants } from '@/components/ui/button-variants'
 import { cn } from '@/lib/utils'
 
 /**
@@ -71,10 +72,100 @@ import { cn } from '@/lib/utils'
  *    it could only ever render eleven broken images. `Carousel_005` is the
  *    component; the demo was its showcase harness.
  *
+ * 8. THE ARROWS ARE REAL BUTTONS IN THIS DESIGN SYSTEM'S OWN CONTROL, AND
+ *    THEY ARE NO LONGER SWIPER'S. This is the largest edit and it is the one
+ *    Gabe asked for on 2026-09-14 -- "carousel navigation must follow the
+ *    design system standards, it looks like that section implements its own
+ *    design system and contradicts ours". He was more right than the complaint
+ *    sounds. Measured in the browser, the arrows were `<div>`s rendering at
+ *    `color: rgb(0, 122, 255)` -- Swiper's `--swiper-theme-color`, iOS blue --
+ *    on a page whose only chroma is a single orange. The reconciliation rule
+ *    in index.css that was supposed to paint them `text-secondary` was losing
+ *    the cascade outright, because a component-level `import 'swiper/css'` is
+ *    injected AFTER the global stylesheet and the two selectors tie on
+ *    specificity. So the vendor's taste was not partly showing through; it was
+ *    winning, and had been for as long as the file existed.
+ *
+ *    They were also `<div>`s with no `type`, no `role` and no label: not
+ *    reachable by keyboard, announced as nothing, and disabled only by a 0.35
+ *    opacity class. In the scroll-driven mode touch is off and the arrows are
+ *    documented as "the only control there is -- and the keyboard affordance",
+ *    which they could not have been.
+ *
+ *    The fix is to stop using Swiper's element names at all. `navigation` now
+ *    points at `.landing-carousel-prev` / `.landing-carousel-next`, which no
+ *    vendor selector matches, so every rule in swiper/css/navigation -- the
+ *    44px box, the absolute inset, `color`, the disabled opacity -- simply
+ *    never applies and there is no override to maintain. What paints them
+ *    instead is `buttonVariants({ variant: 'secondary' })`, the same recipe
+ *    the closing CTA's "create an account" button uses two sections down: the
+ *    app's hairline border, its `bg-inset` hover, its accent focus ring and
+ *    its press animation. Rendering a real `<button>` is also load-bearing
+ *    rather than pedantic -- Swiper's Navigation module sets `el.disabled` on
+ *    a BUTTON and only adds a class otherwise, so the native disabled state,
+ *    and with it `disabled:opacity-50 disabled:pointer-events-none`, comes for
+ *    free at the end of the carousel.
+ *
+ *    `rounded-md` and not the `rounded-full` src/components/ui/carousel.tsx
+ *    uses for the same control in the /documents gallery. That file is
+ *    allowlisted for circles; this page draws 4px corners on everything
+ *    including the slides themselves, and one circular control on it would be
+ *    the only round thing on the page.
+ *
+ * 9. THE CONTROLS MOVED OUT OF THE STAGE, into one row beneath it: dots at the
+ *    leading edge, arrows at the trailing edge. Swiper floats both over the
+ *    media -- arrows inset 4px from the sides, dots 8px off the bottom -- which
+ *    is right for the sample photography it ships with and wrong for
+ *    screenshots, where an arrow at the left edge sits exactly on top of the
+ *    application's own sidebar. It is also what this repo already decided:
+ *    TemplateGallery pulls the same controls out of the card strip "rather
+ *    than floating over the first and last cards". The row is the full width
+ *    of the stage, so both controls land on the page's 1200px grid lines
+ *    rather than on the image's.
+ *
+ *    The dots come with it. `el`, `bulletClass`, `bulletActiveClass` and
+ *    `modifierClass` are all renamed to ours for the same reason the arrows
+ *    were, and `renderBullet` emits a real `<button>` carrying an sr-only
+ *    label -- they were `clickable` spans, which is the identical defect the
+ *    arrows had, on the same control. `horizontalClass` is deliberately left
+ *    alone: every vendor rule that reads it is compounded with
+ *    `.swiper-pagination-bullets`, which `modifierClass` has already renamed,
+ *    so the one class that still lands on our element cannot select anything.
+ *
  * The vendor's inline <style> block was also removed. Its rules now live in
  * one commented block in src/index.css, so the whole Swiper reconciliation can
  * be read in one place rather than half here and half there.
  */
+
+/**
+ * The control element names, in one place because they are written twice each
+ * -- once as the class React renders and once as the selector Swiper is told
+ * to query for. A typo between the two halves is a control that renders and
+ * does nothing, which is exactly the failure edit 4 above describes.
+ */
+const PREV_CLASS = 'landing-carousel-prev'
+const NEXT_CLASS = 'landing-carousel-next'
+const DOTS_CLASS = 'landing-carousel-dots'
+const DOT_CLASS = 'landing-carousel-dot'
+const DOT_ACTIVE_CLASS = 'landing-carousel-dot-active'
+
+/**
+ * One arrow, as this app draws a square icon control.
+ *
+ * `size: 'm'` is the 40px every button on the landing page is, and `w-10 px-0`
+ * squares it -- `buttonVariants` sizes for a label, so height comes from the
+ * variant and width has to be said.
+ *
+ * 40px rather than the 28px `IconButton` would have given. That control is
+ * sized to fit in the gutter of a 44px list row without pushing the row's
+ * content, which is a real constraint and not one that applies here; at 28px
+ * under a 1200px stage it would read as a leftover from a denser screen. 40px
+ * is 4px under the 44px touch guideline and matched to the page's own buttons,
+ * which is the trade this page already makes everywhere else -- and below md
+ * the carousel is not scroll-driven, so touch drag is on and the arrows are a
+ * second way in rather than the only one.
+ */
+const ARROW_CLASS = cn(buttonVariants({ variant: 'secondary', size: 'm' }), 'w-10 px-0')
 
 export interface Carousel005Props {
   /**
@@ -151,14 +242,29 @@ const Carousel_005 = ({
             showPagination
               ? {
                   clickable: true,
+                  // See edit 9 in the docblock: our element, our class names,
+                  // our markup. Nothing here is a Swiper default, so nothing
+                  // in swiper/css/pagination can reach the dots.
+                  el: `.${DOTS_CLASS}`,
+                  bulletClass: DOT_CLASS,
+                  bulletActiveClass: DOT_ACTIVE_CLASS,
+                  modifierClass: `${DOTS_CLASS}-`,
+                  // Static markup, no interpolated content: `index` is a
+                  // number Swiper counts and `className` is the constant
+                  // above. `renderBullet` sets innerHTML, so it is worth
+                  // saying that nothing user-supplied can reach it.
+                  renderBullet: (index: number, className: string) =>
+                    `<button type="button" class="${className}">` +
+                    `<span class="sr-only">Screen ${index + 1}</span>` +
+                    `</button>`,
                 }
               : false
           }
           navigation={
             showNavigation
               ? {
-                  nextEl: '.swiper-button-next',
-                  prevEl: '.swiper-button-prev',
+                  nextEl: `.${NEXT_CLASS}`,
+                  prevEl: `.${PREV_CLASS}`,
                 }
               : false
           }
@@ -221,17 +327,54 @@ const Carousel_005 = ({
               />
             </SwiperSlide>
           ))}
-          {showNavigation && (
-            <div>
-              <div className="swiper-button-next after:hidden">
-                <ChevronRightIcon size={24} />
-              </div>
-              <div className="swiper-button-prev after:hidden">
-                <ChevronLeftIcon size={24} />
-              </div>
-            </div>
-          )}
         </Swiper>
+
+        {/*
+          THE CONTROL ROW, and it is a SIBLING of <Swiper> rather than a child.
+          Swiper renders any non-SwiperSlide child inside `.swiper`, which is
+          `overflow: hidden` and is the stage the screenshots fill -- putting
+          the controls there is what made them float over the image. Out here
+          they are ordinary flow content one `--spacing-section` below it.
+
+          Swiper finds them by selector, not by tree position, so the move
+          costs nothing: the module resolves `nextEl` through
+          `document.querySelectorAll` and binds the click itself. The whole
+          tree is committed before Swiper's mount effect runs, so the elements
+          exist by the time it looks.
+
+          `justify-between` with the dots first: the dots say where you are and
+          the arrows are what you press, so they take the reading order and the
+          two ends of the row respectively. The row renders whenever either
+          control is on; a missing dots element leaves the arrows to be pushed
+          right by `justify-between` on their own.
+        */}
+        {(showNavigation || showPagination) && (
+          <div className="mt-[var(--spacing-section)] flex items-center justify-between gap-4">
+            {showPagination && <div className={cn(DOTS_CLASS, 'flex items-center gap-2')} />}
+
+            {showNavigation && (
+              <div className="ml-auto flex items-center gap-2">
+                {/*
+                  `type="button"` is not boilerplate here. Swiper's Navigation
+                  module disables a control by setting `el.disabled` when the
+                  tag is BUTTON, and a <button> with no type submits the form
+                  it might one day find itself inside.
+
+                  The label is an sr-only span rather than an aria-label, which
+                  is how src/components/ui/carousel.tsx labels the same pair.
+                */}
+                <button type="button" className={cn(PREV_CLASS, ARROW_CLASS)}>
+                  <ChevronLeftIcon size={16} />
+                  <span className="sr-only">Previous screen</span>
+                </button>
+                <button type="button" className={cn(NEXT_CLASS, ARROW_CLASS)}>
+                  <ChevronRightIcon size={16} />
+                  <span className="sr-only">Next screen</span>
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </motion.div>
     </motion.div>
   )

@@ -6,6 +6,7 @@ import { formatTouchedDate } from '@/services/date'
 import { DocumentRow, DOCUMENT_GRID } from '../DocumentRow'
 import { VersionHistory } from '../VersionHistory'
 import { DocumentsPage } from '../DocumentsPage'
+import { chooseOption } from '@/test/select'
 
 afterEach(() => cleanup())
 
@@ -182,11 +183,17 @@ describe('DocumentRow', () => {
     expect(screen.queryByText(/no versions/i)).toBeNull()
   })
 
-  it('names which editor a draft opens in', () => {
-    // One editor since 2026-09-13, so the label is a constant -- kept because
-    // it is what a reader scans the row for, not because it distinguishes.
+  it('names which KIND of document the row is, in the words the filter uses', () => {
+    // It named the EDITOR until 2026-09-14 ("Word"), which was a constant once
+    // there was one editor. It names the kind now, and it has to say it the
+    // way the kind dropdown says it -- a reader who narrows to "CVs" and then
+    // reads "Word" down the column has been shown two names for one thing.
     render(<DocumentRow doc={makeDoc({ mode: 'word' })} />)
-    expect(screen.getByText('Word')).toBeTruthy()
+    expect(screen.getByText('CV')).toBeTruthy()
+
+    cleanup()
+    render(<DocumentRow doc={makeDoc({ mode: 'cover_letter' })} />)
+    expect(screen.getByText('Cover letter')).toBeTruthy()
   })
 })
 
@@ -232,22 +239,81 @@ describe('VersionHistory', () => {
 })
 
 describe('DocumentsPage', () => {
-  it('carries + new cv in the body header, matching Applications Add', () => {
+  it('carries + new document in the body header, matching Applications Add', () => {
+    // `new CV` until 2026-09-14. The button offers two kinds of document now,
+    // so a label naming one of them answers half the question for the reader.
     render(<DocumentsPage docs={[DOC]} />)
     const header = document.querySelector('[data-body-header]') as HTMLElement
-    expect(within(header).getByRole('button', { name: /new cv/i })).toBeTruthy()
+    expect(within(header).getByRole('button', { name: /new document/i })).toBeTruthy()
   })
 
-  it('puts `new CV` in the body header exactly once, never in the Top Bar', () => {
+  it('puts `new document` in the body header exactly once, never in the Top Bar', () => {
     // Renamed: the old name said "exactly one way to start a CV", which stopped
     // being true when the template gallery and import arrived. It never
-    // checked that anyway -- it checks that the HEADER carries one `new CV`
-    // and no more. Content controls belong to the content, not to the Top Bar,
-    // which is chrome and identical on five of the seven app screens.
+    // checked that anyway -- it checks that the HEADER carries one CTA and no
+    // more. Content controls belong to the content, not to the Top Bar, which
+    // is chrome and identical on five of the seven app screens.
     const { container } = render(<DocumentsPage docs={[DOC]} />)
     const header = container.querySelector('[data-body-header]')!
-    const triggers = within(header as HTMLElement).getAllByRole('button', { name: /new cv/i })
+    const triggers = within(header as HTMLElement).getAllByRole('button', { name: /new document/i })
     expect(triggers).toHaveLength(1)
+  })
+
+  it('asks which kind of document before creating anything', async () => {
+    // The chooser is back (it was deleted when one editor left it a modal with
+    // a single button). What makes it a choice again is that `mode` names the
+    // KIND of document rather than the engine, and the two are different
+    // enough that guessing is worse than asking.
+    const onCreateDraft = vi.fn()
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={[DOC]} onCreateDraft={onCreateDraft} />)
+
+    await user.click(screen.getByRole('button', { name: /new document/i }))
+    expect(onCreateDraft).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: /curriculum vitae/i }))
+    expect(onCreateDraft).toHaveBeenCalledWith('word')
+  })
+
+  it('offers the cover letter as the other half of that choice', async () => {
+    const onCreateDraft = vi.fn()
+    const user = userEvent.setup()
+    render(<DocumentsPage docs={[DOC]} onCreateDraft={onCreateDraft} />)
+
+    await user.click(screen.getByRole('button', { name: /new document/i }))
+    await user.click(screen.getByRole('button', { name: /cover letter/i }))
+    expect(onCreateDraft).toHaveBeenCalledWith('cover_letter')
+  })
+
+  it('narrows the list by kind, and says which control emptied it', async () => {
+    // The dropdown was deleted on 2026-09-13 because `word` and `latex` had
+    // come to return the same set. Two kinds disagree again, so it is back --
+    // and the "nothing matches" copy must name the control that did it rather
+    // than borrowing the empty state's "no documents yet", which would be a
+    // false claim about the account.
+    const user = userEvent.setup()
+    const { container } = render(<DocumentsPage docs={[DOC]} />)
+    expect(container.querySelectorAll('[data-document-row]')).toHaveLength(1)
+
+    await chooseOption(user, screen.getByLabelText(/filter documents by kind/i), 'cover letters')
+
+    expect(container.querySelectorAll('[data-document-row]')).toHaveLength(0)
+    const message = container.querySelector('[data-documents-filter-empty]')!
+    expect(message.textContent).toMatch(/no cover letters/i)
+    expect(message.textContent).toMatch(/1 document of the other kind/i)
+  })
+
+  it('reports the search rather than the kind when a search emptied the list', async () => {
+    // The original bug in this copy: naming the kind whatever had happened
+    // announced "no cover letters" to somebody who had typed a word that
+    // matched nothing while the dropdown still said `all documents`.
+    const user = userEvent.setup()
+    const { container } = render(<DocumentsPage docs={[DOC]} />)
+    await user.type(screen.getByLabelText(/search documents by name/i), 'zzz')
+
+    const message = container.querySelector('[data-documents-filter-empty]')!
+    expect(message.textContent).toMatch(/nothing matches/i)
+    expect(message.textContent).not.toMatch(/cover letters/i)
   })
 
   it('renders one row per CV', () => {
@@ -257,10 +323,12 @@ describe('DocumentsPage', () => {
     expect(container.querySelectorAll('[data-document-row]')).toHaveLength(2)
   })
 
-  it('offers a way to start one rather than an empty page when there are no CVs', () => {
+  it('offers a way to start one rather than an empty page when there are no documents', () => {
+    // "no documents yet", not "no CVs yet": the list holds cover letters too,
+    // and naming one kind tells a letter-writer they are on the wrong screen.
     render(<DocumentsPage docs={[]} />)
-    expect(screen.getByText(/no cvs yet/i)).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: /new cv/i }).length).toBeGreaterThan(0)
+    expect(screen.getByText(/no documents yet/i)).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: /new document/i }).length).toBeGreaterThan(0)
   })
 
   it('shows one CV version history at a time, beside the row it belongs to', () => {
@@ -296,10 +364,51 @@ describe('the Word-style start screen', () => {
     const cards = [...container.querySelectorAll('[data-template-card]')].map(
       (c) => (c as HTMLElement).dataset.templateCard
     )
-    // No blank card: `new CV` is already a primary button on this screen, so a
+    // No blank card: `new document` is already a primary button on this screen, so a
     // blank card would be a third route to the same blank document.
     expect(cards.some((c) => c!.startsWith('blank'))).toBe(false)
     expect(cards.some((c) => c!.startsWith('word-'))).toBe(true)
+    // Both sets, which is the bug the data layer left behind: the card list
+    // read `modes.includes('word') ? WORD_TEMPLATES : []`, so a gallery asked
+    // for cover letters rendered nothing at all.
+    expect(cards.some((c) => c!.startsWith('cover-'))).toBe(true)
+  })
+
+  it('searches template names AND descriptions, the same way the list searches', async () => {
+    // "for a career change" is written only in the description -- the card is
+    // named "Career change" -- so a gallery that searched names alone would
+    // miss the words somebody actually types. Every term, any order,
+    // substring: the rule lives in `./search` precisely so the two boxes on
+    // this screen cannot disagree.
+    const user = userEvent.setup()
+    const { container } = render(<DocumentsPage docs={[]} />)
+
+    await user.type(screen.getByLabelText(/search templates by name/i), 'referred')
+    const cards = [...container.querySelectorAll('[data-template-card]')].map(
+      (c) => (c as HTMLElement).dataset.templateCard
+    )
+    expect(cards).toEqual(['cover-referral'])
+  })
+
+  it('narrows the gallery by kind without touching the documents list', async () => {
+    // Two search boxes and two dropdowns share this screen at desktop width.
+    // The guard that they are not wired to each other: narrowing the gallery
+    // to cover letters must leave every CV row where it was.
+    const user = userEvent.setup()
+    const { container } = render(<DocumentsPage docs={[DOC]} />)
+
+    await chooseOption(
+      user,
+      screen.getByLabelText(/filter templates by kind/i),
+      'cover letter templates'
+    )
+
+    const cards = [...container.querySelectorAll('[data-template-card]')].map(
+      (c) => (c as HTMLElement).dataset.templateCard
+    )
+    expect(cards.length).toBeGreaterThan(0)
+    expect(cards.every((c) => c!.startsWith('cover-'))).toBe(true)
+    expect(container.querySelectorAll('[data-document-row]')).toHaveLength(1)
   })
 
   it('reports which template was picked', async () => {
@@ -313,24 +422,28 @@ describe('the Word-style start screen', () => {
 
   })
 
-  it('keeps `new CV` out of the header until there is a list to act on', () => {
+  it('keeps `new document` out of the header until there is a list to act on', () => {
     // Gabe's rule. With no documents the empty state already owns the screen
     // and already carries the call to action; a second identical button in the
     // corner is the same offer made twice, three inches apart.
     const empty = render(<DocumentsPage docs={[]} />)
-    expect(empty.container.querySelector('[data-body-header]')!.textContent).not.toMatch(/new CV/)
+    expect(empty.container.querySelector('[data-body-header]')!.textContent).not.toMatch(
+      /new document/
+    )
     empty.unmount()
 
     render(<DocumentsPage docs={[DOC]} />)
     expect(screen.getByRole('heading', { level: 1 }).closest('[data-body-header]')!.textContent).toMatch(
-      /new CV/
+      /new document/
     )
   })
 
   it('gives the empty state the primary button, and import beside it', () => {
     const { container } = render(<DocumentsPage docs={[]} />)
     const state = container.querySelector('[data-empty-state]')!
-    const newCv = [...state.querySelectorAll('button')].find((b) => b.textContent?.includes('new CV'))!
+    const newCv = [...state.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('new document')
+    )!
     const importBtn = [...state.querySelectorAll('button')].find((b) =>
       b.textContent?.includes('import')
     )!

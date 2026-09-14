@@ -234,11 +234,27 @@ function buildEvents(now: Date): CalendarEvent[] {
  * Dates are spread so `modified` sorts to something readable rather than
  * twelve rows of the same day.
  */
+/**
+ * The demo's documents list.
+ *
+ * IT CARRIES COVER LETTERS AS WELL AS CVS (2026-09-14), because the list has a
+ * kind filter again and a fixture with one kind in it would leave a visitor
+ * choosing "cover letters" and being told the demo account has none -- a
+ * working control that looks broken, which is the exact failure the demo
+ * exists to avoid. Four of sixteen, and dated in among the CVs rather than
+ * appended, so the list does not sort into a block of CVs followed by a block
+ * of letters and give away that they were bolted on.
+ *
+ * Each letter is named after a company that exists in the applications
+ * fixture. The demo's whole discipline is that its screens do not contradict
+ * each other, and a cover letter addressed to a company nobody applied to is
+ * the kind of detail a reviewer notices.
+ */
 function buildResumes(now: Date): ResumeSummary[] {
   const cv = (
     id: string,
     title: string,
-    mode: 'word',
+    mode: ResumeSummary['mode'],
     daysAgo: number,
     version: number
   ): ResumeSummary => ({
@@ -255,16 +271,20 @@ function buildResumes(now: Date): ResumeSummary[] {
 
   return [
     cv('demo-cv-word', 'Software Engineer CV', 'word', 3, 4),
+    cv('demo-cl-meridian', 'Cover letter — Meridian Labs', 'cover_letter', 4, 2),
     cv('demo-cv-frontend', 'Frontend Engineer CV', 'word', 5, 3),
     cv('demo-cv-meridian', 'Product Engineer — Meridian Labs', 'word', 8, 2),
     cv('demo-cv-northwind', 'Software Engineer — Northwind Pay', 'word', 12, 5),
+    cv('demo-cl-northwind', 'Cover letter — Northwind Pay', 'cover_letter', 13, 3),
     cv('demo-cv-fullstack', 'Full Stack Engineer CV', 'word', 16, 2),
     cv('demo-cv-backend', 'Backend Engineer CV', 'word', 24, 1),
+    cv('demo-cl-halcyon', 'Cover letter — Halcyon Systems', 'cover_letter', 28, 1),
     cv('demo-cv-junior', 'Junior Developer CV', 'word', 33, 1),
     cv('demo-cv-ats', 'ATS-safe plain CV', 'word', 41, 2),
     cv('demo-cv-engineer', 'Software Engineer CV', 'word', 21, 2),
     cv('demo-cv-academic', 'Academic CV', 'word', 29, 3),
     cv('demo-cv-compact', 'Compact one-page CV', 'word', 47, 1),
+    cv('demo-cl-speculative', 'Speculative letter — Lumen Studio', 'cover_letter', 52, 1),
     cv('demo-cv-halcyon', 'Frontend Engineer — Halcyon', 'word', 55, 2),
   ]
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCreateResume, useDeleteResume, useResume, useUpdateResume } from '@/hooks/useResumes'
@@ -9,12 +9,73 @@ import { useToast } from '@/contexts/ToastContext'
 import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
 import { buttonVariants } from '@/components/ui/button-variants'
+import { AppDialog } from '@/components/ui/app-dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { DocumentChooser } from '@/components/documents/DocumentChooser'
+import { useCreateDocument } from '@/components/documents/useCreateDocument'
+import type { NoticeKind } from '@/components/documents/DocumentsNotice'
 import { WordResumeEditor } from '@/components/cv/WordResumeEditor'
-import { DEFAULT_WORD_CONTENT } from '@/components/cv/content'
 import type { ResumeContent, ResumeMode } from '@/services/resumeService'
 
 const DOCUMENTS = '/documents'
+
+/**
+ * What `/cv?draft=new` actually is: the document chooser, and the write it
+ * leads to.
+ *
+ * A CHILD COMPONENT RATHER THAN A BRANCH INSIDE `CvRoute`, and the reason is
+ * `useCreateDocument` -- it reads the stored LinkedIn profile so the template
+ * it writes is already personalised, and a hook cannot be called
+ * conditionally. Inlined, every reader who opened an existing CV would fire a
+ * `user_profiles` query for a value only this one state uses, and every test
+ * of the editor would have to mock a hook the editor never touches.
+ *
+ * THE CHOOSER SITS OVER A SKELETON, which is the honest thing to draw here.
+ * M5 made this a full page on the argument that a dialog over an empty screen
+ * has nothing behind it to protect, and Gabe overruled it (2026-08-29: "the
+ * dialog adds user experience"). What is behind it on `/documents` is the
+ * list; arriving straight at this URL there is nothing yet, so the skeleton
+ * stands in for the editor that is about to exist.
+ *
+ * DISMISSING GOES BACK TO `/documents` rather than leaving the reader on a
+ * skeleton of a document they declined to create. `replace`, so Back does not
+ * bounce them straight into the dialog they just closed.
+ */
+function NewDocumentPrompt() {
+  const router = useRouter()
+  const { success, error: showError, info } = useToast()
+
+  // The Documents screens report through `useDocumentsNotice`, which this
+  // route has no business mounting -- its banner half is positioned against
+  // the bottom nav, and the editor has no bottom nav. So the toast context is
+  // adapted to the same three-kind signature, which is all the hook asks for.
+  const notify = useCallback(
+    (kind: NoticeKind, title: string, message?: string) => {
+      const send = kind === 'error' ? showError : kind === 'success' ? success : info
+      send(title, message)
+    },
+    [showError, success, info]
+  )
+  // `replace`, not push: this route is already standing on `?draft=new`, and
+  // pushing would leave a history entry that re-opens the chooser on Back.
+  const { creating, createBlank } = useCreateDocument({ notify, replace: true })
+
+  return (
+    <>
+      <RouteSkeleton variant="detail" />
+      <AppDialog
+        open
+        onOpenChange={(next) => {
+          if (!next) router.replace(DOCUMENTS)
+        }}
+        title="new document"
+        icon="Documents"
+      >
+        <DocumentChooser creating={creating} onChoose={(mode) => void createBlank(mode)} />
+      </AppDialog>
+    </>
+  )
+}
 
 /**
  * The CV editor route.
@@ -27,9 +88,9 @@ const DOCUMENTS = '/documents'
  *
  * That param is the URL contract this route publishes:
  *
- *   /cv?draft=<resume-id>  opens that CV in the editor its stored mode names
- *   /cv?draft=new          asks which editor, creates the CV, then replaces
- *                          the URL with the real id
+ *   /cv?draft=<resume-id>  opens that document in the editor
+ *   /cv?draft=new          asks which KIND of document, creates it, then
+ *                          replaces the URL with the real id
  *   /cv                    has no hub to show any more, so it redirects to
  *                          /documents
  *
@@ -38,10 +99,18 @@ const DOCUMENTS = '/documents'
  * panel. It also means the browser's back button leaves an editor, which the
  * old in-place switch never allowed.
  *
- * The `?draft=new` round trip exists so `+ new cv` in the Documents header can
- * be a plain link while every write to `resumes` still happens on one route:
- * creating a CV needs a mode chosen first, and this is where the two editors
- * that mode picks between already live.
+ * `?draft=new` ASKS AGAIN, having briefly stopped. It was written to ask which
+ * EDITOR; when the LaTeX editor went, one editor left it a modal with a single
+ * button, so it was changed to create a CV on arrival. `ResumeMode` now names
+ * the KIND of document rather than the engine, and a CV and a cover letter are
+ * different enough that guessing is worse than asking -- so the dialog is back,
+ * as `DocumentChooser`, and this URL behaves exactly as the `new document`
+ * button on `/documents` does.
+ *
+ * THE WRITE ITSELF IS NOT HERE. `useCreateDocument` owns it for all three
+ * create paths, because a document created without running the template
+ * through `personalizeTemplate` arrives carrying raw `{{name|Your Name}}`.
+ * Only the tailoring write below stays local, and it is not a template.
  */
 function CvRoute() {
   const router = useRouter()
@@ -53,7 +122,7 @@ function CvRoute() {
   const draftParam = searchParams.get('draft')
   const isNew = draftParam === 'new'
 
-  const { success, error: showError, info } = useToast()
+  const { success, error: showError } = useToast()
   const draftQuery = useResume(isNew ? null : draftParam)
   const createResume = useCreateResume()
   const updateResume = useUpdateResume()
@@ -63,30 +132,6 @@ function CvRoute() {
   useEffect(() => {
     if (!draftParam) router.replace(DOCUMENTS)
   }, [draftParam, router])
-
-  const createDraft = async () => {
-    try {
-      const created = await createResume.mutateAsync({
-        mode: 'word',
-        title: 'Untitled CV',
-        content: DEFAULT_WORD_CONTENT,
-      })
-      info('Draft created', 'Word CV ready.')
-      router.replace(`/cv?draft=${created.id}`)
-    } catch (err) {
-      showError('Create failed', err instanceof Error ? err.message : 'Could not create the CV')
-    }
-  }
-
-  // `?draft=new` CREATES ON ARRIVAL. It used to open a dialog asking Word or
-  // LaTeX; with one editor that dialog is a modal with a single button. The
-  // param survives because `+ new cv` in the Documents header is a plain link
-  // and every write to `resumes` still happens on this route.
-  useEffect(() => {
-    if (isNew && !createResume.isPending) void createDraft()
-    // Once: `createDraft` replaces the URL, which is what ends this state.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew])
 
   const deleteDraft = (draftId: string) => setPendingDeleteId(draftId)
 
@@ -145,10 +190,7 @@ function CvRoute() {
 
   if (!draftParam) return <RouteSkeleton variant="detail" />
 
-  if (isNew) {
-    // The effect above is already creating it; this is the frame in between.
-    return <RouteSkeleton variant="detail" />
-  }
+  if (isNew) return <NewDocumentPrompt />
 
   if (draftQuery.isLoading) return <RouteSkeleton variant="detail" />
 

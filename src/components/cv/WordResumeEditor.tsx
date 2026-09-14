@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { WORD_EDITOR_EXTENSIONS } from './editorExtensions'
 import type { Editor, JSONContent } from '@tiptap/core'
@@ -29,12 +29,13 @@ import { supabase } from '@/lib/supabase'
 import { authedFetch } from '@/lib/authedFetch'
 import type { Job } from '@/types'
 import { DocumentWorkspace } from './DocumentWorkspace'
-import { useCvTailoring } from './CvTailoring'
+import type { CvTailoringOptions } from './CvTailoring'
 import { DocumentRailTabs } from './DocumentRail'
 import { DocumentNavigator } from './DocumentNavigator'
 import { DocumentToolbar } from './DocumentToolbar'
-import { DocumentRailPane } from './DocumentRailPane'
+import { DocumentRailPane, TailoringRailPane } from './DocumentRailPane'
 import { asDocumentTab, DEFAULT_DOCUMENT_TAB, type DocumentTabId } from './documentTabs'
+import { letterReview, type LetterReview } from './letterSuggestions'
 import { useProofread } from './useProofread'
 import { useThesaurus } from './useThesaurus'
 import { useFitToWidth } from './useFitToWidth'
@@ -98,6 +99,25 @@ export interface WordResumeEditorProps {
    * tailor button then says what came back rather than throwing.
    */
   onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+
+  /**
+   * WHAT KIND OF DOCUMENT THIS IS -- and therefore what the editor IS, not
+   * merely what it is called (Gabe, 2026-09-14: "same format for the document
+   * editor but ATS scoring and tailoring will not be included").
+   *
+   * A cover letter gets the same chrome, the same Tiptap engine, the same
+   * autosave and the same grammar pane. What it does not get is the tailor
+   * pane, and not as a hidden tab: `documentTabs` gives it a different tab
+   * list, `asDocumentTab` refuses to restore a remembered `tailor`, and
+   * `TailoringRailPane` -- the only thing that calls `useCvTailoring` -- is
+   * never mounted. A letter is not scored against a posting because it is not
+   * a keyword surface; it is one argument written for one employer.
+   *
+   * DEFAULTED TO `word` SO EVERY EXISTING CALL SITE IS UNCHANGED. /cv passes
+   * `draft.mode` once the documents screen can create a letter; until then the
+   * default is the only value anything supplies.
+   */
+  kind?: ResumeMode
 
   draft: ResumeDraft
   backHref: string
@@ -341,6 +361,14 @@ function ActionRow({
   )
 }
 
+/**
+ * A CV's review object, so the memo below has something of the right shape to
+ * hand down without `letterReview` ever running. A module constant rather than
+ * a fresh literal: it is frozen data, and one identity keeps it out of every
+ * downstream dependency array.
+ */
+const EMPTY_REVIEW: LetterReview = { words: 0, findings: [] }
+
 export function WordResumeEditor({
   draft,
   backHref,
@@ -348,7 +376,9 @@ export function WordResumeEditor({
   onPersistDraft,
   jobs = [],
   onTailored,
+  kind = 'word',
 }: WordResumeEditorProps) {
+  const isLetter = kind === 'cover_letter'
   const { user } = useAuth()
   const { success, error: showError, info } = useToast()
   const [title, setTitle] = useState(draft.title)
@@ -581,10 +611,62 @@ export function WordResumeEditor({
   // useResumeExport on why that dependency belongs in the signature.
   const exportState = useResumeExport({ editor, title, saveDraft, authedFetch })
 
-  const tailoring = useCvTailoring({
-    cvText: editor?.getText() ?? '',
+  /** Read every render, not memoised -- see the note above this block. */
+  const cvText = editor?.getText() ?? ''
+
+  /**
+   * WHICH APPLICATION THE TAILOR PANE IS POINTED AT.
+   *
+   * A plain string in the editor rather than state inside `useCvTailoring`,
+   * and `CvTailoringOptions` carries the full reason. The short version: the
+   * hook now lives one component down so a cover letter never calls it, and
+   * this is the one value that still has to be visible to the tab strip in the
+   * other rail slot. Declared unconditionally because it is a string -- it is
+   * not "the tailoring path", and a cover letter simply never writes to it.
+   */
+  const [tailorJobId, setTailorJobId] = useState('')
+
+  /**
+   * THE LETTER CHECK, WHICH IS WHAT A COVER LETTER HAS INSTEAD OF TAILORING.
+   *
+   * COMPUTED HERE RATHER THAN IN THE PANE because the tab badge needs the
+   * count before the pane is opened -- that is the whole job of a badge, to
+   * say how much is waiting behind a tab nobody has clicked. Computing it in
+   * both places would be two answers to one question.
+   *
+   * MEMOISED ON THE TEXT, unlike `cvText` above it, because this one is real
+   * work: ten rules over the paragraphs, the tokens and the sentences. It is
+   * still cheap enough to run on a keystroke, which is exactly why the pane
+   * has no "check" button -- see `letterSuggestions` for why none of it is
+   * fetched. `EMPTY_REVIEW` keeps a CV from paying for any of it.
+   */
+  const review = useMemo(
+    () => (kind === 'cover_letter' ? letterReview(cvText) : EMPTY_REVIEW),
+    [kind, cvText]
+  )
+
+  /**
+   * EVERYTHING THE TAILORING HOOK NEEDS, BUT NOT THE HOOK ITSELF.
+   *
+   * This was a `useCvTailoring(...)` call until cover letters arrived, and it
+   * is an object now because the call moved down into `TailoringRailPane` --
+   * which only mounts for a CV. That is what makes "a cover letter does not
+   * run the tailoring path" literally true rather than a matter of nothing
+   * being drawn: hooks cannot be called conditionally, so the only way to not
+   * call one is to put a component between yourself and it.
+   *
+   * BUILDING THIS OBJECT COSTS NOTHING ON A COVER LETTER. It is a literal with
+   * two closures in it; no request, no filter over the applications, no
+   * keyword match. The work all lives behind the hook.
+   */
+  const tailoringOptions: CvTailoringOptions = {
+    cvText,
     jobs,
     title,
+    // Lifted out of the hook so the tab strip -- a different workspace slot --
+    // can mark the tailor tab "needs an application". See CvTailoringOptions.
+    jobId: tailorJobId,
+    onJobId: setTailorJobId,
     // A GETTER, not `editor?.getJSON()` inline. The plain text above is read
     // on every render on purpose; serialising the whole node tree on every
     // keystroke for a button nobody has pressed is not the same trade. This
@@ -617,7 +699,7 @@ export function WordResumeEditor({
           await onTailored(input)
         }
       : undefined,
-  })
+  }
   const proofread = useProofread(editor)
   // Follows the caret; see useThesaurus for why it is not behind a button.
   const thesaurus = useThesaurus(editor)
@@ -636,18 +718,31 @@ export function WordResumeEditor({
    * Grammar every time would make the tab they actually use a click they pay
    * for repeatedly. `asDocumentTab` coerces anything stored, so a renamed or
    * removed tab cannot leave the rail permanently blank.
+   *
+   * ONE KEY FOR BOTH KINDS, AND THAT IS WHY THE COERCION TAKES A KIND
+   * (2026-09-14). Keying it per kind was the first instinct and it is worse:
+   * the preference being remembered is "which of these do I use", and a person
+   * who works in the grammar pane works in the grammar pane whichever document
+   * is open. What one key costs is the case the kind argument exists for -- a
+   * CV left on `tailor`, then a cover letter opened, restoring a tab that rail
+   * does not have and leaving the tablist selecting nothing above an empty
+   * pane. Coercing on READ rather than rewriting the stored value keeps that
+   * one-way: opening a letter does not make the CV forget `tailor`.
    */
   const [tab, setTab] = useState<DocumentTabId>(DEFAULT_DOCUMENT_TAB)
 
   useEffect(() => {
     try {
       const stored = window.localStorage.getItem('worktrack:document-tab')
-      if (stored) setTab(asDocumentTab(stored))
+      if (stored) setTab(asDocumentTab(stored, kind))
     } catch {
       // Private windows and blocked site data throw on access. The default
       // tab is a fine answer; losing the preference is not worth an error.
     }
-  }, [])
+    // `kind` is fixed for the life of a mounted editor -- /cv re-keys on the
+    // draft id -- so this is still a mount effect. It is listed because the
+    // coercion reads it, not because it is expected to change.
+  }, [kind])
 
   const selectTab = useCallback((next: DocumentTabId) => {
     setTab(next)
@@ -669,7 +764,12 @@ export function WordResumeEditor({
 
   return (
     <DocumentWorkspace
-      kindLabel="word"
+      /* THE CRUMB IS THE KIND, and "word" only ever meant "the Word editor"
+         because that was the only thing this component opened. It is the
+         breadcrumb between `documents` and the file's own name, so on a letter
+         it has to say letter -- otherwise the path claims you are somewhere
+         you are not. */
+      kindLabel={isLetter ? 'cover letter' : 'word'}
       documentsHref={backHref}
       title={title}
       onTitleChange={(next) => {
@@ -871,15 +971,21 @@ export function WordResumeEditor({
          stacked with it below. See `railNav` in DocumentWorkspace. */
       railNav={
         <DocumentRailTabs
+          kind={kind}
           active={tab}
           onSelect={selectTab}
-          applicationSelected={!!tailoring.jobId}
+          applicationSelected={!!tailorJobId}
           badges={{
             // Grammar and style together: the tab covers both, so a count
             // that only named half of it would understate the work left.
             grammar: proofread.ran
               ? proofread.grammar.length + proofread.style.length
               : null,
+            // THE LETTER CHECK BADGES ITSELF WITHOUT BEING OPENED, which the
+            // grammar tab cannot: there is no request to make, so the count is
+            // simply true. `null` on a CV rather than 0 -- the tab is not in
+            // that strip at all, and a zero would be a claim about it.
+            suggestions: isLetter ? review.findings.length : null,
           }}
         />
       }
@@ -887,15 +993,38 @@ export function WordResumeEditor({
          column of nothing; these are the two things Word puts there, and both
          read straight off the editor. */
       leftRail={<DocumentNavigator editor={editor} />}
+      /* THE BRANCH THAT MAKES "TAILORING DOES NOT RUN" TRUE. It is a component
+         swap rather than a prop, because `useCvTailoring` is a hook and the
+         only way to not call one is to not mount the thing that calls it --
+         see `TailoringRailPane`. A cover letter therefore has no application
+         picker, no ATS ring and no rewrite in this tree at all, rather than a
+         hidden one. */
       rightRail={
-        <DocumentRailPane
-          active={tab}
-          proofread={proofread}
-          thesaurus={thesaurus}
-          tailoring={tailoring}
-        />
+        isLetter ? (
+          <DocumentRailPane
+            active={tab}
+            proofread={proofread}
+            thesaurus={thesaurus}
+            letter={review}
+          />
+        ) : (
+          <TailoringRailPane
+            active={tab}
+            proofread={proofread}
+            thesaurus={thesaurus}
+            tailoring={tailoringOptions}
+          />
+        )
       }
-      footnote="letter-style layout preview with 0.8in margins for a print-ready CV."
+      /* THE PAGE IS THE SAME PAGE AND THE NOTE UNDER IT IS NOT. Both are
+         letter-sized sheets with the same margins, but "print-ready CV" under
+         a cover letter names the wrong document -- and this note is the only
+         line on the screen that says what the sheet is FOR. */
+      footnote={
+        isLetter
+          ? 'letter-style layout preview with 0.8in margins for a print-ready cover letter.'
+          : 'letter-style layout preview with 0.8in margins for a print-ready CV.'
+      }
       paged
     >
       {/* THE PAPER REACHES THE BOTTOM OF THE CANVAS IN SCROLL VIEW.

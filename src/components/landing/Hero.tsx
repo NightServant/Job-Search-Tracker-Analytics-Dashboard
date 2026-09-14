@@ -76,14 +76,29 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
     >
       <HeroMedia posterSrc={posterSrc} videoSrc={videoSrc} paused={unpinned} />
 
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-7">
-        <p className="text-label-caps uppercase text-accent-400">{HERO.eyebrow}</p>
-
-        <h1 className="max-w-4xl text-display-xl text-ink-50">{HERO.headline}</h1>
+      {/*
+        THE STACK IS GROUPED, NOT EVENLY SPACED. It was one `gap-7` column --
+        eyebrow, headline, body and button all 28px apart -- and four things at
+        one interval is a list, not a hierarchy: the eyebrow floated 28px clear
+        of the headline it labels, so the first thing on the page read as a
+        stray line rather than as the headline's kicker.
+        Grouping states the relationships instead. The eyebrow is bound to the
+        headline at `gap-3`, which is the SAME 12px SectionHeading couples its
+        own eyebrow and title with, so the hero and the five section openings
+        below it are finally built the same way. The outer `gap-6` then
+        separates the three real parts -- who this is for, what it does, what to
+        do about it -- and the button's `pt-2` lifts the ask clear of the
+        sentence that earns it.
+      */}
+      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          <p className="text-label-caps uppercase text-accent-400">{HERO.eyebrow}</p>
+          <h1 className="max-w-4xl text-display-xl text-ink-50">{HERO.headline}</h1>
+        </div>
 
         <p className="max-w-[720px] text-body-l text-ink-50/85">{HERO.body}</p>
 
-        <div>
+        <div className="pt-2">
           {/*
             THE ONE BUTTON ON THIS PAGE THAT LEAVES THE SITE, and until
             2026-09-05 it was also the only CTA with no glyph at all. The

@@ -18,8 +18,21 @@ import { lintSections } from '@/services/atsLint'
 import { formatTouchedDate } from '@/services/date'
 import type { ResumeSummary } from '@/services/resumeService'
 
+/**
+ * What a row calls its own kind. `mode` stopped meaning "which editor" on
+ * 2026-09-14 and now means "which kind of document" (see `ResumeMode`).
+ *
+ * `word` READS "CV", NOT "Word". It said "Word" for a few hours on the
+ * argument that the Word editor is still visibly what opens, and that naming
+ * the kind here would only repeat the list it sits in. The kind filter above
+ * the list settled it the other way: that dropdown offers "CVs" and "cover
+ * letters", and a reader who picks CVs and then reads "Word" down the column
+ * has been shown two names for one thing. Which editor opens is not a fact
+ * this row has to carry -- there is only one.
+ */
 const MODE_LABELS: Record<ResumeSummary['mode'], string> = {
-  word: 'Word',
+  word: 'CV',
+  cover_letter: 'Cover letter',
 }
 
 /**

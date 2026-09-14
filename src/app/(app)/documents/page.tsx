@@ -1,17 +1,15 @@
 'use client'
 
 import * as React from 'react'
-import { useRouter } from 'next/navigation'
-import { useResumes, useResumeVersions, useDeleteResume, useCreateResume } from '@/hooks/useResumes'
+import { useResumes, useResumeVersions, useDeleteResume } from '@/hooks/useResumes'
 import { DocumentsNotice, useDocumentsNotice } from '@/components/documents/DocumentsNotice'
 import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { DocumentsPage } from '@/components/documents/DocumentsPage'
-import { DEFAULT_WORD_CONTENT } from '@/components/cv/content'
+import { useCreateDocument } from '@/components/documents/useCreateDocument'
 import { importDocument, UnsupportedDocumentError } from '@/lib/documentImport'
-import type { TemplateChoice } from '@/components/documents/TemplateGallery'
-import type { ResumeContent, ResumeSummary } from '@/services/resumeService'
+import type { ResumeSummary } from '@/services/resumeService'
 
 /**
  * Thin route wrapper, the same split as `applications/page.tsx`: the screen
@@ -30,24 +28,26 @@ import type { ResumeContent, ResumeSummary } from '@/services/resumeService'
  * so it is passed down as its own state, the same distinction the application
  * detail panels make.
  *
- * `onCreateDraft` mirrors `cv/page.tsx`'s own `createDraft` -- same default
- * content, same title strings, same toast copy -- because Task 4 (M5.5) put
- * the New CV dialog's trigger back on this screen instead of behind a
- * navigation to `/cv?draft=new`. The two routes duplicate this dozen lines
- * rather than share a hook for it: this plan's Global Constraints rule out
- * touching `src/hooks/` or `src/services/`, and both routes already had their
- * own `useCreateResume()` call before this task.
+ * THE THREE CREATE PATHS ARE ONE FUNCTION NOW. This file, the Templates route
+ * and `/cv` each kept their own copy of "mutate, toast, navigate" -- same
+ * default content, same title strings, same toast copy -- and the comment that
+ * used to stand here defended that on the grounds that it was only a dozen
+ * lines and that an earlier plan forbade touching `src/hooks/`. Both halves
+ * expired: creating a document now has to choose a starter by KIND and run the
+ * template through `personalizeTemplate` first, and a route that misses that
+ * ships literal `{{name|Your Name}}` to a person. `useCreateDocument` lives in
+ * `components/documents/` rather than `src/hooks/`, so the constraint is still
+ * respected; see its docblock for the rest of the argument.
  */
 export default function Page() {
-  const router = useRouter()
   const { data: docs = [], isLoading, error } = useResumes()
   const [openVersionsFor, setOpenVersionsFor] = React.useState<string | null>(null)
   const versionsQuery = useResumeVersions(openVersionsFor)
   const deleteResume = useDeleteResume()
-  const createResume = useCreateResume()
   // Sonner on desktop, a persistent bottom banner below `lg` -- see
   // DocumentsNotice for why a toast is the wrong shape on this screen.
   const { notify, notice, dismiss } = useDocumentsNotice()
+  const { creating, createBlank, createFromTemplate, createImported } = useCreateDocument({ notify })
   const [pendingDelete, setPendingDelete] = React.useState<ResumeSummary | null>(null)
 
   const confirmDelete = async () => {
@@ -65,28 +65,6 @@ export default function Page() {
   }
 
   /**
-   * One writer for every way a CV starts -- blank, from a template, or from an
-   * imported file. Three call sites creating resumes three slightly different
-   * ways is how the title strings and the toast copy drift apart.
-   */
-  const createDraft = async (title: string, content: ResumeContent) => {
-    try {
-      const created = await createResume.mutateAsync({ mode: 'word', title, content })
-      notify('info', 'Draft created', 'Word CV ready.')
-      router.push(`/cv?draft=${created.id}`)
-    } catch (err) {
-      notify('error', 'Create failed', err instanceof Error ? err.message : 'Could not create the CV')
-    }
-  }
-
-  const createBlank = () => createDraft('Untitled CV', DEFAULT_WORD_CONTENT)
-
-  // Blank drafts do not come through here: the gallery carries templates only,
-  // since `new CV` is already a primary button on that screen.
-  const createFromTemplate = ({ template }: TemplateChoice) =>
-    createDraft(`${template.name} CV`, template.content as ResumeContent)
-
-  /**
    * The import failure is shown, never swallowed. `.docx` is deliberately
    * unreadable for now (see `lib/documentImport`), and a reader who picked one
    * needs to be told why nothing happened rather than left watching a screen
@@ -95,7 +73,7 @@ export default function Page() {
   const importFile = async (file: File) => {
     try {
       const draft = await importDocument(file)
-      await createDraft(draft.title, draft.content)
+      await createImported(draft.title, draft.content)
     } catch (err) {
       notify(
         'error',
@@ -136,10 +114,10 @@ export default function Page() {
         }))}
         versionsLoading={versionsQuery.isLoading}
         versionsError={!!versionsQuery.error}
-        onCreateDraft={() => void createBlank()}
+        onCreateDraft={(mode) => void createBlank(mode)}
         onChooseTemplate={(choice) => void createFromTemplate(choice)}
         onImport={(file) => void importFile(file)}
-        creatingDraft={createResume.isPending}
+        creatingDraft={creating}
       />
       <ConfirmDialog
         open={pendingDelete !== null}

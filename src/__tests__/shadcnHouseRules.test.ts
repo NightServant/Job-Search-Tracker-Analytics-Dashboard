@@ -32,6 +32,10 @@ function read(file: string): string {
  * for `bubble.tsx`, whose reaction badge is a text pill and was rewritten.
  */
 const ROUNDED_FULL_ALLOWED = new Set([
+  // analyzing-document draws one capsule: the scan bar, 7% of the glyph's
+  // width. At the 48px this renders at that is a ~3px-wide bar, where
+  // rounded-full resolves to under 2px -- the thin-capsule case above.
+  'analyzing-document.tsx',
   'avatar.tsx', 'carousel.tsx', 'css-spinner.tsx', 'drawer.tsx', 'message.tsx',
   // progress-track draws the tracker's step nodes and the ring that pulses
   // behind the current one. Both are genuinely circular -- a step marker is as

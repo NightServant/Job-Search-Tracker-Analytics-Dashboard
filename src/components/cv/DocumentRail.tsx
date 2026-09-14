@@ -3,6 +3,7 @@
 import * as React from 'react'
 import { icons } from '@/components/icons'
 import { cn } from '@/lib/utils'
+import type { ResumeMode } from '@/services/resumeService'
 import { DOCUMENT_TABS, type DocumentTab, type DocumentTabId } from './documentTabs'
 import { useRailLayout, type RailLayout } from './railLayout'
 
@@ -55,6 +56,17 @@ import { useRailLayout, type RailLayout } from './railLayout'
  */
 
 export interface DocumentRailTabsProps {
+  /**
+   * Which set of tabs this strip is (2026-09-14). A CV gets grammar and
+   * tailoring, a cover letter gets grammar and the letter check; see
+   * `documentTabs` for why the two lists are data rather than a flag per tab.
+   *
+   * DEFAULTED TO `word`, unlike `asDocumentTab` next door, and the difference
+   * is how loudly each one fails. Passing the wrong kind here puts visibly
+   * wrong tabs on screen; forgetting a kind there silently restores a tab the
+   * rail does not have. Only the second one needs the compiler's help.
+   */
+  kind?: ResumeMode
   active: DocumentTabId
   onSelect: (id: DocumentTabId) => void
   /** Per-tab counts, e.g. 3 spelling issues. `null` renders nothing. */
@@ -72,11 +84,13 @@ export function DocumentRailTabs({
   applicationSelected = false,
   id = 'document-rail',
   className,
+  kind = 'word',
 }: DocumentRailTabsProps) {
+  const tabs = DOCUMENT_TABS[kind]
   const refs = React.useRef<Record<string, HTMLButtonElement | null>>({})
 
   function move(from: DocumentTabId, delta: number) {
-    const order = DOCUMENT_TABS.map((tab) => tab.id)
+    const order = tabs.map((tab) => tab.id)
     const index = order.indexOf(from)
     // Wraps, because a tablist that stops at the ends makes the last tab feel
     // unreachable when arrowing down from the first.
@@ -88,7 +102,7 @@ export function DocumentRailTabs({
   const layout = useRailLayout()
   const row = layout === 'row'
 
-  const current = DOCUMENT_TABS.find((tab) => tab.id === active)
+  const current = tabs.find((tab) => tab.id === active)
   const hintFor = (tab: DocumentTab) =>
     tab.needsApplication && !applicationSelected ? 'needs an application' : tab.hint
 
@@ -107,7 +121,7 @@ export function DocumentRailTabs({
           row ? 'items-stretch border-b border-border-subtle' : 'flex-col'
         )}
       >
-        {DOCUMENT_TABS.map((tab) => (
+        {tabs.map((tab) => (
           <RailTab
             key={tab.id}
             tab={tab}

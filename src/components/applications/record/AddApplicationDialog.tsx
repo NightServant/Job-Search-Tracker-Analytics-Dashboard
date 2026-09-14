@@ -1,6 +1,7 @@
 'use client'
 
 import * as React from 'react'
+import { AnalyzingDocument } from '@/components/ui/analyzing-document'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { CssSpinner } from '@/components/ui/css-spinner'
@@ -99,7 +100,6 @@ export function AddApplicationDialog({
   const [step, setStep] = React.useState<StepId>('link')
   const [linkError, setLinkError] = React.useState('')
   const [readNote, setReadNote] = React.useState('')
-  const [summary, setSummary] = React.useState('')
   const [resumeId, setResumeId] = React.useState('')
 
   const index = STEPS.findIndex((s) => s.id === step)
@@ -111,7 +111,6 @@ export function AddApplicationDialog({
     setStep('link')
     setLinkError('')
     setReadNote('')
-    setSummary('')
     setResumeId('')
     replace({ ...emptyDraft(defaultCurrency) })
     // `replace` is stable and `defaultCurrency` never changes mid-session.
@@ -138,7 +137,6 @@ export function AddApplicationDialog({
       replace,
       setStep,
       setReadNote,
-      setSummary,
       onAutofill,
       onDigest,
     })
@@ -257,11 +255,17 @@ export function AddApplicationDialog({
             data-add-loading
             role="status"
           >
-            <CssSpinner size={20} />
+            {/* The illustration of the step, not a decoration beside it: the
+                scan line crossing a document is the only thing on screen that
+                shows the posting being read. It carries its own sr-only label
+                so it is correct anywhere; here the region above already speaks
+                for it, which is the same arrangement the spinner it replaced
+                had. */}
+            <AnalyzingDocument className="size-12 text-text-muted" />
             <p className="text-body-m text-text-primary">reading the posting</p>
             <p className="max-w-prose text-body-s text-text-muted">
-              Fetching the page, pulling out the company, role, salary and location, then
-              tidying the description into something worth reading. This takes a few seconds.
+              Reading the page and organising what it says — the company, role, salary and
+              location, and the description broken into sections. This takes a few seconds.
             </p>
           </div>
         )
@@ -293,7 +297,6 @@ export function AddApplicationDialog({
                 setResumeId(next ?? '')
                 onLinkedResumeChange?.(next)
               }}
-              summary={summary}
               submitLabel="Save application"
             />
           </div>

@@ -20,7 +20,7 @@ export interface Notice {
  * DESKTOP KEEPS SONNER. Below `lg` it does not (Gabe, 2026-09-06), and the
  * reason is that a toast and this screen want the same corner. Sonner drops
  * its stack over the bottom-right, which on a phone is the bottom edge --
- * directly on top of the bottom nav, and directly on top of the `new CV` CTA
+ * directly on top of the bottom nav, and directly on top of the `new document` CTA
  * on the Templates screen. A toast that covers the control you just pressed
  * reads as the app breaking rather than replying.
  *

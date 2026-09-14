@@ -3,15 +3,28 @@ import type { JSONContent } from '@tiptap/core'
 import { requireUserId, toError } from './supabaseHelpers'
 
 /**
- * ONE MODE. The LaTeX editor was dropped entirely on 2026-09-13 (Gabe: "drop
- * the LaTeX editor feature entirely"), and the type went with it rather than
- * becoming a single-member union that reads like a choice.
+ * WHAT KIND OF DOCUMENT A ROW IS -- not, any more, which editor renders it.
  *
- * THE COLUMN STAYS, because rows written before today still carry `'latex'`.
- * `normaliseMode` below folds anything that is not `'word'` into `'word'`, so a
- * legacy row opens in the only editor there is instead of a blank screen.
+ * READ THE RENAME BEFORE USING THIS. `mode` was written to mean "which editor
+ * engine": `word`, `latex`, `structured`. The LaTeX editor was dropped
+ * entirely on 2026-09-13 (Gabe: "drop the LaTeX editor feature entirely") and
+ * the structured editor was never built, which left a column whose question
+ * had one possible answer -- and `ResumeMode` briefly was the single-member
+ * union `'word'`, which reads like a choice and is not one.
+ *
+ * Cover letters reuse the column rather than getting a table of their own
+ * (migration `20260914090000`). A cover letter is the same row with the same
+ * RLS, the same snapshots and the same Word editor; what differs is which
+ * templates start it and which rail edits it. So `'word'` now means "a CV" and
+ * `'cover_letter'` means "a letter", and a later reader who assumes this still
+ * names an engine will wire the wrong thing.
+ *
+ * THE LEGACY VALUES STAY IN THE DATABASE, because rows written before
+ * 2026-09-13 still carry `'latex'`. `normalizeMode` below folds them into
+ * `'word'`, so a legacy row opens in the only editor there is instead of a
+ * blank screen; they never reach this type.
  */
-export type ResumeMode = 'word'
+export type ResumeMode = 'word' | 'cover_letter'
 
 /** The Word editor stores a Tiptap tree. */
 export type ResumeContent = JSONContent
@@ -92,18 +105,28 @@ type SummaryRow = Omit<ResumeRow, 'content'> & {
  * `word` and its `content` to the starter template, orphaning `sections`.
  * Nothing in the app writes `structured` today, so no row can currently hit
  * it; whoever builds the structured editor must fix this before one can.
+ *
+ * IT TAKES THE ROW'S VALUE NOW, where it used to take nothing and return the
+ * constant `'word'`. That was correct while there was one kind of document and
+ * wrong the moment `cover_letter` existed: a row that IS a letter has to come
+ * back as one, or the Documents list files it under CVs and the editor opens
+ * it with the wrong rail.
+ *
+ * ALLOW-LIST, NOT DENY-LIST. Only `'cover_letter'` survives; everything else,
+ * including `null`, the legacy `'latex'` and `'structured'`, and any value a
+ * future migration widens the CHECK to before this function learns about it,
+ * folds to `'word'`. A row whose kind this code does not recognise still opens
+ * in the editor that exists, which is the same promise the old constant made.
  */
-function normalizeMode(): ResumeMode {
-  // Rows written before 2026-09-13 may still say `latex` or `structured`.
-  // There is one editor now, so they all open in it.
-  return 'word'
+function normalizeMode(mode: string | null | undefined): ResumeMode {
+  return mode === 'cover_letter' ? 'cover_letter' : 'word'
 }
 
 function toDraft(row: ResumeRow): ResumeDraft {
   return {
     id: row.id,
     title: row.title || 'Untitled CV',
-    mode: normalizeMode(),
+    mode: normalizeMode(row.mode),
     content: row.content,
     updated_at: row.updated_at,
   }
@@ -135,7 +158,7 @@ export const resumeService = {
     return ((data ?? []) as SummaryRow[]).map((row) => ({
       id: row.id,
       title: row.title || 'Untitled CV',
-      mode: normalizeMode(),
+      mode: normalizeMode(row.mode),
       updated_at: row.updated_at,
       sections: row.sections ?? null,
       version: latestVersion(row.resume_snapshots),

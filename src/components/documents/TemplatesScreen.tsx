@@ -1,16 +1,21 @@
 'use client'
 
+import * as React from 'react'
 import Link from 'next/link'
 import { PageHeader } from '@/components/ui/page-header'
+import { AppDialog } from '@/components/ui/app-dialog'
 import { ChevronLeftIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { useHideShellBanner } from '@/components/shell/shellBanner'
 import { useAppHref } from '@/components/shell/routeBase'
 import { TemplateGallery, type TemplateChoice } from './TemplateGallery'
+import { DocumentChooser } from './DocumentChooser'
+import type { ResumeMode } from '@/services/resumeService'
 
 export interface TemplatesScreenProps {
   onChoose?: (choice: TemplateChoice) => void
-  onChooseBlank?: () => void
+  /** Fires once the blank card's kind has been chosen. */
+  onChooseBlank?: (mode: ResumeMode) => void
   busy?: boolean
 }
 
@@ -31,13 +36,26 @@ export interface TemplatesScreenProps {
  * (see useHideShellBanner): the visitor read it on the way in, and a second
  * copy would push the first row of cards off the screen.
  *
- * WORD TEMPLATES ONLY. The LaTeX editor and preview do not exist below `lg`,
- * so offering a LaTeX template here would create a document that cannot be
- * opened on the device that made it.
+ * IT CARRIES BOTH KINDS OF TEMPLATE, AND THE CONTROLS THAT NARROW THEM. The
+ * old rule here was "Word templates only", because the LaTeX editor did not
+ * exist below `lg` and a LaTeX template would have created a document that
+ * could not be opened on the device that made it. Cover letters have no such
+ * problem -- they are the same row, the same editor and the same snapshots as
+ * a CV -- so both sets are offered, and this is the screen Gabe named for the
+ * search box and the kind dropdown on mobile and tablet. They are the
+ * gallery's own controls (see `TemplateGallery`), which is what keeps them
+ * identical to the pair desktop gets above the documents list.
+ *
+ * THE BLANK CARD ASKS WHICH KIND FIRST. Every other card on this screen names
+ * its kind under its thumbnail; the blank one cannot, because a blank page is
+ * whichever kind you say it is. So it opens the same chooser the `new
+ * document` button opens on desktop, rather than quietly defaulting to a CV
+ * and handing a letter-writer a Skills heading to delete.
  */
 export function TemplatesScreen({ onChoose, onChooseBlank, busy = false }: TemplatesScreenProps) {
   useHideShellBanner()
   const appHref = useAppHref()
+  const [blankOpen, setBlankOpen] = React.useState(false)
 
   return (
     <div className="flex flex-col gap-8">
@@ -54,18 +72,32 @@ export function TemplatesScreen({ onChoose, onChooseBlank, busy = false }: Templ
           documents
         </Link>
         <PageHeader
-          title="new CV"
-          description="start from a template, or from a blank page."
+          title="new document"
+          description="start from a CV or cover letter template, or from a blank page."
         />
       </div>
 
       <TemplateGallery
         variant="page"
-        modes={['word']}
         busy={busy}
         onChoose={(choice) => onChoose?.(choice)}
-        onChooseBlank={() => onChooseBlank?.()}
+        onChooseBlank={() => setBlankOpen(true)}
       />
+
+      <AppDialog
+        open={blankOpen}
+        onOpenChange={setBlankOpen}
+        title="new document"
+        icon="Documents"
+      >
+        <DocumentChooser
+          creating={busy}
+          onChoose={(mode) => {
+            setBlankOpen(false)
+            onChooseBlank?.(mode)
+          }}
+        />
+      </AppDialog>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs'
+import { execSync } from 'node:child_process'
 import { describe, it, expect } from 'vitest'
 
 /**
@@ -31,6 +32,41 @@ describe('the type scale', () => {
         `--text-${name}--font-weight: ${weight};`
       )
     }
+  })
+
+  /**
+   * THE CHECK THAT RUNS THE OTHER WAY, and the reason it exists is a class
+   * that shipped and painted nothing.
+   *
+   * Everything above asks "does the stylesheet declare what we expect". Nothing
+   * asked the converse -- "does every scale class a component uses actually
+   * exist" -- so a display step below `display-m` sat in the grammar pane's
+   * score from the day it shipped. The scale stops at m; Tailwind emitted no
+   * rule for it, and the number rendered at the inherited 14px body size.
+   *
+   * THIS FILE CANNOT NAME THE DEAD CLASS, which is the same bluntness
+   * `routesAreGuarded.test.ts` has about its own grep: the check reads source,
+   * comments included, so writing the string here would fail the check it is
+   * describing. Say it differently rather than loosening the grep. It is the
+   * worst shape a styling bug can take: nothing errors, nothing is missing
+   * from the page, and the result looks like somebody chose it.
+   *
+   * Matched on the SCALE FAMILIES only. `text-sm` is Tailwind's own and
+   * `text-text-muted` is a colour; neither is this scale's business.
+   */
+  it('uses no scale class the stylesheet does not declare', () => {
+    const raw = execSync(
+      String.raw`grep -rhoE "text-(display|heading|body|label|data)-[a-z0-9]+|text-caption" src --include=*.tsx --include=*.ts || true`,
+      { encoding: 'utf8' }
+    ).trim()
+
+    const used = [...new Set(raw ? raw.split('\n') : [])].sort()
+    // Positive companion: a grep that matched nothing would make this pass by
+    // checking nothing at all.
+    expect(used.length, 'the grep found no scale classes, so it proved nothing').toBeGreaterThan(5)
+
+    const undeclared = used.filter((cls) => !css.includes(`--${cls}:`))
+    expect(undeclared, 'these resolve to no token and emit no CSS').toEqual([])
   })
 
   it('caps the radius at 4px', () => {

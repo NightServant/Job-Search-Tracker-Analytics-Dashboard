@@ -33,9 +33,20 @@ import {
  * has already been tidied and summarised -- a button asking for it again was
  * offering work that had been done.
  *
- * THE SUMMARY IS NOT STORED, and that is deliberate rather than an omission.
- * `jobs` has no column for it, and adding one would mean a migration to hold a
- * derived value that goes stale the moment the description is edited.
+ * THERE IS NO SUMMARY BLOCK ANY MORE (Gabe, 2026-09-14: "I highly request to
+ * remove the job summary section specifically in the job description of the
+ * application preview dialog"), and the reason it had stopped earning its
+ * place is worth keeping. The digest now returns the posting RESTRUCTURED --
+ * it opens with `Role overview:`, which is the same two sentences the summary
+ * rule printed, written from the same source by the same model. A labelled
+ * blurb above a section that says it again is the same information twice, 40px
+ * apart, and the reader has to notice they are the same before they can stop
+ * reading one of them.
+ *
+ * It was never stored either: `jobs` has no column for it, so a record opened
+ * the next day showed the posting without it -- one more reason the structure
+ * is the better home for it than a block that only ever existed in the add
+ * flow.
  *
  * IT IS NOT A TEXTAREA AT REST (Gabe, 2026-09-09: "Remove the text area but
  * display the job description with proper format"). A scraped posting has
@@ -70,8 +81,6 @@ import {
 export interface RecordDescriptionProps {
   value: string
   onChange: (value: string) => void
-  /** The summary the add flow's digest produced, if this surface has one. */
-  summary?: string
   /**
    * Opens the posting's own view. PRESENT MEANS PREVIEW.
    *
@@ -281,7 +290,6 @@ function Section({
 export function RecordDescription({
   value,
   onChange,
-  summary = '',
   onReadMore,
   showHeading = true,
   onBack,
@@ -342,19 +350,6 @@ export function RecordDescription({
           <DocumentsIcon size={16} aria-hidden className="shrink-0 text-text-muted" />
           job description
         </h3>
-      )}
-
-      {summary && (
-        // A RULE, NOT A CARD. The summary is the same text one level up, so it
-        // is set apart by a hairline and a label rather than by a filled box,
-        // which is the vocabulary the rest of the record uses.
-        <div
-          className="flex flex-col gap-1 border-l-2 border-accent-default pl-3"
-          data-posting-summary
-        >
-          <p className="text-label-caps uppercase text-text-secondary">summary</p>
-          <p className="text-body-m text-text-primary">{summary}</p>
-        </div>
       )}
 
       {/* THE CONTROL ROW, AND IT IS A ROW OF ITS OWN (Gabe, 2026-09-13: "back

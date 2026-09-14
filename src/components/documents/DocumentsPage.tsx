@@ -10,6 +10,7 @@ import { IconButton } from '@/components/ui/icon-button'
 import { PlusIcon, TrashIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { EmptyState } from '@/components/ui/empty-state'
+import { Select } from '@/components/ui/select'
 import {
   Pagination,
   PaginationContent,
@@ -20,6 +21,8 @@ import {
 } from '@/components/ui/pagination'
 import { DocumentRow, DOCUMENT_GRID } from './DocumentRow'
 import { TemplateGallery, type TemplateChoice } from './TemplateGallery'
+import { DocumentChooser } from './DocumentChooser'
+import { matchesTerms, searchTerms } from './search'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { ICON_MOTION_GROUP } from '@/components/icons/motion'
@@ -27,23 +30,48 @@ import Link from 'next/link'
 import { useAppHref } from '@/components/shell/routeBase'
 import { VersionHistory, type VersionEntry } from './VersionHistory'
 import { IMPORT_ACCEPT } from '@/lib/documentImport'
-import type { ResumeSummary } from '@/services/resumeService'
+import type { ResumeMode, ResumeSummary } from '@/services/resumeService'
 
 /**
  * `/cv?draft=new` still works as a deep link -- `src/app/(app)/cv/page.tsx`
- * opens the same `ModeChooser` dialog directly when it lands there with
+ * opens the same `DocumentChooser` dialog directly when it lands there with
  * nothing else to sit behind it.
+ *
+ * That contract briefly stopped being true: with one editor left, the chooser
+ * was a modal with a single button, so `?draft=new` created a CV on arrival
+ * instead of asking. There are two kinds of document again, so it asks again,
+ * and a bookmark of this URL behaves exactly as the button does.
  */
 export const NEW_CV_HREF = '/cv?draft=new'
 
 /**
  * Which kinds of document the list can be narrowed to (Gabe, 2026-09-10).
  *
- * `word` and `latex` ARE THE TWO KINDS, not a taxonomy that might grow:
- * `ResumeSummary.mode` has exactly these values, the editor forks on them, and
- * `DocumentRow` already labels every row with one. So the filter is a closed
- * set rather than a search over a free-text field.
+ * THERE ARE EXACTLY TWO KINDS, not a taxonomy that might grow:
+ * `ResumeSummary.mode` has exactly these values and `DocumentRow` already
+ * labels every row with one. So the filter is a closed set rather than a
+ * search over a free-text field.
+ *
+ * They used to be `word` and `latex` -- the two EDITORS. The LaTeX editor was
+ * dropped on 2026-09-13 and `mode` was repurposed on 2026-09-14 to mean the
+ * KIND of document, so the pair is now `word` (a CV) and `cover_letter`. The
+ * closed-set argument survives the rename; the values it named do not.
+ *
+ * THE CONTROL ITSELF WAS DELETED IN BETWEEN, correctly: for one day `word` and
+ * `latex` both returned the same set, and a dropdown whose two options cannot
+ * disagree is furniture. It is back because the options disagree again.
+ *
+ * The labels say "documents", "CVs" and "cover letters" where the template
+ * gallery's filter says "templates" -- the two dropdowns are on one screen at
+ * desktop width and must not read as the same control drawn twice.
  */
+const DOC_FILTERS = [
+  { value: 'all', label: 'all documents' },
+  { value: 'word', label: 'CVs' },
+  { value: 'cover_letter', label: 'cover letters' },
+] as const
+
+type DocFilter = (typeof DOC_FILTERS)[number]['value']
 
 /**
  * Five a page, and only where there is a pager to turn (Gabe, 2026-09-13:
@@ -78,16 +106,21 @@ const PAGE_SIZE = 5
  * the page makes the first job visible without a click and gives the empty
  * state something to actually be empty OF.
  *
- * **Where `new CV` lives is conditional, deliberately.** With documents on the
- * page it sits in the header, where a page-level action belongs. With none, it
- * does NOT: the empty state already owns the screen and already carries the
- * call to action, and a second identical button in the corner is the same
- * offer made twice, three inches apart. Gabe asked for exactly this.
+ * **Where `new document` lives is conditional, deliberately.** With documents
+ * on the page it sits in the header, where a page-level action belongs. With
+ * none, it does NOT: the empty state already owns the screen and already
+ * carries the call to action, and a second identical button in the corner is
+ * the same offer made twice, three inches apart. Gabe asked for exactly this.
  *
- * `import` sits beside `new CV` wherever `new CV` is -- header when there are
- * documents, empty state when there are not -- because they are the two ways
- * to get a document into this list and separating them would imply a
- * hierarchy that does not exist.
+ * IT IS NOT CALLED `new CV` ANY MORE, because it no longer makes one. It opens
+ * the `DocumentChooser`, which asks Curriculum Vitae or Cover Letter, and a
+ * button whose label names one of the two things it offers is a button that
+ * has already answered half the question on the reader's behalf.
+ *
+ * `import` sits beside `new document` wherever `new document` is -- header
+ * when there are documents, empty state when there are not -- because they are
+ * the two ways to get a document into this list and separating them would
+ * imply a hierarchy that does not exist.
  *
  * Version history is one row at a time. Loading every CV's snapshots to render
  * a list of CVs would be one query per row for information almost nobody
@@ -102,8 +135,8 @@ export interface DocumentsPageProps {
   versions?: VersionEntry[]
   versionsLoading?: boolean
   versionsError?: boolean
-  /** Fires when a blank CV is asked for; the caller owns the write and the navigation. */
-  onCreateDraft?: () => void
+  /** Fires once a kind is chosen in the new-document dialog; the caller owns the write and the navigation. */
+  onCreateDraft?: (mode: ResumeMode) => void
   /** Fires when a template card is picked. A null template means a blank document. */
   onChooseTemplate?: (choice: TemplateChoice) => void
   /** Fires with the picked file; the caller parses it and owns the write. */
@@ -129,44 +162,43 @@ export function DocumentsPage({
   // own page. Desktop is deliberately UNCHANGED -- he was explicit that the
   // desktop layout stays as it is.
   //
-  // LaTeX is gone entirely at these widths: no gallery entry, no mode chooser,
-  // no editor and no preview. Existing LaTeX CVs still list (see the row's
-  // `unavailable` note for why hiding them would be worse).
+  //
+  // Both KINDS of document exist at every width -- the old note here said
+  // LaTeX was absent below `lg`, which stopped being a fact about this screen
+  // when the LaTeX editor was deleted and `mode` was repurposed. A cover
+  // letter is the same row and the same editor as a CV, so nothing is
+  // withheld on a phone; only the gallery moves.
   const compact = useBelowDesktop()
   const appHref = useAppHref()
   const openDoc = docs.find((doc) => doc.id === openVersionsFor) ?? null
   const fileInput = React.useRef<HTMLInputElement>(null)
   const hasDocs = docs.length > 0
 
+  const [newDocOpen, setNewDocOpen] = React.useState(false)
+  const [filter, setFilter] = React.useState<DocFilter>('all')
   const [query, setQuery] = React.useState('')
   const [page, setPage] = React.useState(1)
 
   /**
    * SEARCH BY NAME, and it is the control this screen was missing: the list
    * pages at five, so an account with twenty CVs reached the one it wanted by
+   * turning pages and reading titles. The kind filter narrows by KIND; it
    * cannot answer "where is the Northwind one".
    *
-   * EVERY TERM MUST MATCH, in any order -- `engineer north` finds "Software
-   * Engineer — Northwind Pay". Substring rather than prefix, because a CV is
-   * named after a company as often as after a role and nobody remembers which
-   * word came first. The same rule the CV editor's application picker uses;
-   * two search boxes in one app should not disagree about what a match is.
+   * The match rule lives in `./search` rather than here now, because the
+   * template gallery six inches up the page has a search box of its own and
+   * the two must not disagree about what a match is. That warning was in this
+   * comment before the second box existed.
    */
-  const terms = React.useMemo(
-    () => query.toLowerCase().split(/\s+/).filter(Boolean),
-    [query]
-  )
+  const terms = React.useMemo(() => searchTerms(query), [query])
   const filtered = React.useMemo(() => {
-    if (terms.length === 0) return docs
-    return docs.filter((doc) => {
-      const title = doc.title.toLowerCase()
-      return terms.every((term) => title.includes(term))
-    })
-  }, [docs, terms])
+    const byKind = filter === 'all' ? docs : docs.filter((doc) => doc.mode === filter)
+    return byKind.filter((doc) => matchesTerms(terms, doc.title))
+  }, [docs, filter, terms])
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
   // CLAMPED, NOT STORED. Deleting the last row of page 3, or narrowing to
-  // LaTeX when only page 1 has any, would otherwise strand the reader on an
-  // empty page with no control that leads anywhere.
+  // cover letters when only page 1 has any, would otherwise strand the reader
+  // on an empty page with no control that leads anywhere.
   const current = Math.min(page, pageCount)
   // COMPACT TAKES THE WHOLE LIST. Slicing it and then hiding the pager would
   // be worse than either: the rows past the fifth would exist, be filtered,
@@ -177,14 +209,19 @@ export function DocumentsPage({
   // is meaningless afterwards.
   React.useEffect(() => {
     setPage(1)
-  }, [query])
+  }, [filter, query])
 
   // ONE CTA, TWO BEHAVIOURS. Below `lg` it is a link to the Templates page;
-  // on desktop it opens the mode chooser exactly as before. A link and a
-  // button rather than one control that branches on click: the compact one is
-  // a navigation and should be middle-clickable, openable in a new tab, and
-  // announced as a link.
-  const newCvCta = compact ? (
+  // on desktop it opens the document chooser. A link and a button rather than
+  // one control that branches on click: the compact one is a navigation and
+  // should be middle-clickable, openable in a new tab, and announced as a
+  // link.
+  //
+  // The compact link does NOT open the chooser first. It leads to a screen
+  // whose every card already names its kind, so asking on the way in would be
+  // asking a question the destination answers better -- and the one card that
+  // cannot name its kind, `blank document`, opens the chooser there.
+  const newDocCta = compact ? (
     // `buttonVariants` rather than <Button asChild>: this Button has no
     // `asChild`, and the variants module exists precisely so a link can wear
     // the button's clothes -- see button.tsx's note on why it is a separate
@@ -194,12 +231,12 @@ export function DocumentsPage({
       className={cn(ICON_MOTION_GROUP, buttonVariants({ size: 's' }))}
     >
       <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
-      new CV
+      new document
     </Link>
   ) : (
-    <Button size="s" disabled={creatingDraft} onClick={() => onCreateDraft?.()}>
+    <Button size="s" disabled={creatingDraft} onClick={() => setNewDocOpen(true)}>
       <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
-      new CV
+      new document
     </Button>
   )
 
@@ -235,7 +272,7 @@ export function DocumentsPage({
 
       <PageHeader
         title="documents"
-        description="the CVs you send out, and every version you have saved of them."
+        description="the CVs and cover letters you send out, and every version you have saved of them."
         action={
           // Below `lg` the CTA is present WHETHER OR NOT there are documents.
           // On desktop it is suppressed on an empty screen because the empty
@@ -251,7 +288,7 @@ export function DocumentsPage({
           hasDocs || compact ? (
             <div className="flex items-center gap-2 max-sm:w-full max-sm:flex-col max-sm:[&>*]:w-full">
               {importButton}
-              {newCvCta}
+              {newDocCta}
             </div>
           ) : undefined
         }
@@ -262,8 +299,10 @@ export function DocumentsPage({
           the CTA above -- a six-card gallery pushed the user's actual
           documents below the fold on every phone, which is the wrong thing to
           put first on a screen called "documents". Rendered conditionally
-          rather than with `hidden`, because it is the LaTeX cards' only
-          appearance and they must not exist in the compact DOM at all. */}
+          rather than with `hidden`, so the compact DOM has no gallery in it at
+          all -- a `display:none` card is still tabbable in some browsers, and
+          the gallery now carries a search box and a dropdown that would be two
+          more invisible controls in the tab order. */}
       {!compact && (
         <TemplateGallery
           busy={creatingDraft}
@@ -279,20 +318,32 @@ export function DocumentsPage({
           worse by raising that row to 40px while the heading stayed 20px. */}
       <section className="flex flex-col gap-5">
         {/* THE FILTER LIVES WITH THE LIST IT NARROWS, not in the page header
-            beside `new CV` and `import`. Those two are page-level actions; this
-            one only means anything next to the rows it hides. It is drawn only
-            when there are documents, for the same reason `new CV` leaves the
-            header on an empty screen -- a control over nothing. */}
+            beside `new document` and `import`. Those two are page-level
+            actions; this one only means anything next to the rows it hides. It
+            is drawn only when there are documents, for the same reason `new
+            document` leaves the header on an empty screen -- a control over
+            nothing.
+
+            THAT RULE IS NOW LOAD-BEARING RATHER THAN TIDY. At desktop width
+            the template gallery above has a search box and a kind dropdown of
+            its own, so four narrowing controls are on one screen. What tells
+            them apart is that each pair sits on the heading row of the thing
+            it narrows -- these with "your documents", those with "start a new
+            document" -- and that the labels never repeat a noun: "search
+            documents" against "search templates", "CVs" against "CV
+            templates". Moving either pair into the page header would put a
+            control that narrows one section above both of them. */}
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-heading-s text-text-primary">your documents</h2>
           {hasDocs && (
             <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
-              {/* SEARCH FIRST, THEN THE FORMAT. They are not the same kind of
+              {/* SEARCH FIRST, THEN THE KIND. They are not the same kind of
                   control: one finds a document you already have in mind, the
                   other changes which kind of documents the list is about. The
                   finder goes first because it is the one somebody arrives
                   wanting, and it is wider because a title is longer than a
-                  format. */}
+                  kind. The gallery's own pair is ordered the same way, so the
+                  two rows read as the same idea rather than as two designs. */}
               <div className="w-56 max-sm:w-full">
                 <Input
                   id="document-search"
@@ -302,6 +353,19 @@ export function DocumentsPage({
                   placeholder="search documents"
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
+                />
+              </div>
+              {/* Width on a wrapper, not on the Select: `Select`'s own root is
+                  `w-full` and only its trigger takes `className`. Same trap the
+                  calendar's country picker hit. */}
+              <div className="w-44 max-sm:w-full">
+                <Select
+                  id="document-filter"
+                  icon="Documents"
+                  aria-label="Filter documents by kind"
+                  value={filter}
+                  onValueChange={(next) => setFilter(next as DocFilter)}
+                  items={DOC_FILTERS.map((option) => ({ ...option }))}
                 />
               </div>
             </div>
@@ -353,18 +417,34 @@ export function DocumentsPage({
             ))}
 
             {/* A FILTER THAT MATCHES NOTHING IS NOT AN EMPTY ACCOUNT, and it
-                must not borrow the empty state's copy -- "no CVs yet" would be
-                a false claim about the account whenever somebody picks LaTeX
-                and owns only Word documents. */}
+                must not borrow the empty state's copy -- "no documents yet"
+                would be a false claim about the account whenever somebody
+                picks cover letters and owns only CVs. */}
             {filtered.length === 0 && (
-              // WHICH CONTROL EMPTIED THE LIST IS THE WHOLE MESSAGE. There are
-              // two narrowers now, and the old copy named the format whatever
-              // had happened -- so searching for a word that matches nothing
-              // while the filter said `all` announced "no LaTeX documents",
-              // which is a false claim about the account. The search is
-              // reported first because it is the one the reader just typed.
+              // WHICH CONTROL EMPTIED THE LIST IS THE WHOLE MESSAGE, and there
+              // are two of them again. Naming the kind whatever had happened
+              // was the original bug: a search that matches nothing while the
+              // dropdown says `all documents` would announce "no cover
+              // letters", which is a false claim about the account. So the
+              // search is reported when something was typed -- it is the thing
+              // the reader just did -- and the kind only qualifies it.
+              //
+              // With no search term the dropdown is the only candidate left,
+              // and the count of what is in the OTHER kind is the useful half:
+              // it says the account is not empty and where the rest went.
               <p className="py-8 text-body-m text-text-muted" data-documents-filter-empty>
-                nothing matches “{query.trim()}”.
+                {terms.length > 0 ? (
+                  <>
+                    nothing matches “{query.trim()}”
+                    {filter === 'all' ? '' : filter === 'word' ? ' in CVs' : ' in cover letters'}.
+                  </>
+                ) : (
+                  <>
+                    no {filter === 'word' ? 'CVs' : 'cover letters'}. there
+                    {docs.length === 1 ? ' is ' : ' are '}
+                    {docs.length} {docs.length === 1 ? 'document' : 'documents'} of the other kind.
+                  </>
+                )}
               </p>
             )}
 
@@ -448,14 +528,18 @@ export function DocumentsPage({
               // a secondary button here would leave the page with no primary
               // at all. `import` sits beside it as the other way in.
               <div className="flex flex-wrap items-center justify-center gap-2">
-                {newCvCta}
+                {newDocCta}
                 {importButton}
               </div>
             }
           >
+            {/* "no documents yet", not "no CVs yet": the list holds cover
+                letters too, and an empty state that names one kind tells
+                somebody who came to write a letter that they are on the wrong
+                screen. */}
             {compact
-              ? 'no CVs yet. start from a template, or import a document you already have.'
-              : 'no CVs yet. start from a template above, write one from scratch, or import a document you already have.'}
+              ? 'no documents yet. start from a template, or import one you already have.'
+              : 'no documents yet. start from a template above, write one from scratch, or import one you already have.'}
           </EmptyState>
         )}
       </section>
@@ -478,6 +562,27 @@ export function DocumentsPage({
         )}
       </AppDialog>
 
+      {/* Both header and empty-state CTAs open this one dialog rather than
+          each owning their own: they are the same offer rendered in two
+          places, and two dialogs would be two places for the copy to drift. */}
+      <AppDialog
+        open={newDocOpen}
+        onOpenChange={setNewDocOpen}
+        title="new document"
+        icon="Documents"
+      >
+        <DocumentChooser
+          creating={creatingDraft}
+          onChoose={(mode) => {
+            // CLOSED BEFORE THE WRITE, not after it. The caller navigates to
+            // the editor when the row lands, and a dialog still mounted over a
+            // route that has already changed is the scrim that will not go
+            // away -- the failure the version-history dialog hit first.
+            setNewDocOpen(false)
+            onCreateDraft?.(mode)
+          }}
+        />
+      </AppDialog>
     </div>
   )
 }
