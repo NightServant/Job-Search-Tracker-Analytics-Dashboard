@@ -153,8 +153,8 @@ describe('the /signup route', () => {
     verifySignUpOtp.mockResolvedValue(undefined)
     render(<SignupRoute />)
     await fillDetails()
+    // The sixth digit submits; no click. See OtpStep's `submit`.
     await userEvent.type(await screen.findByLabelText(/^Verification code/), '123456')
-    await userEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
 
     expect(verifySignUpOtp).toHaveBeenCalledWith('a@b.test', '123456')
     expect(await screen.findByText('you are all set')).toBeInTheDocument()

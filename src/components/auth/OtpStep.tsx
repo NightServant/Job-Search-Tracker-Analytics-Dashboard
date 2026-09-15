@@ -1,12 +1,13 @@
 'use client'
 
 import * as React from 'react'
+import { cn } from '@/lib/utils'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { ShieldCheckIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { Field } from '@/components/ui/field'
-import { Input } from '@/components/ui/input'
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp'
 
 /**
  * Step two: the six digits emailed to the address just entered.
@@ -54,6 +55,41 @@ const CODE_LENGTH = 6
  */
 const RESEND_COOLDOWN_SECONDS = 30
 
+/**
+ * One digit box, in this app's tokens rather than the vendored component's.
+ *
+ * WHY NOT EDIT `ui/input-otp.tsx`: it is vendored shadcn, it ships shadcn's
+ * palette (`border-input`, `ring-ring`, `bg-input/30`), and `shadcnHouseRules`
+ * asserts over that directory. Restyling at the call site leaves the vendored
+ * file exactly as upstream wrote it and keeps this screen's appearance where
+ * someone reading this screen will look for it.
+ *
+ * SEPARATED BOXES, NOT A JOINED STRIP. The vendored slot draws `border-y
+ * border-r` with rounded ends so six slots read as one segmented control; the
+ * ask was single boxes, so each takes a full border and its own radius and the
+ * group supplies the gap.
+ *
+ * `w-10` AT THE SMALL END IS THE CONSTRAINT THAT SETS THE SIZE: six boxes plus
+ * five 8px gaps is 280px, which clears a 375px phone once the 16px page
+ * gutters are taken off. Anything wider has to shrink the gap or wrap, and a
+ * wrapped code is unreadable as a code.
+ *
+ * `text-heading-s tabular` because these are digits being compared against a
+ * six-character string on a screen somewhere else -- proportional figures make
+ * 1 and 7 argue with their neighbours at this size.
+ */
+const SLOT = cn(
+  'size-11 w-10 sm:size-12 rounded-md border bg-bg-canvas',
+  'text-heading-s tabular text-text-primary',
+  'border-border-default transition-colors',
+  // The active slot borrows the focus treatment every other field in the app
+  // uses, because the real focused element is the invisible input behind all
+  // six -- so a browser focus ring would land in the wrong place, or nowhere.
+  'data-[active=true]:z-10 data-[active=true]:border-accent-default',
+  'data-[active=true]:ring-2 data-[active=true]:ring-accent-default/30',
+  'aria-invalid:border-status-rejected-mark'
+)
+
 export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
   const [code, setCode] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
@@ -72,18 +108,37 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
 
   const ready = code.length === CODE_LENGTH
 
-  async function handleSubmit(event: React.FormEvent) {
-    event.preventDefault()
+  /**
+   * The one verify path, called by the button and by the sixth digit alike.
+   *
+   * IT TAKES THE VALUE rather than reading `code` from the closure, because
+   * `onComplete` fires in the same tick as the state update that completed it
+   * -- the closure still holds five digits at that moment, and verifying five
+   * digits fails with a message about the code being wrong.
+   */
+  const verifying = React.useRef(false)
+  async function submit(value: string) {
+    // `onComplete` can fire again on a re-render, and the button is still
+    // clickable for the instant before `busy` paints. Either would send the
+    // same code twice and spend a `token_verifications` slot for nothing.
+    if (verifying.current || value.length !== CODE_LENGTH) return
+    verifying.current = true
     setError(null)
     setNotice(null)
     setBusy(true)
     try {
-      await onVerify(code)
+      await onVerify(value)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'That code was not accepted.')
     } finally {
       setBusy(false)
+      verifying.current = false
     }
+  }
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault()
+    await submit(code)
   }
 
   return (
@@ -108,30 +163,28 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
       )}
 
       <Field id="auth-otp" label="Verification code" required>
-        <Input
+        <InputOTP
           id="auth-otp"
           name="otp"
           value={code}
-          // Digits only, and capped at the code length: a paste that carries a
-          // space or the word "code" should still work rather than failing
-          // against the auth server for a reason nobody can see.
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, CODE_LENGTH))}
-          inputMode="numeric"
-          autoComplete="one-time-code"
+          onChange={setCode}
           maxLength={CODE_LENGTH}
-          required
-          // Six dots, not "Enter the code": this is the one field where the
-          // SHAPE of the answer is the useful hint, and the label above
-          // already names what it is.
-          placeholder="······"
           autoFocus
-          // The last field in the flow, so it gets the same caret as the three
-          // before it. The wide tracking is not a problem for it: skiper106's
-          // measuring span copies letterSpacing off the computed style, so the
-          // caret lands between the digits rather than drifting left of them.
-          smoothCaret
-          className="tabular tracking-[0.4em]"
-        />
+          disabled={busy}
+          aria-invalid={error ? true : undefined}
+          // Submits on the sixth digit rather than waiting for the button.
+          // Somebody reading a code off a phone has both hands busy; the
+          // form has exactly one thing it could do next, so making them find
+          // a button is a step that carries no decision.
+          onComplete={(value) => void submit(value)}
+          containerClassName="justify-center"
+        >
+          <InputOTPGroup className="gap-2 sm:gap-3">
+            {Array.from({ length: CODE_LENGTH }, (_, i) => (
+              <InputOTPSlot key={i} index={i} className={SLOT} aria-label={`Digit ${i + 1} of ${CODE_LENGTH}`} />
+            ))}
+          </InputOTPGroup>
+        </InputOTP>
       </Field>
 
       {/*

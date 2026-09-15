@@ -255,28 +255,37 @@ describe('the verification step', () => {
   it('verifies the code and then thanks the person', async () => {
     const props = setup()
     await fillDetails()
+    // NO CLICK. The sixth digit submits: somebody reading a code off a phone
+    // has both hands busy, and the form has exactly one thing it could do
+    // next, so making them find a button is a step carrying no decision.
     await userEvent.type(await screen.findByLabelText(/^Verification code/), '123456')
-    await userEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
 
     await waitFor(() =>
       expect(props.onVerify).toHaveBeenCalledWith('gabe@example.com', '123456')
     )
     expect(await screen.findByText('you are all set')).toBeInTheDocument()
+    // Exactly once, however many renders the completion caused.
+    expect(props.onVerify).toHaveBeenCalledTimes(1)
   })
 
   it('keeps digits only, so a pasted code with stray characters still works', async () => {
-    setup()
+    // Still asserted after the switch to segmented boxes, because it is the
+    // behaviour that matters rather than the widget: a code copied out of an
+    // email arrives with spaces, and one read aloud arrives with letters
+    // around it. Both must land as six digits instead of failing against the
+    // auth server for a reason nobody can see.
+    const props = setup()
     await fillDetails()
     const field = (await screen.findByLabelText(/^Verification code/)) as HTMLInputElement
     await userEvent.type(field, 'a1b2c3d4e5f6g7')
     expect(field.value).toBe('123456')
+    await waitFor(() => expect(props.onVerify).toHaveBeenCalledWith('gabe@example.com', '123456'))
   })
 
   it('surfaces a rejected code without losing the step', async () => {
     setup({ onVerify: vi.fn().mockRejectedValue(new Error('Token has expired or is invalid')) })
     await fillDetails()
     await userEvent.type(await screen.findByLabelText(/^Verification code/), '000000')
-    await userEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
     expect(await screen.findByText(/Token has expired/)).toBeInTheDocument()
     expect(screen.getByLabelText(/^Verification code/)).toBeInTheDocument()
   })
@@ -287,7 +296,6 @@ describe('the thank-you step', () => {
     const props = setup()
     await fillDetails()
     await userEvent.type(await screen.findByLabelText(/^Verification code/), '123456')
-    await userEvent.click(screen.getByRole('button', { name: 'Verify and continue' }))
 
     expect(await screen.findByText('you are all set')).toBeInTheDocument()
     // The manual way out: an automatic navigation that fails silently would

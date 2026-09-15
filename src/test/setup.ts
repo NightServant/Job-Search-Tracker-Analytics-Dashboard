@@ -115,4 +115,20 @@ if (typeof (globalThis as { IntersectionObserver?: unknown }).IntersectionObserv
     IntersectionObserverStub
 }
 
+// `document.elementFromPoint`, which jsdom does not implement at all.
+//
+// `input-otp` calls it on a 1s interval to work out whether a password
+// manager has dropped its badge over the field, so it can shift the digits
+// out from under it. The call lands OUTSIDE any test's await -- it is a bare
+// setTimeout -- so it surfaced as an uncaught exception attributed to
+// whichever test happened to be running, in files that never touch an OTP
+// screen. That is why it is stubbed here rather than mocked per test.
+//
+// It returns null, which is the honest answer: jsdom computes no layout, so
+// there is no element at any point. input-otp reads that as "no badge", which
+// is correct for every test.
+if (typeof document !== 'undefined' && typeof document.elementFromPoint !== 'function') {
+  ;(document as unknown as { elementFromPoint: () => Element | null }).elementFromPoint = () => null
+}
+
 // Mock global variables set by Vite

@@ -1,6 +1,7 @@
 'use client'
 
 import { useAuth } from '@/contexts/AuthContext'
+import { useAuthHeld } from './authHold'
 
 /**
  * Holds an auth form back until it is known that the visitor needs one.
@@ -56,6 +57,12 @@ import { useAuth } from '@/contexts/AuthContext'
  */
 export function SignedOutOnly({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
+  const held = useAuthHeld()
+
+  // A flow asking to finish its last screen. Returning null here is what
+  // unmounted /signup's thank-you the instant the code verified -- the
+  // redirect was only half the reason it was never seen. See ./authHold.
+  if (held) return <>{children}</>
 
   // Known to be signed in: the redirect is already in flight and a sign-in form
   // is never the right thing to have on screen. Anything else -- signed out, or

@@ -19,6 +19,7 @@ import { takeAuthAttempt, resetAuthAttempts } from '@/lib/authRateLimit'
 import type { OAuthProviderId } from '@/lib/oauthProviders'
 import { AuthBrandPanel } from './AuthBrandPanel'
 import { OAuthButtons } from './OAuthButtons'
+import { useHoldAuthGuards } from './authHold'
 import { OtpStep } from './OtpStep'
 import { PasswordRequirements } from './PasswordRequirements'
 import { ProgressTrack } from '@/components/ui/progress-track'
@@ -95,6 +96,12 @@ export function SignUpFlow({
   doneDelayMs = 2500,
 }: SignUpFlowProps) {
   const [step, setStep] = React.useState<Step>(0)
+
+  // THE THANK-YOU ONLY EXISTS BECAUSE OF THIS LINE. Verifying the code creates
+  // a session, and both guards in the (auth) layout treat a new session as a
+  // reason to leave -- one navigates, the other unmounts the subtree. This
+  // asks them to wait for the length of step 2. See ./authHold.
+  useHoldAuthGuards(step === 2)
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')

@@ -1,3 +1,4 @@
+import { AuthHoldProvider } from '@/components/auth/AuthHoldProvider'
 import { SignedInRedirect } from '@/components/auth/SignedInRedirect'
 import { SignedOutOnly } from '@/components/auth/SignedOutOnly'
 
@@ -50,8 +51,13 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           that comes into existence WHILE the form is open -- which on /login
           is the ordinary case -- is something middleware cannot see, because
           no request is made. */}
-      <SignedInRedirect />
-      <SignedOutOnly>{children}</SignedOutOnly>
+      {/* Both guards read the hold, so a flow inside `children` can ask for
+          its last screen before either acts. /signup's thank-you is the one
+          that needs it; see components/auth/authHold. */}
+      <AuthHoldProvider>
+        <SignedInRedirect />
+        <SignedOutOnly>{children}</SignedOutOnly>
+      </AuthHoldProvider>
     </div>
   )
 }

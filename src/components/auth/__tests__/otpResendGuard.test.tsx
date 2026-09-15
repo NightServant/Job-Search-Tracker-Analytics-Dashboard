@@ -18,12 +18,6 @@ import { OtpStep } from '../OtpStep'
  * the bug that provoked the clicking.
  */
 
-const setup = () => {
-  const onResend = vi.fn().mockResolvedValue(undefined)
-  render(<OtpStep email="a@b.test" onVerify={vi.fn()} onResend={onResend} onBack={vi.fn()} />)
-  return { onResend, button: () => screen.getByTestId('resend') }
-}
-
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }))
 afterEach(() => vi.useRealTimers())
 

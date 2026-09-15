@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useAuthHeld } from './authHold'
 
 /**
  * Sends a signed-in visitor from a public route to `/dashboard`.
@@ -42,11 +43,16 @@ import { useAuth } from '@/contexts/AuthContext'
  */
 export function SignedInRedirect() {
   const { user, loading } = useAuth()
+  const held = useAuthHeld()
   const router = useRouter()
 
   useEffect(() => {
+    // `held` is a flow on this route asking for its last screen -- /signup's
+    // thank-you, which this redirect used to delete before it painted. See
+    // ./authHold. Without a provider it is always false, so `/` is unchanged.
+    if (held) return
     if (!loading && user) router.replace('/dashboard')
-  }, [loading, user, router])
+  }, [loading, user, held, router])
 
   return null
 }

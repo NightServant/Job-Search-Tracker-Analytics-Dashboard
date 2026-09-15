@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { OTPInput, OTPInputContext } from "input-otp"
+import { OTPInput, OTPInputContext, REGEXP_ONLY_DIGITS } from "input-otp"
 
 import { cn } from "@/lib/utils"
 import { MinusIcon } from "@/components/icons/minus"
@@ -21,6 +21,13 @@ function InputOTP({
         containerClassName
       )}
       spellCheck={false}
+      // Digits by default, because every code this app sends is numeric and
+      // the alternative is silent: without a pattern the component accepts
+      // letters, so a code read aloud or pasted with stray characters reaches
+      // the auth server as nonsense and comes back "invalid". Overridable by
+      // passing `pattern`, which is why it sits above the spread.
+      pattern={REGEXP_ONLY_DIGITS}
+      inputMode="numeric"
       className={cn("disabled:cursor-not-allowed", className)}
       {...props}
     />
