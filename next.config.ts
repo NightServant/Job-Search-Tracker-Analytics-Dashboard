@@ -29,7 +29,30 @@ const nextConfig: NextConfig = {
    * time instead, which is correct for a server-only library anyway -- it is
    * ~2MB of zip machinery no client should ever receive.
    */
-  serverExternalPackages: ['docx'],
+  /**
+   * `@react-pdf/renderer` IS HERE FOR THE SAME REASON AS `docx` AND A SHARPER
+   * ONE. It renders through `pdfkit`, which loads the PDF standard fonts by a
+   * package IMPORTS subpath -- `require('#standard-fonts/Helvetica')`, mapped
+   * in pdfkit's own package.json to `./js/standard-fonts/*.cjs`. A bundler
+   * cannot follow that: the specifier is not a path and the `*` is filled in
+   * at runtime from the font name. Webpack inlined the JS, the `.cjs` metric
+   * files were never traced, and production answered 500 with
+   * `Cannot find module '/var/task/node_modules/pdfkit/js/standard-fonts/
+   * Helvetica.cjs'` -- Helvetica because pdfkit loads it as the document's
+   * default before anything asks for Times.
+   *
+   * Listing it here makes Next `require()` it from node_modules at runtime;
+   * `outputFileTracingIncludes` below is what actually puts the font files in
+   * the deployment, since tracing cannot discover them either.
+   */
+  serverExternalPackages: ['docx', '@react-pdf/renderer'],
+  /**
+   * The files no static analysis can find. Scoped to the one route that needs
+   * them rather than the whole app, so nothing else carries the weight.
+   */
+  outputFileTracingIncludes: {
+    '/api/cv/pdf': ['./node_modules/pdfkit/js/standard-fonts/**', './node_modules/pdfkit/js/data/**'],
+  },
   /**
    * THE MIDDLEWARE RUNS ON NODE, AND THIS FLAG IS WHAT MAKES THAT REAL.
    *
