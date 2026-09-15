@@ -33,11 +33,42 @@ export interface OtpStepProps {
 
 const CODE_LENGTH = 6
 
+/**
+ * Seconds the resend link is unavailable after a send.
+ *
+ * NOT A UX FLOURISH -- A QUOTA GUARD. The auth logs for 2026-09-15 show five
+ * `/resend` calls inside one second, then two more a minute later: the button
+ * was disabled only by the VERIFY busy flag, so nothing stopped a second click
+ * while the first request was still open. Somebody whose code has not arrived
+ * clicks it repeatedly, which is the reasonable thing to do and which this
+ * screen was rewarding with one email per click.
+ *
+ * `[auth.rate_limit] email_sent = 30` is per PROJECT per hour, not per person.
+ * Seven wasted sends is a quarter of the hour's budget spent by one impatient
+ * person, and the punishment for exhausting it lands on whoever signs up next:
+ * they get no code at all, which looks exactly like the bug being clicked at.
+ *
+ * Thirty seconds is long enough to cover the delivery lag that provokes the
+ * clicking -- an SMTP relay plus Gmail is rarely instant -- and short enough
+ * that a genuinely lost email is not a long wait.
+ */
+const RESEND_COOLDOWN_SECONDS = 30
+
 export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
   const [code, setCode] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const [notice, setNotice] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
+  // Separate from `busy`, which is the VERIFY flag. Sharing one boolean is
+  // what left resend unguarded while its own request was in flight.
+  const [resending, setResending] = React.useState(false)
+  const [cooldown, setCooldown] = React.useState(0)
+
+  React.useEffect(() => {
+    if (cooldown <= 0) return
+    const id = setTimeout(() => setCooldown((n) => n - 1), 1000)
+    return () => clearTimeout(id)
+  }, [cooldown])
 
   const ready = code.length === CODE_LENGTH
 
@@ -131,19 +162,31 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
         <button
           type="button"
           data-resend
-          disabled={busy}
+          disabled={busy || resending || cooldown > 0}
           onClick={async () => {
+            // Guarded three ways, and each one covers a click the others do
+            // not: `busy` while a code is being verified, `resending` while
+            // this request is open, `cooldown` for the burst of clicks that
+            // follows a send which has not arrived yet.
+            if (resending || cooldown > 0) return
             setError(null)
+            setResending(true)
             try {
               await onResend()
               setNotice('A new code is on its way.')
+              setCooldown(RESEND_COOLDOWN_SECONDS)
             } catch (err) {
+              // No cooldown on failure: nothing was sent, so nothing was
+              // spent, and making someone wait 30s to retry a request that
+              // never left is punishing them for the server's problem.
               setError(err instanceof Error ? err.message : 'Could not resend the code.')
+            } finally {
+              setResending(false)
             }
           }}
           className="text-accent-default underline underline-offset-4 disabled:opacity-50"
         >
-          resend the code
+          {cooldown > 0 ? `resend in ${cooldown}s` : resending ? 'sending...' : 'resend the code'}
         </button>
       </div>
     </form>
