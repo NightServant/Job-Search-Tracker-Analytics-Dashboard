@@ -221,6 +221,9 @@
      stylesheet never had. Durations existed; easings and the skeleton cycle
      did not. */
   --duration-skeleton: 1200ms;
+  /* Slower than the pulse on purpose: the two must not beat together, or the
+     block appears to flash once per cycle instead of breathing under a sweep. */
+  --duration-sheen: 2000ms;
   --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-decelerate: cubic-bezier(0, 0, 0.2, 1);
 
@@ -508,6 +511,75 @@
 
 @utility animate-pulse {
   animation: pulse var(--duration-skeleton) var(--ease-standard) infinite;
+}
+
+/* THE SKELETON SHEEN (2026-09-15, "add a premium feel to it").
+
+   A narrow highlight travelling left to right across a skeleton block, over
+   the top of the opacity pulse rather than instead of it. The two do different
+   jobs: the pulse says "not real yet", the sweep says "and something is
+   actively happening". A pulse alone, at 1200ms, is indistinguishable from a
+   page that has quietly stopped.
+
+   IT IS A ::after, NOT A BACKGROUND, so the element's own `bg-bg-inset` stays
+   exactly what it was. Painting the gradient into the background would have
+   meant every caller that sets its own background silently loses the sheen.
+
+   THEME-AWARENESS IS WHY THE HIGHLIGHT IS A TOKEN AND NOT `white`. On the
+   light palette the sweep has to be LIGHTER than the inset it crosses; on the
+   dark one, white at any usable opacity blows out against a near-black
+   surface and reads as a flashlight. `--skeleton-sheen` is redefined per
+   theme below rather than being one colour that is wrong in one of them.
+
+   `transform` ONLY -- no width, no left, no background-position. The sweep
+   runs on the compositor and cannot reflow the hundreds of skeleton blocks a
+   table renders at once.
+
+   `overflow: hidden` and `isolation: isolate` are on the base so the
+   travelling highlight is clipped to the block's own rounded corners instead
+   of streaking across its neighbours. */
+@utility animate-shimmer {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      var(--skeleton-sheen) 50%,
+      transparent 100%
+    );
+    animation: skeleton-sheen var(--duration-sheen) var(--ease-standard) infinite;
+  }
+}
+
+@keyframes skeleton-sheen {
+  /* A pause at the start of each cycle: a sweep that restarts the instant it
+     leaves reads as a strobe rather than as a passing highlight. */
+  0%,
+  20% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* NO SWEEP AT ALL under reduced motion, and the opacity pulse goes with it.
+   A travelling highlight is exactly the kind of repeating lateral movement
+   this setting exists to remove, and leaving the pulse behind would still be
+   a thing blinking on the screen of somebody who asked for stillness. The
+   block keeps its `bg-bg-inset` fill, which is all the information the
+   skeleton was ever carrying. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer::after {
+    display: none;
+  }
 }
 
 /* THE HERO'S SCROLL CUE (components/landing/HeroScrollCue, 2026-09-15).
@@ -1433,6 +1505,34 @@ body,
    chroma back to the accent. Dark keeps more saturation because a warm tint
    on near-black reads as depth rather than as a competing hue, and Gabe
    confirmed dark already reads correctly. */
+/* THE SKELETON SHEEN COLOUR, per theme.
+
+   ONE VALUE CANNOT SERVE BOTH and that is the whole reason this is a token.
+   The sweep has to be lighter than the surface it crosses, and the surfaces
+   are near-white and near-black. `white / 0.6` is a clean highlight on the
+   light palette and a flashlight beam on the dark one; the value that looks
+   right on dark is invisible on light.
+
+   Both are white at different strengths rather than two different hues,
+   because a tinted sheen would read as a colour the design system does not
+   otherwise use -- and on a screen that is entirely grey blocks, any hue at
+   all becomes the loudest thing on it.
+
+   Declared in the SAME three-block shape as the backdrop below: bare :root for
+   light, the system-dark case guarded against an explicit light choice, and
+   the explicit dark choice last so a toggle beats the OS in both directions. */
+:root {
+  --skeleton-sheen: rgb(255 255 255 / 0.6);
+}
+:root:not([data-theme='light']) {
+  @media (prefers-color-scheme: dark) {
+    --skeleton-sheen: rgb(255 255 255 / 0.06);
+  }
+}
+:root[data-theme='dark'] {
+  --skeleton-sheen: rgb(255 255 255 / 0.06);
+}
+
 :root {
   --app-backdrop-image: url('/backdrop.jpg');
   --app-backdrop-opacity: 0.09;

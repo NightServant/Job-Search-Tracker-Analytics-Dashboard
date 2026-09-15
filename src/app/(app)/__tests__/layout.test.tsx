@@ -1,13 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import AppLayout from '../layout'
 
 const useAuthMock = vi.hoisted(() => vi.fn())
 const replaceMock = vi.hoisted(() => vi.fn())
+const pathnameMock = vi.hoisted(() => vi.fn(() => '/dashboard'))
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: useAuthMock }))
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ replace: replaceMock, push: vi.fn(), refresh: vi.fn() }),
+  // The layout reads the path to choose WHICH skeleton to show while auth
+  // resolves -- a route-shaped outline rather than the blank page this used to
+  // paint. See SKELETON_BY_PREFIX in the layout.
+  usePathname: () => pathnameMock(),
 }))
 vi.mock('@/components/shell/AppShell', () => ({
   AppShell: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
@@ -16,6 +21,7 @@ vi.mock('@/components/shell/AppShell', () => ({
 beforeEach(() => {
   replaceMock.mockClear()
   useAuthMock.mockReset()
+  pathnameMock.mockReturnValue('/dashboard')
 })
 
 describe('the authenticated shell guard', () => {
@@ -56,5 +62,111 @@ describe('the authenticated shell guard', () => {
     useAuthMock.mockReturnValue({ user: null, loading: false, signingOut: true })
     render(<AppLayout>x</AppLayout>)
     expect(replaceMock).not.toHaveBeenCalled()
+  })
+})
+
+
+/**
+ * What a signed-in visitor looks at while the session resolves.
+ *
+ * IT WAS A BLANK PAGE. This guard returned `null` for `loading`, so every cold
+ * load of a private route painted an empty document until
+ * `supabase.auth.getSession()` came back -- a network round trip. The page's
+ * own skeleton could not help, because it lives inside `children`, which the
+ * gate had already refused to render. Gabe, 2026-09-15: "there are blank
+ * pages".
+ *
+ * THE SHAPE IS THE FEATURE, which is why these assert on the variant rather
+ * than on "something rendered". A spinner says work is happening; a skeleton
+ * in the shape of the route says WHAT is arriving, so the page resolves into
+ * an outline the reader has already started on instead of replacing a spinner
+ * with a screen.
+ */
+describe('the loading state, which used to be nothing at all', () => {
+  const loading = { user: null, loading: true, signingOut: false }
+
+  it('paints a skeleton instead of an empty page', async () => {
+    useAuthMock.mockReturnValue(loading)
+    const { container } = render(<AppLayout>x</AppLayout>)
+    // AWAITED, because `RouteSkeleton` sits behind `DelayedSkeleton`'s 200ms
+    // gate -- see the test below, which asserts that gate is still there.
+    // THE ASSERTION THAT WOULD HAVE CAUGHT IT: before this, the container
+    // stayed empty forever rather than for 200ms.
+    await waitFor(() => expect(container.querySelector('[data-route-skeleton]')).toBeTruthy())
+  })
+
+  it('does not flash one on a session that resolves quickly', () => {
+    // The 200ms gate matters MORE here than on a route change: a warm reload
+    // with a cached session resolves in single-digit milliseconds, and a
+    // skeleton for one frame on every navigation is worse than none.
+    useAuthMock.mockReturnValue(loading)
+    const { container } = render(<AppLayout>x</AppLayout>)
+    expect(container.querySelector('[data-route-skeleton]')).toBeNull()
+  })
+
+  it('tells a screen reader it is loading, not just a sighted one', async () => {
+    useAuthMock.mockReturnValue(loading)
+    render(<AppLayout>x</AppLayout>)
+    const status = await screen.findByRole('status')
+    expect(status).toHaveAttribute('aria-busy', 'true')
+    expect(status).toHaveTextContent('Loading')
+  })
+
+  it('does not leak the route content while auth is unresolved', () => {
+    // The skeleton replaces `children`; it does not render alongside them.
+    useAuthMock.mockReturnValue(loading)
+    const { container } = render(<AppLayout>secret</AppLayout>)
+    expect(container.textContent).not.toContain('secret')
+  })
+
+  const variantAfterGate = async (container: HTMLElement) => {
+    await waitFor(() => expect(container.querySelector('[data-route-skeleton]')).toBeTruthy())
+    return container.querySelector('[data-route-skeleton]')!.getAttribute('data-route-skeleton')
+  }
+
+  it('chooses the skeleton that matches the route', async () => {
+    useAuthMock.mockReturnValue(loading)
+    pathnameMock.mockReturnValue('/analytics')
+    const { container } = render(<AppLayout>x</AppLayout>)
+    expect(await variantAfterGate(container)).toBe('analytics')
+  })
+
+  it('prefers the longer prefix, so a record is not shown a list', async () => {
+    // `/applications/123` matches both `/applications/` and `/applications`,
+    // and a record shown a table outline resolves into something a different
+    // shape -- the exact jump a skeleton exists to prevent.
+    useAuthMock.mockReturnValue(loading)
+    pathnameMock.mockReturnValue('/applications/123')
+    const { container } = render(<AppLayout>x</AppLayout>)
+    expect(await variantAfterGate(container)).toBe('detail')
+  })
+
+  it('falls back to a plausible outline on a route it does not know', async () => {
+    useAuthMock.mockReturnValue(loading)
+    pathnameMock.mockReturnValue('/something-new')
+    const { container } = render(<AppLayout>x</AppLayout>)
+    expect(await variantAfterGate(container)).toBe('dashboard')
+  })
+
+  it('shows nothing when signed out and NOT loading, because a redirect is in flight', () => {
+    // A skeleton here would promise a page that is deliberately not coming.
+    useAuthMock.mockReturnValue({ user: null, loading: false, signingOut: false })
+    const { container } = render(<AppLayout>x</AppLayout>)
+    expect(container.querySelector('[data-route-skeleton]')).toBeNull()
+  })
+
+  it('lets an expiry outrank the skeleton', () => {
+    // An expiry arrives as `user === null` like every other signed-out state.
+    // Telling somebody whose session just ended to wait for a page would be a
+    // lie, so the dialog wins even while `loading` is true.
+    useAuthMock.mockReturnValue({
+      user: null,
+      loading: true,
+      signingOut: false,
+      sessionExpired: true,
+      acknowledgeSessionExpiry: vi.fn(),
+    })
+    const { container } = render(<AppLayout>x</AppLayout>)
+    expect(container.querySelector('[data-route-skeleton]')).toBeNull()
   })
 })

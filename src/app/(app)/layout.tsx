@@ -1,10 +1,11 @@
 'use client'
 
 import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { SessionExpiredDialog } from '@/components/auth/SessionExpiredDialog'
 import { AppShell } from '@/components/shell/AppShell'
+import { RouteSkeleton, type RouteSkeletonVariant } from '@/components/ui/loading-skeletons'
 
 /**
  * The authenticated shell.
@@ -14,8 +15,42 @@ import { AppShell } from '@/components/shell/AppShell'
  * every table is behind owner-only RLS, so an unauthenticated request returns
  * nothing regardless of what the UI renders.
  */
+/**
+ * Which skeleton to show for a path, while auth is still resolving.
+ *
+ * THE SHAPE IS THE POINT. A generic spinner tells somebody that something is
+ * happening; a skeleton in the shape of the route tells them WHAT is arriving,
+ * and the page then resolves into the outline they were already reading rather
+ * than replacing it. That is the whole difference between a loading screen and
+ * a page that is loading.
+ *
+ * Longest prefix first, so `/applications/123` gets `detail` rather than the
+ * `table` that `/applications` matches.
+ *
+ * `dashboard` IS THE FALLBACK rather than a blank, because an unknown route
+ * under this layout is still a page with a heading and panels -- and the worst
+ * case is showing a plausible outline for a beat, which is what every skeleton
+ * does anyway.
+ */
+const SKELETON_BY_PREFIX: ReadonlyArray<readonly [string, RouteSkeletonVariant]> = [
+  ['/applications/', 'detail'],
+  ['/applications', 'table'],
+  ['/analytics', 'analytics'],
+  ['/documents', 'documents'],
+  ['/calendar', 'calendar'],
+  ['/cv', 'detail'],
+  ['/settings', 'detail'],
+  ['/dashboard', 'dashboard'],
+]
+
+function skeletonVariantFor(pathname: string | null): RouteSkeletonVariant {
+  const match = SKELETON_BY_PREFIX.find(([prefix]) => pathname?.startsWith(prefix))
+  return match ? match[1] : 'dashboard'
+}
+
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { user, loading, signingOut, sessionExpired } = useAuth()
+  const pathname = usePathname()
   const router = useRouter()
 
   useEffect(() => {
@@ -63,7 +98,51 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   // same shell with no AuthProvider above it at all -- `useAuth` throws there,
   // which is correct and is how /demo stays a route space rather than an
   // account.
-  if (loading || !user) return sessionExpired ? <SessionExpiredDialog /> : null
+  /*
+    THE EXPIRY DIALOG OUTRANKS EVERYTHING, including the skeleton below. An
+    expiry arrives as `user === null` like every other signed-out state, and
+    showing a loading skeleton to somebody whose session just ended would be
+    telling them to wait for something that is never coming.
+  */
+  if (sessionExpired) return <SessionExpiredDialog />
+
+  /*
+    A SKELETON WHILE AUTH RESOLVES, NOT A BLANK PAGE (Gabe, 2026-09-15:
+    "there are blank pages").
+
+    This line used to return `null` for `loading`, which meant every cold load
+    of a signed-in route painted an empty white document until
+    `supabase.auth.getSession()` came back -- a network round trip, so tens of
+    milliseconds on a good connection and a great deal more on a bad one. The
+    page's OWN skeleton could not help: it lives inside `children`, which this
+    gate had already refused to render.
+
+    THE SHELL IS SAFE TO RENDER WITHOUT A USER. `AppShell` takes plain props
+    and never calls `useAuth` -- it is the same component /demo mounts with no
+    AuthProvider above it at all. So the chrome can paint immediately and the
+    content area can carry the skeleton, which is what makes this feel like a
+    page arriving rather than a page missing.
+
+    IT IS NOT A FLASH OF PROTECTED CHROME. Middleware turns an unauthenticated
+    request away before this page is ever generated, so anyone who reaches
+    this branch has a cookie and is nearly always about to resolve to a user.
+    The skeleton carries no data -- it is grey blocks in the shape of the route
+    that is loading.
+  */
+  if (loading) {
+    return (
+      <AppShell>
+        <RouteSkeleton variant={skeletonVariantFor(pathname)} />
+      </AppShell>
+    )
+  }
+
+  /*
+    Signed out and NOT loading: the effect above is navigating to /login, and
+    the right thing to show in the meantime is nothing. A skeleton here would
+    promise a page that is deliberately not coming.
+  */
+  if (!user) return null
 
   return <AppShell>{children}</AppShell>
 }
