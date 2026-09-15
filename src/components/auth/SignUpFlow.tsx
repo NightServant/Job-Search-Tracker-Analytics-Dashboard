@@ -48,7 +48,15 @@ export interface SignUpFlowProps {
   onSignUp: (email: string, password: string) => Promise<void>
   onVerify: (email: string, code: string) => Promise<void>
   onResend: (email: string) => Promise<void>
-  onProvider: (provider: OAuthProviderId) => Promise<void>
+  /**
+   * Starts an OAuth round trip. Optional, and the provider buttons are
+   * omitted without it -- the same seam `AuthScreen` has always had. The
+   * pages stopped passing it on 2026-09-15: no provider is enabled on the
+   * Supabase project, so both buttons returned
+   * "Unsupported provider: provider is not enabled" after a full round
+   * trip. A control that cannot work is worse than no control.
+   */
+  onProvider?: (provider: OAuthProviderId) => Promise<void>
   /** Called after the thank-you has been shown. */
   onDone: () => void
   /** How long the thank-you holds before leaving. Injectable for tests. */
@@ -253,7 +261,7 @@ export function SignUpFlow({
                 Create account
               </Button>
 
-              <OAuthButtons onSelect={onProvider} disabled={busy} />
+              {onProvider && <OAuthButtons onSelect={onProvider} disabled={busy} />}
 
               <div data-switch-mobile className="text-body-s lg:hidden">
                 <span className="text-text-muted">have an account? </span>

@@ -60,6 +60,39 @@ async function fill(password = 'hunter22') {
   await userEvent.type(screen.getByLabelText(/^Password/), password)
 }
 
+/**
+ * NEITHER ROUTE OFFERS AN OAUTH PROVIDER, and that is the assertion rather
+ * than a side effect.
+ *
+ * Gabe, 2026-09-15: "remove the continue with google and microsoft buttons."
+ * `/auth/v1/settings` on the project reports every external provider false --
+ * Google and Microsoft have never been enabled -- so both buttons ran a full
+ * round trip and came back with
+ * `{"error_code":"validation_failed","msg":"Unsupported provider: provider is
+ * not enabled"}`. A control that cannot work is worse than no control: it
+ * reads as a broken app rather than a feature that is not set up.
+ *
+ * THE COMPONENTS ARE STILL HERE AND STILL TESTED. `AuthScreen` and
+ * `SignUpFlow` both take `onProvider` as an optional prop and omit the buttons
+ * without it, and their own suites still pass one in. So this is not a
+ * deletion -- it is the two PAGES declining to pass it, which is one line each
+ * to put back the day a provider is actually enabled.
+ *
+ * These assert on the route components, where the decision lives. Asserting on
+ * `AuthScreen` would prove nothing: it never rendered them unprompted.
+ */
+describe('neither route offers a provider button', () => {
+  it('renders no provider button on /login', () => {
+    render(<LoginRoute />)
+    expect(screen.queryByRole('button', { name: /continue with/i })).toBeNull()
+  })
+
+  it('renders no provider button on /signup', () => {
+    render(<SignupRoute />)
+    expect(screen.queryByRole('button', { name: /continue with/i })).toBeNull()
+  })
+})
+
 describe('the /login route', () => {
   it('signs in and sends the user to the dashboard', async () => {
     signIn.mockResolvedValue(undefined)

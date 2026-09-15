@@ -12,14 +12,13 @@ import { SignUpFlow } from '@/components/auth/SignUpFlow'
  */
 export default function Page() {
   const router = useRouter()
-  const { signUp, verifySignUpOtp, resendSignUpOtp, signInWithProvider } = useAuth()
+  const { signUp, verifySignUpOtp, resendSignUpOtp } = useAuth()
 
   return (
     <SignUpFlow
       onSignUp={signUp}
       onVerify={verifySignUpOtp}
       onResend={resendSignUpOtp}
-      onProvider={signInWithProvider}
       onDone={() => router.push('/dashboard')}
     />
   )
