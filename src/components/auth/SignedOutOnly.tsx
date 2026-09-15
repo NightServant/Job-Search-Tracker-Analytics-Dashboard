@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useAuthHeld } from './authHold'
-import { StatusState } from '@/components/ui/status-state'
+import { HandoffScreen } from './HandoffScreen'
 
 /**
  * Holds an auth form back until it is known that the visitor needs one.
@@ -93,14 +93,10 @@ export function SignedOutOnly({ children }: { children: React.ReactNode }) {
   */
   if (user) {
     return (
-      <div className="grid min-h-screen place-items-center bg-bg-canvas px-gutter">
-        <StatusState
-          kind="loading"
-          titleAs="h1"
-          title="signing you in"
-          message="One moment while we get your account ready."
-        />
-      </div>
+      <HandoffScreen
+        title="signing you in"
+        message="One moment while we get your account ready."
+      />
     )
   }
 

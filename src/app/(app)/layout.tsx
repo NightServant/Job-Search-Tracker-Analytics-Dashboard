@@ -4,6 +4,7 @@ import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { SessionExpiredDialog } from '@/components/auth/SessionExpiredDialog'
+import { HandoffScreen } from '@/components/auth/HandoffScreen'
 import { AppShell } from '@/components/shell/AppShell'
 import { RouteSkeleton, type RouteSkeletonVariant } from '@/components/ui/loading-skeletons'
 
@@ -149,11 +150,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   /*
-    Signed out and NOT loading: the effect above is navigating to /login, and
-    the right thing to show in the meantime is nothing. A skeleton here would
-    promise a page that is deliberately not coming.
+    SIGNING OUT. Measured on 2026-09-15 by rendering this layout across every
+    state it can be in: this branch and the one below were the last two that
+    produced a completely empty document, on the server AND in the browser.
+
+    It is a DIFFERENT SENTENCE from the sign-in one, not a shared "please
+    wait". Somebody who pressed sign out and is told "signing you in" will
+    believe they pressed the wrong control.
+
+    No skeleton and no shell here: the shell is the thing being left, and an
+    outline of the dashboard would be a promise of a page nobody is going to.
   */
-  if (!user) return null
+  if (signingOut) {
+    return (
+      <HandoffScreen
+        title="signing you out"
+        message="Clearing this browser and taking you back to the home page."
+      />
+    )
+  }
+
+  /*
+    Signed out and NOT signing out: the effect above is sending this visitor
+    to /login because they asked for a private page without a session. The
+    navigation is already in flight, so the honest thing to show is where they
+    are going -- not a skeleton of the page they cannot have.
+  */
+  if (!user) {
+    return (
+      <HandoffScreen
+        title="taking you to sign in"
+        message="You need to be signed in to see that page."
+      />
+    )
+  }
 
   return <AppShell>{children}</AppShell>
 }
