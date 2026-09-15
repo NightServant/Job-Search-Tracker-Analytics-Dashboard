@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { JSONContent } from '@tiptap/core'
-import { applySuggestions, tailoredTitle } from '../applyTailoring'
+import { applySuggestions, tailoredTitle, isRetailorOfSameApplication } from '../applyTailoring'
 import type { TailoringSuggestion } from '@/services/integrations/tailoring'
 
 /**
@@ -104,5 +104,47 @@ describe('tailoredTitle', () => {
 
   it('survives an untitled document', () => {
     expect(tailoredTitle('   ', 'Initech')).toBe('Initech')
+  })
+})
+
+
+/**
+ * The write this predicate chooses is destructive in one direction, so both
+ * directions are pinned. See `isRetailorOfSameApplication` for why the links
+ * are the only evidence it is allowed to use.
+ */
+describe('choosing between a new file and a rewrite', () => {
+  const links = [{ job_id: 'job-initech' }, { job_id: 'job-globex' }]
+
+  it('rewrites when this document was already tailored for this application', () => {
+    expect(
+      isRetailorOfSameApplication({ draftId: 'cv-1', jobId: 'job-initech', links })
+    ).toBe(true)
+  })
+
+  it('writes a new file for an application this document has not been tailored for', () => {
+    expect(
+      isRetailorOfSameApplication({ draftId: 'cv-1', jobId: 'job-acme', links })
+    ).toBe(false)
+  })
+
+  it('writes a new file when the document has no links at all', () => {
+    // The first tailoring run of a fresh CV. Nothing to overwrite.
+    expect(isRetailorOfSameApplication({ draftId: 'cv-1', jobId: 'job-initech', links: [] })).toBe(
+      false
+    )
+  })
+
+  it('never overwrites when there is no open document', () => {
+    // `/cv?draft=new` has no file yet, so "rewrite the current one" has no
+    // referent -- and returning true here would send the route to update
+    // `null`.
+    expect(isRetailorOfSameApplication({ draftId: null, jobId: 'job-initech', links })).toBe(false)
+  })
+
+  it('never overwrites when no application was chosen', () => {
+    // The rail can hand off with an empty job id; an empty string must not
+    // match a link, and must not be read as "the same application".
+    expect(isRetailorOfSameApplication({ draftId: 'cv-1', jobId: '', links })).toBe(false)
   })
 })

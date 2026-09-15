@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useCreateResume, useDeleteResume, useResume, useUpdateResume } from '@/hooks/useResumes'
 import { useJobs } from '@/hooks/useJobs'
+import { usePinDocumentLink, useResumeLinks } from '@/hooks/useDocumentLinks'
 import { useToast } from '@/contexts/ToastContext'
 import { RouteSkeleton } from '@/components/ui/loading-skeletons'
 import { RouteError } from '@/components/ui/route-states'
@@ -15,6 +16,7 @@ import { DocumentChooser } from '@/components/documents/DocumentChooser'
 import { useCreateDocument } from '@/components/documents/useCreateDocument'
 import type { NoticeKind } from '@/components/documents/DocumentsNotice'
 import { WordResumeEditor } from '@/components/cv/WordResumeEditor'
+import { isRetailorOfSameApplication } from '@/components/cv/applyTailoring'
 import type { ResumeContent, ResumeMode } from '@/services/resumeService'
 
 const DOCUMENTS = '/documents'
@@ -126,6 +128,11 @@ function CvRoute() {
   const draftQuery = useResume(isNew ? null : draftParam)
   const createResume = useCreateResume()
   const updateResume = useUpdateResume()
+  // Which applications the OPEN CV has already been tailored for. Read here
+  // rather than inside the handler because it decides between two different
+  // writes, and a hook cannot be called from inside a callback.
+  const resumeLinks = useResumeLinks(isNew ? null : draftParam)
+  const pinLink = usePinDocumentLink()
   const deleteResume = useDeleteResume()
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
@@ -160,9 +167,57 @@ function CvRoute() {
    * first thing anyone does.
    *
    */
-  const tailorIntoNewDraft = async (input: { title: string; content: ResumeContent }) => {
+  const tailorIntoDraft = async (input: {
+    title: string
+    content: ResumeContent
+    jobId: string
+  }) => {
+    // A NEW APPLICATION IS A NEW FILE; THE SAME ONE AGAIN IS A REWRITE.
+    //
+    // Every run used to create a document, which is right the first time and
+    // wrong every time after: tailoring against one posting, reading it, and
+    // running it again is an ordinary thing to do, and it left a pile of files
+    // with the same name differing only in which run produced them. Nothing in
+    // /documents told them apart, and the pile grew per re-run rather than per
+    // application.
+    //
+    // `application_documents` already records which CV went to which
+    // application, so the question "have I tailored THIS file for THIS posting
+    // before?" is a row that either exists or does not -- no new column, and
+    // no guessing from the title, which would collide on two roles at the same
+    // company.
+    const isRetailor = isRetailorOfSameApplication({
+      draftId: isNew ? null : draftParam,
+      jobId: input.jobId,
+      links: resumeLinks.data ?? [],
+    })
+
     try {
-      const created = await createResume.mutateAsync({ mode: 'word', ...input })
+      if (isRetailor) {
+        // IN PLACE, AND THE TITLE IS LEFT ALONE. It is the same document for
+        // the same posting; renaming it on every re-run is how "CV — Initech"
+        // becomes a title nobody can read. The previous text is not lost: the
+        // editor forces a snapshot before handing off, so the version being
+        // overwritten is in the history this CV already keeps.
+        await updateResume.mutateAsync({
+          id: draftParam as string,
+          patch: { content: input.content },
+        })
+        success('Tailored CV updated', 'Rewritten for the same application.')
+        return
+      }
+
+      const created = await createResume.mutateAsync({
+        mode: 'word',
+        title: input.title,
+        content: input.content,
+      })
+      // LINKED IMMEDIATELY, because the link is what makes the NEXT run a
+      // rewrite instead of a third file. Tailoring never wrote one before, so
+      // "same application" was a question nothing in the data could answer.
+      if (input.jobId) {
+        await pinLink.mutateAsync({ job_id: input.jobId, resume_id: created.id })
+      }
       success('Tailored CV created', `${input.title} is ready.`)
       router.push(`/cv?draft=${created.id}`)
     } catch (err) {
@@ -241,7 +296,7 @@ function CvRoute() {
         backHref={DOCUMENTS}
         onDelete={(id) => deleteDraft(id)}
         onPersistDraft={persistDraft}
-        onTailored={(input) => tailorIntoNewDraft(input)}
+        onTailored={(input) => tailorIntoDraft(input)}
       />
       <ConfirmDialog
         open={pendingDeleteId !== null}

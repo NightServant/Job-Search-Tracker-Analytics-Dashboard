@@ -142,7 +142,19 @@ export interface CvTailoringOptions {
    * Where a tailored document goes. Optional because the route owns every
    * write in this app and the editors have to stay renderable without one.
    */
-  onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+  /**
+   * `jobId` IS THE WHOLE VERSIONING DECISION, and it is why this carries more
+   * than a title and a body. A tailored CV used to be a new document every
+   * time, so re-tailoring the same application five times left five files with
+   * the same name. The route needs to know WHICH application this run was for
+   * to tell "a new application" (a new file) from "this one again" (a rewrite
+   * of the file already tailored for it), and only this hook knows.
+   */
+  onTailored?: (input: {
+    title: string
+    content: ResumeContent
+    jobId: string
+  }) => Promise<void>
   fetchImpl?: typeof fetch
 }
 
@@ -250,6 +262,7 @@ export function useCvTailoring(options: CvTailoringOptions): CvTailoringState {
         await options.onTailored({
           title: tailoredTitle(options.title ?? '', selectedJob?.company),
           content,
+          jobId,
         })
         handedOff = true
         setOutcome({ kind: 'created' })

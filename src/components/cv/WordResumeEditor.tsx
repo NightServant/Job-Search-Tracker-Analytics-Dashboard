@@ -98,7 +98,7 @@ export interface WordResumeEditorProps {
    * Optional, so the editor still mounts in a test with nothing wired -- the
    * tailor button then says what came back rather than throwing.
    */
-  onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+  onTailored?: (input: { title: string; content: ResumeContent; jobId: string }) => Promise<void>
 
   /**
    * WHAT KIND OF DOCUMENT THIS IS -- and therefore what the editor IS, not
@@ -696,6 +696,16 @@ export function WordResumeEditor({
               'Your unsaved edits could not be saved, so the tailored copy was not created.'
             )
           }
+          // CHECKPOINT BEFORE THE HANDOFF, because the route may now REWRITE
+          // this document rather than create a new one -- re-tailoring against
+          // the application it was already tailored for overwrites the text on
+          // screen. Without this the previous rewrite is simply gone: the
+          // autosave path takes a snapshot at most once every five minutes, and
+          // two tailoring runs inside that window leave nothing to go back to.
+          // `force` bypasses that floor but not the delta guard, so a run that
+          // changed nothing still writes no version, and the new-document path
+          // pays only that same skipped check.
+          await writeSnapshot({ force: true })
           await onTailored(input)
         }
       : undefined,

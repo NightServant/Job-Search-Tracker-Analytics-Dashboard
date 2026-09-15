@@ -118,3 +118,36 @@ export function tailoredTitle(originalTitle: string, company?: string | null): s
   if (!base) return suffix
   return base.endsWith(tail) ? base : `${base}${tail}`
 }
+
+/**
+ * Whether a tailoring run rewrites the open document or writes a new one.
+ *
+ * NEW APPLICATION = NEW FILE; SAME APPLICATION AGAIN = REWRITE (Gabe,
+ * 2026-09-15). Every run used to create a document, which is right the first
+ * time and wrong every time after -- re-tailoring against one posting left a
+ * pile of files with the same title, differing only in which run made them.
+ *
+ * IT IS A PREDICATE IN THIS FILE RATHER THAN A CONDITION IN THE ROUTE because
+ * it chooses between a destructive write and a safe one. Getting it wrong in
+ * the `true` direction overwrites a CV the user meant to keep, which is the
+ * same class of harm the rest of this file exists to prevent, and a condition
+ * spelled inline in a handler is one nothing can test.
+ *
+ * The links are the ONLY evidence used. Matching on the title instead would
+ * collide on two different roles at the same company -- both tailored CVs end
+ * up called "CV -- Initech" -- and quietly overwrite the wrong one.
+ */
+export function isRetailorOfSameApplication(input: {
+  /** The open document, or null when there is not one yet. */
+  draftId: string | null
+  /** The application this run was tailored against. */
+  jobId: string
+  /** Applications the open document is already linked to. */
+  links: { job_id: string }[]
+}): boolean {
+  const { draftId, jobId, links } = input
+  // No open document, or no application chosen, is not a re-tailor of
+  // anything: there is nothing to overwrite and nothing to match against.
+  if (!draftId || !jobId) return false
+  return links.some((link) => link.job_id === jobId)
+}

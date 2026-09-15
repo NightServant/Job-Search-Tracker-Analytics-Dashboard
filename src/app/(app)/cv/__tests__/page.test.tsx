@@ -40,13 +40,16 @@ vi.mock('@/hooks/useJobs', () => ({
   useJobs: () => ({ data: [], isLoading: false, error: null }),
 }))
 
-// The "sent to N applications" dropdown was removed from WordResumeEditor
-// (Gabe, Worktrack Revisions item 6), and with it the only call to
-// useResumeLinks in this route's tree. The mock is kept rather than deleted
-// -- nothing in this file breaks without it -- but it is dead: no component
-// under test imports useDocumentLinks any more.
+// LIVE AGAIN. This mock was dead once the "sent to N applications" dropdown
+// left WordResumeEditor (Gabe, Worktrack Revisions item 6). The route reads
+// these links again for a different reason: they are what decides whether
+// tailoring writes a new document or rewrites the open one, so `resumeLinks`
+// is the input that switches between the two branches.
+const resumeLinksMock = vi.hoisted(() => vi.fn(() => ({ data: [], isLoading: false })))
+const pinMutate = vi.hoisted(() => vi.fn().mockResolvedValue({}))
 vi.mock('@/hooks/useDocumentLinks', () => ({
-  useResumeLinks: () => ({ data: [], isLoading: false }),
+  useResumeLinks: () => resumeLinksMock(),
+  usePinDocumentLink: () => ({ mutateAsync: pinMutate, isPending: false }),
 }))
 vi.mock('@/hooks/useResumes', () => ({
   useResume: useResumeMock,
