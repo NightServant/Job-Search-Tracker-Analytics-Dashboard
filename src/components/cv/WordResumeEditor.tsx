@@ -714,7 +714,29 @@ export function WordResumeEditor({
           // changed nothing still writes no version, and the new-document path
           // pays only that same skipped check.
           await writeSnapshot({ force: true })
-          return await onTailored(input)
+          const wrote = await onTailored(input)
+
+          // THE REWRITE HAS TO LAND ON SCREEN, and only this branch has to do
+          // it by hand. `created` navigates to the new CV, which remounts this
+          // editor and loads the new text for free. `updated` rewrote the
+          // document you are already looking at and STAYS here -- and the
+          // content sync above keys on `draft.id`, deliberately, so that a
+          // refetch can never clobber what someone is typing. Nothing else
+          // would put the new text in the editor: the row changed, the screen
+          // did not, and the match score is derived from `editor.getText()`,
+          // so the panel would go on reporting the score of the CV this one
+          // replaced.
+          if (wrote === 'updated') {
+            editor?.commands.setContent(input.content)
+            // `setContent` fires `update`, which marks the editor dirty -- over
+            // text that was just written to the row it came from. Mark it saved
+            // instead, with the same "never rewind" guard `saveDraft` uses so an
+            // older overlapping save cannot un-save this.
+            setSavedRevision((current) => Math.max(current, revisionRef.current))
+            setLastSavedAt(new Date().toISOString())
+          }
+
+          return wrote
         }
       : undefined,
   }

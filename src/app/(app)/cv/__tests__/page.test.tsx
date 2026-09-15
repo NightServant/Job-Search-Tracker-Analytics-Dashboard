@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, cleanup, fireEvent, act } from '@testing-library/react'
+import { render, screen, cleanup, fireEvent, act, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ResumeDraft } from '@/services/resumeService'
 
@@ -36,16 +36,33 @@ vi.mock('next/navigation', () => ({
 // The tailoring rail's application picker. Stubbed empty: the rail's own
 // behaviour is covered in CvTailoring's tests, and importing the real hook
 // here would drag a QueryClient into every route-state test.
+const jobsMock = vi.hoisted(() =>
+  vi.fn<() => { data: unknown[]; isLoading: boolean; error: unknown }>(() => ({
+    data: [],
+    isLoading: false,
+    error: null,
+  }))
+)
 vi.mock('@/hooks/useJobs', () => ({
-  useJobs: () => ({ data: [], isLoading: false, error: null }),
+  useJobs: () => jobsMock(),
 }))
+
+// The rail reaches /api/tailor through `authedFetch`, because tailoring spends
+// a metered allowance and the route is authenticated.
+const authedFetchMock = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/authedFetch', () => ({ authedFetch: authedFetchMock }))
 
 // LIVE AGAIN. This mock was dead once the "sent to N applications" dropdown
 // left WordResumeEditor (Gabe, Worktrack Revisions item 6). The route reads
 // these links again for a different reason: they are what decides whether
 // tailoring writes a new document or rewrites the open one, so `resumeLinks`
 // is the input that switches between the two branches.
-const resumeLinksMock = vi.hoisted(() => vi.fn(() => ({ data: [], isLoading: false })))
+const resumeLinksMock = vi.hoisted(() =>
+  vi.fn<() => { data: { job_id: string }[]; isLoading: boolean }>(() => ({
+    data: [],
+    isLoading: false,
+  }))
+)
 const pinMutate = vi.hoisted(() => vi.fn().mockResolvedValue({}))
 vi.mock('@/hooks/useDocumentLinks', () => ({
   useResumeLinks: () => resumeLinksMock(),
@@ -90,6 +107,7 @@ vi.mock('@/lib/supabase', () => ({
 
 import { AppShell } from '@/components/shell/AppShell'
 import Page from '../page'
+import { makeJob } from '@/test/fixtures'
 
 /**
  * The file commands moved behind one icon on 2026-09-13 ("compress this into a
@@ -634,5 +652,86 @@ describe('restoring a version persists the version that was restored', () => {
       vi.advanceTimersByTime(1200)
     })
     expect(updateMutate).toHaveBeenCalledTimes(1)
+  })
+})
+
+
+/**
+ * Re-tailoring the SAME application has to change what is on screen.
+ *
+ * `created` navigates to the new CV, which remounts the editor and loads the
+ * new text for free. `updated` rewrites the document already open and stays
+ * here -- and the editor's content sync keys on `draft.id` so that a refetch
+ * cannot clobber someone's typing. Without the explicit refresh the row would
+ * change, the screen would not, and the match panel -- which scores
+ * `editor.getText()` -- would go on reporting the score of the CV this one
+ * just replaced.
+ */
+describe('re-tailoring the open CV for the same application', () => {
+  // WISHLIST, deliberately: `useCvTailoring` narrows the picker to the
+  // wishlist, and an `applied` fixture leaves the input disabled with
+  // "nothing on the wishlist to tailor to".
+  const JOB = makeJob({
+    id: 'job-1',
+    status: 'wishlist',
+    company: 'Initech',
+    role: 'Backend Engineer',
+    description: 'We need React and TypeScript and Postgres experience.',
+  })
+
+  beforeEach(() => {
+    jobsMock.mockReturnValue({ data: [JOB], isLoading: false, error: null })
+    // The open document IS the tailored CV for Initech, and is linked to it.
+    resumeLinksMock.mockReturnValue({ data: [{ job_id: 'job-1' }], isLoading: false })
+    authedFetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        ok: true,
+        summary: null,
+        suggestions: [
+          {
+            section: 'summary',
+            before: 'Shipped the rewrite',
+            after: 'Delivered the rewrite with React and TypeScript',
+            rationale: 'closer to the posting',
+          },
+        ],
+      }),
+    })
+  })
+
+  it('rewrites the open document and puts the new text on screen', async () => {
+    // `pointerEventsCheck: 0`: the rail sits inside a vendored tab panel, and
+    // the inert/pointer-events bookkeeping those panels do makes userEvent
+    // refuse the click on the picker even though it is the visible tab.
+    const user = userEvent.setup({ pointerEventsCheck: 0 })
+    params('cv-1')
+    resolved(wordDraft({ title: 'Backend CV — Initech' }))
+
+    await act(async () => {
+      render(<Page />)
+    })
+
+    // The rail lives behind a tab strip, so the tailoring pane has to be the
+    // active one before its picker exists.
+    await user.click(await screen.findByRole('tab', { name: /tailor to a job/i }))
+
+    // Pick the application: the picker is a combobox, not a select.
+    await user.click(await screen.findByRole('combobox', { name: /application/i }))
+    const listbox = await screen.findByRole('listbox')
+    await user.click(await within(listbox).findByRole('option', { name: /initech/i }))
+
+    await user.click(await screen.findByRole('button', { name: /tailor this cv/i }))
+
+    // The SAME document was rewritten -- no second file.
+    await waitFor(() => expect(updateMutate).toHaveBeenCalled())
+    expect(createMutate).not.toHaveBeenCalled()
+
+    // And the rewrite is on screen, which is the part that was missing.
+    await waitFor(() =>
+      expect(screen.getByText(/Delivered the rewrite with React and TypeScript/)).toBeTruthy()
+    )
+    expect(screen.queryByText(/^Shipped the rewrite$/)).toBeNull()
   })
 })
