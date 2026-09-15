@@ -166,6 +166,26 @@ describe('the tailoring request', () => {
     expect(body.model).toBe('test-model')
   })
 
+  it('asks the provider to constrain the reply to JSON', async () => {
+    // Production returned "The model returned malformed JSON" while the prompt
+    // alone was doing the asking. The prompt is still there, but a generated
+    // reply can put a literal newline inside a string that quotes a multi-line
+    // CV block, and no wording prevents that -- `response_format` does. If this
+    // field is dropped the failure comes back intermittently and only under
+    // real CVs, which is the hardest kind to reproduce, so it is pinned here.
+    const fetchImpl = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: '{"summary":null,"suggestions":[]}' } }] }),
+    }) as unknown as typeof fetch
+
+    await tailorCv({ cvText: 'cv', jobDescription: 'jd' }, { config, fetchImpl })
+    const body = JSON.parse(
+      (fetchImpl as unknown as ReturnType<typeof vi.fn>).mock.calls[0][1].body as string
+    )
+    expect(body.response_format).toEqual({ type: 'json_object' })
+  })
+
   it('refuses to run without both halves', async () => {
     await expect(
       tailorCv({ cvText: '', jobDescription: 'jd' }, { config })

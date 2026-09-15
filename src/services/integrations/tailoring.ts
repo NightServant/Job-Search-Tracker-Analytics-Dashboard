@@ -178,6 +178,18 @@ export async function tailorCv(
         // Low but not zero: this is a rewriting task where a little variation
         // helps, and the no-invention rule is carried by the prompt.
         temperature: 0.3,
+        // ASKED FOR, NOT HOPED FOR (2026-09-15). The prompt already says "JSON
+        // only, no prose and no code fences", and the model mostly complies --
+        // but "mostly" surfaced in production as "The model returned malformed
+        // JSON". A reply is generated token by token, so nothing stops a
+        // literal newline landing inside a `before` string that quotes a
+        // multi-line CV block, and that is invalid JSON however good the
+        // rewrite is. This constrains generation at the provider instead of
+        // asking politely, which also removes the fences and the stray prose
+        // `parseTailoringReply` currently has to strip. Verified against Groq
+        // with `openai/gpt-oss-120b`: valid JSON even when the completion is
+        // cut short, where the unconstrained call returned nothing usable.
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: user },
