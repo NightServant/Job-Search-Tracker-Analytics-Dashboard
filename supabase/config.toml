@@ -448,13 +448,38 @@ max_frequency = "5s"
 # `sessionExpired` there. Without that half, this half reads to the user as the
 # app logging them out at random.
 #
-# THESE ONLY TAKE EFFECT ON A PUSH. `npm run push:auth-config` -- never
-# `supabase config push` directly; see docs/SECURITY.md for why.
-[auth.sessions]
-# Force log out after the specified duration.
-timebox = "24h"
-# Force log out if the user has been inactive longer than the specified duration.
-inactivity_timeout = "8h"
+# COMMENTED OUT 2026-09-15: THIS IS A PAID FEATURE AND THE PUSH IS REJECTED.
+#
+#   unexpected status 402: {"message":"User sessions can only be configured
+#   on Pro Plans and up."}
+#
+# The whole file is sent as one request, so this block did not merely fail --
+# it took the Brevo SMTP switch, the new site_url, the 10-minute OTP expiry and
+# the fixed redirect allow-list down with it. That is why it is commented
+# rather than left to fail loudly: everything else here is free-tier and has to
+# be able to land.
+#
+# WHAT THIS COSTS, STATED PLAINLY. Server-side session expiry is now NOT
+# implemented. `jwt_expiry` still rotates the access token hourly, and refresh
+# rotation still runs, but nothing ends a session on the server -- so a session
+# on a shared or stolen laptop still lasts indefinitely. The security item
+# "sessions expire" is back to half-done, and no amount of client code closes
+# it, because a timeout the client enforces is one anyone can skip by not
+# running the client.
+#
+# THE CLIENT HALF IS STILL WORTH HAVING and still runs. AuthContext's
+# `sessionExpired` and SessionExpiredDialog handle a refusal from ANY cause --
+# a revoked session, a password change elsewhere, a project restart, an admin
+# sign-out. Those all still happen; they are just no longer joined by a clock.
+#
+# TO ENABLE: upgrade the project to Pro, uncomment, and
+# `npm run push:auth-config` -- never `supabase config push` directly; see
+# docs/SECURITY.md for why.
+# [auth.sessions]
+# # Force log out after the specified duration.
+# timebox = "24h"
+# # Force log out if the user has been inactive longer than the specified duration.
+# inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]

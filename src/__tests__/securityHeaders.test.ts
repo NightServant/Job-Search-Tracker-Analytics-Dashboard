@@ -108,13 +108,18 @@ describe('the security response headers', () => {
 })
 
 /**
- * The session really expires on the SERVER, not only in the browser.
+ * What the auth configuration actually promises, including where it cannot.
  *
- * `jwt_expiry` is not a session lifetime and the distinction is easy to lose:
- * it is how long one access token is good for, and with refresh-token rotation
- * on, the browser renews it indefinitely. Before `[auth.sessions]` was set, a
- * session on a borrowed laptop lasted forever -- which is why "sessions
- * expire" needed more than the value that was already there.
+ * `jwt_expiry` IS NOT A SESSION LIFETIME and the distinction is the reason
+ * this block exists: it is how long one access token is good for, and with
+ * refresh-token rotation on, the browser renews it indefinitely. So "sessions
+ * expire" needs more than the value that was already there.
+ *
+ * IT STILL DOES, because the thing that would supply it -- `[auth.sessions]`
+ * -- is a Pro feature and this project is on the free tier. The push returns
+ * 402. The first test below therefore checks the honest state rather than the
+ * intended one, and says so loudly enough that a green run is not mistaken for
+ * a solved problem.
  *
  * Asserted by reading config.toml rather than by asking Supabase: this is the
  * file `npm run push:auth-config` sends, so it is the thing that can regress
@@ -123,10 +128,43 @@ describe('the security response headers', () => {
 describe('the Supabase auth configuration', () => {
   const config = readFileSync('supabase/config.toml', 'utf8')
 
-  it('ends a session on a timebox and on inactivity', () => {
-    const sessions = config.slice(config.indexOf('[auth.sessions]'))
-    expect(sessions).toMatch(/^timebox = /m)
-    expect(sessions).toMatch(/^inactivity_timeout = /m)
+  it('either times sessions out, or records why it cannot', () => {
+    /*
+      THIS ASSERTED A TIMEBOX UNTIL 2026-09-15, WHEN THE PUSH CAME BACK 402:
+
+        {"message":"User sessions can only be configured on Pro Plans and up."}
+
+      Server-side session expiry is a paid feature, and this project is on the
+      free tier. The block had to be commented out -- `config push` sends the
+      whole file in one request, so it was not failing alone, it was taking the
+      Brevo SMTP switch, the site_url and the OTP expiry down with it.
+
+      WHY THE TEST DID NOT SIMPLY GO AWAY. Deleting it would delete the only
+      executable record that this is unfinished, and "sessions expire" is a
+      line in the security brief. So it now accepts EITHER state and checks the
+      one that is true: live, and both keys are set; or disabled, and the file
+      says it is a plan limit rather than an oversight. On the day the project
+      moves to Pro, uncommenting makes the first branch true and the assertions
+      about both keys come back automatically.
+
+      WHAT IS REALLY LOST, so nobody reads a green test as a working feature:
+      nothing ends a session on the server. `jwt_expiry` rotates an access
+      token hourly and refresh rotation continues indefinitely, so a session on
+      a stolen laptop lives until someone signs out. No client code can close
+      that -- a timeout the client enforces is one that anyone who does not run
+      the client skips.
+    */
+    const live = /^\[auth\.sessions\]/m.test(config)
+    if (live) {
+      const sessions = config.slice(config.search(/^\[auth\.sessions\]/m))
+      expect(sessions).toMatch(/^timebox = /m)
+      expect(sessions).toMatch(/^inactivity_timeout = /m)
+      return
+    }
+    // Disabled: the reason has to be in the file, not only in a commit.
+    expect(config, 'sessions are off with no explanation').toMatch(/402/)
+    expect(config).toMatch(/Pro Plans/)
+    expect(config, 'the way back has to be written down').toMatch(/# timebox = /)
   })
 
   it('expires an emailed code in minutes rather than an hour', () => {

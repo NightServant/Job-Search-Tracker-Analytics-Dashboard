@@ -460,18 +460,49 @@ that cannot reach its own auth provider is not a hardened app.
 `src/__tests__/securityHeaders.test.ts` asserts both absences so neither is
 "fixed" into an outage later.
 
-### Sessions now actually expire
+### Sessions — STILL OPEN, and it is a plan limit
 
-`jwt_expiry = 3600` was already set and is **not** a session lifetime: it is how
-long one access token is good for, and with refresh-token rotation on, the
-browser renews it forever. A session on a borrowed laptop lasted indefinitely.
+**Server-side session expiry is not implemented, and no code in this repository
+can implement it.** Stated first because the rest of this section describes
+real work that does not add up to the thing the brief asks for.
 
-`[auth.sessions]` in `supabase/config.toml` now sets `timebox = "24h"` and
-`inactivity_timeout = "8h"`, enforced by GoTrue rather than by anything this
-repo ships. The client half is `sessionExpired` in `AuthContext` plus
-`SessionExpiredDialog`: a session that ends underneath a reader is told apart
-from a deliberate sign-out and from never having signed in, and gets a sentence
-and a `?next=` link instead of a silent bounce to `/login`.
+`jwt_expiry = 3600` is **not** a session lifetime: it is how long one access
+token is good for, and with refresh-token rotation on, the browser renews it
+forever. A session on a borrowed or stolen laptop lasts until somebody signs
+out.
+
+`[auth.sessions]` — `timebox = "24h"`, `inactivity_timeout = "8h"` — is what
+closes it, and pushing it returns:
+
+```
+unexpected status 402: {"message":"User sessions can only be configured on Pro Plans and up."}
+```
+
+It is a paid feature and this project is on the free tier, so the block is
+commented out in `supabase/config.toml` with the reason recorded inline. It had
+to be: `config push` sends the whole file in one request, so the block was not
+failing alone — it was taking the Brevo SMTP switch, the site URL and the OTP
+expiry down with it.
+
+**Do not answer this with a client-side idle timer.** A timeout the client
+enforces is one that anyone who does not run the client skips, which makes it a
+UX affordance wearing a security label — the same objection this document
+already makes about `lib/authRateLimit`.
+
+The two honest ways forward, neither free and unsupported at once:
+
+1. **Upgrade to Pro**, uncomment the block, push. Supported, costs money.
+2. **Delete stale rows from `auth.sessions` on a `pg_cron` schedule.** This does
+   genuinely revoke them and works on the free tier, but it reaches into
+   GoTrue's own schema, which Supabase does not support and may change across
+   releases.
+
+THE CLIENT HALF IS BUILT AND STILL EARNS ITS PLACE: `sessionExpired` in
+`AuthContext` plus `SessionExpiredDialog`. Sessions still end for reasons other
+than a clock — a revoked refresh token, a password changed elsewhere, an admin
+sign-out, a project restart — and when one does, a reader is told apart from a
+deliberate sign-out and from never having signed in, and gets a sentence and a
+`?next=` link instead of a silent bounce to `/login`.
 
 `otp_expiry` went from 3600 to 600. One number governs the sign-up code and the
 password-reset code, both single-factor; an hour is long enough for a forwarded
