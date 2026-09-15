@@ -85,6 +85,24 @@ interface AuthContextType {
   verifySignUpOtp: (email: string, token: string) => Promise<void>
   /** Re-sends the sign-up code. Supabase applies its own cooldown. */
   resendSignUpOtp: (email: string) => Promise<void>
+  /**
+   * Starts a password reset: emails a recovery CODE to the address.
+   *
+   * IT DOES NOT SAY WHETHER THE ADDRESS HAS AN ACCOUNT, and unlike `signUp`
+   * that silence is kept deliberately. Supabase returns success either way,
+   * there is no `identities` tell to read, and a reset endpoint that answers
+   * "no such user" is the single most-probed enumeration oracle there is. The
+   * UI's copy is written to match -- "if that address has an account".
+   */
+  requestPasswordReset: (email: string) => Promise<void>
+  /**
+   * Verifies a recovery code. ON SUCCESS THE USER IS SIGNED IN -- that is how
+   * Supabase recovery works, and it is what makes `updatePassword` below
+   * possible without the old password.
+   */
+  verifyRecoveryOtp: (email: string, token: string) => Promise<void>
+  /** Sets a new password for the session `verifyRecoveryOtp` just created. */
+  updatePassword: (password: string) => Promise<void>
   /** Starts an OAuth redirect. Resolves when the browser is handed over. */
   signInWithProvider: (provider: OAuthProviderId) => Promise<void>
 }
@@ -302,6 +320,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw new Error(error.message)
   }
 
+  const requestPasswordReset = async (email: string) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
+    // NO `redirectTo`. That option exists to make the emailed LINK land
+    // somewhere, and this flow sends a code instead -- see
+    // supabase/templates/recovery.html. Passing one would imply a round trip
+    // through the inbox that no route in this app implements.
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizeEmail(email))
+    if (error) throw authError(error)
+  }
+
+  const verifyRecoveryOtp = async (email: string, token: string) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
+    // `type: 'recovery'`, not 'signup' and not 'email'. They are three
+    // different flows and the wrong one rejects a perfectly good code.
+    const { error } = await supabase.auth.verifyOtp({
+      email: normalizeEmail(email),
+      token: token.trim(),
+      type: 'recovery',
+    })
+    if (error) throw new Error(error.message)
+  }
+
+  const updatePassword = async (password: string) => {
+    if (!hasValidSupabaseConfig) {
+      throw new Error(supabaseConfigError || 'Supabase is not configured')
+    }
+    // Relies on the session `verifyRecoveryOtp` just created. Called without
+    // one, Supabase rejects it -- which is the correct failure, since the
+    // alternative would be changing a password on the strength of nothing.
+    const { error } = await supabase.auth.updateUser({ password })
+    if (error) throw authError(error)
+  }
+
   const signInWithProvider = async (provider: OAuthProviderId) => {
     if (!hasValidSupabaseConfig) {
       throw new Error(supabaseConfigError || 'Supabase is not configured')
@@ -405,6 +460,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         signUp,
         verifySignUpOtp,
         resendSignUpOtp,
+        requestPasswordReset,
+        verifyRecoveryOtp,
+        updatePassword,
         signInWithProvider,
         signOut,
       }}

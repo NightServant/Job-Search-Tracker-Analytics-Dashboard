@@ -98,11 +98,23 @@ export function SignUpFlow({
 }: SignUpFlowProps) {
   const [step, setStep] = React.useState<Step>(0)
 
-  // THE THANK-YOU ONLY EXISTS BECAUSE OF THIS LINE. Verifying the code creates
-  // a session, and both guards in the (auth) layout treat a new session as a
-  // reason to leave -- one navigates, the other unmounts the subtree. This
-  // asks them to wait for the length of step 2. See ./authHold.
-  useHoldAuthGuards(step === 2)
+  /*
+    THE THANK-YOU ONLY EXISTS BECAUSE OF THIS LINE. Verifying the code creates
+    a session, and both guards in the (auth) layout treat a new session as a
+    reason to leave -- one navigates, the other unmounts the subtree.
+
+    `step >= 1`, NOT `step === 2`, and the difference was a live bug for a few
+    hours. The session is created inside `onVerify`, which resolves BEFORE
+    `setStep(2)` runs, so holding on step 2 leaves a one-await window in which
+    the session exists and the guards are still armed. They fire in it.
+
+    It shipped that way because this file's composition test mocked `useAuth`
+    as a variable nobody re-read: flipping it re-rendered nothing, so the
+    window was invisible and the test was green on a broken flow. The mock now
+    notifies its consumers the way the real context does, and both it and the
+    password-reset flow are held from the code step.
+  */
+  useHoldAuthGuards(step >= 1)
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')

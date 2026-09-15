@@ -30,6 +30,24 @@ export interface OtpStepProps {
   onVerify: (code: string) => Promise<void>
   onResend: () => Promise<void>
   onBack: () => void
+  /**
+   * What the code is FOR, completing the sentence "Enter it below to …".
+   *
+   * PARAMETERISED RATHER THAN COPIED when the password-reset flow needed this
+   * screen. Everything that makes it work -- the segmented boxes, the single
+   * real input behind them, submit-on-sixth-digit, the double-submit ref, the
+   * resend cooldown that exists because somebody burned a quarter of an hour's
+   * email quota clicking -- is flow-agnostic. A second copy would have started
+   * identical and drifted, and the drift would be in the half nobody looks at
+   * twice.
+   *
+   * Only the two sentences differ, so only they are props.
+   */
+  purpose?: string
+  /** Heading above it. Defaults to the sign-up wording. */
+  heading?: string
+  /** Label on the link back to the address step. */
+  backLabel?: string
 }
 
 const CODE_LENGTH = 6
@@ -90,7 +108,15 @@ const SLOT = cn(
   'aria-invalid:border-status-rejected-mark'
 )
 
-export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
+export function OtpStep({
+  email,
+  onVerify,
+  onResend,
+  onBack,
+  purpose = 'finish creating your account',
+  heading = 'check your email',
+  backLabel = 'use a different email',
+}: OtpStepProps) {
   const [code, setCode] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const [notice, setNotice] = React.useState<string | null>(null)
@@ -144,10 +170,10 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="flex flex-col gap-2">
-        <h1 className="text-heading-l text-text-primary">check your email</h1>
+        <h1 className="text-heading-l text-text-primary">{heading}</h1>
         <p className="text-body-m text-text-secondary">
           We sent a {CODE_LENGTH}-digit code to <strong className="text-text-primary">{email}</strong>.
-          Enter it below to finish creating your account.
+          Enter it below to {purpose}.
         </p>
       </div>
 
@@ -210,7 +236,7 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
           onClick={onBack}
           className="text-text-secondary underline underline-offset-4 hover:text-text-primary"
         >
-          use a different email
+          {backLabel}
         </button>
         <button
           type="button"

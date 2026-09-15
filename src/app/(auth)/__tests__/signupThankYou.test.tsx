@@ -31,30 +31,57 @@ vi.mock('next/navigation', () => ({
 }))
 
 const verifySignUpOtp = vi.fn()
-let signedIn = false
-vi.mock('@/contexts/AuthContext', () => ({
-  useAuth: () => ({
-    user: signedIn ? { id: 'u1', email: 'gabe@example.com' } : null,
-    session: null,
-    loading: false,
-    signIn: vi.fn(),
-    // Verifying is what creates the session, so the mock does both -- that
-    // ordering is the entire bug.
-    signUp: vi.fn().mockResolvedValue(undefined),
-    verifySignUpOtp,
-    resendSignUpOtp: vi.fn(),
-    signOut: vi.fn(),
-  }),
-}))
+
+/*
+  THE MOCK NOTIFIES ITS CONSUMERS, like the real context does.
+
+  A plain `useAuth: () => ({ user: flagOrNull })` only reports a change to a
+  component that re-renders for some other reason, and the guards here are
+  SIBLINGS of the page. This file passed for a while on a mock that just
+  flipped a variable -- which meant it was not exercising the guards at all.
+  See forgotPasswordRoute.test, where the same weakness hid a real one-await
+  window between the session appearing and the hold being applied.
+*/
+const store = vi.hoisted(() => ({ signedIn: false, listeners: new Set<() => void>() }))
+function setSignedIn(value: boolean) {
+  store.signedIn = value
+  store.listeners.forEach((notify) => notify())
+}
+
+vi.mock('@/contexts/AuthContext', async () => {
+  const React = await import('react')
+  return {
+    useAuth: () => {
+      const [, force] = React.useReducer((n: number) => n + 1, 0)
+      React.useEffect(() => {
+        store.listeners.add(force)
+        return () => {
+          store.listeners.delete(force)
+        }
+      }, [])
+      return {
+        user: store.signedIn ? { id: 'u1', email: 'gabe@example.com' } : null,
+        session: null,
+        loading: false,
+        signIn: vi.fn(),
+        signUp: vi.fn().mockResolvedValue(undefined),
+        verifySignUpOtp,
+        resendSignUpOtp: vi.fn(),
+        signOut: vi.fn(),
+      }
+    },
+  }
+})
 
 import AuthLayout from '../layout'
 import SignupRoute from '../signup/page'
 
 beforeEach(() => {
   vi.clearAllMocks()
-  signedIn = false
+  setSignedIn(false)
+  // Verifying is what creates the session. That ordering is the entire bug.
   verifySignUpOtp.mockImplementation(async () => {
-    signedIn = true
+    setSignedIn(true)
   })
 })
 
@@ -112,18 +139,11 @@ describe('signing up inside the real auth layout', () => {
     // The hold is for ONE screen. If a session appears while the credentials
     // form is open -- another tab signing in -- the guard must still act, or
     // this becomes a permanent hole rather than a pause.
-    const view = renderRoute()
+    renderRoute()
     await screen.findByLabelText(/^Email/)
-
-    // An explicit rerender, because `useAuth` here is a module-level flag: a
-    // guard mounted as a SIBLING of the page will not re-run just because the
-    // page's own state changed. In a browser the context update does this.
-    signedIn = true
-    view.rerender(
-      <AuthLayout>
-        <SignupRoute />
-      </AuthLayout>
-    )
+    // No manual rerender: the mock notifies consumers, as a session arriving
+    // in another tab would.
+    setSignedIn(true)
     await waitFor(() => expect(replace).toHaveBeenCalledWith('/dashboard'))
   })
 })

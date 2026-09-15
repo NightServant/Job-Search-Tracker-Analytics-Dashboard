@@ -403,6 +403,14 @@ sender_name = "Worktrack"
 subject = "Your Worktrack verification code"
 content_path = "./supabase/templates/confirmation.html"
 
+# THE RECOVERY TEMPLATE IS NOT OPTIONAL FOR A CODE-BASED RESET. Supabase's
+# stock version carries {{ .ConfirmationURL }} and no token, so `verifyOtp`
+# with `type: 'recovery'` has nothing to verify against and the reset flow
+# cannot work at all. Same trap as the confirmation template above.
+[auth.email.template.recovery]
+subject = "Your Worktrack password reset code"
+content_path = "./supabase/templates/recovery.html"
+
 # Uncomment to customize email template
 # [auth.email.template.invite]
 # subject = "You have been invited"

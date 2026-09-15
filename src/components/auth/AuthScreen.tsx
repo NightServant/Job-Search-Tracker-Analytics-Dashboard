@@ -198,6 +198,25 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
             />
           </Field>
 
+          {!isSignUp && (
+            /*
+              UNDER THE PASSWORD FIELD AND RIGHT-ALIGNED, which is where every
+              product this one competes with puts it -- people look there
+              without reading. It is deliberately NOT offered on the sign-up
+              form: there is no password yet to have forgotten, and a reset
+              link beside a field you are inventing is an invitation to a dead
+              end.
+            */
+            <div data-forgot-password className="-mt-2 text-body-s lg:self-end">
+              <Link
+                href="/forgot-password"
+                className="text-text-muted underline underline-offset-4 hover:text-text-primary"
+              >
+                forgot your password?
+              </Link>
+            </div>
+          )}
+
           {isSignUp && (
             <Field id="auth-confirm" label="Confirm password" required>
               <PasswordInput

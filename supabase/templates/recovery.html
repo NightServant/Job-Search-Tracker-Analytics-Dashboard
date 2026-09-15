@@ -1,0 +1,39 @@
+<!--
+  The password-reset email.
+
+  IT SENDS A CODE, NOT A LINK, AND THAT IS NOT A STYLE CHOICE. Supabase's
+  stock "Reset password" template contains {{ .ConfirmationURL }} and no
+  token, exactly like the stock signup one -- so a project on the default
+  template never generates a recovery code and
+  verifyOtp({ type: 'recovery' }) fails forever against something that was
+  never issued. The reset flow in this app is three steps in one page; a
+  clicked link would land on a redirect target it does not implement.
+
+  See templates/confirmation.html, which documents the same trap for signup.
+  This file is the recovery half of it, in version control rather than as an
+  edit somebody remembers making in a dashboard once.
+
+  THE WORDING ASSUMES THE REQUEST MAY NOT HAVE COME FROM THE READER. A reset
+  email is the one message a stranger can cause to arrive in someone else's
+  inbox, so the last paragraph has to tell an alarmed reader the true thing:
+  nothing has changed yet, and ignoring this leaves the account exactly as it
+  was.
+
+  Inline styles only, and no <style> block -- Gmail's web client strips them,
+  which would leave the code as unstyled body text.
+-->
+<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif; color: #18181b; line-height: 1.5;">
+  <p style="margin: 0 0 16px;">Here is your Worktrack password reset code:</p>
+
+  <p style="margin: 0 0 16px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #c2410c;">
+    {{ .Token }}
+  </p>
+
+  <p style="margin: 0 0 16px;">Enter it on the reset screen to choose a new password.</p>
+
+  <p style="margin: 0; font-size: 13px; color: #71717a;">
+    The code expires in 10 minutes. If you did not ask to reset your password,
+    you can ignore this email — your password has not changed and nobody can
+    change it without this code.
+  </p>
+</div>
