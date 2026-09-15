@@ -115,36 +115,114 @@ describe('tailoredTitle', () => {
  */
 describe('choosing between a new file and a rewrite', () => {
   const links = [{ job_id: 'job-initech' }, { job_id: 'job-globex' }]
+  const TAILORED = 'Gabe - CV (ATS) — Initech'
+  const MASTER = 'Gabe - CV (ATS)'
 
-  it('rewrites when this document was already tailored for this application', () => {
+  it('rewrites when this document IS the tailored CV for this application', () => {
     expect(
-      isRetailorOfSameApplication({ draftId: 'cv-1', jobId: 'job-initech', links })
+      isRetailorOfSameApplication({
+        draftId: 'cv-1',
+        draftTitle: TAILORED,
+        tailoredName: TAILORED,
+        jobId: 'job-initech',
+        links,
+      })
     ).toBe(true)
+  })
+
+  /**
+   * THE ONE THAT MATTERS. Found on the real account, 2026-09-15: the master CV
+   * was pinned to FIFTY-TWO applications, because a link records that a CV was
+   * SENT somewhere -- not that it is the tailored copy for it. Deciding on the
+   * link alone would have overwritten the master the moment it was tailored
+   * against any of those fifty-two, and the master is the document every
+   * tailored copy is made from.
+   */
+  it('never overwrites a master CV that was merely SENT to this application', () => {
+    expect(
+      isRetailorOfSameApplication({
+        draftId: 'cv-master',
+        draftTitle: MASTER,
+        // What this run WOULD call a new document -- not what the master is called.
+        tailoredName: TAILORED,
+        jobId: 'job-initech',
+        links,
+      })
+    ).toBe(false)
   })
 
   it('writes a new file for an application this document has not been tailored for', () => {
     expect(
-      isRetailorOfSameApplication({ draftId: 'cv-1', jobId: 'job-acme', links })
+      isRetailorOfSameApplication({
+        draftId: 'cv-1',
+        draftTitle: TAILORED,
+        tailoredName: TAILORED,
+        jobId: 'job-acme',
+        links,
+      })
+    ).toBe(false)
+  })
+
+  it('writes a new file for a second role at the SAME company', () => {
+    // Both tailored CVs are called "... — Initech", so the title agrees and
+    // only the link can tell them apart. This document was made for the first
+    // role; the second one is a new file.
+    expect(
+      isRetailorOfSameApplication({
+        draftId: 'cv-1',
+        draftTitle: TAILORED,
+        tailoredName: TAILORED,
+        jobId: 'job-initech-second-role',
+        links,
+      })
     ).toBe(false)
   })
 
   it('writes a new file when the document has no links at all', () => {
-    // The first tailoring run of a fresh CV. Nothing to overwrite.
-    expect(isRetailorOfSameApplication({ draftId: 'cv-1', jobId: 'job-initech', links: [] })).toBe(
-      false
-    )
+    expect(
+      isRetailorOfSameApplication({
+        draftId: 'cv-1',
+        draftTitle: TAILORED,
+        tailoredName: TAILORED,
+        jobId: 'job-initech',
+        links: [],
+      })
+    ).toBe(false)
   })
 
   it('never overwrites when there is no open document', () => {
-    // `/cv?draft=new` has no file yet, so "rewrite the current one" has no
-    // referent -- and returning true here would send the route to update
-    // `null`.
-    expect(isRetailorOfSameApplication({ draftId: null, jobId: 'job-initech', links })).toBe(false)
+    expect(
+      isRetailorOfSameApplication({
+        draftId: null,
+        draftTitle: TAILORED,
+        tailoredName: TAILORED,
+        jobId: 'job-initech',
+        links,
+      })
+    ).toBe(false)
   })
 
   it('never overwrites when no application was chosen', () => {
-    // The rail can hand off with an empty job id; an empty string must not
-    // match a link, and must not be read as "the same application".
-    expect(isRetailorOfSameApplication({ draftId: 'cv-1', jobId: '', links })).toBe(false)
+    expect(
+      isRetailorOfSameApplication({
+        draftId: 'cv-1',
+        draftTitle: TAILORED,
+        tailoredName: TAILORED,
+        jobId: '',
+        links,
+      })
+    ).toBe(false)
+  })
+
+  it('never overwrites when the open document has no title yet', () => {
+    expect(
+      isRetailorOfSameApplication({
+        draftId: 'cv-1',
+        draftTitle: '',
+        tailoredName: TAILORED,
+        jobId: 'job-initech',
+        links,
+      })
+    ).toBe(false)
   })
 })

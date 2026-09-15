@@ -127,27 +127,50 @@ export function tailoredTitle(originalTitle: string, company?: string | null): s
  * time and wrong every time after -- re-tailoring against one posting left a
  * pile of files with the same title, differing only in which run made them.
  *
- * IT IS A PREDICATE IN THIS FILE RATHER THAN A CONDITION IN THE ROUTE because
- * it chooses between a destructive write and a safe one. Getting it wrong in
- * the `true` direction overwrites a CV the user meant to keep, which is the
- * same class of harm the rest of this file exists to prevent, and a condition
- * spelled inline in a handler is one nothing can test.
+ * IT TAKES TWO PIECES OF EVIDENCE, AND THE SECOND ONE IS THE IMPORTANT ONE.
  *
- * The links are the ONLY evidence used. Matching on the title instead would
- * collide on two different roles at the same company -- both tailored CVs end
- * up called "CV -- Initech" -- and quietly overwrite the wrong one.
+ * A LINK IS NOT "THIS IS THE TAILORED CV" -- it is "this CV was SENT to this
+ * application", which is a different fact and a much commoner one. The first
+ * version of this asked only "is the open document linked to this job?", and
+ * on the real account that meant a master CV pinned to FIFTY-TWO applications
+ * would be REWRITTEN the moment it was tailored against any of them. The
+ * master CV is the one document that must never be overwritten; it is what
+ * every tailored copy is made from.
+ *
+ * So the title has to agree. `tailoredTitle` is idempotent -- it appends
+ * ` -- <company>` unless the title already ends that way -- so the tailored
+ * name computed for this run equals the open document's own name EXACTLY when
+ * that document is already the tailored one for this company. A master called
+ * "Gabe - CV (ATS)" never matches "Gabe - CV (ATS) -- Initech", so it is safe
+ * however many applications it is pinned to.
+ *
+ * The link is still required, and still does the job the title cannot: two
+ * different roles at the same employer produce the same tailored title, and
+ * only the link says which of the two this document was made for.
+ *
+ * IT IS A PREDICATE IN THIS FILE RATHER THAN A CONDITION IN THE ROUTE because
+ * it chooses between a destructive write and a safe one, which is the class of
+ * harm the rest of this file exists to prevent, and a condition spelled inline
+ * in a handler is one nothing can test.
  */
 export function isRetailorOfSameApplication(input: {
   /** The open document, or null when there is not one yet. */
   draftId: string | null
+  /** The open document's current title. */
+  draftTitle: string
+  /** The name this run would give a NEW document -- `tailoredTitle`'s answer. */
+  tailoredName: string
   /** The application this run was tailored against. */
   jobId: string
-  /** Applications the open document is already linked to. */
+  /** Applications the open document has been linked to. */
   links: { job_id: string }[]
 }): boolean {
-  const { draftId, jobId, links } = input
+  const { draftId, draftTitle, tailoredName, jobId, links } = input
   // No open document, or no application chosen, is not a re-tailor of
   // anything: there is nothing to overwrite and nothing to match against.
   if (!draftId || !jobId) return false
+  // The document must already BE the tailored one for this company, not merely
+  // a CV that was once sent to it. See above -- this is what protects a master.
+  if (!draftTitle || draftTitle !== tailoredName) return false
   return links.some((link) => link.job_id === jobId)
 }

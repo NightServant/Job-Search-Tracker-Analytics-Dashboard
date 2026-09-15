@@ -186,8 +186,13 @@ function CvRoute() {
     // before?" is a row that either exists or does not -- no new column, and
     // no guessing from the title, which would collide on two roles at the same
     // company.
+    // `input.title` is `tailoredTitle`'s answer for this run; when the open
+    // document is already called that, it IS the tailored CV for this company
+    // rather than a master that happens to have been sent there.
     const isRetailor = isRetailorOfSameApplication({
       draftId: isNew ? null : draftParam,
+      draftTitle: draftQuery.data?.title ?? '',
+      tailoredName: input.title,
       jobId: input.jobId,
       links: resumeLinks.data ?? [],
     })
