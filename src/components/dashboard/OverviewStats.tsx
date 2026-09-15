@@ -19,8 +19,27 @@ import type { Job } from '@/types'
  * So each pair of cards here lands exactly on one chart card below, provided
  * both grids use `gap-section`. They do.
  *
- * Two columns on a phone rather than one: these are four short cards, and one
- * per row would push the first chart below three screens of scrolling.
+ * ONE COLUMN ON A PHONE, which reverses what this said (Gabe, 2026-09-15:
+ * "use single column layout for stat cards"). The old sentence was "two
+ * columns on a phone rather than one: these are four short cards, and one per
+ * row would push the first chart below three screens of scrolling."
+ *
+ * The premise was wrong: they are not short cards at that width. A screenshot
+ * at phone width shows the half-column measure breaking every one of them --
+ * "SUCCESS RATE" wraps mid-label, "6 more on the wishlist" takes two lines,
+ * "10 of 27 heard back" takes two. Four cards that each wrap twice are taller
+ * than four that do not, so the scrolling the old argument was protecting
+ * against was being caused by the thing it was defending.
+ *
+ * It also brings this in line with the app's other KPI row: `Analytics` has
+ * been `grid-cols-1 sm:grid-cols-2 md:grid-cols-4` all along, so the dashboard
+ * was the only screen doing something different.
+ *
+ * THE ALIGNMENT ARGUMENT ABOVE IS UNAFFECTED, and it is worth saying why
+ * rather than leaving the next reader to re-derive it. That pairing is an
+ * `xl` property -- it needs four stat columns over two chart columns -- and
+ * the chart grid below is a single column until `xl`. Below that breakpoint
+ * there was never anything for these to line up with.
  */
 export function HeadlineStats({ jobs }: { jobs: Job[] }) {
   const stats = jobStats(jobs)
@@ -29,7 +48,10 @@ export function HeadlineStats({ jobs }: { jobs: Job[] }) {
     // `data-kpi-strip` is kept from the component this replaces: it is what
     // the dashboard test uses to assert this row sits above the follow-up
     // nudge, and that ordering did not change.
-    <section data-kpi-strip className="grid grid-cols-2 gap-section xl:grid-cols-4">
+    <section
+      data-kpi-strip
+      className="grid grid-cols-1 gap-section sm:grid-cols-2 xl:grid-cols-4"
+    >
       <StatCard
         icon="Applications"
         label="applications"

@@ -118,6 +118,37 @@ describe('Dashboard', () => {
     }
   })
 
+  it('stacks the stat cards on a phone and only widens above it', async () => {
+    /*
+      Gabe, 2026-09-15: "use single column layout for stat cards". This
+      reverses the component's own earlier reasoning -- it argued for two
+      columns on a phone because "these are four short cards" -- and the
+      screenshot he sent is why: at 375px the half-column measure wrapped
+      "SUCCESS RATE" mid-label and put both "6 more on the wishlist" and
+      "10 of 27 heard back" onto two lines. Four cards that each wrap twice
+      are taller than four that do not, so two columns were causing the
+      scrolling they were meant to save.
+
+      ASSERTED ON THE CLASSES, NOT ON MEASURED WIDTHS, because jsdom computes
+      no layout -- every element here is 0x0 and a test that measured columns
+      would be measuring nothing. The live behaviour was checked in a browser
+      instead: 1 column at 375px, 2 at 700px, 4 at 1400px.
+
+      The upper two are pinned as well as the phone one. "Single column" is
+      right for a phone and would be wasteful on a desktop, and a later edit
+      that dropped the responsive steps entirely would satisfy the headline
+      request while making the widest screens worse.
+    */
+    const { container } = await renderDashboard(<Dashboard jobs={FRESH_FIXTURE} />)
+    const strip = container.querySelector('[data-kpi-strip]')!
+    expect(strip.className).toContain('grid-cols-1')
+    expect(strip.className).toContain('sm:grid-cols-2')
+    expect(strip.className).toContain('xl:grid-cols-4')
+    // The bare two-column default is the thing that must not come back: it is
+    // what applied at phone width.
+    expect(strip.className).not.toMatch(/(^|\s)grid-cols-2(\s|$)/)
+  })
+
   it('puts two more stat cards between the charts and the recent-applications table', async () => {
     // "I highly recommend to add more two card components before recent
     // applications table" -- and BEFORE is the part worth pinning: inside the
