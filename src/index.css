@@ -1719,11 +1719,60 @@ body,
   width: 100%;
   height: auto;
 }
+/* THE SLIDE'S SHAPE FOLLOWS THE TIER BEING SHOWN (2026-09-15).
+
+   One ratio was right while every capture was a 1440px desktop screenshot.
+   The carousel now art-directs by viewport -- a phone is served the phone
+   layout, which is PORTRAIT -- and the four tiers are nowhere near each other:
+
+     mobile    374x846   0.442
+     tablet    766x846   0.905
+     laptop   1022x846   1.208
+     desktop  1600x779   2.054
+
+   Left at the desktop ratio, `object-contain` would have drawn the phone
+   capture at the slide's height and 44% of that in width: a 74px sliver in a
+   343px box. The whole point of shipping the phone layout is that somebody on
+   a phone can read it.
+
+   THE QUERIES MATCH ./screens EXACTLY and have to. These declare the shape of
+   the box; `<source media>` in the carousel decides which file goes in it. If
+   the two lists ever disagree the wrong-shaped image lands in the box and
+   letterboxes -- landingCarousel.test.ts reads both and fails when they drift.
+
+   NO `max-height`, AND THAT IS A DECISION RATHER THAN AN OMISSION (Gabe:
+   "carousel should render the exact width and height of each pictures"). A cap
+   was tried here first, to stop the phone capture making a 776px slide in a
+   343px slot. It works, and it buys that by letting `object-contain` add side
+   bands -- so the hairline border stops hugging the screenshot and starts
+   reading as padding around a smaller one, which is the presentation fault
+   this section exists to avoid.
+
+   The slide is therefore exactly the capture's shape at every tier, and a
+   portrait screenshot makes a tall slide. That is what a phone screenshot is. */
 .Carousal_005 .swiper-slide {
   width: 100%;
-  /* 1440x702 -- the real pixel size of every capture under public/screens.
-     Do not write a glob here: a `*` followed by a `/` closes this comment. */
-  aspect-ratio: 1440 / 702;
+  /* 1600x779, the desktop capture. Do not write a glob here: a `*` followed
+     by a `/` closes this comment. */
+  aspect-ratio: 1600 / 779;
+}
+
+@media (max-width: 1279px) {
+  .Carousal_005 .swiper-slide {
+    aspect-ratio: 1022 / 846;
+  }
+}
+
+@media (max-width: 1023px) {
+  .Carousal_005 .swiper-slide {
+    aspect-ratio: 766 / 846;
+  }
+}
+
+@media (max-width: 639px) {
+  .Carousal_005 .swiper-slide {
+    aspect-ratio: 374 / 846;
+  }
 }
 
 /* ---------------------------------------------------------------------------

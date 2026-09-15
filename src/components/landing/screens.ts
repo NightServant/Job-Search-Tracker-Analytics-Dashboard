@@ -7,101 +7,138 @@
  * publishes whatever is in it, and the only accounts with real data are real
  * people's. Route them through the demo and there is nothing to redact.
  *
- * Taken with headless Chrome at 1440x900, light theme:
- *
- *   for r in dashboard applications analytics documents calendar; do
- *     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" --headless \
- *       --disable-gpu --hide-scrollbars --force-device-scale-factor=1 \
- *       --window-size=1440,900 --virtual-time-budget=9000 \
- *       --screenshot="public/screens/$r.png" "http://localhost:3000/demo/$r"
- *   done
- *
- * Each file stays under 400 KB. Five uncompressed screenshots is several
- * megabytes shipped to every visitor of a page whose whole argument is
- * restraint. Check with `du -h public/screens/*.png` after re-capturing.
- *
  * They include the demo banner, deliberately. These ARE the demo screens, and
  * a landing page arguing "no marketing claims, just things you can check"
  * should not crop the one label saying where its screenshots came from.
- *
- * `documents.png` is here rather than an application-detail shot because M5.5
- * rebuilt Documents into a Word-style start screen with a template gallery,
- * which is now the most distinctive screen in the app. A detail pane is not.
  *
  * There is no CV-editor shot: /demo has no CV route, because the editor is a
  * write surface and the demo has no write path. Captioning a calendar as the
  * CV editor to fill the slot would be the kind of small lie this page's whole
  * social-proof section exists to avoid.
  *
- * EVERY SCREEN HAS TWO CAPTURES, one per theme. A landing page that follows
- * the reader's theme and then shows five dark screenshots on a white page is
- * worse than one that never adapted at all: the mismatch reads as stock
- * imagery borrowed from somewhere else, which is the exact impression a
- * screenshot of your own product exists to prevent.
+ * ---------------------------------------------------------------------------
+ * FOUR CAPTURES PER SCREEN PER THEME, AND THAT IS ART DIRECTION RATHER THAN
+ * RESOLUTION SWITCHING (2026-09-15). This replaced a pair of widths -- a
+ * 1440px capture and the same capture at 768 -- which is the right tool for
+ * "same picture, fewer pixels" and the wrong one here.
  *
- * JPEG, not PNG. These are UI over a gradient backdrop, which is the case PNG
- * is worst at -- the same captures were 4.6MB as PNG and are 1.2MB as JPEG at
- * quality 88, with the table text still crisp at 1:1 (checked, not assumed).
- * 1440px wide keeps them sharp in a slot that renders at roughly 1200.
+ * Worktrack's layout does not merely get narrower. Below `lg` the sidebar is
+ * replaced by a bottom tab bar; the stat cards go four across, then two, then
+ * one; the chart grid collapses at `xl`. A phone was therefore downloading a
+ * desktop screenshot -- sidebar and all -- and rendering it about 340px wide,
+ * which shows a visitor an interface they will never see at a size where they
+ * cannot read it either.
+ *
+ * THE TIERS ARE THE APP'S OWN BREAKPOINTS, not invented ones, so each capture
+ * is the layout that visitor's own device would produce:
+ *
+ *   mobile   < 640   bottom tab bar, stat cards one per row
+ *   tablet   < 1024  bottom tab bar, stat cards two across
+ *   laptop   < 1280  sidebar, stat cards two across, charts one column
+ *   desktop  >=1280  sidebar, stat cards four across, charts two columns
+ *
+ * `sm` is where the stat grid splits, `lg` is where the chrome swaps, `xl` is
+ * where the chart grids do -- see the breakpoint note in docs. A fifth set was
+ * captured at 1367px and is deliberately unused: it renders the SAME layout as
+ * the 1920px one, so it would have been a second resolution of one picture,
+ * which is what the srcset this replaces already did badly.
+ *
+ * MEDIA QUERIES ARE CORRECT FOR THE VIEWPORT AND WRONG FOR THE THEME, which
+ * is why only half of this moved into `<picture>`. `prefers-color-scheme`
+ * follows the OPERATING SYSTEM, and this app has a theme toggle that must beat
+ * it; the carousel therefore still ships both themes and lets the `dark:`
+ * class variant choose. Viewport width has no such split -- there is only one
+ * answer and the browser already knows it -- so `<source media>` is exactly
+ * right there. See the render in components/v1/skiper51.
+ *
+ * JPEG at quality 80, not PNG. These are UI over a gradient backdrop, which is
+ * the case PNG is worst at. The desktop tier is capped at 1600px: the slot
+ * renders at roughly 1200, so 1600 is sharp at 1x and still reasonable on a
+ * 2x display, while the 1920 originals pushed one visitor's download to 2.1MB
+ * on a page whose whole argument is restraint. At 1600/q80 a desktop visitor
+ * fetches about 1.3MB for all five slides in both themes, and the table text
+ * is still crisp at 1:1 -- checked by cropping one at 2x, not assumed.
+ *
+ * Re-check with `du -sh public/screens` and the per-tier totals after any
+ * recapture.
  */
 
+/** A viewport tier, narrowest first. `desktop` is the fallback and has no query. */
+export const SCREEN_TIERS = [
+  { dir: 'mobile', media: '(max-width: 639px)' },
+  { dir: 'tablet', media: '(max-width: 1023px)' },
+  { dir: 'laptop', media: '(max-width: 1279px)' },
+] as const
+
+export type ScreenTheme = 'light' | 'dark'
+
 export interface LandingScreen {
-  /** Shown while the page is in the light theme. */
-  srcLight: string
-  /** Shown while the page is in the dark theme. */
-  srcDark: string
+  /** The file name under `/screens/<theme>/<tier>/`, and the demo route it came from. */
+  slug: string
   alt: string
   caption: string
 }
 
 /**
- * The 768px capture that sits beside each 1440px one.
+ * The `<source>` list for one screen in one theme, narrowest query first.
  *
- * Every one of these ten files is a 1440-wide screenshot, and a phone was
- * downloading all of them at full size to render them about 350px across --
- * roughly 1.2MB of detail no 375px screen can resolve. The narrow variants are
- * the same captures at 768 (`sips -Z 768`), around 35KB each.
- *
- * `sizes` is what makes the choice possible at all: without it the browser
- * assumes the image fills the viewport, which on a phone is the one case where
- * the guess is close and on a desktop is badly wrong. The slot is the page's
- * 1200px container inset by its gutters, which is what this describes.
+ * ORDER IS LOAD-BEARING. `<picture>` takes the FIRST source whose media
+ * matches, so a `max-width` list has to run narrow to wide -- reversed, every
+ * viewport under 1280 would match the laptop query and no phone would ever see
+ * the phone capture.
  */
-export const SCREEN_SIZES = '(min-width: 1264px) 1200px, calc(100vw - 4rem)'
+export function screenSources(theme: ScreenTheme, slug: string) {
+  return SCREEN_TIERS.map((tier) => ({
+    media: tier.media,
+    srcSet: `/screens/${theme}/${tier.dir}/${slug}.jpg`,
+  }))
+}
 
-export function screenSrcSet(src: string): string {
-  return `${src.replace(/\.jpg$/, '-768.jpg')} 768w, ${src} 1440w`
+/** The `<img>` fallback: the desktop capture, used when no media query matches. */
+export function screenSrc(theme: ScreenTheme, slug: string): string {
+  return `/screens/${theme}/desktop/${slug}.jpg`
 }
 
 export const SCREENS: LandingScreen[] = [
+  /*
+    THE ORDER IS THE APP'S OWN NAV ORDER (Gabe, 2026-09-15: "order of pictures
+    must be overview, applications, planner, documents and analytics"), which
+    is also the order the captures were taken in.
+
+    It used to run overview, applications, analytics, documents, planner --
+    leading with the charts, on the reasoning that analytics is the most
+    persuasive screen. That put the carousel in a different order from the
+    sidebar every one of these screenshots contains, so a reader comparing the
+    two saw the product disagree with itself. Following the nav costs nothing
+    and means the carousel is a walk through the app rather than a pitch deck.
+  */
   {
-    srcLight: '/screens/light/dashboard.jpg',
-    srcDark: '/screens/dark/dashboard.jpg',
+    slug: 'overview',
     alt: 'The overview screen, showing application counts by stage and recent activity.',
     caption: 'the overview',
   },
   {
-    srcLight: '/screens/light/applications.jpg',
-    srcDark: '/screens/dark/applications.jpg',
-    alt: 'The applications screen, showing the five-stage pipeline as a board.',
+    slug: 'applications',
+    alt: 'The applications screen, showing every role being tracked with its status.',
     caption: 'the pipeline',
   },
   {
-    srcLight: '/screens/light/analytics.jpg',
-    srcDark: '/screens/dark/analytics.jpg',
-    alt: 'The analytics screen, showing conversion and time-in-stage charts.',
-    caption: 'the analytics',
+    // `planner`, NOT `calendar`, which is what these files and this caption
+    // used to say. The app's own nav has read "planner" for some time, so the
+    // landing page was captioning a screen with a name it does not use -- the
+    // sort of small drift that makes a product look like someone else's.
+    slug: 'planner',
+    alt: 'The planner screen, showing upcoming interviews and applications that have gone quiet.',
+    caption: 'the planner',
   },
   {
-    srcLight: '/screens/light/documents.jpg',
-    srcDark: '/screens/dark/documents.jpg',
-    alt: 'The documents screen, showing the CV template gallery.',
+    slug: 'documents',
+    alt: 'The documents screen, showing saved CVs and cover letters with their versions.',
     caption: 'the documents',
   },
   {
-    srcLight: '/screens/light/calendar.jpg',
-    srcDark: '/screens/dark/calendar.jpg',
-    alt: 'The calendar screen, showing interviews and deadlines on a month grid.',
-    caption: 'the calendar',
+    slug: 'analytics',
+    alt: 'The analytics screen, showing conversion rates and time-in-stage charts.',
+    caption: 'the analytics',
   },
 ]

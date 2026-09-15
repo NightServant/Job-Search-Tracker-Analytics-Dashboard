@@ -26,8 +26,15 @@ import { cn } from '@/lib/utils'
  * without also removing its entry there, and do not remove the entry while the
  * file is still here.
  *
- * Seven edits were made to the downloaded source. Each one is a project
- * constraint the vendor default contradicts:
+ * Ten edits were made to the downloaded source. Each one is a project
+ * constraint the vendor default contradicts.
+ *
+ * THE COUNT WAS WRONG BEFORE THIS ONE ARRIVED: it said "seven" while the list
+ * below already ran to 9, because edits 8 and 9 were appended without it being
+ * updated. Worth fixing rather than matching, since `index.css` cites "edits 8
+ * and 9" by number -- a new edit numbered 8 would have pointed that reference
+ * at the wrong thing, which is why this one is 10.
+ *
  *
  * 1. lucide-react -> @/components/icons. The Global Constraint is one icon
  *    vocabulary; shadcn copies source in-tree, so this is an edit, not a fork.
@@ -66,6 +73,25 @@ import { cn } from '@/lib/utils'
  *    SCREENSHOTS, where a 5% zoom crops the app chrome at every edge -- the
  *    sidebar on the left, the last table row at the bottom. A screenshot has
  *    no seams to hide and every edge of it is content.
+ *
+ * 10. The slide image became a `<picture>` with viewport-tier `<source>`s.
+ *    The vendor ships one `<img>`, which is correct for its sample
+ *    photography -- one picture, several resolutions -- and wrong for
+ *    screenshots of a responsive application, where the phone capture is a
+ *    different LAYOUT rather than a smaller copy. `srcset` cannot express
+ *    that: it assumes every candidate is interchangeable and picks on width
+ *    and pixel density, so a retina phone could be handed the desktop shot.
+ *    `<source media>` is the element that does.
+ *
+ *    THE THEME PAIR IS UNCHANGED AND MUST STAY OUT OF `media`. Both captures
+ *    still ship and the `dark:` class picks one, for the reason spelled out at
+ *    the render below: `prefers-color-scheme` follows the OS and this app has
+ *    a toggle that has to beat it. Only the viewport half moved.
+ *
+ *    `className="contents"` on both `<picture>` elements so neither introduces
+ *    a box: the slide's own sizing is on the `<img>`, and a wrapper with a
+ *    layout of its own would break the `h-full w-full object-contain` that
+ *    keeps a 16:10 screenshot inside the stage.
  *
  * 7. The vendor's `Skiper51` demo export was dropped. It hardcoded eleven
  *    /images/x.com/*.jpeg paths that do not exist in this repo's public/, so
@@ -199,13 +225,16 @@ export interface Carousel005Props {
    * why both ship rather than one being chosen in JavaScript.
    */
   images: {
+    /** The fallback capture, used when no `media` in the list below matches. */
     srcLight: string
     srcDark: string
-    /** Optional narrow-viewport variants, as a `srcset` string. */
-    srcSetLight?: string
-    srcSetDark?: string
-    /** The slot's rendered width, for the browser to pick against. */
-    sizes?: string
+    /**
+     * Viewport-tier captures, NARROWEST FIRST -- `<picture>` takes the first
+     * match, so a reversed `max-width` list would hand every viewport the
+     * widest entry.
+     */
+    sourcesLight?: { media: string; srcSet: string }[]
+    sourcesDark?: { media: string; srcSet: string }[]
     alt: string
   }[]
   className?: string
@@ -364,25 +393,31 @@ const Carousel_005 = ({
                 are lazy, and the carousel is section 4, so neither is fetched
                 until it is near the viewport.
               */}
-              <img
-                className="h-full w-full rounded-md border border-border-subtle object-contain dark:hidden"
-                src={image.srcLight}
-                srcSet={image.srcSetLight}
-                sizes={image.sizes}
-                alt={image.alt}
-                loading="lazy"
-                decoding="async"
-              />
-              <img
-                className="hidden h-full w-full rounded-md border border-border-subtle object-contain dark:block"
-                src={image.srcDark}
-                srcSet={image.srcSetDark}
-                sizes={image.sizes}
-                alt=""
-                aria-hidden
-                loading="lazy"
-                decoding="async"
-              />
+              <picture className="contents dark:hidden">
+                {image.sourcesLight?.map((s) => (
+                  <source key={s.media} media={s.media} srcSet={s.srcSet} />
+                ))}
+                <img
+                  className="h-full w-full rounded-md border border-border-subtle object-contain dark:hidden"
+                  src={image.srcLight}
+                  alt={image.alt}
+                  loading="lazy"
+                  decoding="async"
+                />
+              </picture>
+              <picture className="contents">
+                {image.sourcesDark?.map((s) => (
+                  <source key={s.media} media={s.media} srcSet={s.srcSet} />
+                ))}
+                <img
+                  className="hidden h-full w-full rounded-md border border-border-subtle object-contain dark:block"
+                  src={image.srcDark}
+                  alt=""
+                  aria-hidden
+                  loading="lazy"
+                  decoding="async"
+                />
+              </picture>
             </SwiperSlide>
           ))}
         </Swiper>

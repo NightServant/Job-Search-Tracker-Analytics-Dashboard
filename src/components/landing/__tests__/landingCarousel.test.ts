@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it, expect } from 'vitest'
+import { SCREENS as SCREENS_MANIFEST, SCREEN_TIERS } from '../screens'
 
 /**
  * The carousel slide's aspect ratio matches the screenshots it holds.
@@ -41,79 +42,174 @@ function jpegSize(path: string): { width: number; height: number } {
   throw new Error(`${path}: no SOF marker`)
 }
 
-function screenshots(): string[] {
+/** Every capture, as `{ theme, tier, path }`. The tree is theme/tier/slug.jpg. */
+function screenshots(): { theme: string; tier: string; path: string }[] {
   return readdirSync(SCREENS)
     .filter((d) => statSync(join(SCREENS, d)).isDirectory())
     .flatMap((theme) =>
       readdirSync(join(SCREENS, theme))
-        .filter((f) => f.endsWith('.jpg'))
-        .map((f) => join(SCREENS, theme, f))
+        .filter((t) => statSync(join(SCREENS, theme, t)).isDirectory())
+        .flatMap((tier) =>
+          readdirSync(join(SCREENS, theme, tier))
+            .filter((f) => f.endsWith('.jpg'))
+            .map((f) => ({ theme, tier, path: join(SCREENS, theme, tier, f) }))
+        )
     )
 }
 
-describe('the landing carousel slide', () => {
-  it('is declared at the ratio the screenshots actually are', () => {
-    const css = readFileSync(CSS, 'utf8')
-    const match = css.match(/\.Carousal_005 \.swiper-slide \{[^}]*aspect-ratio:\s*([\d.]+)\s*\/\s*([\d.]+)/)
-    expect(match, 'no aspect-ratio found on the carousel slide').not.toBeNull()
+/**
+ * The slide ratio declared for each tier, read out of the stylesheet.
+ *
+ * The base rule is the desktop one; each `max-width` block overrides it. This
+ * returns them keyed by the breakpoint so they can be checked against the
+ * captures that will actually land in them.
+ */
+function declaredRatios(css: string): Record<string, number> {
+  const out: Record<string, number> = {}
+  const base = css.match(/\.Carousal_005 \.swiper-slide \{[^}]*aspect-ratio:\s*([\d.]+)\s*\/\s*([\d.]+)/)
+  if (base) out.desktop = Number(base[1]) / Number(base[2])
+  const byQuery: Record<string, string> = { '1279px': 'laptop', '1023px': 'tablet', '639px': 'mobile' }
+  for (const [px, tier] of Object.entries(byQuery)) {
+    const re = new RegExp(
+      `@media \\(max-width: ${px}\\) \\{\\s*\\.Carousal_005 \\.swiper-slide \\{[^}]*aspect-ratio:\\s*([\\d.]+)\\s*/\\s*([\\d.]+)`
+    )
+    const m = css.match(re)
+    if (m) out[tier] = Number(m[1]) / Number(m[2])
+  }
+  return out
+}
 
-    const declared = Number(match![1]) / Number(match![2])
+describe('the landing carousel slide', () => {
+  it('declares a slide ratio for every tier that matches that tier\'s captures', () => {
+    /*
+      THE ORIGINAL BUG, GENERALISED. This started as one ratio against one set
+      of captures, after a 2.05 image in a 1.60 slide had `object-cover`
+      silently eating 28% of every screenshot.
+
+      The carousel now art-directs by viewport, so there are FOUR shapes rather
+      than one -- 0.44 on a phone against 2.05 on a desktop -- and the failure
+      it guards against is worse than before: leaving the desktop ratio in
+      place would draw the phone capture as a 74px sliver in a 343px box, which
+      is the whole reason for shipping the phone layout undone.
+    */
+    const css = readFileSync(CSS, 'utf8')
+    const ratios = declaredRatios(css)
     const files = screenshots()
     expect(files.length).toBeGreaterThan(0)
 
-    for (const file of files) {
-      const { width, height } = jpegSize(file)
+    for (const tier of ['mobile', 'tablet', 'laptop', 'desktop']) {
+      expect(ratios[tier], `no slide aspect-ratio declared for ${tier}`).toBeGreaterThan(0)
+    }
+
+    for (const { tier, path } of files) {
+      const { width, height } = jpegSize(path)
       const actual = width / height
       expect(
-        Math.abs(actual - declared),
-        `${file} is ${width}x${height} (${actual.toFixed(4)}) but the slide is declared ${declared.toFixed(4)} — object-fit will crop or letterbox it`
+        Math.abs(actual - ratios[tier]),
+        `${path} is ${width}x${height} (${actual.toFixed(3)}) but the ${tier} slide is declared ${ratios[tier].toFixed(3)} — object-contain will letterbox it`
       ).toBeLessThan(0.01)
     }
   })
 
-  it('every screenshot is the same shape, so one ratio can serve them all', () => {
-    // A single slide ratio is only correct if the captures agree with each
-    // other. One odd screenshot would letterbox on its own slide, and the
-    // assertion above would not say which end of the mismatch was wrong.
-    //
-    // SHAPE, NOT PIXEL SIZE. This asserted one exact `WxH` for every file,
-    // which was the same thing while there was one capture per screen per
-    // theme. There are now two -- a 1440 and a 768 for the srcset -- so the
-    // invariant it was really protecting has to be stated directly: same
-    // ratio, any resolution.
-    const ratios = screenshots().map((f) => {
-      const { width, height } = jpegSize(f)
-      return { f, ratio: width / height, size: `${width}x${height}` }
-    })
-    const spread = Math.max(...ratios.map((r) => r.ratio)) - Math.min(...ratios.map((r) => r.ratio))
-    expect(
-      spread,
-      `mixed screenshot shapes: ${ratios.map((r) => `${r.f} ${r.size}`).join(', ')}`
-    ).toBeLessThan(0.01)
+  it('keeps every capture within a tier the same shape', () => {
+    /*
+      NARROWED FROM "every screenshot is the same shape". That was right while
+      all ten files were one desktop capture at two resolutions; it is wrong
+      now by design, because the tiers are deliberately different shapes -- a
+      portrait phone against a landscape desktop.
+
+      The invariant that survives is the one that was doing the work: within a
+      tier they must agree, or a single slide ratio letterboxes whichever one
+      is odd. A recapture that missed one screen is exactly how that happens.
+    */
+    const byTier = new Map<string, { path: string; ratio: number; size: string }[]>()
+    for (const { tier, path } of screenshots()) {
+      const { width, height } = jpegSize(path)
+      const list = byTier.get(tier) ?? []
+      list.push({ path, ratio: width / height, size: `${width}x${height}` })
+      byTier.set(tier, list)
+    }
+    expect(byTier.size).toBe(4)
+
+    for (const [tier, files] of byTier) {
+      const spread = Math.max(...files.map((f) => f.ratio)) - Math.min(...files.map((f) => f.ratio))
+      expect(
+        spread,
+        `mixed shapes in ${tier}: ${files.map((f) => `${f.path} ${f.size}`).join(', ')}`
+      ).toBeLessThan(0.01)
+    }
   })
 
-  it('gives every capture the narrow variant its srcset promises', () => {
-    // `screenSrcSet()` builds `<name>-768.jpg 768w` from the full-size path by
-    // string substitution, so a capture added without its variant produces a
-    // srcset entry that 404s -- and a 404 in a srcset is silent: the browser
-    // simply falls back, and the phone quietly downloads 1440px again.
-    const full = screenshots().filter((f) => !f.endsWith('-768.jpg'))
-    expect(full.length).toBeGreaterThan(0)
-    for (const file of full) {
-      const variant = file.replace(/\.jpg$/, '-768.jpg')
-      expect(existsSync(variant), `${variant} is missing`).toBe(true)
-      expect(jpegSize(variant).width, `${variant} is not 768 wide`).toBe(768)
+  it('has every screen in every tier and both themes, so no source 404s', () => {
+    /*
+      REPLACES the `-768.jpg` variant check, which guarded the same failure
+      under the old srcset scheme: a capture added without its partner produced
+      a source that 404s, and a 404 inside `<picture>`/`srcset` is SILENT --
+      the browser just falls through to the next candidate, and the phone
+      quietly gets the desktop shot again. Same trap, more slots to miss: four
+      tiers times two themes is eight files per screen rather than two.
+    */
+    const slugs = SCREENS_MANIFEST.map((s) => s.slug)
+    expect(slugs.length).toBeGreaterThan(0)
+    for (const theme of ['light', 'dark']) {
+      for (const tier of ['mobile', 'tablet', 'laptop', 'desktop']) {
+        for (const slug of slugs) {
+          const file = join(SCREENS, theme, tier, `${slug}.jpg`)
+          expect(existsSync(file), `${file} is missing`).toBe(true)
+        }
+      }
     }
+  })
+
+  it('declares the same breakpoints in the stylesheet and in the source list', () => {
+    /*
+      THE TWO HALVES MUST AGREE OR THE BOX AND ITS CONTENTS DISAGREE. The CSS
+      decides the SHAPE of the slide per viewport; `screenSources` decides
+      which FILE goes in it. They are written in different files in different
+      languages, and nothing but this connects them -- move one breakpoint and
+      the phone capture lands in a laptop-shaped box with bands down both
+      sides, which looks like a bug in the image rather than in a media query.
+    */
+    const css = readFileSync(CSS, 'utf8')
+    for (const tier of SCREEN_TIERS) {
+      const px = tier.media.match(/(\d+)px/)![1]
+      expect(
+        css.includes(`@media (max-width: ${px}px)`),
+        `screens.ts serves the ${tier.dir} capture below ${px}px, but index.css declares no slide ratio at that width`
+      ).toBe(true)
+    }
+  })
+
+  it('walks the app in the order its own sidebar does', () => {
+    /*
+      Gabe, 2026-09-15: "order of pictures must be overview, applications,
+      planner, documents and analytics."
+
+      It is pinned rather than left to the array because the failure is silent:
+      every screenshot in the carousel CONTAINS the sidebar, so a carousel in a
+      different order shows the product disagreeing with itself, and nothing
+      about the page looks broken while it happens.
+    */
+    expect(SCREENS_MANIFEST.map((s) => s.slug)).toEqual([
+      'overview',
+      'applications',
+      'planner',
+      'documents',
+      'analytics',
+    ])
   })
 
   it('fits the whole screenshot rather than cropping it', () => {
     // object-cover is what turned the ratio drift into a silent 28% crop.
     // contain fails visibly instead, which is the behaviour worth keeping even
     // once the ratios agree.
+    //
+    // Scoped to `<img` tags: the two `<picture>` wrappers carry `dark:hidden`
+    // too, and matching those made this count four and fail.
     const src = readFileSync('src/components/v1/skiper51.tsx', 'utf8')
-    const imgClasses = [...src.matchAll(/className="([^"]*(?:dark:hidden|dark:block)[^"]*)"/g)].map(
-      (m) => m[1]
-    )
+    const imgClasses = [
+      ...src.matchAll(/<img\s[^>]*className="([^"]*(?:dark:hidden|dark:block)[^"]*)"/g),
+    ].map((m) => m[1])
     expect(imgClasses.length).toBe(2)
     for (const cls of imgClasses) {
       expect(cls).toContain('object-contain')

@@ -96,16 +96,19 @@ describe('the README describes this repository', () => {
     // Both directions. An embedded image that 404s is the most visible
     // possible way for a README to be wrong.
     const text = readme()
-    for (const shot of ['dashboard', 'applications', 'analytics']) {
+    // `overview`, not `dashboard`: the captures are named for the screen the
+    // app's own nav shows, and the route file is still /dashboard.
+    for (const shot of ['overview', 'applications', 'analytics']) {
       expect(text, `README does not embed the ${shot} screenshot`).toMatch(
-        new RegExp(`/screens/[a-z]+/${shot}\\.(?:jpg|png)`)
+        new RegExp(`/screens/[a-z]+/[a-z]+/${shot}\\.(?:jpg|png)`)
       )
     }
-    // Paths are theme-scoped now -- public/screens/<theme>/<name>.jpg -- so the
-    // check walks the subdirectories rather than assuming a flat folder. This
-    // test caught the move itself: the README still pointed at the old flat
-    // PNGs, which would have shipped five broken images.
-    const embedded = [...text.matchAll(/\/screens\/([a-z]+\/[a-z-]+\.(?:jpg|png))/g)].map(
+    // Paths are theme AND TIER scoped now -- public/screens/<theme>/<tier>/<name>.jpg
+    // -- so the check walks two levels rather than one. This test has now
+    // caught both moves: the flat-to-theme one, and the theme-to-tier one when
+    // the carousel started art-directing by viewport. Either would have
+    // shipped five broken images in the README.
+    const embedded = [...text.matchAll(/\/screens\/([a-z]+\/[a-z]+\/[a-z-]+\.(?:jpg|png))/g)].map(
       (m) => m[1]
     )
     expect(embedded.length).toBeGreaterThan(0)

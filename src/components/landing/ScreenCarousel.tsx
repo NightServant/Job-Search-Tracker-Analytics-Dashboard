@@ -3,7 +3,7 @@
 import type { Swiper as SwiperClass } from 'swiper'
 import { Carousel_005 } from '@/components/v1/skiper51'
 import { carouselOptionsFor } from './carouselOptions'
-import { SCREEN_SIZES, screenSrcSet, type LandingScreen } from './screens'
+import { screenSources, screenSrc, type LandingScreen } from './screens'
 
 /**
  * The product screens, shown through skiper51 (Swiper.js).
@@ -42,11 +42,13 @@ export function ScreenCarousel({
     <div data-testid="screen-carousel" data-scroll-driven={scrollDriven ? 'true' : 'false'}>
       <Carousel_005
         images={screens.map((s) => ({
-          srcLight: s.srcLight,
-          srcDark: s.srcDark,
-          srcSetLight: screenSrcSet(s.srcLight),
-          srcSetDark: screenSrcSet(s.srcDark),
-          sizes: SCREEN_SIZES,
+          // Four captures per theme, one per viewport tier -- see ./screens for
+          // why these are different LAYOUTS rather than one layout at four
+          // sizes, and why the theme half deliberately stayed out of `media`.
+          srcLight: screenSrc('light', s.slug),
+          srcDark: screenSrc('dark', s.slug),
+          sourcesLight: screenSources('light', s.slug),
+          sourcesDark: screenSources('dark', s.slug),
           alt: s.alt,
         }))}
         loop={options.loop}
