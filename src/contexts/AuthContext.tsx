@@ -6,7 +6,7 @@ import { hasValidSupabaseConfig, supabase, supabaseConfigError } from '@/lib/sup
 import { clearStoredSession } from '@/lib/supabaseSession'
 import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 import { normalizeEmail } from '@/lib/credentials'
-import type { OAuthProviderId } from '@/lib/oauthProviders'
+import { OAUTH_SCOPES, type OAuthProviderId } from '@/lib/oauthProviders'
 
 /**
  * Turns a Supabase auth error into an Error with a usable message.
@@ -281,6 +281,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // definition. The destination must also be listed in the Supabase
         // dashboard's redirect allow-list, which is the real enforcement.
         redirectTo: `${window.location.origin}/dashboard`,
+        // Undefined for providers that need nothing extra, which the SDK
+        // treats as "the defaults". Azure is the one that does -- see
+        // OAUTH_SCOPES for why its email has to be asked for by name.
+        scopes: OAUTH_SCOPES[provider],
       },
     })
     if (error) throw new Error(error.message)

@@ -33,6 +33,24 @@ export interface OAuthProvider {
   mark: ComponentType<{ size?: number; className?: string }>
 }
 
+/**
+ * Extra OAuth scopes a provider needs beyond the defaults, by id.
+ *
+ * AZURE WILL NOT RETURN AN EMAIL WITHOUT BEING ASKED. Supabase Auth requires a
+ * valid email address back from the provider -- it is the account's identity
+ * in `auth.users` -- and Microsoft omits it from the token unless the `email`
+ * scope is requested explicitly. Without this the Microsoft button completes
+ * the whole round trip and then fails at the end, which reads like a Supabase
+ * fault rather than a missing parameter.
+ *
+ * GOOGLE IS ABSENT ON PURPOSE. Its default scope set already carries email and
+ * profile, so naming them would be a no-op that implies the list is exhaustive.
+ * An entry here should mean "this provider needs something extra".
+ */
+export const OAUTH_SCOPES: Partial<Record<OAuthProviderId, string>> = {
+  azure: 'email',
+}
+
 export const OAUTH_PROVIDERS: OAuthProvider[] = [
   { id: 'google', label: 'Continue with Google', mark: GoogleMark },
   { id: 'azure', label: 'Continue with Microsoft', mark: MicrosoftMark },
