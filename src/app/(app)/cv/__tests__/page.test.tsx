@@ -741,3 +741,39 @@ describe('re-tailoring the open CV for the same application', () => {
     expect(screen.queryByText(/^Shipped the rewrite$/)).toBeNull()
   })
 })
+
+/**
+ * `.tex` leads the exports and is the only one marked.
+ *
+ * Gabe, 2026-09-15: ".tex ... is the best version of the CV". It used to sit
+ * last under a comment arguing it was the niche one, so this is a reversal
+ * rather than an addition -- and a reversal is exactly what a later tidy-up
+ * puts back, which is why the ORDER is asserted and not just the marker.
+ */
+describe('the export menu recommends .tex', () => {
+  it('puts .tex above .docx and PDF', async () => {
+    params('cv-1')
+    resolved(wordDraft())
+    render(<Page />)
+    await openActions()
+
+    const tex = screen.getByRole('button', { name: /export \.tex/i })
+    const docx = screen.getByRole('button', { name: /export \.docx/i })
+    const pdf = screen.getByRole('button', { name: /export pdf/i })
+
+    expect(tex.compareDocumentPosition(docx) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(docx.compareDocumentPosition(pdf) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('marks exactly one row, and it is the .tex one', async () => {
+    params('cv-1')
+    resolved(wordDraft())
+    render(<Page />)
+    await openActions()
+
+    // A list where two things are recommended has recommended nothing.
+    const marks = screen.getAllByText(/^recommended$/i)
+    expect(marks).toHaveLength(1)
+    expect(screen.getByRole('button', { name: /export \.tex/i })).toContainElement(marks[0])
+  })
+})

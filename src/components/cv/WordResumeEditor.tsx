@@ -322,6 +322,7 @@ function ActionRow({
   onClick,
   disabled,
   destructive,
+  recommended,
   className,
 }: {
   icon: React.ReactNode
@@ -330,6 +331,15 @@ function ActionRow({
   onClick: () => void
   disabled?: boolean
   destructive?: boolean
+  /**
+   * Marks the one row worth taking by default.
+   *
+   * ACCENT TEXT, NOT A BADGE. The design system settled on no pills, and a
+   * rounded chip here would be the only one in the app -- so the word carries
+   * the emphasis and the orange carries the eye. One row may have it: a list
+   * where two things are recommended has recommended nothing.
+   */
+  recommended?: boolean
   className?: string
 }) {
   return (
@@ -349,19 +359,28 @@ function ActionRow({
       <span
         className={cn(
           'mt-0.5 shrink-0',
-          destructive ? 'text-status-rejected-mark' : 'text-text-muted'
+          destructive
+            ? 'text-status-rejected-mark'
+            : recommended
+              ? 'text-accent-default'
+              : 'text-text-muted'
         )}
       >
         {icon}
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span
-          className={cn(
-            'text-body-s',
-            destructive ? 'text-status-rejected-mark' : 'text-text-primary'
+        <span className="flex items-baseline gap-2">
+          <span
+            className={cn(
+              'text-body-s',
+              destructive ? 'text-status-rejected-mark' : 'text-text-primary'
+            )}
+          >
+            {label}
+          </span>
+          {recommended && (
+            <span className="shrink-0 text-body-s text-accent-default">recommended</span>
           )}
-        >
-          {label}
         </span>
         <span className="text-body-s text-text-muted">{hint}</span>
       </span>
@@ -903,6 +922,33 @@ export function WordResumeEditor({
                       resetTemplate()
                     }}
                   />
+                  {/* FIRST OF THE THREE, AND THE ONLY ONE MARKED (Gabe,
+                      2026-09-15: ".tex ... is the best version of the CV").
+                      It used to be last, under a comment arguing the list was
+                      most-wanted-first and that a .tex source was a thing only
+                      academic applications asked for. That was a guess about
+                      who exports what; the author of the CVs says the LaTeX
+                      output is the one worth sending, so it leads and it says
+                      so.
+
+                      The mark is accent text rather than a badge -- see
+                      ActionRow -- and exactly one row carries it.
+
+                      STILL NOT IN THE COMPACT ROW BELOW. That row holds two
+                      exports on a phone and the menu carries all three at
+                      every width; which two belong on a handset is a separate
+                      question from which one is best. */}
+                  <ActionRow
+                    icon={<DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />}
+                    label={exportState.isExportingLatex ? 'exporting .tex…' : 'export .tex'}
+                    hint="LaTeX source — the best-looking version of this CV"
+                    recommended
+                    disabled={!editor || exportState.isExportingLatex}
+                    onClick={() => {
+                      setActionsOpen(false)
+                      void exportState.exportLatex()
+                    }}
+                  />
                   <ActionRow
                     icon={<DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />}
                     label={exportState.isExportingDocx ? 'exporting .docx…' : 'export .docx'}
@@ -921,29 +967,6 @@ export function WordResumeEditor({
                     onClick={() => {
                       setActionsOpen(false)
                       void exportState.exportPdf()
-                    }}
-                  />
-                  {/* LAST OF THE THREE, and it is a deliberate ordering rather
-                      than an append. The list is most-wanted first: .docx is
-                      what application forms accept, PDF is what a person
-                      opens, and a .tex source is what a specific kind of
-                      academic application asks for. The hint says which one
-                      that is, because somebody who does not need LaTeX should
-                      be able to skip the row without reading further.
-
-                      It is NOT in the compact row below. That row has space
-                      for two exports on a phone, and the two it has are the
-                      ones a phone is plausibly used for -- nobody compiles a
-                      .tex on a handset, and the menu here carries it at every
-                      width anyway. */}
-                  <ActionRow
-                    icon={<DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />}
-                    label={exportState.isExportingLatex ? 'exporting .tex…' : 'export .tex'}
-                    hint="LaTeX source, for academic applications"
-                    disabled={!editor || exportState.isExportingLatex}
-                    onClick={() => {
-                      setActionsOpen(false)
-                      void exportState.exportLatex()
                     }}
                   />
                   {/* A destructive action does not sit flush against the
