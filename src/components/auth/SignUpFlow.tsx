@@ -20,6 +20,7 @@ import type { OAuthProviderId } from '@/lib/oauthProviders'
 import { AuthBrandPanel } from './AuthBrandPanel'
 import { OAuthButtons } from './OAuthButtons'
 import { useHoldAuthGuards } from './authHold'
+import { isExistingAccountError } from '@/lib/existingAccount'
 import { OtpStep } from './OtpStep'
 import { PasswordRequirements } from './PasswordRequirements'
 import { ProgressTrack } from '@/components/ui/progress-track'
@@ -106,6 +107,9 @@ export function SignUpFlow({
   const [password, setPassword] = React.useState('')
   const [confirm, setConfirm] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
+  // Separate from `error`, because this one is not a message to read -- it is
+  // a message plus the action that resolves it. See the catch below.
+  const [existingAccount, setExistingAccount] = React.useState<string | null>(null)
   const [busy, setBusy] = React.useState(false)
 
   React.useEffect(() => {
@@ -119,6 +123,7 @@ export function SignUpFlow({
   async function handleDetails(event: React.FormEvent) {
     event.preventDefault()
     setError(null)
+    setExistingAccount(null)
 
     const cleanEmail = normalizeEmail(email)
 
@@ -165,7 +170,22 @@ export function SignUpFlow({
       setEmail(cleanEmail)
       setStep(1)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not create the account.')
+      /*
+        THE ONE ERROR THAT IS NOT JUST TEXT. Every other failure here is prose
+        from Supabase rendered verbatim; this one needs a route out, because
+        the person is not doing anything wrong -- they already have what they
+        are trying to create, and the only useful next move is to sign in.
+        Without it they were shown "check your email" and waited for a code
+        that is never sent, since there is nothing to confirm.
+
+        The address is captured so the sign-in link can carry it and they do
+        not have to type it a third time.
+      */
+      if (isExistingAccountError(err)) {
+        setExistingAccount(cleanEmail)
+      } else {
+        setError(err instanceof Error ? err.message : 'Could not create the account.')
+      }
     } finally {
       setBusy(false)
     }
@@ -205,6 +225,44 @@ export function SignUpFlow({
               {error && (
                 <Alert variant="destructive" role="alert">
                   <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+
+              {existingAccount && (
+                /*
+                  NOT `variant="destructive"`. Nothing failed and the person
+                  did nothing wrong -- they have an account. Painting that red
+                  tells them they made a mistake when the honest reading is
+                  "you are already done, go this way".
+                */
+                <Alert role="alert" data-existing-account>
+                  <AlertDescription>
+                    <span>
+                      You already have an account with{' '}
+                      <strong className="text-text-primary">{existingAccount}</strong>. No code
+                      was sent, because there is nothing to confirm.
+                    </span>{' '}
+                    {/*
+                      NO `?email=` ON THIS LINK. It would have to be read back
+                      by AuthScreen, which does not read it, so it was a
+                      promise the next page does not keep -- and an address in
+                      a query string is copied into history and into every
+                      referrer the next page sends. Saving one field of typing
+                      is not worth either.
+
+                      NO "reset your password" EITHER, which the first draft
+                      offered: this app has no password-reset flow at all --
+                      `resetPasswordForEmail` appears nowhere -- so the link
+                      would have gone to the sign-in form and left somebody
+                      hunting for a button that does not exist.
+                    */}
+                    <Link
+                      href="/login"
+                      className="text-accent-default underline underline-offset-4"
+                    >
+                      Sign in instead
+                    </Link>
+                  </AlertDescription>
                 </Alert>
               )}
 

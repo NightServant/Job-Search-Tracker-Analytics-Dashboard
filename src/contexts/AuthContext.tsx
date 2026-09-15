@@ -7,6 +7,7 @@ import { clearStoredSession } from '@/lib/supabaseSession'
 import { currentEnvSource, readSupabaseConfig } from '@/lib/env'
 import { normalizeEmail } from '@/lib/credentials'
 import { OAUTH_SCOPES, type OAuthProviderId } from '@/lib/oauthProviders'
+import { ExistingAccountError } from '@/lib/existingAccount'
 
 /**
  * Turns a Supabase auth error into an Error with a usable message.
@@ -232,15 +233,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw authError(error)
   }
 
+  /**
+   * Register, and say so when the address already has an account.
+   *
+   * SUPABASE DELIBERATELY WILL NOT TELL YOU. Signing up with an address that
+   * already has a CONFIRMED account returns HTTP 200, no error, and a user
+   * object with a freshly minted decoy `id` -- verified against this project
+   * on 2026-09-15: the real row is 0b3a7a93… and the response carried
+   * b6cbddb0…. That is anti-enumeration: an endpoint that answers "taken"
+   * lets anyone test addresses against your user table one request at a time.
+   *
+   * THE COST OF THAT SILENCE, which is why this exists (Gabe, 2026-09-15:
+   * "add an alert when users are trying to sign up with an existing
+   * account"): the person is shown "check your email" and no email is ever
+   * sent, because there is nothing to confirm. They wait, they resend, they
+   * conclude the app is broken. That is a guaranteed dead end for a real
+   * person, weighed against a probing risk that a determined attacker can
+   * approach other ways -- and this is a job tracker, not a bank. Disclosure
+   * is the right trade HERE; it would not be everywhere.
+   *
+   * `identities` IS THE TELL, and the empirical check matters because a
+   * wrong reading fires this on EVERY signup and blocks registration
+   * entirely. Probed against the live project both ways:
+   *
+   *     existing confirmed address ->  identities: []        (0 entries)
+   *     brand new address          ->  identities: [ … ]     (1 entry)
+   *
+   * `length === 0` and not a falsy check: `identities` is absent rather than
+   * empty on some responses, and treating absent as "exists" would be the
+   * false positive that stops everyone signing up.
+   */
   const signUp = async (email: string, password: string) => {
     if (!hasValidSupabaseConfig) {
       throw new Error(supabaseConfigError || 'Supabase is not configured')
     }
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: normalizeEmail(email),
       password,
     })
     if (error) throw authError(error)
+    if (data.user && data.user.identities?.length === 0) {
+      throw new ExistingAccountError()
+    }
   }
 
   const verifySignUpOtp = async (email: string, token: string) => {
