@@ -332,13 +332,18 @@ otp_expiry = 600
 # it is not an account id, and it is not the key. Port 465 is implicit TLS,
 # which is what Supabase's sender expects.
 #
-# ADMIN_EMAIL IS THE FROM ADDRESS AND RESEND WILL REJECT IT unless the domain
-# is verified in the Resend dashboard. Until a domain is verified the only
-# usable value is `onboarding@resend.dev`, which Resend will deliver ONLY to
-# the address that owns the Resend account -- fine for testing the flow, and
-# useless for real signups, since every other recipient is silently dropped.
-# It is env-driven so switching from the test sender to a real one is a
-# variable change rather than a commit.
+# ADMIN_EMAIL IS THE FROM ADDRESS AND BREVO WILL REJECT ANYTHING UNVERIFIED.
+# It must be an address confirmed under Senders in the Brevo dashboard; the
+# account's own login address is not automatically one. Currently
+# `egabe.cervantes@gmail.com`. It is env-driven so changing sender is a
+# variable change rather than a commit, and `scripts/push-auth-config.sh`
+# refuses to push a leftover `@resend.dev` value -- that is a real trap, not a
+# hypothetical: it sat here as a non-empty string long after Resend was gone.
+#
+# (The paragraph that used to be here described Resend's shared sender as the
+# live setup. It was left in place after the switch and read as current
+# configuration, which is exactly how somebody concludes the push did not take.
+# The history is below, clearly marked as history.)
 # BREVO, NOT RESEND, AND THE REASON IS THE ONE THING THAT WAS BLOCKING REAL
 # SIGNUPS (2026-09-15). Gabe: "I am so tired of waiting for the free domain."
 #
