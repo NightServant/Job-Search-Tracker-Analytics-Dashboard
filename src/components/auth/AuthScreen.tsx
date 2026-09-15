@@ -117,11 +117,30 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
     setBusy(true)
     try {
       await onSubmit(email, password)
+      /*
+        BUSY STAYS ON AFTER A SUCCESSFUL SUBMIT, and the `finally` this
+        replaces is why the sign-in button went back to reading "Sign in"
+        1.5 seconds after it was pressed -- caught in a screen recording on
+        2026-09-15.
+
+        `onSubmit` here ends in `router.push('/dashboard')`, which RETURNS
+        IMMEDIATELY: it starts a navigation, it does not wait for one. So the
+        promise resolved, the `finally` cleared `busy`, and the form sat there
+        looking idle and re-submittable for the whole time the next route was
+        being fetched. Somebody who presses a button that visibly un-presses
+        itself presses it again, which is the one thing a sign-in form must
+        not invite.
+
+        Nothing has to clear it: this component is about to be unmounted by
+        the navigation it just started. The `catch` below is the only path
+        that survives, and it clears `busy` itself.
+      */
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong. Try again.')
-    } finally {
-      // In a finally, so a rejection cannot strand the button disabled and
-      // leave the visitor with a form they can see but not resubmit.
+      // Cleared HERE rather than in a `finally`, so a rejection cannot strand
+      // the button disabled and leave somebody with a form they can see but
+      // not resubmit -- while a success leaves it spinning until the page
+      // changes underneath it.
       setBusy(false)
     }
   }

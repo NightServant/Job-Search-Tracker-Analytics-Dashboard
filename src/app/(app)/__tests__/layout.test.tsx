@@ -95,13 +95,32 @@ describe('the loading state, which used to be nothing at all', () => {
     await waitFor(() => expect(container.querySelector('[data-route-skeleton]')).toBeTruthy())
   })
 
-  it('does not flash one on a session that resolves quickly', () => {
-    // The 200ms gate matters MORE here than on a route change: a warm reload
-    // with a cached session resolves in single-digit milliseconds, and a
-    // skeleton for one frame on every navigation is worse than none.
+  it('renders on the FIRST pass, so it exists in the server HTML', async () => {
+    /*
+      THIS TEST ASSERTED THE OPPOSITE FOR ONE COMMIT, and the opposite was the
+      bug. It claimed the 200ms gate should apply here too, "so a fast session
+      never flashes a skeleton" -- which sounds right and is wrong, because
+      the gate is `useState` plus an effect and EFFECTS DO NOT RUN DURING SSR.
+      Gated, this branch renders as nothing in the delivered document and
+      stays nothing for another 200ms after hydration: exactly the window it
+      was added to cover. A screen recording caught ~900ms of white between
+      the sign-in form and the dashboard with the gated version deployed.
+
+      There is also no warm case to protect. This branch is reached only when
+      `loading` is true, and `loading` starts true once per AuthProvider mount
+      -- that is, once per document load, where `getSession()` must make a
+      network round trip. Client-side navigations inside the app never reach
+      it, because the provider is already resolved.
+
+      `renderToString` rather than `render`, because "synchronously" is the
+      whole claim and jsdom would let an effect-driven render pass a
+      `waitFor`. This is the actual server output.
+    */
+    const { renderToString } = await import('react-dom/server')
     useAuthMock.mockReturnValue(loading)
-    const { container } = render(<AppLayout>x</AppLayout>)
-    expect(container.querySelector('[data-route-skeleton]')).toBeNull()
+    const html = renderToString(<AppLayout>x</AppLayout>)
+    expect(html).toContain('data-route-skeleton')
+    expect(html).not.toContain('x</')
   })
 
   it('tells a screen reader it is loading, not just a sighted one', async () => {

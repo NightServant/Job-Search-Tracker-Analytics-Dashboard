@@ -98,10 +98,44 @@ function HeaderBlock({ action = true }: { action?: boolean }) {
  *
  * Wrapped in the 200ms gate, so a warm navigation never flashes one.
  */
-export function RouteSkeleton({ variant }: { variant: RouteSkeletonVariant }) {
+export function RouteSkeleton({
+  variant,
+  immediate = false,
+}: {
+  variant: RouteSkeletonVariant
+  /**
+   * Skips the 200ms gate.
+   *
+   * THE GATE CANNOT RUN ON THE SERVER, and that is the whole reason this prop
+   * exists. `DelayedSkeleton` is `useState(false)` plus an effect, and effects
+   * do not run during SSR -- so a server-rendered skeleton is rendered as
+   * NOTHING, and stays nothing for another 200ms after hydration. A screen
+   * recording on 2026-09-15 caught the result: roughly 900ms of pure white
+   * between the sign-in form and the dashboard, on the exact path the gated
+   * skeleton was added to cover.
+   *
+   * WHEN TO PASS IT: only where there is no warm case to protect. The gate
+   * earns its keep on a client-side navigation between two cached screens,
+   * where a react-query read resolves in single-digit milliseconds and an
+   * ungated skeleton would flash for one frame. The auth gate in
+   * `(app)/layout` is the opposite situation -- it is only ever reached on a
+   * COLD document load, where `getSession()` must make a network round trip
+   * and there is nothing cached to be fast about.
+   */
+  immediate?: boolean
+}) {
+  if (immediate) return <RouteSkeletonBody variant={variant} />
   return (
     <DelayedSkeleton>
-      <div role="status" aria-busy="true" data-route-skeleton={variant} className="flex flex-col gap-8">
+      <RouteSkeletonBody variant={variant} />
+    </DelayedSkeleton>
+  )
+}
+
+/** The markup itself, shared by the gated and ungated paths. */
+function RouteSkeletonBody({ variant }: { variant: RouteSkeletonVariant }) {
+  return (
+    <div role="status" aria-busy="true" data-route-skeleton={variant} className="flex flex-col gap-8">
         <span className="sr-only">Loading</span>
 
         {variant === 'dashboard' && (
@@ -230,6 +264,5 @@ export function RouteSkeleton({ variant }: { variant: RouteSkeletonVariant }) {
           </>
         )}
       </div>
-    </DelayedSkeleton>
   )
 }

@@ -132,7 +132,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (loading) {
     return (
       <AppShell>
-        <RouteSkeleton variant={skeletonVariantFor(pathname)} />
+        {/* `immediate`, because this skeleton has to exist in the SERVER's
+            HTML. RouteSkeleton's usual 200ms gate is `useState` plus an
+            effect, and effects do not run during SSR -- so the gated version
+            renders as nothing in the delivered document and stays nothing for
+            another 200ms after hydration. That is precisely the window this
+            branch was written to cover, and a screen recording caught it:
+            ~900ms of white between the sign-in form and the dashboard.
+
+            There is no warm case to protect here. This branch is only ever
+            reached on a cold document load, where `getSession()` must go to
+            the network. See RouteSkeleton's `immediate`. */}
+        <RouteSkeleton immediate variant={skeletonVariantFor(pathname)} />
       </AppShell>
     )
   }
