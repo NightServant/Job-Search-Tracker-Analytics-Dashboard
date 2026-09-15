@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderResumeHtml } from '../pdfExport'
+import { renderDocumentHtml, renderResumeHtml } from '../pdfExport'
 
 /**
  * The page geometry and the one value on it that is not already markup.
@@ -35,5 +35,53 @@ describe('renderResumeHtml', () => {
 
   it('places the document body inside the page', () => {
     expect(renderResumeHtml('<h1>Name</h1>', 'CV')).toMatch(/<main class="page">\s*<h1>Name<\/h1>/)
+  })
+})
+
+/**
+ * The schema the document is parsed against has to be the editor's.
+ *
+ * SHIPPED BROKEN AND CAUGHT IN PRODUCTION (2026-09-15). The first version
+ * passed a bare `StarterKit` to `generateHTML`, which builds a schema without
+ * `textStyle` -- a mark the toolbar writes for every font and size change. The
+ * route answered 500 "Could not build the PDF" on a real CV and the log said
+ * `RangeError: There is no mark type textStyle in this schema`. A fixture made
+ * of plain headings and paragraphs passed the whole way; only a document
+ * carrying the editor's own marks fails, which is why the fixture below has
+ * them.
+ */
+describe('renderDocumentHtml uses the editor schema', () => {
+  const marked = {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        content: [
+          {
+            type: 'text',
+            marks: [
+              { type: 'textStyle', attrs: { fontFamily: 'Calibri', fontSize: '11pt' } },
+              { type: 'bold' },
+            ],
+            text: 'Senior Frontend Engineer',
+          },
+          { type: 'text', marks: [{ type: 'highlight', attrs: { color: '#ffff00' } }], text: 'a11y' },
+        ],
+      },
+    ],
+  }
+
+  it('renders a document carrying the editor marks instead of throwing', () => {
+    expect(() => renderDocumentHtml(marked)).not.toThrow()
+  })
+
+  it('keeps the formatting rather than dropping it silently', () => {
+    // The quieter half of the same bug: an extension list that merely omits a
+    // mark loses the formatting without an error, so the PDF disagrees with
+    // what the editor is showing.
+    const html = renderDocumentHtml(marked)
+    expect(html).toContain('Calibri')
+    expect(html).toContain('<strong>')
+    expect(html).toContain('<mark')
   })
 })

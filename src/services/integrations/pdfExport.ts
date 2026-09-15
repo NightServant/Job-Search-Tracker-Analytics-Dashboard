@@ -1,6 +1,6 @@
 import { generateHTML } from '@tiptap/html'
-import StarterKit from '@tiptap/starter-kit'
 import type { JSONContent } from '@tiptap/core'
+import { WORD_EDITOR_EXTENSIONS } from '@/components/cv/editorExtensions'
 
 /**
  * PDF export for the CV editor.
@@ -130,10 +130,30 @@ async function resolveExecutable(): Promise<{ executablePath: string; args: stri
   }
 }
 
+/**
+ * The document as HTML, split out so it can be tested without a browser.
+ *
+ * This is the half that actually broke in production: everything above it is
+ * a string template and everything below it is Chromium, but the schema this
+ * builds is derived from an extension list that has to match the editor's.
+ */
+export function renderDocumentHtml(content: unknown): string {
+  return generateHTML(content as JSONContent, WORD_EDITOR_EXTENSIONS)
+}
+
 export async function buildPdf(content: unknown, title: string): Promise<Uint8Array> {
-  // The Tiptap document, whose node types this does not model -- it renders
-  // whatever the editor saved rather than validating it.
-  const innerHtml = generateHTML(content as JSONContent, [StarterKit])
+  // THE EDITOR'S OWN EXTENSIONS, not a bare StarterKit. `generateHTML` builds
+  // a schema from this list and THROWS on anything the document uses that the
+  // list does not declare -- "There is no mark type textStyle in this schema"
+  // against a real CV, because the toolbar writes `textStyle` for every font
+  // and size change. StarterKit alone also silently loses highlight, sub- and
+  // superscript and text alignment, which is the quieter half of the same bug:
+  // a PDF that is missing the formatting the editor is showing.
+  //
+  // Sharing the list is what keeps the export honest. It is the same constant
+  // `WordResumeEditor` builds the editor from, so a formatting feature added
+  // there cannot render on screen and vanish from the PDF.
+  const innerHtml = renderDocumentHtml(content)
   const fullHtml = renderResumeHtml(innerHtml, title)
 
   const puppeteer = (await import('puppeteer-core')).default
