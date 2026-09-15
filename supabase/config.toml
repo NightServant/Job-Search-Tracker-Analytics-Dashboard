@@ -165,9 +165,26 @@ site_url = "env(SUPABASE_AUTH_SITE_URL)"
 # The public URL that Auth serves on. Defaults to the API external URL with `/auth/v1` appended.
 # external_url = ""
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
-# Both the deployed origin and localhost, so a push does not lock developers
-# out of their own OAuth round trip.
-additional_redirect_urls = ["env(SUPABASE_AUTH_SITE_URL)", "http://localhost:3000"]
+# EVERY ENTRY ENDS IN `/**`, AND THE BARE ORIGINS THAT USED TO BE HERE WERE
+# WRONG. These are matched as patterns against the WHOLE redirect URL, path
+# included, and the app sends `${origin}/dashboard` -- so a bare
+# `https://worktrack-jobs.vercel.app` matches nothing the app ever asks for.
+# It would have pushed cleanly and rejected every OAuth return.
+#
+# THE OLD DOMAIN IS LISTED ON PURPOSE. It still resolves, still serves, and is
+# what existing links point at; a Vercel project may hold several .vercel.app
+# domains at no cost. Dropping it here is the one genuinely breaking edit in
+# the whole rename.
+#
+# Hardcoded rather than `env(SUPABASE_AUTH_SITE_URL)` because this list has to
+# name MORE than the current site: the previous domain and localhost are not
+# derivable from it, and interpolating one origin is what silently reduced this
+# to a single entry before.
+additional_redirect_urls = [
+  "https://worktrack-jobs.vercel.app/**",
+  "https://job-search-tracker-analytics-dashbo-one.vercel.app/**",
+  "http://localhost:3000/**",
+]
 # How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
 jwt_expiry = 3600
 # JWT issuer URL. If not set, defaults to auth.external_url.
