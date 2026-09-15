@@ -52,8 +52,19 @@ function runsFrom(node: TipTapNode): TextRun[] {
     return [
       new TextRun({
         text: node.text,
-        bold: marks.has('bold'),
-        italics: marks.has('italic'),
+        // OMITTED WHEN ABSENT, NOT SET TO FALSE, and that distinction is the
+        // whole of a real bug: `bold: false` emits `<w:b w:val="false"/>` on
+        // the run, and a run-level property BEATS the paragraph style. Every
+        // heading was therefore un-bolded by its own text -- the style said
+        // bold, the run said "specifically not", and Word believes the run.
+        // Gabe: "Word documents missed the bold letters."
+        //
+        // Absent, the run inherits: body text from a document default that is
+        // not bold, a heading from a Heading style that is. There is no way to
+        // say "not bold inside a bold heading" any more, which is not a shape
+        // the editor can produce.
+        ...(marks.has('bold') ? { bold: true } : {}),
+        ...(marks.has('italic') ? { italics: true } : {}),
         // `w:sz` is half-points, which is what `size` takes as a number.
         ...(Number.isFinite(points) && points > 0 ? { size: Math.round(points * 2) } : {}),
       }),
@@ -295,7 +306,12 @@ function stylesFrom(doc: unknown): IStylesOptions | undefined {
 
   const heading = (size: number | null) => {
     const style = {
-      ...(size !== null ? { run: { size: halfPoints(size), bold: true } } : {}),
+      // BOLD REGARDLESS OF SIZE. It used to ride along with the size, so a
+      // document carrying no typography attributes -- which is every template,
+      // and every import that had none to read -- produced headings that were
+      // neither larger nor bolder than body text. The size is genuinely
+      // optional; a heading being bold is not.
+      run: { bold: true, ...(size !== null ? { size: halfPoints(size) } : {}) },
       ...(Object.keys(headingSpacing).length > 0
         ? { paragraph: { spacing: headingSpacing } }
         : {}),

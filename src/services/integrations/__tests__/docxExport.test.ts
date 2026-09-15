@@ -124,3 +124,76 @@ describe('exporting the Word CV', () => {
     expect(text).toContain('still here')
   })
 })
+
+/**
+ * Bold has to SURVIVE the trip, and the way it stopped was invisible from the
+ * outside: the file opened, the text was right, and every heading was light.
+ *
+ * `bold: false` on a run emits `<w:b w:val="false"/>`, and a run-level
+ * property BEATS the paragraph style in Word. So every heading was un-bolded
+ * by its own text -- the Heading style said bold, the run said "specifically
+ * not", and Word believes the run. Gabe: "Word documents missed the bold
+ * letters."
+ *
+ * Asserted on the XML because that is the contract. A test that only checked
+ * `buildDocx` returned bytes passed throughout the bug.
+ */
+describe('bold survives the Word export', () => {
+  async function documentXml(doc: unknown): Promise<string> {
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(Buffer.from(await buildDocx(doc, 'CV')))
+    return (await zip.file('word/document.xml')?.async('string')) ?? ''
+  }
+
+  function runFor(xml: string, text: string): string {
+    const runs = xml.match(/<w:r>[\s\S]*?<\/w:r>/g) ?? []
+    const run = runs.find((candidate) => candidate.includes(`>${text}<`))
+    return run ?? ''
+  }
+
+  const doc = {
+    type: 'doc',
+    content: [
+      { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'HEADING' }] },
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', marks: [{ type: 'bold' }], text: 'BOLDED' },
+          { type: 'text', text: 'PLAIN' },
+          { type: 'text', marks: [{ type: 'italic' }], text: 'SLANTED' },
+        ],
+      },
+    ],
+  }
+
+  it('never writes a bold override onto a heading run', async () => {
+    const run = runFor(await documentXml(doc), 'HEADING')
+    expect(run).not.toContain('w:val="false"')
+    // No run properties at all is the point: it inherits the Heading style.
+    expect(run).not.toContain('<w:b ')
+  })
+
+  it('still marks a genuinely bold run', async () => {
+    expect(runFor(await documentXml(doc), 'BOLDED')).toContain('<w:b/>')
+  })
+
+  it('leaves unmarked text to inherit rather than forcing it upright', async () => {
+    const run = runFor(await documentXml(doc), 'PLAIN')
+    expect(run).not.toContain('<w:b')
+    expect(run).not.toContain('<w:i')
+  })
+
+  it('still marks a genuinely italic run', async () => {
+    expect(runFor(await documentXml(doc), 'SLANTED')).toContain('<w:i/>')
+  })
+
+  it('makes the Heading styles bold even with no typography attributes', async () => {
+    // Templates carry no doc attrs at all, and the bold used to ride along
+    // with the heading SIZE -- so those documents got neither.
+    const JSZip = (await import('jszip')).default
+    const zip = await JSZip.loadAsync(Buffer.from(await buildDocx(doc, 'CV')))
+    const styles = (await zip.file('word/styles.xml')?.async('string')) ?? ''
+    const heading1 = /<w:style [^>]*w:styleId="Heading1"[\s\S]*?<\/w:style>/.exec(styles)?.[0] ?? ''
+    expect(heading1).toContain('<w:b/>')
+  })
+})
