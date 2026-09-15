@@ -98,7 +98,15 @@ export interface WordResumeEditorProps {
    * Optional, so the editor still mounts in a test with nothing wired -- the
    * tailor button then says what came back rather than throwing.
    */
-  onTailored?: (input: { title: string; content: ResumeContent; jobId: string }) => Promise<void>
+  /**
+   * Resolves with which write the route made, so the rail can say "opening the
+   * new document" only when the page is actually about to change.
+   */
+  onTailored?: (input: {
+    title: string
+    content: ResumeContent
+    jobId: string
+  }) => Promise<'created' | 'updated' | void>
 
   /**
    * WHAT KIND OF DOCUMENT THIS IS -- and therefore what the editor IS, not
@@ -706,7 +714,7 @@ export function WordResumeEditor({
           // changed nothing still writes no version, and the new-document path
           // pays only that same skipped check.
           await writeSnapshot({ force: true })
-          await onTailored(input)
+          return await onTailored(input)
         }
       : undefined,
   }

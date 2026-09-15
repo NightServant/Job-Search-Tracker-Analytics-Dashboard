@@ -171,7 +171,7 @@ function CvRoute() {
     title: string
     content: ResumeContent
     jobId: string
-  }) => {
+  }): Promise<'created' | 'updated'> => {
     // A NEW APPLICATION IS A NEW FILE; THE SAME ONE AGAIN IS A REWRITE.
     //
     // Every run used to create a document, which is right the first time and
@@ -204,7 +204,7 @@ function CvRoute() {
           patch: { content: input.content },
         })
         success('Tailored CV updated', 'Rewritten for the same application.')
-        return
+        return 'updated'
       }
 
       const created = await createResume.mutateAsync({
@@ -220,6 +220,7 @@ function CvRoute() {
       }
       success('Tailored CV created', `${input.title} is ready.`)
       router.push(`/cv?draft=${created.id}`)
+      return 'created'
     } catch (err) {
       // NOT "Tailoring failed" (found in review, 2026-09-13). The rewrite is
       // the expensive half and it succeeded; the rail says so in as many

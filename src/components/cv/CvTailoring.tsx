@@ -62,6 +62,14 @@ import { applySuggestions, tailoredTitle } from './applyTailoring'
 export type TailoringOutcome =
   /** Handed to `onTailored`; the route is creating the document and leaving. */
   | { kind: 'created' }
+  /**
+   * The route REWROTE the open document instead of adding one, because it had
+   * already been tailored for this application. Its own outcome because the
+   * two end differently: `created` navigates away, this one stays put, and
+   * telling someone a document is "opening" when the page is not going to
+   * change is how a control comes to look broken.
+   */
+  | { kind: 'updated' }
   /** Every suggestion missed. Deliberately NOT a new document -- see below. */
   | { kind: 'unchanged' }
   /**
@@ -154,7 +162,7 @@ export interface CvTailoringOptions {
     title: string
     content: ResumeContent
     jobId: string
-  }) => Promise<void>
+  }) => Promise<'created' | 'updated' | void>
   fetchImpl?: typeof fetch
 }
 
@@ -259,13 +267,20 @@ export function useCvTailoring(options: CvTailoringOptions): CvTailoringState {
       }
 
       try {
-        await options.onTailored({
+        const wrote = await options.onTailored({
           title: tailoredTitle(options.title ?? '', selectedJob?.company),
           content,
           jobId,
         })
-        handedOff = true
-        setOutcome({ kind: 'created' })
+        // `updated` stays on this page, so the rail is still mounted to show
+        // it; `created` navigates, and `handedOff` keeps the button disabled
+        // through the unmount rather than flickering back to life first.
+        handedOff = wrote !== 'updated'
+        setOutcome({ kind: wrote === 'updated' ? 'updated' : 'created' })
+        if (wrote === 'updated') {
+          runningRef.current = false
+          setRunning(false)
+        }
       } catch (err) {
         // The rewrite is not the part that failed, and saying "tailoring
         // failed" would send someone to re-run a request that costs allowance.
@@ -369,52 +384,14 @@ export function TailoringAnalysisRail({ state }: { state: CvTailoringState }) {
         )}
       </div>
 
-      {/* TWO: HOW IT SCORES. Read like the application record's third column
-          -- verdict in words, then the ring, then the two inventories -- from
-          the same `ui/ats-verdict` pieces, because one score with two
-          appearances is how two surfaces start disagreeing about a threshold.
-          `limit={12}`, not the record's 24: this is a 320px rail, and both
-          lists fold honestly with the count in the heading.
+      {/* TWO: THE REWRITE, AND IT SITS DIRECTLY UNDER THE PICKER.
 
-          MATCHED BEFORE MISSING, same as the record. The revision asked for
-          the matched list "for positive reinforcement", and a list of failures
-          above a list of wins reverses the point of showing them at all. */}
-      <div className="flex flex-col gap-4 border-t border-border-subtle pt-5">
-        {match === null ? (
-          <p className="text-body-s text-text-muted">
-            pick an application above to score this CV against its posting.
-          </p>
-        ) : (
-          <>
-            <AtsVerdict score={match.score} />
-            {/* Sizes itself by its CONTAINER rather than the viewport -- this
-                rail is 320px on the same wide screen where the record dialog
-                is roomy, and a viewport query cannot tell those apart. */}
-            <AtsDonut
-              score={match.score}
-              matched={match.matched.length}
-              missing={match.missing.length}
-              verdict={verdictFor(match.score)}
-            />
-            <AtsTermChips
-              label="matched"
-              tone="matched"
-              terms={match.matched}
-              limit={12}
-              emptyText="none of the posting’s terms appear in this CV yet."
-            />
-            <AtsTermChips
-              label="missing"
-              tone="missing"
-              terms={match.missing}
-              limit={12}
-              emptyText="none — every term in the posting shows up in this CV."
-            />
-          </>
-        )}
-      </div>
-
-      {/* THREE: THE REWRITE.
+          MOVED ABOVE THE SCORE (Gabe, 2026-09-15). The action used to come
+          after the verdict, the ring and two chip lists that fold at twelve
+          terms each -- so in a 320px rail the button was off the bottom of the
+          panel, and the reason to scroll was invisible from where you chose
+          the application. Picking a posting and tailoring against it is one
+          gesture; the score is what you read afterwards, or not at all.
 
           THE SUGGESTION LIST WAS HERE. Each rewrite came back as a
           before/after card with its own `apply` button that edited the open
@@ -425,9 +402,15 @@ export function TailoringAnalysisRail({ state }: { state: CvTailoringState }) {
           it was a "suggested summary" printed under the rewrites with no way
           to take it, which is a suggestion in the sense that a poster is. */}
       <div className="flex flex-col gap-3 border-t border-border-subtle pt-5">
+        {/* SAYS BOTH OUTCOMES, because there are two now. The old copy
+            promised "a new document" and that "the one you have open is left
+            exactly as it is", which stopped being true when re-tailoring the
+            same application started rewriting the open file instead of adding
+            a fourth copy of it. A control that misdescribes which document it
+            is about to write is worse than one that says nothing. */}
         <p className="text-body-s text-text-muted">
-          rewrites this CV against the posting and saves the result as a new document. the one
-          you have open is left exactly as it is.
+          rewrites this CV against the posting. the first run for an application saves a new
+          document; running it again for the same application updates that one.
         </p>
 
         <Button
@@ -476,6 +459,14 @@ export function TailoringAnalysisRail({ state }: { state: CvTailoringState }) {
           </p>
         )}
 
+        {outcome?.kind === 'updated' && (
+          // Stays on this page, so this is the only thing that tells the
+          // reader the run landed -- there is no navigation to notice.
+          <p role="status" className="text-body-s text-text-muted">
+            tailored — this document was rewritten for the same application.
+          </p>
+        )}
+
         {outcome?.kind === 'unsaved' && (
           <p role="status" className="text-body-s text-text-muted">
             {outcome.count} rewrites came back, but this editor has nowhere to save a new
@@ -483,6 +474,51 @@ export function TailoringAnalysisRail({ state }: { state: CvTailoringState }) {
           </p>
         )}
       </div>
+      {/* THREE: HOW IT SCORES. Read like the application record's third column
+          -- verdict in words, then the ring, then the two inventories -- from
+          the same `ui/ats-verdict` pieces, because one score with two
+          appearances is how two surfaces start disagreeing about a threshold.
+          `limit={12}`, not the record's 24: this is a 320px rail, and both
+          lists fold honestly with the count in the heading.
+
+          MATCHED BEFORE MISSING, same as the record. The revision asked for
+          the matched list "for positive reinforcement", and a list of failures
+          above a list of wins reverses the point of showing them at all. */}
+      <div className="flex flex-col gap-4 border-t border-border-subtle pt-5">
+        {match === null ? (
+          <p className="text-body-s text-text-muted">
+            pick an application above to score this CV against its posting.
+          </p>
+        ) : (
+          <>
+            <AtsVerdict score={match.score} />
+            {/* Sizes itself by its CONTAINER rather than the viewport -- this
+                rail is 320px on the same wide screen where the record dialog
+                is roomy, and a viewport query cannot tell those apart. */}
+            <AtsDonut
+              score={match.score}
+              matched={match.matched.length}
+              missing={match.missing.length}
+              verdict={verdictFor(match.score)}
+            />
+            <AtsTermChips
+              label="matched"
+              tone="matched"
+              terms={match.matched}
+              limit={12}
+              emptyText="none of the posting’s terms appear in this CV yet."
+            />
+            <AtsTermChips
+              label="missing"
+              tone="missing"
+              terms={match.missing}
+              limit={12}
+              emptyText="none — every term in the posting shows up in this CV."
+            />
+          </>
+        )}
+      </div>
+
     </PanelSection>
   )
 }

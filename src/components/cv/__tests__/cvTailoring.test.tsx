@@ -62,7 +62,11 @@ function Harness({
   fetchImpl?: typeof fetch
   content?: ResumeContent
   title?: string
-  onTailored?: (input: { title: string; content: ResumeContent }) => Promise<void>
+  onTailored?: (input: {
+    title: string
+    content: ResumeContent
+    jobId: string
+  }) => Promise<'created' | 'updated' | void>
 }) {
   // THE SELECTION LIVES OUTSIDE THE HOOK SINCE 2026-09-14, so the harness
   // holds it -- which is exactly what `WordResumeEditor` does. It moved out
@@ -267,5 +271,43 @@ describe('the tailoring section', () => {
     await user.click(screen.getByRole('button', { name: /tailor this cv/i }))
 
     expect(await screen.findByText(/nowhere to save a new document/i)).toBeTruthy()
+  })
+})
+
+
+/**
+ * The action sits under the picker, not under the score.
+ *
+ * ORDER IS THE WHOLE POINT OF THIS ONE (Gabe, 2026-09-15). The button used to
+ * come after the verdict, the ring and two chip lists that fold at twelve
+ * terms each, which in a 320px rail put it off the bottom of the panel -- the
+ * reason to scroll was invisible from where you picked the application.
+ * Asserted on DOM ORDER rather than by eye, because a reorder is exactly the
+ * kind of change a later edit undoes without noticing.
+ */
+describe('the tailoring rail puts the action under the picker', () => {
+  it('renders the rewrite copy and button before the score', async () => {
+    const user = userEvent.setup()
+    render(<Harness cvText="Shipped the rewrite" />)
+    await pickApplication(user, /initech/i)
+
+    const button = await screen.findByRole('button', { name: /tailor this cv/i })
+    const blurb = screen.getByText(/rewrites this CV against the posting/i)
+    // The score section: "matched" labels both the chip heading and the donut
+    // legend, so take the first occurrence -- any of them is after the button.
+    const matched = (await screen.findAllByText(/matched/i))[0]
+
+    // `compareDocumentPosition` reads DOM order: FOLLOWING means the score
+    // comes after, which is the arrangement being pinned.
+    expect(blurb.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(button.compareDocumentPosition(matched) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('does not promise a new document, since re-tailoring rewrites this one', () => {
+    render(<Harness cvText="Shipped the rewrite" />)
+    // The old copy said the open document "is left exactly as it is", which
+    // stopped being true for a re-tailor of the same application.
+    expect(screen.queryByText(/left exactly as it is/i)).toBeNull()
+    expect(screen.getByText(/running it again for the same application updates that one/i)).toBeTruthy()
   })
 })
