@@ -199,6 +199,53 @@ describe('the landing carousel slide', () => {
     ])
   })
 
+  it('draws the pagination dot separately from its touch target', () => {
+    /*
+      "Tall weird dots" (Gabe, 2026-09-15): on a touch device the five dots
+      rendered as 7x44 pill-shaped BARS.
+
+      The cause is the touch-target floor elsewhere in this stylesheet --
+      `@media (pointer: coarse) { button:not([data-icon-button]) { min-height:
+      44px } }` -- which is correct, and which these are subject to because
+      Swiper's `renderBullet` makes them <button>s. While the dot WAS the
+      button, growing the target grew the dot.
+
+      IT CANNOT BE REPRODUCED BY RESIZING A DESKTOP BROWSER, which is why it
+      survived several passes of looking at the carousel on a narrow viewport.
+      The rule keys off the input DEVICE, not the width. That is also why this
+      test reads the stylesheet rather than rendering: jsdom has no pointer
+      type either, so a render-based test would be just as blind.
+
+      The invariant is the split: the button paints nothing, the `::before`
+      is the circle. Re-adding a background or a radius to the button is
+      exactly the bug.
+    */
+    const css = readFileSync(CSS, 'utf8')
+    const rule = css.match(/\.landing-carousel-dot \{([^}]*)\}/)
+    expect(rule, 'no .landing-carousel-dot rule found').not.toBeNull()
+    expect(rule![1], 'the button must paint nothing -- the ::before is the dot').not.toMatch(
+      /background:\s*var\(--color/
+    )
+    expect(rule![1], 'a radius on the button is what made it a pill when stretched').not.toContain(
+      'border-radius'
+    )
+
+    const before = css.match(/\.landing-carousel-dot::before \{([^}]*)\}/)
+    expect(before, 'the dot itself must be drawn by ::before').not.toBeNull()
+    expect(before![1]).toContain('border-radius')
+    expect(before![1]).toMatch(/height:\s*7px/)
+
+    // And the target needs width on touch: the floor only sets height, so
+    // without this it is 7px wide and 44 tall -- no easier to hit than before.
+    //
+    // 24px is WCAG 2.5.8 (AA). A square 44 (2.5.5, AAA) was tried and put the
+    // dots 52px apart, which reads as five controls rather than one indicator.
+    const coarse = css.match(/@media \(pointer: coarse\) \{\s*\.landing-carousel-dot \{\s*min-width:\s*(\d+)px/)
+    expect(coarse, 'no coarse-pointer width for the dot target').not.toBeNull()
+    expect(Number(coarse![1]), 'below the WCAG 2.5.8 minimum').toBeGreaterThanOrEqual(24)
+    expect(Number(coarse![1]), 'wide enough to space the dots apart visibly').toBeLessThan(44)
+  })
+
   it('fits the whole screenshot rather than cropping it', () => {
     // object-cover is what turned the ratio drift into a silent 28% crop.
     // contain fails visibly instead, which is the behaviour worth keeping even
