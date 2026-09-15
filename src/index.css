@@ -1439,6 +1439,41 @@ body,
   animation: icon-refuse var(--duration-base) var(--ease-standard) 1;
 }
 
+/* THE ONE CONTINUOUS ICON MOTION, and it is the exception the two above are
+   the rule for. `settle` and `refuse` each run ONCE: they comment on
+   something that just happened. This one has to keep going, because what it
+   says -- "still working" -- stays true for as long as it is on screen.
+
+   A STATIC GLYPH IS THE PROBLEM IT SOLVES. `StatusState`'s loading preset had
+   no motion at all, so every loading surface in the app showed a clock face
+   sitting perfectly still. That is indistinguishable from a page that has
+   given up, which is exactly the impression a loading state exists to
+   prevent.
+
+   BREATHING RATHER THAN SPINNING. The preset's glyph is a clock, and rotating
+   a clock face reads as time flying rather than as work in progress. Opacity
+   with a touch of scale works on any glyph the preset might use later, and
+   both properties are compositor-only so a loading screen cannot reflow
+   whatever is behind it.
+
+   1600ms, slower than the 1200ms skeleton pulse on purpose -- a full-screen
+   state should feel calm, and the two are never on screen together anyway. */
+.icon-breathe {
+  animation: icon-breathe 1600ms var(--ease-standard) infinite;
+}
+
+@keyframes icon-breathe {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.45;
+    transform: scale(0.94);
+  }
+}
+
 @keyframes icon-settle {
   0% {
     transform: scale(1);
@@ -1467,7 +1502,11 @@ body,
 
 @media (prefers-reduced-motion: reduce) {
   .icon-settle,
-  .icon-refuse {
+  .icon-refuse,
+  /* `breathe` too: a glyph pulsing forever is a repeating animation, which is
+     the whole category this setting turns off. The state's two sentences say
+     the same thing without it. */
+  .icon-breathe {
     animation: none;
   }
 }

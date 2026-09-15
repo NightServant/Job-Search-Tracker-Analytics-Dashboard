@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useAuthHeld } from './authHold'
+import { StatusState } from '@/components/ui/status-state'
 
 /**
  * Holds an auth form back until it is known that the visitor needs one.
@@ -64,10 +65,44 @@ export function SignedOutOnly({ children }: { children: React.ReactNode }) {
   // redirect was only half the reason it was never seen. See ./authHold.
   if (held) return <>{children}</>
 
-  // Known to be signed in: the redirect is already in flight and a sign-in form
-  // is never the right thing to have on screen. Anything else -- signed out, or
-  // not yet known -- renders, which is what keeps the server render intact.
-  if (user) return null
+  /*
+    SIGNED IN AND STILL ON AN AUTH ROUTE MEANS A HANDOFF IS IN FLIGHT, and
+    what goes here used to be `return null`.
+
+    THAT NULL WAS THE BLANK PAGE. Gabe recorded a real sign-in on 2026-09-15:
+    the form is pressed, and roughly 900ms of PURE WHITE sits between it and
+    the dashboard. This line is where the white came from. `signIn` resolves,
+    `onAuthStateChange` sets `user`, and this component empties the entire
+    /login document -- while `router.push('/dashboard')` is still fetching the
+    next route. Rendering nothing was correct about the FORM and wrong about
+    the PAGE.
+
+    Confirmed rather than assumed: server-rendering the (auth) layout with a
+    user present produced zero visible characters.
+
+    IT COVERS EVERY AUTH ROUTE AT ONCE, which is why the fix belongs here
+    rather than in the sign-in page. /login, /signup and /forgot-password all
+    mount this, and all three end by creating a session and navigating. A fix
+    in one page would have left the other two blanking.
+
+    NOT the form, and not a skeleton of the dashboard either. The form is the
+    thing that must go -- it is answered, and leaving it up invites a second
+    submit. A dashboard skeleton would be a promise about a specific
+    destination this component cannot see: /signup goes on to a thank-you,
+    and a reset goes to a password field.
+  */
+  if (user) {
+    return (
+      <div className="grid min-h-screen place-items-center bg-bg-canvas px-gutter">
+        <StatusState
+          kind="loading"
+          titleAs="h1"
+          title="signing you in"
+          message="One moment while we get your account ready."
+        />
+      </div>
+    )
+  }
 
   return <>{children}</>
 }

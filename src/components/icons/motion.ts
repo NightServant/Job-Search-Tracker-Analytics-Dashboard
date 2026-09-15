@@ -166,6 +166,24 @@ export const ICON_STATE_MOTION = {
   refuse: 'icon-refuse',
 } as const
 
+/*
+  `icon-breathe` IS DELIBERATELY NOT IN THE MAP ABOVE, and the omission is the
+  design decision.
+
+  It was added there first, and `iconMotion.test` rejected it: every entry in
+  this vocabulary must run exactly once, because the brief's rule is "avoid
+  continuous or distracting animations" and one `infinite` here is an error
+  icon shaking forever. The test was right.
+
+  These two are STATE COMMENTARY -- they remark on something that has just
+  happened to settled content, and they stop. A loading indicator is a
+  different category: it describes a condition that is still true, so it has
+  to repeat, and the app already accepts that elsewhere (`animate-pulse` on
+  skeletons, `CssSpinner` in buttons) without ever calling it state
+  commentary. `StatusState` applies `icon-breathe` directly for `kind
+  === 'loading'`; see there.
+*/
+
 /**
  * NO STROKE-DRAWING VARIANT, and that is a limit rather than an omission.
  *

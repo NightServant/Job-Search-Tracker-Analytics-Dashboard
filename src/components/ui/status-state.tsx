@@ -287,7 +287,26 @@ export function StatusState({
         className={cn(
           TONE_CLASS[preset.tone],
           '[&_svg]:size-12',
-          preset.motion && ICON_STATE_MOTION[preset.motion]
+          preset.motion && ICON_STATE_MOTION[preset.motion],
+          /*
+            THE ONE CONTINUOUS MOTION, and it is applied here rather than
+            through `preset.motion` on purpose. `ICON_STATE_MOTION` is state
+            COMMENTARY -- each of its entries remarks on something that just
+            happened and stops -- and `iconMotion.test` enforces that every
+            entry runs exactly once, because the brief's rule is "avoid
+            continuous or distracting animations". Putting `breathe` in that
+            map failed it, correctly.
+
+            `loading` is the one kind whose condition is still true for as
+            long as it is on screen, so it is the one that has to repeat. It
+            is the same category as the skeleton pulse and the button
+            spinner, neither of which lives in that vocabulary either.
+
+            Without it this drew a clock face sitting perfectly still, which
+            is indistinguishable from a page that has given up -- the exact
+            impression a loading state exists to prevent.
+          */
+          kind === 'loading' && 'icon-breathe'
         )}
       />
 
