@@ -10,15 +10,14 @@ import { buildPdf } from '@/services/integrations/pdfExport'
  * Chromium against a runtime capped at 256MB of memory and 20MB of bundle, so
  * it was never deployable and never deployed. The browser called a function
  * that did not exist, and the platform's 404 fails CORS preflight -- which
- * surfaces as a TypeError with no status to report. See `pdfExport` for the
- * measurements.
+ * surfaces as a TypeError with no status to report.
  *
- * `runtime = 'nodejs'`, and `maxDuration` because this one is genuinely slow:
- * a cold start pays for extracting and booting Chromium before it renders
- * anything. The other two exports are pure computation and need neither.
+ * `runtime = 'nodejs'`, and NO `maxDuration`: `buildPdf` lays the document out
+ * in JavaScript rather than booting a browser, so it is the same order of work
+ * as the docx and latex exports beside it. See `pdfExport` for why there is no
+ * browser here any more.
  */
 export const runtime = 'nodejs'
-export const maxDuration = 120
 
 /** A CV is a few pages of JSON. Matches `/api/cv/docx`. */
 const MAX_BYTES = 2_000_000

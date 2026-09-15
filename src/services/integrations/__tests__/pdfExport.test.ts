@@ -1,87 +1,127 @@
 import { describe, it, expect } from 'vitest'
-import { renderDocumentHtml, renderResumeHtml } from '../pdfExport'
+import { buildPdf, faceFor, styleForMarks, toPoints } from '../pdfExport'
 
 /**
- * The page geometry and the one value on it that is not already markup.
+ * The mapping, not the bytes.
  *
- * `buildPdf` itself is not tested here: it boots Chromium, which is not a unit
- * test, and the part that can go quietly wrong is the HTML handed to it. The
- * rendering was verified by hand against a real browser when it moved off the
- * edge function -- Letter, 0.8in padding, Times.
+ * `buildPdf` produces a PDF and reading one back to find out whether bold
+ * survived is a test nobody writes twice -- so the pieces that decide what a
+ * run of text looks like are asserted directly, and `buildPdf` itself is
+ * checked only for "it produced a PDF and did not throw".
  */
-describe('renderResumeHtml', () => {
-  it('escapes the title instead of pasting it into the document', () => {
-    // NOT HYPOTHETICAL PEDANTRY: the edge function this replaced dropped the
-    // title into `<title>` raw, so a CV named `</title><script>` wrote a
-    // script tag into a page the server then opened in a browser. Small blast
-    // radius -- their own document -- but the rule at a trust boundary does
-    // not bend for size.
-    const html = renderResumeHtml('<p>body</p>', 'CV </title><script>alert(1)</script>')
-    expect(html).not.toContain('<script>')
-    expect(html).toContain('&lt;script&gt;')
+describe('toPoints', () => {
+  it.each([
+    ['11pt', 11],
+    ['14px', 10.5],
+    ['1rem', 12],
+    ['11', 11],
+  ])('reads %s as %s points', (input, expected) => {
+    expect(toPoints(input)).toBe(expected)
   })
 
-  it('escapes the ampersand first, so an entity cannot be smuggled through', () => {
-    // `&lt;` written by the user must survive as text, not decode into `<`.
-    expect(renderResumeHtml('', 'R&D &lt;b&gt;')).toContain('R&amp;D &amp;lt;b&amp;gt;')
-  })
-
-  it('keeps the page geometry the layout was tuned for', () => {
-    const html = renderResumeHtml('<p>body</p>', 'CV')
-    expect(html).toContain('size: Letter')
-    expect(html).toContain('width: 8.5in')
-    expect(html).toContain('padding: 0.8in')
-  })
-
-  it('places the document body inside the page', () => {
-    expect(renderResumeHtml('<h1>Name</h1>', 'CV')).toMatch(/<main class="page">\s*<h1>Name<\/h1>/)
+  it('returns undefined rather than NaN for a size it cannot read', () => {
+    // A NaN fontSize renders a line at the wrong size instead of failing, and
+    // it is only visible next to the rest of the CV.
+    expect(toPoints('inherit')).toBeUndefined()
+    expect(toPoints(undefined)).toBeUndefined()
+    expect(toPoints(12)).toBe(12)
   })
 })
 
 /**
- * The schema the document is parsed against has to be the editor's.
- *
- * SHIPPED BROKEN AND CAUGHT IN PRODUCTION (2026-09-15). The first version
- * passed a bare `StarterKit` to `generateHTML`, which builds a schema without
- * `textStyle` -- a mark the toolbar writes for every font and size change. The
- * route answered 500 "Could not build the PDF" on a real CV and the log said
- * `RangeError: There is no mark type textStyle in this schema`. A fixture made
- * of plain headings and paragraphs passed the whole way; only a document
- * carrying the editor's own marks fails, which is why the fixture below has
- * them.
+ * The four Times faces are one family to a reader and four names here:
+ * `@react-pdf/renderer` selects a face by NAME, not by fontWeight/fontStyle.
  */
-describe('renderDocumentHtml uses the editor schema', () => {
-  const marked = {
+describe('faceFor', () => {
+  it.each([
+    [false, false, 'Times-Roman'],
+    [true, false, 'Times-Bold'],
+    [false, true, 'Times-Italic'],
+    [true, true, 'Times-BoldItalic'],
+  ])('bold=%s italic=%s -> %s', (bold, italic, expected) => {
+    expect(faceFor(bold, italic)).toBe(expected)
+  })
+})
+
+describe('styleForMarks', () => {
+  it('carries bold, italic, underline and strike', () => {
+    expect(styleForMarks([{ type: 'bold' }, { type: 'italic' }]).fontFamily).toBe('Times-BoldItalic')
+    expect(styleForMarks([{ type: 'underline' }]).textDecoration).toBe('underline')
+    expect(styleForMarks([{ type: 'strike' }]).textDecoration).toBe('line-through')
+    expect(styleForMarks([{ type: 'underline' }, { type: 'strike' }]).textDecoration).toBe(
+      'line-through underline'
+    )
+  })
+
+  /**
+   * FOUND BY LOOKING AT THE OUTPUT (2026-09-15). Every heading rendered
+   * upright. Each run of text is its own <Text> nested inside the block's
+   * <Text>, and a nested `fontFamily` WINS -- so a heading styled Times-Bold
+   * lost its weight the moment its own text run named Times-Roman, which is
+   * every heading with no bold mark on it. The block passes its weight down.
+   */
+  it('keeps the block weight when the run itself is unmarked', () => {
+    expect(styleForMarks(undefined, true).fontFamily).toBe('Times-Bold')
+    expect(styleForMarks([{ type: 'italic' }], true).fontFamily).toBe('Times-BoldItalic')
+    expect(styleForMarks(undefined, false).fontFamily).toBe('Times-Roman')
+  })
+
+  it('reads size and colour off textStyle, which is what the toolbar writes', () => {
+    const style = styleForMarks([
+      { type: 'textStyle', attrs: { fontSize: '13pt', color: '#ff0000' } },
+    ])
+    expect(style.fontSize).toBe(13)
+    expect(style.color).toBe('#ff0000')
+  })
+
+  it('gives an uncoloured highlight a colour, since null means the default', () => {
+    expect(styleForMarks([{ type: 'highlight', attrs: { color: null } }]).backgroundColor).toBe(
+      '#fef08a'
+    )
+    expect(styleForMarks([{ type: 'highlight', attrs: { color: '#ffff00' } }]).backgroundColor).toBe(
+      '#ffff00'
+    )
+  })
+})
+
+describe('buildPdf', () => {
+  const doc = {
     type: 'doc',
     content: [
+      { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Name' }] },
       {
         type: 'paragraph',
+        attrs: { textAlign: 'right' },
         content: [
           {
             type: 'text',
-            marks: [
-              { type: 'textStyle', attrs: { fontFamily: 'Calibri', fontSize: '11pt' } },
-              { type: 'bold' },
-            ],
-            text: 'Senior Frontend Engineer',
+            marks: [{ type: 'textStyle', attrs: { fontSize: '11pt' } }, { type: 'bold' }],
+            text: 'Role',
           },
-          { type: 'text', marks: [{ type: 'highlight', attrs: { color: '#ffff00' } }], text: 'a11y' },
+        ],
+      },
+      {
+        type: 'bulletList',
+        content: [
+          { type: 'listItem', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Did a thing.' }] }] },
         ],
       },
     ],
   }
 
-  it('renders a document carrying the editor marks instead of throwing', () => {
-    expect(() => renderDocumentHtml(marked)).not.toThrow()
+  it('produces a PDF', async () => {
+    const pdf = await buildPdf(doc, 'CV')
+    expect(Buffer.from(pdf.slice(0, 5)).toString()).toBe('%PDF-')
+    expect(pdf.length).toBeGreaterThan(500)
   })
 
-  it('keeps the formatting rather than dropping it silently', () => {
-    // The quieter half of the same bug: an extension list that merely omits a
-    // mark loses the formatting without an error, so the PDF disagrees with
-    // what the editor is showing.
-    const html = renderDocumentHtml(marked)
-    expect(html).toContain('Calibri')
-    expect(html).toContain('<strong>')
-    expect(html).toContain('<mark')
+  it('does not throw on an empty or unmapped document', async () => {
+    // A node type this does not model is skipped, not fatal -- the export must
+    // not die on a document the editor was perfectly happy to save.
+    await expect(buildPdf({ type: 'doc', content: [] }, 'CV')).resolves.toBeDefined()
+    await expect(
+      buildPdf({ type: 'doc', content: [{ type: 'horizontalRule' }, { type: 'table' }] }, 'CV')
+    ).resolves.toBeDefined()
+    await expect(buildPdf({}, 'CV')).resolves.toBeDefined()
   })
 })
