@@ -524,15 +524,21 @@ describe('snapshots survive the autosave that precedes them', () => {
 })
 
 describe('PDF export does not paper over a failed save', () => {
-  // Export saves first and then posts the same content to the edge function.
+  // Export saves first and then posts the same content to `/api/cv/pdf`.
   // Both halves are asserted so the negative case cannot pass for some
   // unrelated reason -- an absent session used to stop the request anyway.
+  //
+  // THROUGH `authedFetch` SINCE 2026-09-15, not `global.fetch`. PDF export
+  // used to call a Supabase edge function directly, and that function launched
+  // Chromium against a runtime capped at 256MB and a 20MB bundle -- so it was
+  // never deployable, never deployed, and every press ended in "Failed to
+  // fetch". It is a Next route beside the docx and latex exports now.
   function exportFetch() {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       blob: vi.fn().mockResolvedValue(new Blob(['%PDF'], { type: 'application/pdf' })),
     })
-    global.fetch = fetchMock
+    authedFetchMock.mockImplementation(fetchMock)
     return fetchMock
   }
 
@@ -565,7 +571,7 @@ describe('PDF export does not paper over a failed save', () => {
       fireEvent.click(screen.getByRole('button', { name: /export pdf/i }))
     })
     expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining('/functions/v1/resume-export-pdf'),
+      '/api/cv/pdf',
       expect.objectContaining({ method: 'POST' })
     )
   })

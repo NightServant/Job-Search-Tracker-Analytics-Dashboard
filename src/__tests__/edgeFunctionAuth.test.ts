@@ -50,15 +50,18 @@ describe('edge function authentication', () => {
   // POSITIVE COMPANION, and not a formality: every assertion below is inside a
   // loop over this list, so a glob that silently matched nothing -- a renamed
   // directory, a moved functions root -- would turn the whole suite green
-  // while checking zero files. Naming the four also means DELETING one is a
-  // deliberate edit here rather than a silent reduction in coverage.
+  // while checking zero files. Naming them also means DELETING one is a
+  // deliberate edit here rather than a silent reduction in coverage -- which
+  // is what this line is: `resume-export-pdf` left on 2026-09-15. It launched
+  // headless Chromium against a runtime capped at 256MB of memory and a 20MB
+  // bundle, so it was never deployable and never deployed; PDF export is
+  // `/api/cv/pdf` now, beside the docx and latex routes.
   it('finds every function that is expected to exist', () => {
     const names = edgeFunctions().map((fn) => fn.name).sort()
     expect(names).toEqual([
       'analytics-cache-proxy',
       'cv-render',
       'job-url-autofill',
-      'resume-export-pdf',
     ])
   })
 

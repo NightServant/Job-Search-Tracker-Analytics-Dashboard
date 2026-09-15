@@ -2,8 +2,6 @@
 
 import { useState } from 'react'
 import type { Editor } from '@tiptap/core'
-import { supabase } from '@/lib/supabase'
-import { readSupabaseConfig, currentEnvSource } from '@/lib/env'
 import { useToast } from '@/contexts/ToastContext'
 
 /**
@@ -82,28 +80,29 @@ export function useResumeExport({
     if (!editor) return
     setIsExportingPdf(true)
     try {
+      // SAVED FIRST, unlike the other two. A PDF is the artefact people
+      // actually send, so it must not be built from text that is still only in
+      // the editor -- and a failed save means the document and the export
+      // would disagree.
       if (!(await saveDraft(false))) return
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      if (!session?.access_token) throw new Error('No active session found')
-      const { url: supabaseUrl, anonKey: supabaseAnonKey } = readSupabaseConfig(currentEnvSource())
-      const response = await fetch(`${supabaseUrl}/functions/v1/resume-export-pdf`, {
+      // `/api/cv/pdf`, not a Supabase edge function: the function this used to
+      // call launched Chromium against a 256MB, 20MB-bundle runtime and was
+      // therefore never deployed, so every press ended in "Failed to fetch"
+      // with no status behind it. Same route shape as the other two exports.
+      const response = await authedFetch('/api/cv/pdf', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-          apikey: supabaseAnonKey,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title: title.trim() || 'Untitled CV', content: editor.getJSON() }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.trim() || 'CV', content: editor.getJSON() }),
       })
-      if (!response.ok) throw new Error((await response.text()) || `Export failed (${response.status})`)
-      const blob = await response.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${safeFileName(title)}.pdf`
-      a.click()
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || `Export failed (${response.status})`)
+      }
+      const url = URL.createObjectURL(await response.blob())
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${safeFileName(title)}.pdf`
+      anchor.click()
       URL.revokeObjectURL(url)
       success('PDF ready', 'Your CV PDF has been downloaded.')
     } catch (err) {
