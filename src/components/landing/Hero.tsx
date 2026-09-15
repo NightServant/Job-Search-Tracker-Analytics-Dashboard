@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button-variants'
 import { ExternalIcon } from '@/components/icons'
 import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { HeroMedia } from './HeroMedia'
+import { HeroScrollCue } from './HeroScrollCue'
 import { HERO } from './content'
 
 /**
@@ -56,9 +57,10 @@ import { HERO } from './content'
  * h-full the hero letterboxed itself, leaving a ~39px band of page background
  * above and below the dark media on every pinned frame.
  *
- * Content sits in the same 1200px container as every section below it, so the
- * headline starts on the same vertical line as every heading on the page.
- * Before that it used its own `px-16` and lined up with nothing.
+ * Content sits in the same `max-w-wide` container as every section below it,
+ * so the headline starts on the same vertical line as every heading on the
+ * page. Before that it used its own `px-16` and lined up with nothing. The
+ * container was 1200 until 2026-09-15; see Section for why it is 1440 now.
  */
 export interface HeroProps {
   posterSrc: string
@@ -72,7 +74,21 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
     <section
       id="hero"
       data-landing-section="hero"
-      className="relative isolate flex h-full min-h-[88svh] flex-col justify-center overflow-hidden px-gutter pb-24 pt-32 md:pb-32 md:pt-40 lg:min-h-[92svh]"
+      /*
+        `pb-40 md:pb-48` -- 160/192px -- and the extra 64px over the old
+        `pb-24 md:pb-32` is RESERVED FOR THE SCROLL CUE rather than being air.
+        The cue is absolutely positioned and reaches 160px up from the bottom
+        edge; the content is centred between this padding and `pt-32`, so it
+        can never come closer to the bottom than the padding does. Keeping the
+        padding at or above the cue's reach is what makes a collision between
+        the two impossible instead of merely unlikely on the viewport somebody
+        happened to test. See HeroScrollCue.
+
+        It also reads better: with `justify-center` a larger bottom padding
+        lifts the headline and the CTA slightly, which leaves the lower third
+        of the hero to the footage and the cue rather than crowding all three.
+      */
+      className="relative isolate flex h-full min-h-[88svh] flex-col justify-center overflow-hidden px-gutter pb-40 pt-32 md:pb-48 md:pt-40 lg:min-h-[92svh]"
     >
       <HeroMedia posterSrc={posterSrc} videoSrc={videoSrc} paused={unpinned} />
 
@@ -90,7 +106,7 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
         do about it -- and the button's `pt-2` lifts the ask clear of the
         sentence that earns it.
       */}
-      <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-wide flex-col gap-6">
         <div className="flex flex-col gap-3">
           <p className="text-label-caps uppercase text-accent-400">{HERO.eyebrow}</p>
           <h1 className="max-w-4xl text-display-xl text-ink-50">{HERO.headline}</h1>
@@ -127,6 +143,21 @@ export function Hero({ posterSrc, videoSrc, unpinned = false }: HeroProps) {
           </Link>
         </div>
       </div>
+
+      {/*
+        THE SCROLL CUE, and it is a SIBLING of the content column rather than
+        the last child of it. The column is `max-w-wide mx-auto`, so a cue
+        inside it would centre on the COLUMN and land left of the section's own
+        middle at any viewport wider than 1200 + gutters. It is also absolutely
+        positioned against the section, which the column is not.
+
+        It reuses `unpinned` rather than taking a scroll position of its own:
+        the hero already receives one boolean meaning "the reader has moved on",
+        and the background video's pause reads the same one. Two components
+        deriving the same fact independently is the defect this page has a
+        standing rule against -- see LandingNavbar's `overHero`.
+      */}
+      <HeroScrollCue hidden={unpinned} />
     </section>
   )
 }

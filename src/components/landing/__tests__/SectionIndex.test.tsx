@@ -60,18 +60,18 @@ describe('SectionIndex', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  // 2xl (1440), not lg. At 1024-1439 the 1200px container leaves no usable
-  // margin -- none at all at 1024, 40px at 1280 -- so the fixed furniture
-  // overlapped the content on every small laptop. Both halves of the pair move
-  // together; see SectionRail's docblock.
-  it('is hidden below 2xl, where there is no margin to live in', () => {
+  // 1640, not lg and no longer 2xl. The furniture lives in the margin the
+  // page's container leaves, so the threshold is arithmetic on that width --
+  // it moved with the container on 2026-09-15. Both halves of the pair move
+  // together; see SectionRail's docblock for the working.
+  it('is hidden until the container leaves a margin to live in', () => {
     render(<SectionIndex sections={SECTIONS} activeId="hero" />)
     expect(el().className).toContain('hidden')
-    expect(el().className).toContain('2xl:block')
+    expect(el().className).toContain('min-[1640px]:block')
   })
 
   /**
-   * Between 1440 and 1560 this reduces to the section NAME -- the counter and
+   * Between 1640 and 1800 this reduces to the section NAME -- the counter and
    * the rule that separates them both drop out.
    *
    * The existing assertions in this file all still pass with the counter
@@ -79,7 +79,7 @@ describe('SectionIndex', () => {
    * layout to notice. So without this the behaviour is unpinned: a later edit
    * could delete the responsive classes and every test here would stay green.
    *
-   * The threshold is `min-[1560px]`, shared with SectionRail's labels rather
+   * The threshold is `min-[1800px]`, shared with SectionRail's labels rather
    * than chosen again here. These two are a matched pair in opposite margins,
    * and the failure mode of picking a second number is a page that is visibly
    * lopsided for a band of widths -- which is the exact bug this pass started
@@ -93,17 +93,17 @@ describe('SectionIndex', () => {
     const counter = (document.querySelector('[data-section-index-position]') as HTMLElement)
       .parentElement as HTMLElement
     expect(counter.className.split(' ')).toContain('hidden')
-    expect(counter.className).toContain('min-[1560px]:block')
+    expect(counter.className).toContain('min-[1800px]:block')
 
     const rule = document.querySelector('[data-section-index-rule]') as HTMLElement
     expect(rule.className.split(' ')).toContain('hidden')
-    expect(rule.className).toContain('min-[1560px]:block')
+    expect(rule.className).toContain('min-[1800px]:block')
 
     // The name is the half that survives: it is the only place on the page
     // that states the current section outright, where position is already
     // shown as six dots by the rail opposite.
     const name = document.querySelector('[data-section-index-label]') as HTMLElement
     expect(name.className.split(' ')).not.toContain('hidden')
-    expect(name.className).not.toContain('min-[1560px]:')
+    expect(name.className).not.toContain('min-[1800px]:')
   })
 })

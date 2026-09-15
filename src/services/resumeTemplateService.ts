@@ -22,6 +22,90 @@ import type { ResumeMode } from './resumeService'
  * Anything that writes a template's `content` straight to the database without
  * going through that function ships raw `{{name|Your Name}}` to a person.
  */
+/**
+ * WHY EVERY TEMPLATE NOW CARRIES `attrs` ON ITS `doc` NODE, and what the
+ * numbers in them are for.
+ *
+ * Gabe, 2026-09-15: "CV and Cover Letter templates felt the same. Implement
+ * different typography, spacing, and format in every template to feel distinct
+ * to each other." He was describing something literally true rather than an
+ * impression. Fingerprinted before the change, all eleven templates had:
+ * NO `attrs` at all, an `h1` followed by `h2` sections, and no alignment, no
+ * rules and no per-block spacing anywhere. The only thing separating them was
+ * the wording and the number of sections. Six CVs rendered in one face, at one
+ * size, at one leading, on one page -- so "Classic" and "Modern" were the same
+ * document with different nouns in it.
+ *
+ * THE THREE LEVERS, AND THEY ARE ALL REAL ONES. `documentTypography` and
+ * `pageGeometry` have ridden on the doc node since the .docx import started
+ * reading them out of real Word files; the editor turns them into CSS on the
+ * sheet, and as of 2026-09-15 both exporters write them back. So a template
+ * setting them is using the same mechanism an imported CV uses, not a
+ * preview-only decoration.
+ *
+ *   TYPOGRAPHY   face, body size, leading, paragraph spacing, and the title
+ *                and section sizes with the space around them.
+ *   SPACING      the leading and paragraph values above, plus `ruled` and the
+ *                per-block `spaceBefore` / `spaceAfter` where a template wants
+ *                one block to breathe differently from its neighbours.
+ *   FORMAT       margins, whether the header is centred, and whether section
+ *                headings carry a rule.
+ *
+ * THE TABLE, so the eleven can be compared in one place rather than by reading
+ * eleven trees. Every row is a decision about WHO the template is for; none of
+ * it is variation for its own sake.
+ *
+ *   CVs                 face      body  lead  para  margin  header   rules
+ *   Classic             Georgia   10.5  1.15  4     1.0in   centred  yes
+ *   Modern              Helvetica 10.5  1.35  6     0.9in   left     no
+ *   Detailed            Georgia   9.5   1.05  2.5   0.6in   left     yes
+ *   ATS-safe            Arial     11    1.15  6     1.0in   left     no
+ *   Entry level         Georgia   11    1.3   7     1.1in   centred  no
+ *   Technical           Helvetica 10    1.2   4     0.75in  left     yes
+ *
+ *   Cover letters       face      body  lead  para  margin  date
+ *   Standard            Georgia   11    1.2   10    1.0in   left
+ *   Concise             Helvetica 11    1.35  12    1.15in  (none)
+ *   Career change       Cambria   11    1.25  9     1.0in   right
+ *   Referral            Helvetica 10.5  1.25  8     0.9in   (none)
+ *   Speculative         Georgia   10.5  1.3   10    1.25in  right
+ *
+ * THE REASONING BEHIND THE EXTREMES, since the middle rows are interpolation:
+ *
+ *   DETAILED is the densest thing here on purpose -- 9.5pt on 1.05 leading at
+ *   0.6in margins -- because it is the one with seven sections and the only
+ *   way a comprehensive CV stays on two pages is to buy the room. It is the
+ *   template for somebody with a lot to say.
+ *
+ *   ATS-SAFE IS THE LEAST STYLED, AND THAT IS ITS ENTIRE POINT. Arial, 11pt,
+ *   1in margins, no rules, no centring, nothing italic. Every other template
+ *   here is making a typographic argument; this one is deliberately making
+ *   none, because a parser reading it should meet nothing it has to decide
+ *   about. A "designed" ATS template would be a contradiction.
+ *
+ *   ENTRY LEVEL IS THE ROOMIEST -- 11pt, 1.3 leading, 1.1in margins -- because
+ *   its problem is the opposite of Detailed's. Somebody with one job and a
+ *   degree has half a page of content, and a dense template makes that look
+ *   thin. Generous type makes the same words fill the page honestly.
+ *
+ *   SPECULATIVE HAS THE WIDEST MARGINS of the letters, 1.25in, which gives it
+ *   the narrowest text column. A cold letter nobody asked for has to look
+ *   considered before it is read, and a short measure is what does that.
+ *
+ * FACES ARE STACKS, NOT SINGLE NAMES, because `fontFamily` is a CSS value --
+ * it is what the editor puts on the sheet. `latexExport` and `docxExport` both
+ * take the first family and drop the fallbacks, which is correct: the
+ * fallbacks are the browser's business and the exported file should name the
+ * face that was actually chosen.
+ *
+ * THE COVER LETTERS' PROSE IS UNTOUCHED BY ALL OF THIS, deliberately.
+ * `shippedLettersPassTheirOwnPane.test.ts` asserts that every shipped letter
+ * survives this app's own suggestions pane -- four of the five once opened
+ * with the exact phrase the pane flags as a tired opening, and the templates
+ * were rewritten rather than the rule loosened. Changing type, spacing and
+ * where the date sits makes them feel distinct without reopening a decision
+ * that a test is holding shut.
+ */
 export type ResumeTemplate = {
   id: string
   name: string
@@ -39,14 +123,32 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
     mode: 'word',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 1.0, right: 1.0, bottom: 1.0, left: 1.0 },
+        },
+        documentTypography: {
+          fontFamily: "'Georgia', 'Times New Roman', serif",
+          fontSize: 10.5,
+          lineHeight: 1.15,
+          paragraphSpacing: 4,
+          titleSize: 18,
+          sectionSize: 11.5,
+          headingSpaceBefore: 10,
+          headingSpaceAfter: 3,
+        },
+      },
       content: [
         {
           type: 'heading',
-          attrs: { level: 1 },
+          attrs: { level: 1, textAlign: 'center' },
           content: [{ type: 'text', text: '{{name|Your Name}}' }],
         },
         {
           type: 'paragraph',
+          attrs: { textAlign: 'center' },
           content: [
             {
               type: 'text',
@@ -56,7 +158,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Professional Summary' }],
         },
         {
@@ -70,7 +172,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Professional Experience' }],
         },
         {
@@ -115,7 +217,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Skills' }],
         },
         {
@@ -129,7 +231,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Education' }],
         },
         {
@@ -150,6 +252,23 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
     mode: 'word',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 0.9, right: 0.9, bottom: 0.9, left: 0.9 },
+        },
+        documentTypography: {
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontSize: 10.5,
+          lineHeight: 1.35,
+          paragraphSpacing: 6,
+          titleSize: 22,
+          sectionSize: 10,
+          headingSpaceBefore: 14,
+          headingSpaceAfter: 5,
+        },
+      },
       content: [
         {
           type: 'heading',
@@ -255,6 +374,23 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
     mode: 'word',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 0.6, right: 0.6, bottom: 0.6, left: 0.6 },
+        },
+        documentTypography: {
+          fontFamily: "'Georgia', 'Times New Roman', serif",
+          fontSize: 9.5,
+          lineHeight: 1.05,
+          paragraphSpacing: 2.5,
+          titleSize: 15,
+          sectionSize: 10.5,
+          headingSpaceBefore: 7,
+          headingSpaceAfter: 2,
+        },
+      },
       content: [
         {
           type: 'heading',
@@ -272,7 +408,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Executive Summary' }],
         },
         {
@@ -286,7 +422,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Core Competencies' }],
         },
         {
@@ -312,7 +448,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Professional Experience' }],
         },
         {
@@ -348,7 +484,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Notable Projects' }],
         },
         {
@@ -365,7 +501,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Certifications' }],
         },
         {
@@ -384,7 +520,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Education' }],
         },
         {
@@ -406,6 +542,23 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
     mode: 'word',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 1.0, right: 1.0, bottom: 1.0, left: 1.0 },
+        },
+        documentTypography: {
+          fontFamily: "Arial, 'Helvetica Neue', Helvetica, sans-serif",
+          fontSize: 11,
+          lineHeight: 1.15,
+          paragraphSpacing: 6,
+          titleSize: 14,
+          sectionSize: 12,
+          headingSpaceBefore: 12,
+          headingSpaceAfter: 4,
+        },
+      },
       content: [
         {
           type: 'heading',
@@ -490,14 +643,32 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
     mode: 'word',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 1.1, right: 1.1, bottom: 1.1, left: 1.1 },
+        },
+        documentTypography: {
+          fontFamily: "'Georgia', 'Times New Roman', serif",
+          fontSize: 11,
+          lineHeight: 1.3,
+          paragraphSpacing: 7,
+          titleSize: 20,
+          sectionSize: 12,
+          headingSpaceBefore: 14,
+          headingSpaceAfter: 5,
+        },
+      },
       content: [
         {
           type: 'heading',
-          attrs: { level: 1 },
+          attrs: { level: 1, textAlign: 'center' },
           content: [{ type: 'text', text: '{{name|Your Name}}' }],
         },
         {
           type: 'paragraph',
+          attrs: { textAlign: 'center' },
           content: [{ type: 'text', text: '{{email|email@example.com}} | {{phone|+63 900 000 0000}} | {{website|github.com/you}}' }],
         },
         {
@@ -574,6 +745,23 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
     mode: 'word',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 0.75, right: 0.75, bottom: 0.75, left: 0.75 },
+        },
+        documentTypography: {
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontSize: 10,
+          lineHeight: 1.2,
+          paragraphSpacing: 4,
+          titleSize: 17,
+          sectionSize: 10.5,
+          headingSpaceBefore: 9,
+          headingSpaceAfter: 3,
+        },
+      },
       content: [
         {
           type: 'heading',
@@ -586,7 +774,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Stack' }],
         },
         {
@@ -595,7 +783,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Experience' }],
         },
         {
@@ -636,7 +824,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Selected projects' }],
         },
         {
@@ -645,7 +833,7 @@ export const WORD_TEMPLATES: ResumeTemplate[] = [
         },
         {
           type: 'heading',
-          attrs: { level: 2 },
+          attrs: { level: 2, ruled: true },
           content: [{ type: 'text', text: 'Education' }],
         },
         {
@@ -689,6 +877,23 @@ export const COVER_LETTER_TEMPLATES: ResumeTemplate[] = [
     mode: 'cover_letter',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 1.0, right: 1.0, bottom: 1.0, left: 1.0 },
+        },
+        documentTypography: {
+          fontFamily: "'Georgia', 'Times New Roman', serif",
+          fontSize: 11,
+          lineHeight: 1.2,
+          paragraphSpacing: 10,
+          titleSize: null,
+          sectionSize: null,
+          headingSpaceBefore: null,
+          headingSpaceAfter: null,
+        },
+      },
       content: [
         {
           type: 'paragraph',
@@ -768,6 +973,23 @@ export const COVER_LETTER_TEMPLATES: ResumeTemplate[] = [
     mode: 'cover_letter',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 1.15, right: 1.15, bottom: 1.15, left: 1.15 },
+        },
+        documentTypography: {
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontSize: 11,
+          lineHeight: 1.35,
+          paragraphSpacing: 12,
+          titleSize: null,
+          sectionSize: null,
+          headingSpaceBefore: null,
+          headingSpaceAfter: null,
+        },
+      },
       content: [
         {
           type: 'paragraph',
@@ -827,6 +1049,23 @@ export const COVER_LETTER_TEMPLATES: ResumeTemplate[] = [
     mode: 'cover_letter',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 1.0, right: 1.0, bottom: 1.0, left: 1.0 },
+        },
+        documentTypography: {
+          fontFamily: "'Cambria', 'Georgia', serif",
+          fontSize: 11,
+          lineHeight: 1.25,
+          paragraphSpacing: 9,
+          titleSize: null,
+          sectionSize: null,
+          headingSpaceBefore: null,
+          headingSpaceAfter: null,
+        },
+      },
       content: [
         {
           type: 'paragraph',
@@ -838,7 +1077,11 @@ export const COVER_LETTER_TEMPLATES: ResumeTemplate[] = [
             { type: 'text', text: '{{email|email@example.com}} | {{phone|+63 900 000 0000}}' },
           ],
         },
-        { type: 'paragraph', content: [{ type: 'text', text: '{{today}}' }] },
+        {
+          type: 'paragraph',
+          attrs: { textAlign: 'right' },
+          content: [{ type: 'text', text: '{{today}}' }],
+        },
         {
           type: 'paragraph',
           content: [
@@ -902,6 +1145,23 @@ export const COVER_LETTER_TEMPLATES: ResumeTemplate[] = [
     mode: 'cover_letter',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 0.9, right: 0.9, bottom: 0.9, left: 0.9 },
+        },
+        documentTypography: {
+          fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif",
+          fontSize: 10.5,
+          lineHeight: 1.25,
+          paragraphSpacing: 8,
+          titleSize: null,
+          sectionSize: null,
+          headingSpaceBefore: null,
+          headingSpaceAfter: null,
+        },
+      },
       content: [
         {
           type: 'paragraph',
@@ -967,6 +1227,23 @@ export const COVER_LETTER_TEMPLATES: ResumeTemplate[] = [
     mode: 'cover_letter',
     content: {
       type: 'doc',
+      attrs: {
+        pageGeometry: {
+          width: 8.5,
+          height: 11,
+          margin: { top: 1.25, right: 1.25, bottom: 1.25, left: 1.25 },
+        },
+        documentTypography: {
+          fontFamily: "'Georgia', 'Times New Roman', serif",
+          fontSize: 10.5,
+          lineHeight: 1.3,
+          paragraphSpacing: 10,
+          titleSize: null,
+          sectionSize: null,
+          headingSpaceBefore: null,
+          headingSpaceAfter: null,
+        },
+      },
       content: [
         {
           type: 'paragraph',
@@ -981,7 +1258,11 @@ export const COVER_LETTER_TEMPLATES: ResumeTemplate[] = [
             },
           ],
         },
-        { type: 'paragraph', content: [{ type: 'text', text: '{{today}}' }] },
+        {
+          type: 'paragraph',
+          attrs: { textAlign: 'right' },
+          content: [{ type: 'text', text: '{{today}}' }],
+        },
         { type: 'paragraph', content: [{ type: 'text', text: 'Dear [name, or the team you are writing to],' }] },
         {
           type: 'paragraph',

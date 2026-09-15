@@ -2,6 +2,7 @@
 
 import * as React from 'react'
 import { AnalyzingDocument } from '@/components/ui/analyzing-document'
+import { RotatingText } from '@/components/ui/status-state'
 import { AppDialog } from '@/components/ui/app-dialog'
 import { Button } from '@/components/ui/button'
 import { CssSpinner } from '@/components/ui/css-spinner'
@@ -43,6 +44,28 @@ import type { JobAutofillResult, JobFormData } from '@/types'
  * the whole flow on a fetch nobody controls would make the unreliable half the
  * required half.
  */
+
+/**
+ * What step 3 says while it runs, in the order the work actually happens.
+ *
+ * TRUE IN ORDER, WHICH IS THE WHOLE POINT. `autofillPosting` fetches the page,
+ * then the extractor reads it, then `digestPosting` restructures it under
+ * headings, then the draft is filled -- so these four lines are a progress
+ * report rather than four synonyms for "waiting". A shuffled list of
+ * reassurances would be decoration pretending to be information, and a reader
+ * who noticed the shuffle would trust the next thing the app told them less.
+ *
+ * FOUR RATHER THAN THE WHOLE PIPELINE. `RotatingText` holds on the last one,
+ * and the step usually finishes somewhere in the middle of the list; a longer
+ * sequence would mostly be lines nobody sees, and would make the ones they do
+ * see change too fast to read.
+ */
+const READ_STEPS = [
+  'opening the posting',
+  'reading the page',
+  'organising what it says',
+  'filling the application',
+]
 
 export interface AddApplicationDialogProps {
   open: boolean
@@ -250,8 +273,27 @@ export function AddApplicationDialog({
 
       case 'fill':
         return (
+          /*
+            CENTRED, AND IT WAS NOT (Gabe, 2026-09-15: "application wizard model
+            loading state animated icon and text is not centered"). This was
+            `items-start`, so the glyph and both lines sat hard against the left
+            edge of a dialog that is 1280px wide at desktop -- a 48px icon and
+            two sentences in the top-left corner of an otherwise empty panel,
+            which reads as content that failed to lay out rather than as a step
+            in progress. `items-center` plus `text-center` is the arrangement
+            every other waiting, empty and failed state in this app already
+            uses; this one step was the exception.
+
+            THE COPY CHANGES WHILE IT RUNS, which is the other half of the same
+            instruction. See `RotatingText`: the phrases are the work in the
+            order it actually happens, so the changing line is a progress
+            report rather than a screensaver. That matters here more than
+            anywhere else in the app, because this step waits on somebody
+            else's web page and a model, and it is the one place a reader has
+            no other signal that anything is still happening.
+          */
           <div
-            className="flex min-h-48 flex-col items-start justify-center gap-3"
+            className="flex min-h-48 flex-col items-center justify-center gap-3 text-center"
             data-add-loading
             role="status"
           >
@@ -262,7 +304,9 @@ export function AddApplicationDialog({
                 for it, which is the same arrangement the spinner it replaced
                 had. */}
             <AnalyzingDocument className="size-12 text-text-muted" />
-            <p className="text-body-m text-text-primary">reading the posting</p>
+            <p className="text-body-m text-text-primary">
+              <RotatingText phrases={READ_STEPS} />
+            </p>
             <p className="max-w-prose text-body-s text-text-muted">
               Reading the page and organising what it says — the company, role, salary and
               location, and the description broken into sections. This takes a few seconds.

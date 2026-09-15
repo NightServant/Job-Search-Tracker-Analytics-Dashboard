@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { authenticate } from '@/lib/apiAuth'
 import { rejectReason, normalizeTargetUrl } from '@/lib/jobUrl'
+import { logSecurityEvent } from '@/lib/securityLog'
 
 /**
  * The public door to LinkedIn profile extraction.
@@ -67,6 +68,16 @@ export async function POST(request: Request) {
   // person's stuck loop, and an IP is shared by everyone behind a NAT.
   const limit = throttle(auth.user.id)
   if (!limit.allowed) {
+    // THE `unusual traffic` SIGNAL. The throttle was firing into silence,
+    // which makes a rate limit a control nobody can audit: there is no way to
+    // tell a working one from one that never triggers. One of these is a
+    // rage-click; a hundred from one id is a loop or a script.
+    logSecurityEvent({
+      kind: 'rate.limited',
+      route: '/api/profile',
+      userId: auth.user.id,
+      status: 429,
+    })
     return NextResponse.json(
       { error: 'Too many requests', retryAfterSeconds: limit.retryAfterSeconds },
       { status: 429, headers: { 'Retry-After': String(limit.retryAfterSeconds) } }
@@ -81,10 +92,31 @@ export async function POST(request: Request) {
   }
 
   const reason = rejectReason(body?.url)
-  if (reason) return NextResponse.json({ error: reason }, { status: 400 })
+  if (reason) {
+    // THE SSRF GATE REFUSING SOMETHING. A URL this route will not fetch is the
+    // single most interesting rejection in the app: it is either a mistake or
+    // somebody probing what the server will reach on their behalf, and the two
+    // are told apart by how many there are. `reason` is our own closed set of
+    // strings, never the caller's URL -- logging an attacker-supplied URL is
+    // how a log drain becomes a place to inject.
+    logSecurityEvent({
+      kind: 'request.rejected',
+      route: '/api/profile',
+      userId: auth.user.id,
+      reason,
+      status: 400,
+    })
+    return NextResponse.json({ error: reason }, { status: 400 })
+  }
 
   const extractor = process.env.EXTRACTOR_URL
   if (!extractor) {
+    logSecurityEvent({
+      kind: 'config.missing',
+      route: '/api/profile',
+      reason: 'extractor-binding',
+      status: 503,
+    })
     return NextResponse.json(
       { error: 'Profile import is not configured for this deployment.' },
       { status: 503 }
@@ -100,6 +132,13 @@ export async function POST(request: Request) {
     const payload = await response.json()
     return NextResponse.json(payload, { status: response.status })
   } catch {
+    logSecurityEvent({
+      kind: 'request.failed',
+      route: '/api/profile',
+      userId: auth.user.id,
+      reason: 'extractor-unreachable',
+      status: 502,
+    })
     // Unreachable, not unreadable. See /api/autofill for why the distinction
     // is worth the two branches.
     return NextResponse.json(

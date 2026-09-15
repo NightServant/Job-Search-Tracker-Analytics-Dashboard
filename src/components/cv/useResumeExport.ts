@@ -7,13 +7,21 @@ import { readSupabaseConfig, currentEnvSource } from '@/lib/env'
 import { useToast } from '@/contexts/ToastContext'
 
 /**
- * Getting the open CV out of the browser, as PDF and as .docx.
+ * Getting the open CV out of the browser, as PDF, .docx and .tex.
  *
- * BOTH FORMATS, NOT ONE, and the reason is in the domain rather than the code:
- * ATS parsers still handle .docx more reliably than PDF and many application
- * forms accept Word only, while a human reviewer opening the file wants the
- * PDF's fixed layout. Which one matters depends on who is on the other end,
- * and the author is the only one who knows that.
+ * THREE FORMATS, NOT ONE, and the reason is in the domain rather than the
+ * code: ATS parsers still handle .docx more reliably than PDF and many
+ * application forms accept Word only, while a human reviewer opening the file
+ * wants the PDF's fixed layout. Which one matters depends on who is on the
+ * other end, and the author is the only one who knows that.
+ *
+ * `.tex` JOINED THEM ON 2026-09-15 (Gabe: "make sure these word documents are
+ * able to be exported as LaTeX files without breaking formats"). It answers a
+ * narrower audience than the other two and a real one: academic and research
+ * applications routinely ask for a source file, and a CV that can only leave
+ * this app as .docx or PDF is one a postdoc application cannot use. See
+ * `services/integrations/latexExport` for what "without breaking formats"
+ * turned out to mean.
  *
  * SPLIT OUT OF `WordResumeEditor` ON 2026-09-11 (509 lines). Two handlers and
  * two booleans that read the editor and talk to two endpoints, sharing nothing
@@ -34,8 +42,10 @@ import { useToast } from '@/contexts/ToastContext'
 export interface ResumeExport {
   exportPdf: () => Promise<void>
   exportDocx: () => Promise<void>
+  exportLatex: () => Promise<void>
   isExportingPdf: boolean
   isExportingDocx: boolean
+  isExportingLatex: boolean
 }
 
 export interface ResumeExportOptions {
@@ -43,7 +53,7 @@ export interface ResumeExportOptions {
   title: string
   /** Must resolve true before anything is generated. See the docblock. */
   saveDraft: (notify?: boolean) => Promise<boolean>
-  /** Adds the bearer token; `/api/cv/docx` authenticates like every route. */
+  /** Adds the bearer token; `/api/cv/docx` and `/api/cv/latex` both authenticate. */
   authedFetch: (input: string, init?: RequestInit) => Promise<Response>
 }
 
@@ -66,6 +76,7 @@ export function useResumeExport({
   const { success, error: showError } = useToast()
   const [isExportingPdf, setIsExportingPdf] = useState(false)
   const [isExportingDocx, setIsExportingDocx] = useState(false)
+  const [isExportingLatex, setIsExportingLatex] = useState(false)
 
   const exportPdf = async () => {
     if (!editor) return
@@ -131,5 +142,55 @@ export function useResumeExport({
     }
   }
 
-  return { exportPdf, exportDocx, isExportingPdf, isExportingDocx }
+  /**
+   * THE SAME SHAPE AS `exportDocx`, and the duplication is deliberate rather
+   * than un-factored. The two differ in the endpoint, the extension, the
+   * media handling and the toast, which is four of the six lines that would
+   * be parameters -- a shared helper taking four arguments to save two lines
+   * is a helper whose call sites are harder to read than the thing it
+   * replaced.
+   *
+   * `response.text()`, NOT `.blob()`. A .tex IS text, and round-tripping it
+   * through a blob would work while making the one thing worth asserting in a
+   * test -- that the source says what it should -- reachable only by decoding
+   * it back. The Blob is built here instead, with the type the download needs.
+   */
+  const exportLatex = async () => {
+    if (!editor) return
+    setIsExportingLatex(true)
+    try {
+      const response = await authedFetch('/api/cv/latex', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: title.trim() || 'CV', content: editor.getJSON() }),
+      })
+      if (!response.ok) {
+        const body = (await response.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error || `Export failed (${response.status})`)
+      }
+      const source = await response.text()
+      const url = URL.createObjectURL(
+        new Blob([source], { type: 'application/x-tex;charset=utf-8' })
+      )
+      const anchor = document.createElement('a')
+      anchor.href = url
+      anchor.download = `${safeFileName(title)}.tex`
+      anchor.click()
+      URL.revokeObjectURL(url)
+      success('LaTeX file ready', 'Your CV has been downloaded as .tex.')
+    } catch (err) {
+      showError('Export failed', err instanceof Error ? err.message : 'Could not export LaTeX file')
+    } finally {
+      setIsExportingLatex(false)
+    }
+  }
+
+  return {
+    exportPdf,
+    exportDocx,
+    exportLatex,
+    isExportingPdf,
+    isExportingDocx,
+    isExportingLatex,
+  }
 }

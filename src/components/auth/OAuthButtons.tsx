@@ -62,6 +62,20 @@ export function OAuthButtons({ onSelect, disabled = false }: OAuthButtonsProps) 
             // merely disabled. One provider redirecting is not three providers
             // thinking, and three spinners would say it was.
             loading={busy === provider.id}
+            // "Redirecting", not "Signing in": this button hands the browser
+            // to Google or Microsoft and the signing in happens over there. A
+            // label that claimed otherwise would be wrong for however long the
+            // hand-off takes, which on a slow connection is the whole visible
+            // duration of this state.
+            //
+            // The provider is NOT named in it, even though the label knows
+            // which one this is. `provider.label` is "Continue with Google" --
+            // a sentence, not a name -- so interpolating it reads "Redirecting
+            // to Continue with Google". Adding a second `name` field to
+            // OAUTH_PROVIDERS for one loading label is more moving parts than
+            // the label earns; the button that changed is the one under the
+            // pointer, so which provider is obvious from where it happened.
+            loadingText="Redirecting..."
             disabled={disabled || busy !== null}
             onClick={async () => {
               setBusy(provider.id)

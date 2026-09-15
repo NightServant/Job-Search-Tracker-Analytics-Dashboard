@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react'
 import { User, Session } from '@supabase/supabase-js'
 import { hasValidSupabaseConfig, supabase, supabaseConfigError } from '@/lib/supabase'
 import { clearStoredSession } from '@/lib/supabaseSession'
@@ -42,6 +42,33 @@ interface AuthContextType {
    * only intent does, and this is where intent lives.
    */
   signingOut: boolean
+  /**
+   * True when a signed-in session ENDED WITHOUT THE USER ASKING.
+   *
+   * WHY IT IS NOT JUST `user === null`. Three different things end with no
+   * user, and only one of them is worth interrupting somebody over:
+   *
+   *   never signed in     -- the ordinary state of a stranger. Say nothing.
+   *   signed out on purpose -- they clicked the button. Say nothing; they know.
+   *   the session expired  -- the server refused a refresh, or a token was
+   *                          revoked, or they were signed out on another
+   *                          device. This one arrives with no warning, in the
+   *                          middle of something, and the app owes them a
+   *                          sentence.
+   *
+   * Nothing in the session state distinguishes the third from the first two:
+   * only the HISTORY does -- there was a user, the user asked for nothing, and
+   * now there is no user. That transition is what this flag records, and it is
+   * why `signingOut` sits beside it rather than being folded into it.
+   *
+   * SERVER-SIDE EXPIRY IS WHAT MAKES THIS FIRE AT ALL. `jwt_expiry` alone
+   * never ends a session -- refresh-token rotation renews it forever -- so
+   * before supabase/config.toml gained `[auth.sessions]` (2026-09-15) the only
+   * way to reach this state was a revoked token. See that file.
+   */
+  sessionExpired: boolean
+  /** Clears `sessionExpired` once the app has told the user about it. */
+  acknowledgeSessionExpiry: () => void
   signIn: (email: string, password: string) => Promise<void>
   signUp: (email: string, password: string) => Promise<void>
   signOut: () => Promise<SignOutResult>
@@ -80,6 +107,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
   const [signingOut, setSigningOut] = useState(false)
+  const [sessionExpired, setSessionExpired] = useState(false)
+  /**
+   * Whether a session has EVER been seen in this provider's lifetime.
+   *
+   * A ref, not state, and that is load-bearing rather than an optimisation:
+   * `onAuthStateChange`'s callback closes over whatever it captured when the
+   * subscription was made, and the effect below is deliberately mounted once
+   * with `[]`. A `useState` value read in there would be frozen at `false`
+   * forever and the expiry would never fire. A ref is the same object on every
+   * render, so reading `.current` inside the callback reads the present.
+   */
+  const hadSession = useRef(false)
+  /**
+   * The same problem for `signingOut`. The callback has to be able to tell a
+   * deliberate sign-out from an expiry, and the state variable it would
+   * otherwise read is the one captured at subscribe time -- always `false`,
+   * which would report every sign-out as an expiry.
+   */
+  const signingOutRef = useRef(false)
 
   useEffect(() => {
     /**
@@ -117,6 +163,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .getSession()
       .then(({ data: { session } }) => {
         if (!active) return
+        // Seeds the expiry test: a page loaded WITH a session is the "there
+        // was one" half. Without this a token that dies moments after load
+        // would be indistinguishable from never having signed in.
+        if (session) hadSession.current = true
         setSession(session)
         setUser(session?.user ?? null)
       })
@@ -132,6 +182,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (!active) return
+
+      /*
+        THE EXPIRY TEST, and it is a TRANSITION rather than a state.
+        "There was a session, the user did not ask to leave, and now there is
+        none" is the only shape an expiry has -- see `sessionExpired` on the
+        context type for why the three ways to have no user cannot be told
+        apart any other way.
+
+        It is deliberately NOT keyed on the event name. supabase-js emits
+        SIGNED_OUT for a revoked token, for a failed refresh AND for our own
+        `signOut()`, and it emits nothing at all when a refresh quietly returns
+        a null session -- so a switch on the event would both false-positive on
+        the deliberate case and miss a real one.
+      */
+      if (hadSession.current && !signingOutRef.current && !session) {
+        setSessionExpired(true)
+      }
+      if (session) {
+        hadSession.current = true
+        // A fresh session ends the expired state. This is what clears the
+        // notice when somebody signs back in, without the dialog having to
+        // reach into auth to do it.
+        setSessionExpired(false)
+      }
+
       setSession(session)
       setUser(session?.user ?? null)
       // Whichever of the two answers first releases the app.
@@ -242,6 +317,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // next render -- setting it afterwards would leave exactly the window this
     // is meant to close.
     setSigningOut(true)
+    // The ref, not just the state: the auth listener reads this to tell a
+    // deliberate sign-out from an expiry, and it cannot see a state update
+    // made after it subscribed. Set BEFORE the call for the same reason
+    // `signingOut` is -- onAuthStateChange can fire while signOut() is still
+    // in flight, and a sign-out reported as an expiry would pop a dialog at
+    // somebody who just asked to leave.
+    signingOutRef.current = true
 
     let serverError: Error | null = null
     try {
@@ -279,6 +361,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         signingOut,
+        sessionExpired,
+        acknowledgeSessionExpiry: () => setSessionExpired(false),
         signIn,
         signUp,
         verifySignUpOtp,

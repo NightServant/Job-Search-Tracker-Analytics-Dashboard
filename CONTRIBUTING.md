@@ -21,8 +21,8 @@ npm --version   # Should be 9.0.0+
 
 ### 1. Clone & Install
 ```bash
-git clone https://github.com/yourusername/Job-Search-Tracker-Analytics-Dashboard.git
-cd Job-Search-Tracker-Analytics-Dashboard
+git clone https://github.com/NightServant/Worktrack.git
+cd Worktrack
 npm install
 ```
 
@@ -184,7 +184,7 @@ texts/              # Non-code documentation
 
 ## 💬 Questions?
 
-- Open an [issue](https://github.com/yourusername/Job-Search-Tracker-Analytics-Dashboard/issues) with questions
+- Open an [issue](https://github.com/NightServant/Worktrack/issues) with questions
 - Check [texts/](texts/) for architecture and design docs
 - Start a discussion for design feedback before major PRs
 

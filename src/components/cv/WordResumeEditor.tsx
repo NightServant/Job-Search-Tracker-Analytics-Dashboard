@@ -883,6 +883,29 @@ export function WordResumeEditor({
                       void exportState.exportPdf()
                     }}
                   />
+                  {/* LAST OF THE THREE, and it is a deliberate ordering rather
+                      than an append. The list is most-wanted first: .docx is
+                      what application forms accept, PDF is what a person
+                      opens, and a .tex source is what a specific kind of
+                      academic application asks for. The hint says which one
+                      that is, because somebody who does not need LaTeX should
+                      be able to skip the row without reading further.
+
+                      It is NOT in the compact row below. That row has space
+                      for two exports on a phone, and the two it has are the
+                      ones a phone is plausibly used for -- nobody compiles a
+                      .tex on a handset, and the menu here carries it at every
+                      width anyway. */}
+                  <ActionRow
+                    icon={<DownloadIcon size={16} aria-hidden className={iconMotion('drop')} />}
+                    label={exportState.isExportingLatex ? 'exporting .tex…' : 'export .tex'}
+                    hint="LaTeX source, for academic applications"
+                    disabled={!editor || exportState.isExportingLatex}
+                    onClick={() => {
+                      setActionsOpen(false)
+                      void exportState.exportLatex()
+                    }}
+                  />
                   {/* A destructive action does not sit flush against the
                       exports: the heavier rule is the pause before it. */}
                   <ActionRow

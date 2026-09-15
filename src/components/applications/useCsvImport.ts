@@ -6,6 +6,7 @@ import {
   parseJobsCsvText,
   type ParsedJobRow,
 } from '@/lib/jobCsv'
+import { assertContentMatchesExtension, assertWithinSizeLimit } from '@/lib/uploadSafety'
 import type { Job, JobFormData } from '@/types'
 
 /**
@@ -69,6 +70,26 @@ export function useCsvImport({
     async (file: File) => {
       setParsing(true)
       try {
+        /*
+          BEFORE `file.text()`, which is the only placement that helps: once
+          the read has run the memory is spent and a check is a comment.
+
+          Nothing here checked anything until 2026-09-15. The toolbar's input
+          carries `accept=".csv,text/csv"`, which filters the picker's default
+          view and nothing else -- every picker has an "All files" option, so a
+          disk image was one mis-click away from being read into a string.
+
+          The content check catches the mistake people actually make on this
+          screen, which is picking an .xlsx: it is a zip, it has a signature,
+          and parsing one as CSV produces a page of binary rows offered for
+          import as if they were applications.
+
+          `onCsvError` rather than a throw: this screen already has a place to
+          show a refusal, and the message is written for the reader.
+        */
+        assertWithinSizeLimit(file, 'csv')
+        await assertContentMatchesExtension(file, '.csv')
+
         const result = parseJobsCsvText(await file.text())
         if (result.fatalError) {
           onCsvError?.(result.fatalError)

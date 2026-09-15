@@ -510,6 +510,40 @@
   animation: pulse var(--duration-skeleton) var(--ease-standard) infinite;
 }
 
+/* THE HERO'S SCROLL CUE (components/landing/HeroScrollCue, 2026-09-15).
+
+   A chevron travelling the inside of a mouse-shaped capsule, fading in at the
+   top and out at the bottom. `transform` and `opacity` only, so it runs on the
+   compositor and cannot reflow the pinned hero it sits inside -- the same rule
+   every other animation in this file follows.
+
+   NOT Tailwind's `animate-bounce`. That is a ball hitting a floor: a fast
+   fall, a hard stop, a squash. On a page whose only other motion is a 150ms
+   colour fade it reads as a toy. 1.8s and a soft ease reads as "keep going".
+
+   The component does not render the class under prefers-reduced-motion, so
+   there is no paused animation left behind to restart. */
+@utility animate-hero-cue {
+  animation: hero-cue 1800ms var(--ease-standard) infinite;
+}
+
+@keyframes hero-cue {
+  0% {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  25% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(9px);
+  }
+}
+
 /* Six unused utilities removed in M5.5 Item 11 (.animate-fade-in,
    .animate-slide-down, .animate-slide-up, .btn-danger, .btn-ghost,
    .card-hover).

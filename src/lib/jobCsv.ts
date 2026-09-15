@@ -1,6 +1,7 @@
 import Papa from 'papaparse'
 import { Job, JobFormData, JobStatus, WorkMode } from '@/types'
 import { isSupportedCurrency, type SupportedCurrency } from '@/services/userPreferences'
+import { escapeCsvCell } from '@/lib/uploadSafety'
 
 export interface ParsedJobRow {
   rowNumber: number
@@ -367,5 +368,34 @@ export function buildJobsCsvText(
     description: job.description ?? '',
   }))
 
-  return Papa.unparse(rows, { columns: [...EXPORT_COLUMNS] })
+  /*
+    EVERY CELL GOES THROUGH `escapeCsvCell` (2026-09-15), and this is the one
+    change in the file-handling pass that protects somebody OTHER than the
+    person clicking.
+
+    `Papa.unparse` quotes correctly and that is not the problem. A spreadsheet
+    UN-quotes the cell and then evaluates it: a value beginning `=`, `+`, `-`
+    or `@` is a formula, and Excel's formula language reaches outside the
+    document (`=HYPERLINK`, `=WEBSERVICE`, DDE). Every column below is text
+    somebody typed into a form, and `company` is routinely pasted straight off
+    a job posting -- so a crafted posting becomes a crafted row becomes a
+    crafted CSV mailed to a recruiter, and the payload runs on their machine.
+    CSV injection, CWE-1236, and correct quoting is exactly why it is missed.
+
+    A LEADING APOSTROPHE is the conventional fix and the only one that does not
+    corrupt honest data: Excel, Sheets and Numbers all read it as "this is
+    text", strip it on display, and never evaluate what follows. Refusing or
+    stripping the character would mangle a salary note reading `-` or a role
+    called `@Home`.
+
+    APPLIED AT EXPORT, NOT AT IMPORT, because import is not where the value
+    becomes dangerous -- it is a harmless string in a database until something
+    writes it into a spreadsheet. Sanitising on the way in would also silently
+    rewrite a company name the user can see on screen.
+  */
+  const safeRows = rows.map((row) =>
+    Object.fromEntries(Object.entries(row).map(([key, value]) => [key, escapeCsvCell(value)]))
+  )
+
+  return Papa.unparse(safeRows, { columns: [...EXPORT_COLUMNS] })
 }

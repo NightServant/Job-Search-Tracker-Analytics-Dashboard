@@ -1,5 +1,5 @@
 /**
- * What "matches" means, for every search box on the Documents screen.
+ * What "matches" means, for every search box in this app.
  *
  * IT IS A SHARED FUNCTION BECAUSE THERE ARE NOW TWO BOXES ON ONE PAGE. The
  * documents list has had a search since 2026-09-10, and its comment already
@@ -9,6 +9,13 @@
  * list's, a disagreement would be visible in a single glance -- the same typed
  * word narrowing one control and not the other, for no reason a reader could
  * see.
+ *
+ * IT MOVED OUT OF `components/documents/` ON 2026-09-15, when the remote-roles
+ * rail on the calendar got a search box of its own and became the third
+ * consumer. A rule the whole app follows cannot live inside one feature's
+ * folder: `components/calendar` importing from `components/documents` to find
+ * out what a match is would make the documents screen a dependency of the
+ * calendar for no reason anybody reading either file could guess.
  *
  * THE RULE: every term must appear somewhere in the searched text, in any
  * order, as a substring. `engineer north` finds "Software Engineer —

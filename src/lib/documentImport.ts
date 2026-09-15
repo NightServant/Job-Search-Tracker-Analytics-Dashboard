@@ -1,3 +1,9 @@
+import {
+  assertContentMatchesExtension,
+  assertWithinSizeLimit,
+  assertZipWithinBudget,
+  safeDocumentTitle,
+} from '@/lib/uploadSafety'
 import type { ResumeContent, ResumeMode } from '@/services/resumeService'
 import {
   DEFAULT_GEOMETRY,
@@ -53,13 +59,17 @@ function extensionOf(filename: string): string {
   return dot === -1 ? '' : filename.slice(dot).toLowerCase()
 }
 
-/** The filename without its extension, which is a far better title than "Untitled". */
-export function titleFromFilename(filename: string): string {
-  const base = filename.replace(/^.*[\\/]/, '')
-  const dot = base.lastIndexOf('.')
-  const stem = (dot === -1 ? base : base.slice(0, dot)).trim()
-  return stem.length > 0 ? stem : 'Imported CV'
-}
+/*
+  `titleFromFilename` LIVED HERE AND IS GONE (2026-09-15). It did the same job
+  as `safeDocumentTitle` in lib/uploadSafety -- strip the path, drop the
+  extension, fall back -- WITHOUT the sanitising, and once the import switched
+  to the safe one it had no callers left but its own test.
+
+  Deleted rather than kept beside it, because two functions with the same
+  signature and the same obvious name, one of which quietly passes a
+  right-to-left override through into a stored title, is precisely how the
+  unsafe one gets picked next time somebody needs a title from a filename.
+*/
 
 /**
  * Plain text into tiptap's document shape.
@@ -142,6 +152,26 @@ function readArrayBuffer(file: File): Promise<ArrayBuffer> {
 export async function importDocument(file: File): Promise<ImportedDocument> {
   const extension = extensionOf(file.name)
 
+  /*
+    THE GATES RUN IN THIS ORDER FOR A REASON, and the order is "cheapest and
+    most informative first".
+
+    SIZE, before the extension check and before a single byte is read. A 500MB
+    file named `.exe` should be refused for being 500MB, not sent away with
+    advice about picking a .txt -- and the size is the check that stops the tab
+    freezing whichever advice it gives.
+
+    EXTENSION, next, because it decides which parser is even a candidate.
+
+    CONTENT, last of the three and before any parser sees the file: the
+    extension is a claim by whoever named it, and this is where a renamed PDF
+    or an actual executable is caught. It costs one 8-byte disk read.
+
+    All three live in lib/uploadSafety, shared with the two CSV pickers, which
+    had no checks at all.
+  */
+  assertWithinSizeLimit(file, 'document')
+
   if (extension === '.doc') {
     throw new UnsupportedDocumentError(
       'That is the old .doc format, which cannot be read. Open it in Word and save it as .docx, then import that.'
@@ -154,7 +184,13 @@ export async function importDocument(file: File): Promise<ImportedDocument> {
     )
   }
 
-  const title = titleFromFilename(file.name)
+  await assertContentMatchesExtension(file, extension)
+
+  // `safeDocumentTitle`, not `titleFromFilename`. The filename becomes a stored
+  // title, is rendered on /documents, and ends up in a Content-Disposition on
+  // export -- so a right-to-left override or a newline in it is somebody
+  // else's problem three screens away. See lib/uploadSafety.
+  const title = safeDocumentTitle(file.name)
 
   if (extension === '.docx') {
     return { mode: 'word', title, content: await docxToWordContent(file) }
@@ -216,6 +252,22 @@ async function docxToWordContent(file: File): Promise<ResumeContent> {
   // a reader importing a .txt should not pay to download it.
   const mammoth = await import('mammoth')
   const arrayBuffer = await readArrayBuffer(file)
+
+  /*
+    THE BOMB CHECK, AND IT HAS TO HAPPEN BEFORE MAMMOTH. A .docx is a zip, and
+    a zip declares how large it becomes -- ten kilobytes can declare four
+    gigabytes. The 8MB file cap says nothing about that, and both consumers
+    below decompress without asking: `readSetupFromDocx` for the page setup and
+    mammoth for the content.
+
+    It is checked HERE rather than inside `readSetupFromDocx` because that
+    function is wrapped in a try/catch that falls back to Word's defaults on
+    any failure -- correct for a corrupt package, and exactly wrong for a bomb:
+    it would swallow the refusal and hand the same buffer to mammoth anyway.
+    This throw is meant to escape.
+  */
+  const JSZipForBudget = (await import('jszip')).default
+  assertZipWithinBudget((await JSZipForBudget.loadAsync(arrayBuffer)).files)
   // THE PAGE THE DOCUMENT WAS WRITTEN FOR, read before the content. mammoth
   // converts the body and discards the section setup entirely, so the margins
   // have to come out of the package directly -- and without them every import

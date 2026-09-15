@@ -12,6 +12,7 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  CarouselRow,
 } from '@/components/ui/carousel'
 import { ICON_MOTION_GROUP } from '@/components/icons/motion'
 import { useAppHref } from '@/components/shell/routeBase'
@@ -94,12 +95,6 @@ export function UpNext({ items = [], className }: UpNextProps) {
               what is booked, and what has gone quiet for more than {QUIET_AFTER_DAYS} days.
             </CardDescription>
           </div>
-          {items.length > 0 && (
-            <div className="flex shrink-0 items-center gap-2">
-              <CarouselPrevious className="static translate-y-0" />
-              <CarouselNext className="static translate-y-0" />
-            </div>
-          )}
         </div>
 
         {/* AN EMPTY ACCOUNT IS A REAL STATE AND IT IS GOOD NEWS. Nothing booked
@@ -119,7 +114,17 @@ export function UpNext({ items = [], className }: UpNextProps) {
             below is clear.
           </EmptyState>
         ) : (
-          <CarouselContent className="-ml-4">
+          /* THE ARROWS FLANK THE RAIL now rather than sitting on the heading
+             row (Gabe, 2026-09-15). One arrangement for every carousel in the
+             app -- see `CarouselRow` in ui/carousel.
+
+             The "only when there is a rail" rule survives the move and is now
+             structural rather than a condition: the row is the populated
+             branch of this ternary, so the empty state above it has no
+             controls to disable. */
+          <CarouselRow>
+            <CarouselPrevious />
+            <CarouselContent className="-ml-4">
             {items.map((item) => {
               const lead = item.at ? formatLead(item.at, now) : null
               return (
@@ -167,7 +172,9 @@ export function UpNext({ items = [], className }: UpNextProps) {
                 </CarouselItem>
               )
             })}
-          </CarouselContent>
+            </CarouselContent>
+            <CarouselNext />
+          </CarouselRow>
         )}
       </Carousel>
     </section>

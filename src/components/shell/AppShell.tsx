@@ -6,6 +6,7 @@ import { Sidebar, NAV, type NavEntry } from '@/components/ui/sidebar'
 import { AppBackground } from './AppBackground'
 import { activeNavHref, isUnder } from '@/lib/activeNav'
 import { cn } from '@/lib/utils'
+import { ConnectionNotice } from './ConnectionNotice'
 import { TopBar } from './TopBar'
 import { BottomNav } from './BottomNav'
 import { DocumentFocusProvider } from './documentFocus'
@@ -162,6 +163,18 @@ export function AppShell({
         {!documentFocused && (
           <TopBar settingsActive={settingsActive} settingsHref={settingsHref} />
         )}
+        {/* CONNECTIVITY SITS ABOVE THE ROUTE'S OWN BANNER and is never
+            suppressed by `bannerHidden`. That flag exists so one screen can
+            stand its own notice down -- the Templates page does, because a
+            second copy of the demo paragraph pushes its first row of cards off
+            a phone. Being offline is not that kind of message: it is not about
+            this screen, no screen is entitled to hide it, and the screen most
+            likely to want the room is the one where a failed read is hardest
+            to explain without it.
+
+            It renders nothing at all when the connection is fine, so the
+            layout reserves no height for it -- see ConnectionNotice. */}
+        <ConnectionNotice />
         {!bannerHidden && banner}
         <main
           className={cn(

@@ -41,6 +41,8 @@ export default function Page() {
       <RouteError
         title="could not load your dashboard."
         message={error instanceof Error ? error.message : 'An error occurred while loading your applications.'}
+        // See RouteError: a refusal gets its own screen and no retry button.
+        error={error}
       />
     )
   }

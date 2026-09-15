@@ -2,19 +2,21 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { Input } from '@/components/ui/input'
-import { Select } from '@/components/ui/select'
+import { Button } from '@/components/ui/button'
+import { FilterBar } from '@/components/ui/filter-bar'
+import { StatusState } from '@/components/ui/status-state'
 import {
   Carousel,
   CarouselContent,
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  CarouselRow,
 } from '@/components/ui/carousel'
 import { getTemplatesForMode } from '@/services/resumeTemplateService'
 import type { ResumeTemplate } from '@/services/resumeTemplateService'
 import type { ResumeMode } from '@/services/resumeService'
-import { matchesTerms, searchTerms } from './search'
+import { matchesTerms, searchTerms } from '@/lib/search'
 
 export interface TemplateChoice {
   mode: ResumeMode
@@ -228,37 +230,38 @@ export function TemplateGallery({
     </button>
   )
 
-  const controls = (
-    <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
-      <div className="w-52 max-sm:w-full">
-        <Input
-          id="template-search"
-          type="search"
-          icon="Search"
-          aria-label="Search templates by name"
-          placeholder="search templates"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-        />
-      </div>
-      {/* Width on a wrapper, not on the Select: `Select`'s own root is
-          `w-full` and only its trigger takes `className`. Same trap the
-          calendar's country picker hit.
+  /*
+    ONE `FilterBar`, NOT A HAND-BUILT ROW (2026-09-15). The widths, the gaps
+    and the phone-width stacking were spelled out here, in DocumentsPage and in
+    JobFeed, and the three copies had drifted to three different widths for the
+    same control.
 
-          `Tag` rather than the `Documents` glyph the list's own filter uses.
-          Two identical icons on two dropdowns eight inches apart is the
-          strongest possible hint that they are the same control. */}
-      <div className="w-52 max-sm:w-full">
-        <Select
-          id="template-filter"
-          icon="Tag"
-          aria-label="Filter templates by kind"
-          value={kind}
-          onValueChange={(next) => setKind(next as TemplateFilter)}
-          items={TEMPLATE_FILTERS.map((option) => ({ ...option }))}
-        />
-      </div>
-    </div>
+    `Tag` rather than the `Documents` glyph the list's own filter uses. Two
+    identical icons on two dropdowns eight inches apart is the strongest
+    possible hint that they are the same control, and at desktop width both are
+    on screen at once.
+  */
+  const controls = (
+    <FilterBar
+      search={{
+        id: 'template-search',
+        label: 'Search templates by name',
+        placeholder: 'search templates',
+        value: query,
+        onChange: setQuery,
+      }}
+      selects={[
+        {
+          id: 'template-filter',
+          label: 'Filter templates by kind',
+          icon: 'Tag',
+          width: 'l',
+          value: kind,
+          onValueChange: (next) => setKind(next as TemplateFilter),
+          items: TEMPLATE_FILTERS.map((option) => ({ ...option })),
+        },
+      ]}
+    />
   )
 
   // A SEARCH THAT MATCHES NOTHING IS NOT AN EMPTY GALLERY. The same rule the
@@ -267,10 +270,29 @@ export function TemplateGallery({
   // the kind is named as the place that was searched rather than as a cause.
   const nothingMatches =
     visible.length === 0 ? (
-      <p className="py-8 text-body-m text-text-muted" data-template-empty>
-        no templates match “{query.trim()}”
-        {kind === 'all' ? '' : ` in ${kind === 'word' ? 'CV templates' : 'cover letters'}`}.
-      </p>
+      /* `StatusState kind="no-results"`, the same component the documents list
+         under this gallery now uses (2026-09-15). Two sections on one screen
+         reporting the same outcome must report it the same way -- that is the
+         rule this whole gallery's docblock already argues for its search and
+         its dropdown, applied to the result of using them. The SENTENCE is
+         unchanged; the glyph and the centring are what it gains. */
+      <StatusState
+        kind="no-results"
+        compact
+        data-template-empty
+        title="no matching templates"
+        message={
+          <>
+            no templates match “{query.trim()}”
+            {kind === 'all' ? '' : ` in ${kind === 'word' ? 'CV templates' : 'cover letters'}`}.
+          </>
+        }
+        action={
+          <Button variant="secondary" size="s" onClick={() => setQuery('')}>
+            clear the search
+          </Button>
+        }
+      />
     ) : null
 
   // A GRID, NOT A RAIL, on the Templates page. A carousel is right for a strip
@@ -298,43 +320,70 @@ export function TemplateGallery({
 
   return (
     <section data-template-gallery className={cn('flex flex-col gap-3', className)}>
-      {/* The heading row moved INSIDE the Carousel, because the arrows are on
-          it now. They used to float over the rail at `-top-9`, which put them
-          exactly where the search box and the dropdown had to go; the previous
-          arrangement only worked because that half of the row was empty.
-          Inside the Carousel they can be static, which is also less code than
-          the absolute-positioning override they carried. */}
+      {/* THE ARROWS LEFT THE HEADING ROW on 2026-09-15 and now flank the rail
+          itself -- the one arrangement every carousel in this app uses; see
+          `CarouselRow` in ui/carousel. They had been on the heading row since
+          the search box and dropdown arrived, which was the best available
+          answer while the alternative was Swiper's own floating controls over
+          the first and last card.
+
+          What the move buys here specifically: the heading row now carries
+          only the things that NARROW the gallery, and the things that MOVE it
+          sit on the rail they move. Those are two different jobs and they were
+          reading as one four-control cluster. */}
       <Carousel
         opts={{ align: 'start', dragFree: true, containScroll: 'trimSnaps' }}
-        className="flex w-full flex-col gap-3"
+        // `gap-6` (24px), up from 12. This is now the distance from the
+        // section's HEADER GROUP to the rail, not from a heading to the next
+        // thing -- see FilterBar for the three steps and why 12/12 read as a
+        // flat stack.
+        className="flex w-full flex-col gap-6"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-baseline gap-4">
+        {/* THE HEADER GROUP: the name of the gallery and the controls that
+            narrow it, 12px apart, because they are one thing. The heading is
+            its own line now and the controls are their own row below it
+            (Gabe, 2026-09-15: "implement a new row containing that
+            components").
+
+            `items-baseline` so "pick a starting point" sits on the h2's
+            baseline rather than its box -- they are one phrase in two weights,
+            not two stacked things. */}
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <h2 className="text-heading-s text-text-primary">start a new document</h2>
             <p className="text-body-s text-text-muted">pick a starting point</p>
           </div>
-          <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
-            {controls}
-            {/* After the narrowers, not before: these move the rail, and the
-                rail is whatever the two controls to their left left behind. */}
-            <div className="flex items-center gap-2">
-              <CarouselPrevious className="static translate-y-0" />
-              <CarouselNext className="static translate-y-0" />
-            </div>
-          </div>
+          {controls}
         </div>
 
-        {/* -ml-4 / pl-4 is the carousel's own gutter idiom: the track is
-            shifted left by one gap so the first card sits flush with the page
-            margin while every later card keeps its spacing. */}
-        <CarouselContent className="-ml-4">
-          {blankCard && <CarouselItem className="basis-auto pl-4">{blankCard}</CarouselItem>}
-          {visible.map((card) => (
-            <CarouselItem key={card.key} className="basis-auto pl-4">
-              {cardButton(card)}
-            </CarouselItem>
-          ))}
-        </CarouselContent>
+        {/* ARROWS ONLY WHEN THERE IS A RAIL TO PAGE, which is the rule the two
+            calendar rails already follow -- two disabled chevrons flanking an
+            empty band are controls for a list that is not there. Seen on
+            screen the moment the flanking layout landed: a search matching
+            nothing left `<` and `>` facing each other across 200px of nothing,
+            above the message explaining why.
+
+            `visible.length` rather than a separate flag: when it is zero the
+            blank card is gone too (it hides while a search is running, because
+            a blank page is not a search result), so the row would hold nothing
+            at all. */}
+        {visible.length > 0 && (
+          <CarouselRow>
+            <CarouselPrevious />
+            {/* -ml-4 / pl-4 is the carousel's own gutter idiom: the track is
+                shifted left by one gap so the first card sits flush with the
+                row's own left edge while every later card keeps its spacing. */}
+            <CarouselContent className="-ml-4">
+              {blankCard && <CarouselItem className="basis-auto pl-4">{blankCard}</CarouselItem>}
+              {visible.map((card) => (
+                <CarouselItem key={card.key} className="basis-auto pl-4">
+                  {cardButton(card)}
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+            <CarouselNext />
+          </CarouselRow>
+        )}
       </Carousel>
 
       {nothingMatches}
@@ -343,150 +392,300 @@ export function TemplateGallery({
 }
 
 /** A page-shaped diagram of the template's structure, in rules rather than type. */
+/**
+ * The card's preview of a template.
+ *
+ * IT HAS TO SHOW THE DIFFERENCE, which is the whole reason it changed on
+ * 2026-09-15. Gabe: "CV and Cover Letter templates felt the same." The gallery
+ * is where that impression is formed -- it is eleven cards side by side, and
+ * before this they were eleven near-identical stacks of stripes. Worse, the
+ * rule table branched on `compact` and `academic`, two template ids DELETED
+ * some time ago, so five of the six CVs fell through to one default shape and
+ * the gallery was telling the truth: they really were the same.
+ *
+ * SO THE THUMBNAIL IS DRIVEN BY THE TEMPLATE'S ACTUAL DESIGN rather than by a
+ * hand-drawn guess at it. `THUMBNAILS` below mirrors the table in
+ * resumeTemplateService: the page's margins become the card's padding, the
+ * leading becomes the gap between rules, a centred header becomes centred
+ * bars, and a ruled section heading becomes a hairline under the bar. Somebody
+ * changing a template's typography and not this will see the two disagree,
+ * which is the best that can be done without rendering the real document.
+ *
+ * IT IS STILL A DIAGRAM, NOT A PREVIEW. Rendering eleven real documents means
+ * mounting eleven tiptap editors to throw away, and at 128px no reader could
+ * tell Georgia from Helvetica anyway. What a thumbnail has to answer is "how
+ * is this one SHAPED" -- dense or airy, centred or left, ruled or plain -- and
+ * those survive the reduction.
+ */
 function Thumbnail({ id }: { id: string }) {
+  const spec = THUMBNAILS[id] ?? DEFAULT_THUMBNAIL
+
   return (
     <span
       aria-hidden
       className={cn(
-        'flex aspect-[3/4] w-32 flex-col gap-1.5 overflow-hidden rounded-sm border p-3',
+        'flex aspect-[3/4] w-32 flex-col overflow-hidden rounded-sm border',
         'border-border-subtle bg-bg-canvas',
         'transition-colors duration-(--duration-fast)',
-        'group-hover/template:border-accent-default'
+        'group-hover/template:border-accent-default',
+        // THE PAGE'S OWN MARGINS, scaled to the card. A 0.6in template really
+        // does put more on the page than a 1.25in one, and padding is the only
+        // honest way a 128px card can say so.
+        spec.pad,
+        // And its leading. `gap` here is doing the job `lineHeight` does in
+        // the document.
+        spec.gap
       )}
     >
-      <ThumbnailRules id={id} />
-    </span>
-  )
-}
-
-/**
- * Bar = heading, hairline = body. Ratios differ per template so the shapes do.
- *
- * A LETTER HAS A DIFFERENT SILHOUETTE FROM A CV, and drawing it as one was the
- * bug: every `cover-*` id fell through to the default arm and got the CV's
- * alternating heading/body ladder, so the five letters were five identical
- * cards. At 128px the thumbnail is the only thing telling them apart -- the
- * names are one word each -- so it has to show the letter's own furniture: a
- * right-aligned sender block, a date, a left recipient block, a salutation,
- * then unbroken prose and a short sign-off. No mid-document headings at all,
- * which is the single most visible difference from every CV beside it.
- *
- * The variations between the five are the real ones. `concise` drops the
- * address blocks (its description says "no address block") and runs three
- * short paragraphs; `speculative` has no recipient to address, so it opens
- * straight into prose under the date; `referral` and `career-change` keep the
- * full block layout and differ in how the body is weighted.
- */
-function ThumbnailRules({ id }: { id: string }) {
-  const heading = 'bg-accent-default'
-  const body = 'bg-border-default'
-  // `right` is the sender block and the date, which sit against the right
-  // margin in a block letter -- `ml-auto` is what makes the shape read as a
-  // letter rather than as a very sparse CV.
-  const rows: Rule[] = id.startsWith('cover-') ? coverRules(id) : cvRules(id)
-
-  return (
-    <>
-      {rows.map(([type, width], i) => (
+      {spec.rows.map(([kind, width], i) => (
         <span
           key={i}
           className={cn(
             'block rounded-[1px]',
             width,
-            type === 'heading' ? `h-1.5 ${heading}` : `h-0.5 ${body}`,
-            type === 'right' && 'ml-auto'
+            kind === 'heading' || kind === 'title'
+              ? 'bg-accent-default'
+              : 'bg-border-default',
+            kind === 'title' ? 'h-2' : kind === 'heading' ? 'h-1.5' : 'h-0.5',
+            // `right` is the sender block and the date of a block letter,
+            // which sit against the right margin -- it is what makes the shape
+            // read as a letter rather than as a very sparse CV.
+            kind === 'right' && 'ml-auto',
+            kind === 'centre' && 'mx-auto',
+            // The rule under a section heading, drawn as the card's own
+            // hairline rather than a second bar: at this size a 1px gap
+            // between two bars is invisible, and a border is not.
+            kind === 'heading' && spec.ruled && 'border-b border-border-default pb-0.5'
           )}
         />
       ))}
-    </>
+    </span>
   )
 }
 
-type Rule = [type: 'heading' | 'body' | 'right', width: string]
+/**
+ * One row of the diagram.
+ *
+ * `title` is the name at the top of a CV, which is the biggest thing on the
+ * page and the first thing the eye lands on; `heading` is a section. They were
+ * one kind before, which is part of why every card looked alike -- a CV whose
+ * name is 22pt and one whose name is 14pt drew the identical bar.
+ */
+type Rule = [kind: 'title' | 'heading' | 'body' | 'right' | 'centre', width: string]
 
-function cvRules(id: string): Rule[] {
-  if (id.endsWith('compact')) {
-    return [
-      ['heading', 'w-2/3'],
+interface ThumbnailSpec {
+  /** Tailwind padding, standing in for the page's margins. */
+  pad: string
+  /** Tailwind gap, standing in for the leading. */
+  gap: string
+  /** Whether section headings carry a rule, as the template does. */
+  ruled: boolean
+  rows: Rule[]
+}
+
+const DEFAULT_THUMBNAIL: ThumbnailSpec = {
+  pad: 'p-3',
+  gap: 'gap-1.5',
+  ruled: false,
+  rows: [
+    ['title', 'w-2/3'],
+    ['body', 'w-full'],
+    ['heading', 'w-1/2'],
+    ['body', 'w-full'],
+    ['body', 'w-4/5'],
+  ],
+}
+
+/**
+ * The eleven, keyed by the SAME ids the templates use.
+ *
+ * KEYED EXACTLY, with no `endsWith` and no fallthrough chain. The old table
+ * matched on suffixes and still carried branches for `compact` and `academic`,
+ * which have not existed for some time -- a suffix match fails silently when
+ * an id changes, and silently is how five of six CVs ended up sharing one
+ * shape. An id that is missing here gets `DEFAULT_THUMBNAIL`, and the test
+ * beside this file asserts that none of them does.
+ */
+const THUMBNAILS: Record<string, ThumbnailSpec> = {
+  // Centred name and contact over ruled sections: the printed-CV convention.
+  'word-classic': {
+    pad: 'p-3',
+    gap: 'gap-1.5',
+    ruled: true,
+    rows: [
+      ['title', 'w-1/2 mx-auto'],
+      ['body', 'w-2/3 mx-auto'],
+      ['heading', 'w-2/5'],
       ['body', 'w-full'],
       ['body', 'w-5/6'],
-      ['heading', 'w-1/2'],
+      ['heading', 'w-1/3'],
       ['body', 'w-full'],
-      ['body', 'w-4/5'],
+    ],
+  },
+  // The airy one: no rules, the widest gaps, and the biggest name on the page.
+  'word-modern': {
+    pad: 'p-3.5',
+    gap: 'gap-2.5',
+    ruled: false,
+    rows: [
+      ['title', 'w-3/4'],
+      ['body', 'w-1/2'],
+      ['heading', 'w-2/5'],
       ['body', 'w-full'],
-    ]
-  }
-  if (id.endsWith('detailed') || id.endsWith('academic')) {
-    return [
-      ['heading', 'w-3/4'],
+      ['heading', 'w-1/3'],
+      ['body', 'w-5/6'],
+    ],
+  },
+  // Seven sections at 9.5pt on 0.6in margins: the densest page here, and the
+  // thumbnail has to be the busiest card in the gallery or it is lying.
+  'word-detailed': {
+    pad: 'p-1.5',
+    gap: 'gap-1',
+    ruled: true,
+    rows: [
+      ['title', 'w-2/3'],
       ['body', 'w-full'],
-      ['heading', 'w-1/2'],
+      ['heading', 'w-2/5'],
+      ['body', 'w-full'],
+      ['body', 'w-full'],
+      ['heading', 'w-1/3'],
       ['body', 'w-full'],
       ['body', 'w-5/6'],
       ['heading', 'w-2/5'],
       ['body', 'w-full'],
-      ['heading', 'w-1/2'],
+      ['heading', 'w-1/4'],
       ['body', 'w-3/4'],
-    ]
-  }
-  return [
-    ['heading', 'w-2/3'],
-    ['body', 'w-full'],
-    ['body', 'w-1/2'],
-    ['heading', 'w-1/2'],
-    ['body', 'w-full'],
-    ['body', 'w-4/5'],
-  ]
-}
+    ],
+  },
+  // DELIBERATELY THE PLAINEST CARD IN THE GALLERY. No rules, nothing centred,
+  // even widths, even gaps. A parser should meet nothing it has to decide
+  // about, and the thumbnail says so by having nothing to look at.
+  'word-ats': {
+    pad: 'p-3',
+    gap: 'gap-1.5',
+    ruled: false,
+    rows: [
+      ['title', 'w-1/2'],
+      ['body', 'w-2/3'],
+      ['heading', 'w-1/3'],
+      ['body', 'w-full'],
+      ['body', 'w-full'],
+      ['heading', 'w-1/3'],
+      ['body', 'w-full'],
+    ],
+  },
+  // The roomiest: fewest rows, widest gaps, centred header. Half a page of
+  // content that fills a page honestly.
+  'word-entry': {
+    pad: 'p-4',
+    gap: 'gap-2.5',
+    ruled: false,
+    rows: [
+      ['title', 'w-1/2 mx-auto'],
+      ['body', 'w-2/3 mx-auto'],
+      ['heading', 'w-2/5'],
+      ['body', 'w-full'],
+      ['heading', 'w-1/3'],
+      ['body', 'w-4/5'],
+    ],
+  },
+  // Skills-forward and tight: a short ruled block near the top, then the runs.
+  'word-technical': {
+    pad: 'p-2',
+    gap: 'gap-1',
+    ruled: true,
+    rows: [
+      ['title', 'w-3/5'],
+      ['body', 'w-full'],
+      ['heading', 'w-1/3'],
+      ['body', 'w-full'],
+      ['body', 'w-2/3'],
+      ['heading', 'w-2/5'],
+      ['body', 'w-full'],
+      ['body', 'w-5/6'],
+      ['body', 'w-3/4'],
+    ],
+  },
 
-function coverRules(id: string): Rule[] {
-  // No address blocks at all, and three short paragraphs: this is the one for
-  // an online form, where the furniture of a posted letter is dead weight.
-  if (id === 'cover-concise') {
-    return [
-      ['heading', 'w-1/2'],
+  // THE LETTERS. What separates these on a card is the FURNITURE -- how much
+  // of the page is spent before the prose starts -- which is exactly what
+  // distinguishes them in use.
+  'cover-standard': {
+    pad: 'p-3',
+    gap: 'gap-1.5',
+    ruled: false,
+    rows: [
+      ['body', 'w-1/2'],
+      ['body', 'w-2/5'],
       ['body', 'w-1/3'],
+      ['body', 'w-2/5'],
+      ['heading', 'w-1/3'],
+      ['body', 'w-full'],
+      ['body', 'w-full'],
+      ['body', 'w-3/4'],
+      ['body', 'w-1/4'],
+    ],
+  },
+  // No furniture at all and the widest margins: straight into three
+  // paragraphs, which is the whole pitch of this one.
+  'cover-concise': {
+    pad: 'p-4',
+    gap: 'gap-2.5',
+    ruled: false,
+    rows: [
+      ['heading', 'w-1/2'],
       ['body', 'w-full'],
       ['body', 'w-full'],
       ['body', 'w-2/3'],
-      ['body', 'w-full'],
-      ['body', 'w-1/2'],
-    ]
-  }
-  // Nobody to address: a speculative letter keeps the sender and the date and
-  // then goes straight into prose, so the recipient block is simply absent.
-  if (id === 'cover-speculative') {
-    return [
-      ['right', 'w-1/2'],
-      ['right', 'w-1/3'],
       ['body', 'w-1/3'],
+    ],
+  },
+  // Modified block: the date sits right, which is the one visible difference
+  // between this and `standard` on a page.
+  'cover-career-change': {
+    pad: 'p-3',
+    gap: 'gap-1.5',
+    ruled: false,
+    rows: [
+      ['body', 'w-1/2'],
+      ['right', 'w-1/3'],
+      ['body', 'w-2/5'],
+      ['heading', 'w-1/3'],
       ['body', 'w-full'],
       ['body', 'w-full'],
       ['body', 'w-5/6'],
+      ['body', 'w-1/4'],
+    ],
+  },
+  // The shortest letter here: a name, a salutation and three short paragraphs.
+  'cover-referral': {
+    pad: 'p-2.5',
+    gap: 'gap-1.5',
+    ruled: false,
+    rows: [
+      ['body', 'w-1/2'],
+      ['heading', 'w-1/3'],
+      ['body', 'w-full'],
+      ['body', 'w-5/6'],
+      ['body', 'w-full'],
+      ['body', 'w-1/4'],
+    ],
+  },
+  // The widest margins of the five, so the narrowest column on the card.
+  'cover-speculative': {
+    pad: 'p-5',
+    gap: 'gap-2',
+    ruled: false,
+    rows: [
+      ['body', 'w-1/2'],
+      ['right', 'w-1/3'],
+      ['heading', 'w-2/5'],
+      ['body', 'w-full'],
+      ['body', 'w-full'],
       ['body', 'w-1/3'],
-    ]
-  }
-  // The full block letter: sender right, date right, recipient left,
-  // salutation, body, sign-off. `referral` and `career-change` differ from
-  // `standard` only in how much of the page the body takes.
-  const bodyRuns: Rule[] =
-    id === 'cover-referral'
-      ? [
-          ['body', 'w-full'],
-          ['body', 'w-5/6'],
-          ['body', 'w-full'],
-        ]
-      : [
-          ['body', 'w-full'],
-          ['body', 'w-full'],
-          ['body', 'w-3/4'],
-        ]
-  return [
-    ['right', 'w-1/2'],
-    ['right', 'w-1/3'],
-    ['body', 'w-2/5'],
-    ['heading', 'w-1/3'],
-    ...bodyRuns,
-    ['body', 'w-1/4'],
-  ]
+    ],
+  },
 }
+
+/** Exported for the test that asserts every shipped template has a card. */
+export const THUMBNAIL_IDS = Object.keys(THUMBNAILS)

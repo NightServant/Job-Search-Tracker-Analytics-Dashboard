@@ -30,7 +30,7 @@
 
 import type { IconName } from '@/components/icons'
 
-export const REPO_URL = 'https://github.com/NightServant/Job-Search-Tracker-Analytics-Dashboard'
+export const REPO_URL = 'https://github.com/NightServant/Worktrack'
 export const COMMITS_URL = `${REPO_URL}/commits/main`
 
 export const HERO = {

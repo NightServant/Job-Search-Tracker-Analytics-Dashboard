@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { currentEnvSource, readSupabaseConfig } from './env'
+import { logSecurityEvent } from './securityLog'
 
 /**
  * Who is calling one of this app's API routes.
@@ -21,6 +22,18 @@ import { currentEnvSource, readSupabaseConfig } from './env'
  * signature and expiry. Reading the JWT's claims locally would accept any
  * well-formed token, including one the caller wrote, which is not
  * authentication -- it is a formality that looks like one.
+ *
+ * EVERY REFUSAL IS LOGGED (2026-09-15), and until now none of them was. A 401
+ * went back to the caller and left no trace on the server, which means a
+ * thousand of them left no trace either -- so "log authentication attempts so
+ * suspicious behaviour can be detected" was unmet in the one place every API
+ * route funnels through. The event carries the route and a short reason and
+ * NEVER the token or an email; see lib/securityLog for why the second matters
+ * as much as the first.
+ *
+ * SUCCESSES ARE NOT LOGGED. A line per authorised request is the application's
+ * ordinary traffic written twice, and it buries the refusals in it. The
+ * interesting signal here is the rate of failure, which needs only failures.
  */
 export interface ApiCaller {
   id: string
@@ -41,11 +54,22 @@ function bearerFrom(request: Request): string | null {
 }
 
 export async function authenticate(request: Request): Promise<AuthResult> {
+  // The path only. A full URL carries a query string, and this app puts job
+  // ids in one.
+  const route = (() => {
+    try {
+      return new URL(request.url).pathname
+    } catch {
+      return 'unknown'
+    }
+  })()
+
   const config = readSupabaseConfig(currentEnvSource())
   if (!config.isConfigured) {
     // 503, not 401: the caller did nothing wrong and retrying with a better
     // token will not help. A misconfigured deployment must not read as a
     // rejected user.
+    logSecurityEvent({ kind: 'config.missing', route, reason: 'supabase-unconfigured', status: 503 })
     return {
       ok: false,
       status: 503,
@@ -55,6 +79,7 @@ export async function authenticate(request: Request): Promise<AuthResult> {
 
   const token = bearerFrom(request)
   if (!token) {
+    logSecurityEvent({ kind: 'auth.rejected', route, reason: 'no-bearer-token', status: 401 })
     return { ok: false, status: 401, message: 'Sign in to use this.' }
   }
 
@@ -68,12 +93,21 @@ export async function authenticate(request: Request): Promise<AuthResult> {
   try {
     const { data, error } = await client.auth.getUser(token)
     if (error || !data.user) {
+      // `invalid-token` and not the provider's own message: that string is
+      // Supabase's to change, and an error body copied into a log is how an
+      // upstream's diagnostics end up in a drain nobody audited.
+      logSecurityEvent({ kind: 'auth.rejected', route, reason: 'invalid-token', status: 401 })
       return { ok: false, status: 401, message: 'That session is not valid. Sign in again.' }
     }
     return { ok: true, user: { id: data.user.id, email: data.user.email ?? null } }
   } catch {
     // Supabase unreachable. Failing CLOSED is the only safe direction on an
     // endpoint that spends money -- an outage must not become an open door.
+    //
+    // Logged under its OWN kind rather than as a rejection: a spike of these
+    // is an outage and a spike of rejections is an attack, and a dashboard
+    // that cannot tell them apart will page somebody for the wrong reason.
+    logSecurityEvent({ kind: 'auth.unavailable', route, reason: 'verify-failed', status: 503 })
     return { ok: false, status: 503, message: 'Could not verify your session. Try again shortly.' }
   }
 }

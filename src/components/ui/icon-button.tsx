@@ -26,25 +26,74 @@ import { ICON_MOTION_GROUP } from '@/components/icons/motion'
  * and padding overrides for the one control that carries a word instead of a
  * glyph.
  */
-export type IconButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement>
+export interface IconButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  /**
+   * `danger` marks a control that DESTROYS something (Gabe, 2026-09-15: "your
+   * document section delete action must be a danger in desktop and laptop
+   * screens").
+   *
+   * WHY IT HAD TO BECOME A PROP RATHER THAN CLASSES AT ONE CALL SITE. Delete
+   * was drawn FOUR ways in this app, and the request is one of them:
+   *
+   *   /applications, table    a `Button` with hand-written
+   *                           `border-status-rejected-mark text-status-rejected-mark
+   *                           hover:bg-status-rejected-mark/10` — red, and the
+   *                           only place that had decided.
+   *   /applications, list     a bare `IconButton` — grey.
+   *   /documents, desktop     a bare `IconButton` — grey. The reported one.
+   *   /documents, below md    `DropdownMenuItem variant="destructive"` — red.
+   *
+   * So the same verb was red on a phone and grey on the laptop, on the same
+   * screen, three inches apart in the source. That is not four decisions; it
+   * is one decision that was only ever made where somebody happened to write
+   * the classes out. This is where it gets made.
+   *
+   * RED AT REST, NOT ONLY ON HOVER, and that follows the precedent rather than
+   * inventing one: the applications table already paints its delete
+   * `text-status-rejected-mark` with no interaction, and the compact overflow
+   * item is red the moment the menu opens. A control that only admits what it
+   * does once the pointer is on it is a control somebody can click without
+   * ever having been told.
+   *
+   * THE FOCUS RING TURNS RED WITH IT. Every other control in this app rings in
+   * the accent; on a destructive one the accent points at the wrong thing --
+   * it is the colour this design system uses for "this is the action we want
+   * you to take".
+   */
+  tone?: 'neutral' | 'danger'
+}
+
+/**
+ * `status-rejected-mark` is the app's red, borrowed from the pipeline rather
+ * than a second palette invented for destructive controls -- the same rule
+ * `StatusState`'s tones follow. The hover surface is that colour at 10% rather
+ * than `status-rejected-fill`, because `fill` is `ink-800` in the dark theme
+ * (a neutral) while an alpha of the mark stays red in both.
+ */
+const TONES = {
+  neutral: 'text-text-muted hover:bg-bg-inset hover:text-text-primary focus-visible:ring-accent-default',
+  danger:
+    'text-status-rejected-mark hover:bg-status-rejected-mark/10 hover:text-status-rejected-mark focus-visible:ring-status-rejected-mark',
+} as const
 
 export const IconButton = React.forwardRef<HTMLButtonElement, IconButtonProps>(
-  ({ className, type = 'button', ...props }, ref) => (
+  ({ className, type = 'button', tone = 'neutral', ...props }, ref) => (
     <button
       ref={ref}
       type={type}
       data-icon-button
+      data-tone={tone}
       className={cn(
         // The named group its glyph's motion variant listens to. Inert on its
         // own: nothing happens unless a child asks for `group-hover/icon:`.
         ICON_MOTION_GROUP,
-        'grid h-7 w-9 place-items-center rounded-md text-text-muted',
+        'grid h-7 w-9 place-items-center rounded-md',
         // The same press as `buttonVariants`, for the same reason: an icon
         // button is the only control on a row and needs to confirm the tap.
         'transition-[color,background-color,transform] duration-(--duration-fast)',
-        'hover:bg-bg-inset hover:text-text-primary',
         'active:scale-[0.94] motion-reduce:active:scale-100 motion-reduce:transition-none',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+        'focus-visible:outline-none focus-visible:ring-2',
+        TONES[tone],
         className
       )}
       {...props}

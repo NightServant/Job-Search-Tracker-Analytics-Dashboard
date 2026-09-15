@@ -2,7 +2,8 @@
 
 import * as React from 'react'
 import { cn } from '@/lib/utils'
-import { Input } from '@/components/ui/input'
+import { FilterBar } from '@/components/ui/filter-bar'
+import { StatusState } from '@/components/ui/status-state'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { AppDialog } from '@/components/ui/app-dialog'
@@ -10,7 +11,6 @@ import { IconButton } from '@/components/ui/icon-button'
 import { PlusIcon, TrashIcon, UploadIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Select } from '@/components/ui/select'
 import {
   Pagination,
   PaginationContent,
@@ -22,7 +22,7 @@ import {
 import { DocumentRow, DOCUMENT_GRID } from './DocumentRow'
 import { TemplateGallery, type TemplateChoice } from './TemplateGallery'
 import { DocumentChooser } from './DocumentChooser'
-import { matchesTerms, searchTerms } from './search'
+import { matchesTerms, searchTerms } from '@/lib/search'
 import { useBelowDesktop } from '@/hooks/useBelowDesktop'
 import { buttonVariants } from '@/components/ui/button-variants'
 import { ICON_MOTION_GROUP } from '@/components/icons/motion'
@@ -248,7 +248,15 @@ export function DocumentsPage({
   )
 
   return (
-    <div className="flex flex-col gap-8">
+    /*
+      `gap-10` (40px), up from 32. On this screen the template gallery and the
+      documents list are stacked, and each one now has a 24px step inside it
+      between its header group and its content -- at 32px the boundary BETWEEN
+      the sections was barely larger than a gap inside one, so "your documents"
+      did not read as a new section starting. See FilterBar for the three
+      steps.
+    */
+    <div className="flex flex-col gap-10">
       {/*
         A hidden input rather than a drop zone or a dialog: the picker is the
         platform's own and already knows how to filter by extension, remember
@@ -316,7 +324,7 @@ export function DocumentsPage({
           heading, so "your documents" read as a caption on the NAME column
           rather than as the section's own title. The filter control made it
           worse by raising that row to 40px while the heading stayed 20px. */}
-      <section className="flex flex-col gap-5">
+      <section className="flex flex-col gap-6">
         {/* THE FILTER LIVES WITH THE LIST IT NARROWS, not in the page header
             beside `new document` and `import`. Those two are page-level
             actions; this one only means anything next to the rows it hides. It
@@ -333,42 +341,50 @@ export function DocumentsPage({
             documents" against "search templates", "CVs" against "CV
             templates". Moving either pair into the page header would put a
             control that narrows one section above both of them. */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        {/* THE HEADER GROUP: the list's name and the controls that narrow it,
+            12px apart because they are one thing, and 24px clear of the table
+            below. It was a flat 20/20 -- see FilterBar for the three steps.
+
+            THE GROUP RENDERS EVEN WITH NO CONTROLS, which is why the heading
+            is inside it rather than beside it: `hasDocs` gates the row, and an
+            empty account still has a section called "your documents". */}
+        <div className="flex flex-col gap-3">
           <h2 className="text-heading-s text-text-primary">your documents</h2>
+
+          {/* SEARCH FIRST, THEN THE KIND -- the order `FilterBar` enforces for
+            every section that has both. They are not the same kind of control:
+            one finds a document you already have in mind, the other changes
+            which kind of documents the list is about.
+
+            THE HEADING NO LONGER SHARES THIS LINE (Gabe, 2026-09-15:
+            "implement a new row containing that components"). It was a
+            `justify-between` row with "your documents" at one end and the pair
+            at the other; they are a row of their own now, which is what lets
+            the search absorb the width instead of taking whatever the heading
+            left. The hand-built version before that set `w-56` for the search
+            and `w-44` for the dropdown while the gallery six inches up the page
+            set `w-52` for both -- neither number was decided, and the
+            difference was visible on one screen. */}
           {hasDocs && (
-            <div className="flex flex-wrap items-center gap-3 max-sm:w-full">
-              {/* SEARCH FIRST, THEN THE KIND. They are not the same kind of
-                  control: one finds a document you already have in mind, the
-                  other changes which kind of documents the list is about. The
-                  finder goes first because it is the one somebody arrives
-                  wanting, and it is wider because a title is longer than a
-                  kind. The gallery's own pair is ordered the same way, so the
-                  two rows read as the same idea rather than as two designs. */}
-              <div className="w-56 max-sm:w-full">
-                <Input
-                  id="document-search"
-                  type="search"
-                  icon="Search"
-                  aria-label="Search documents by name"
-                  placeholder="search documents"
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </div>
-              {/* Width on a wrapper, not on the Select: `Select`'s own root is
-                  `w-full` and only its trigger takes `className`. Same trap the
-                  calendar's country picker hit. */}
-              <div className="w-44 max-sm:w-full">
-                <Select
-                  id="document-filter"
-                  icon="Documents"
-                  aria-label="Filter documents by kind"
-                  value={filter}
-                  onValueChange={(next) => setFilter(next as DocFilter)}
-                  items={DOC_FILTERS.map((option) => ({ ...option }))}
-                />
-              </div>
-            </div>
+            <FilterBar
+              search={{
+                id: 'document-search',
+                label: 'Search documents by name',
+                placeholder: 'search documents',
+                value: query,
+                onChange: setQuery,
+              }}
+              selects={[
+                {
+                  id: 'document-filter',
+                  label: 'Filter documents by kind',
+                  icon: 'Documents',
+                  value: filter,
+                  onValueChange: (next) => setFilter(next as DocFilter),
+                  items: DOC_FILTERS.map((option) => ({ ...option })),
+                },
+              ]}
+            />
           )}
         </div>
 
@@ -409,7 +425,17 @@ export function DocumentsPage({
                 // delete MEANS while letting each look right where it is.
                 onDelete={() => onDelete?.(doc)}
                 actions={
-                  <IconButton aria-label={`Delete ${doc.title}`} onClick={() => onDelete?.(doc)}>
+                  // `tone="danger"` (Gabe, 2026-09-15). This control is only
+                  // rendered from `md` up -- `DocumentRow` puts the same verb
+                  // in an overflow menu below that, where it has been a
+                  // `variant="destructive"` item all along. So the two halves
+                  // of one row finally agree that delete is destructive; the
+                  // desktop half was the one saying otherwise.
+                  <IconButton
+                    tone="danger"
+                    aria-label={`Delete ${doc.title}`}
+                    onClick={() => onDelete?.(doc)}
+                  >
                     <TrashIcon size={16} aria-hidden className={`[&_svg]:size-4 ${iconMotion('lid')}`} />
                   </IconButton>
                 }
@@ -432,20 +458,54 @@ export function DocumentsPage({
               // With no search term the dropdown is the only candidate left,
               // and the count of what is in the OTHER kind is the useful half:
               // it says the account is not empty and where the rest went.
-              <p className="py-8 text-body-m text-text-muted" data-documents-filter-empty>
-                {terms.length > 0 ? (
-                  <>
-                    nothing matches “{query.trim()}”
-                    {filter === 'all' ? '' : filter === 'word' ? ' in CVs' : ' in cover letters'}.
-                  </>
-                ) : (
-                  <>
-                    no {filter === 'word' ? 'CVs' : 'cover letters'}. there
-                    {docs.length === 1 ? ' is ' : ' are '}
-                    {docs.length} {docs.length === 1 ? 'document' : 'documents'} of the other kind.
-                  </>
-                )}
-              </p>
+              // `StatusState kind="no-results"` since 2026-09-15, replacing a
+              // loose muted <p>. The SENTENCES are unchanged -- they were
+              // already doing the hard part, which is naming which control
+              // emptied the list -- and what they gain is the lens glyph and
+              // the centring every other "nothing here" surface in the app
+              // has. A line of grey text is the shape a FAILED READ takes too,
+              // and telling those two apart at a glance is the whole reason
+              // this component exists.
+              //
+              // `compact`, because this sits inside a section under a heading
+              // and a column row, not on an empty screen.
+              <StatusState
+                kind="no-results"
+                compact
+                data-documents-filter-empty
+                /* The heading must not repeat the message's own opening
+                   words -- "nothing matches that search" over "nothing matches
+                   'zzz' in CVs" is the same sentence twice, and it broke a
+                   test that reads the copy rather than a data attribute. The
+                   heading names the SHAPE of the result; the message names the
+                   term and the kind. */
+                title={terms.length > 0 ? 'no matching documents' : 'nothing of that kind'}
+                message={
+                  terms.length > 0 ? (
+                    <>
+                      nothing matches “{query.trim()}”
+                      {filter === 'all' ? '' : filter === 'word' ? ' in CVs' : ' in cover letters'}.
+                    </>
+                  ) : (
+                    <>
+                      no {filter === 'word' ? 'CVs' : 'cover letters'}. there
+                      {docs.length === 1 ? ' is ' : ' are '}
+                      {docs.length} {docs.length === 1 ? 'document' : 'documents'} of the other kind.
+                    </>
+                  )
+                }
+                action={
+                  // Only when a search is what emptied it. Offering to clear a
+                  // search nobody typed is a button that does nothing, and the
+                  // dropdown is two inches away and already reads as the
+                  // control that did this.
+                  terms.length > 0 ? (
+                    <Button variant="secondary" size="s" onClick={() => setQuery('')}>
+                      clear the search
+                    </Button>
+                  ) : undefined
+                }
+              />
             )}
 
             {filtered.length > 0 && (

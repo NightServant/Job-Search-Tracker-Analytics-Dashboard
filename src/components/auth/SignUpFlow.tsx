@@ -6,7 +6,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Field } from '@/components/ui/field'
 import { Input, PasswordInput } from '@/components/ui/input'
-import { CheckIcon, UserRoundIcon } from '@/components/icons'
+import { UserRoundIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 import {
   isPasswordStrong,
@@ -22,6 +22,7 @@ import { OAuthButtons } from './OAuthButtons'
 import { OtpStep } from './OtpStep'
 import { PasswordRequirements } from './PasswordRequirements'
 import { ProgressTrack } from '@/components/ui/progress-track'
+import { StatusState } from '@/components/ui/status-state'
 
 /**
  * Registration, as three steps over one layout.
@@ -241,7 +242,13 @@ export function SignUpFlow({
 
               {/* The glyph is dropped while busy: Button's spinner uses the
                   same leading slot. */}
-              <Button type="submit" variant="primary" size="m" loading={busy}>
+              <Button
+                type="submit"
+                variant="primary"
+                size="m"
+                loading={busy}
+                loadingText="Creating your account..."
+              >
                 {!busy && <UserRoundIcon size={16} aria-hidden className={iconMotion('lift')} />}
                 Create account
               </Button>
@@ -274,28 +281,46 @@ export function SignUpFlow({
           )}
 
           {step === 2 && (
-            <div data-signup-done className="flex flex-col items-center gap-4 text-center">
-              <span
-                aria-hidden
-                className="grid h-12 w-12 place-items-center rounded-full bg-status-offer-mark/10 text-status-offer-mark"
-              >
-                <CheckIcon size={24} />
-              </span>
-              <h1 className="text-heading-l text-text-primary">you are all set</h1>
-              <p className="text-body-m text-text-secondary">
-                Your account is verified. Taking you to your dashboard now.
-              </p>
-              {/*
-                A link beside the automatic redirect, not instead of it: an
-                automatic navigation that fails silently leaves someone on a
-                thank-you page forever, and this is the way out.
-              */}
-              <Link
-                href="/dashboard"
-                className="text-body-s text-accent-default underline underline-offset-4"
-              >
-                go to the dashboard now
-              </Link>
+            /*
+              `StatusState kind="success"` since 2026-09-15, replacing a
+              hand-rolled block that drew its own 48px circle badge, its own
+              green token and its own centred stack. Every one of those
+              decisions was right; the problem was that they were made HERE,
+              so the app's only success screen shared nothing with the app's
+              other nine states and would have drifted from them the first
+              time either was touched.
+
+              `titleAs="h1"` is the one thing this caller needs that a state
+              inside a panel must not have: this IS the page, and a page whose
+              only text is a paragraph has no heading for a screen reader to
+              navigate by. It matches step 0's own `<h1>` exactly.
+
+              The glyph changes from a filled circle badge to `CircleCheck` at
+              the state's own scale. That is the vocabulary rule rather than a
+              preference: `icons` is the one drawing set, and a bespoke badge
+              built from a background colour and a bare tick is a second one.
+            */
+            <div data-signup-done>
+              <StatusState
+                kind="success"
+                titleAs="h1"
+                compact
+                title="you are all set"
+                message="Your account is verified. Taking you to your dashboard now."
+                action={
+                  /*
+                    A link beside the automatic redirect, not instead of it: an
+                    automatic navigation that fails silently leaves someone on
+                    a thank-you page forever, and this is the way out.
+                  */
+                  <Link
+                    href="/dashboard"
+                    className="text-body-s text-accent-default underline underline-offset-4"
+                  >
+                    go to the dashboard now
+                  </Link>
+                }
+              />
             </div>
           )}
         </div>

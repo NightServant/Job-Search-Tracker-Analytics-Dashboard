@@ -99,7 +99,15 @@ export function ApplicationsList({
                   </IconButton>
                 )}
                 {onDelete && (
+                  // `tone="danger"`, for the reason the documents row got it
+                  // (Gabe, 2026-09-15) rather than as unrequested tidying: the
+                  // applications TABLE two files over already draws its delete
+                  // red, so leaving this one grey would have moved the
+                  // inconsistency rather than removed it -- delete would read
+                  // as destructive in the table view and harmless in the list
+                  // view of the same records.
                   <IconButton
+                    tone="danger"
                     aria-label={`Delete ${job.role} at ${job.company}`}
                     onClick={() => onDelete(job)}
                     className="shrink-0"

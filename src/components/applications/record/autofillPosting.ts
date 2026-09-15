@@ -133,6 +133,14 @@ export async function autofillPosting({
           salaryMin: mined.salary_min == null ? undefined : String(mined.salary_min),
           salaryMax: mined.salary_max == null ? undefined : String(mined.salary_max),
           techStack: mined.tech_stack?.length ? mined.tech_stack.join(', ') : undefined,
+          // THE ROLE OVERVIEW'S HOMELESS TERMS (2026-09-15). Employment type,
+          // the shift, the office pattern -- facts a reader decides on that
+          // this app has no column for. They used to ride in the description's
+          // `Role overview:` block; that block is gone, because role-overview
+          // information now fills the FORM and the description is duties and
+          // qualifications. Without this line the instruction would have
+          // traded one loss for another. See `PostingFields.tags`.
+          tags: mined.tags?.length ? mined.tags.join(', ') : undefined,
           // Guarded against the union and the supported set: both arrive from
           // a remote page, and an unrecognised value would put a select into a
           // state no option matches, or fail a CHECK at the insert.

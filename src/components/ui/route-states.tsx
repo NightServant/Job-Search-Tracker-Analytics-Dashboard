@@ -2,6 +2,8 @@ import * as React from 'react'
 import { Button } from '@/components/ui/button'
 import { AlertCircleIcon } from '@/components/icons'
 import { ICON_STATE_MOTION } from '@/components/icons/motion'
+import { StatusState } from '@/components/ui/status-state'
+import { isPermissionDenied } from '@/services/supabaseHelpers'
 
 /**
  * The route-level loading and error blocks every top-level `page.tsx` under
@@ -53,9 +55,44 @@ export interface RouteErrorProps {
    * cannot fix the error, as the detail route's not-found state does.
    */
   action?: React.ReactNode
+  /**
+   * The thrown value, when the caller has it.
+   *
+   * IT IS OPTIONAL AND IT CHANGES THE WHOLE SCREEN. When it is a refusal
+   * rather than a failure -- see `isPermissionDenied` -- this renders the
+   * `denied` state instead, with no retry button. That distinction was
+   * invisible before 2026-09-15: a row-level-security refusal and a dropped
+   * connection both arrived here as an unlabelled Error, so a route answered
+   * "this is not yours" with "could not load your dashboard" and a button that
+   * would refuse identically every time it was pressed.
+   *
+   * Passed rather than derived from `message`, because the code is the
+   * evidence and the message is a sentence somebody wrote.
+   */
+  error?: unknown
 }
 
-export function RouteError({ title, message, action }: RouteErrorProps) {
+export function RouteError({ title, message, action, error }: RouteErrorProps) {
+  /*
+    A REFUSAL IS NOT A FAILURE, and the two get different screens.
+
+    `title` and `message` are DELIBERATELY IGNORED on this branch. Every caller
+    passes something like "could not load your dashboard" plus whatever string
+    the thrown error carried -- and for a refusal both are wrong: nothing
+    failed to load, and the database's own wording ("new row violates
+    row-level security policy for table jobs") is not a sentence to show
+    anybody. The state's own copy is the right copy here.
+
+    NO RETRY, and that is the substantive half. `RouteError`'s default action
+    reloads the page, which for a refusal produces the identical refusal. A
+    button that cannot work is worse than no button: it is what somebody
+    presses six times before concluding the app is broken rather than that the
+    answer is no.
+  */
+  if (isPermissionDenied(error)) {
+    return <StatusState kind="denied" action={action} />
+  }
+
   return (
     <div className="flex flex-col items-center gap-3 py-24 text-center">
       <AlertCircleIcon

@@ -207,6 +207,10 @@ function CvRoute() {
             ? draftQuery.error.message
             : 'An error occurred while loading it.'
         }
+        // See RouteError. This route already reasoned about the distinction in
+        // prose above -- "RLS makes a bad id and someone else's CV
+        // indistinguishable" -- and this is what finally acts on it.
+        error={draftQuery.error}
       />
     )
   }

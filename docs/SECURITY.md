@@ -222,6 +222,38 @@ resend.com/domains, and change the `from` address to an email using this
 domain.
 ```
 
+### THE SENDING BLOCK IS GONE (2026-09-15): Brevo, not Resend
+
+Everything below this heading describes the Resend arrangement and the domain
+hunt it forced. It is kept because the reasoning about *why* each alternative
+route failed is still correct and worth not repeating — but the conclusion has
+changed, so read it as history.
+
+**What was wrong.** Resend's shared `onboarding@resend.dev` sender delivers
+only to the Resend account owner. Every other recipient was dropped *silently*
+— not bounced, not errored, never delivered — so signup worked for exactly one
+address. Lifting that needs a verified sending **domain**, which is what the
+`worktrack.eu.org` request had been waiting on since 2026-09-03 with no queue
+position and no support channel.
+
+**What changed.** Brevo's free tier verifies a **single sender address** rather
+than a domain: you click a link in an email sent to an ordinary mailbox — a
+Gmail address is fine — and from then on you may send to anybody, 300 a day.
+`[auth.email.smtp]` in `supabase/config.toml` now points at
+`smtp-relay.brevo.com:587`.
+
+**The domain is now an upgrade, not a blocker.** When `worktrack.eu.org` lands,
+adding its DKIM records to Brevo improves deliverability and lets the From
+address stop being a personal mailbox. Nothing in the app changes for it, and
+nobody is blocked while it is pending.
+
+**Credentials** — `SUPABASE_AUTH_SMTP_USER` (the Brevo login email, which is
+the SMTP username), `BREVO_SMTP_KEY` (an **SMTP key**, not the account password
+and not the transactional API key), `SUPABASE_AUTH_SMTP_SENDER` (the verified
+sender). The key is read from the macOS keychain under service
+`worktrack-smtp` so it never sits in the working tree; see
+`scripts/push-auth-config.sh`.
+
 ### To reach real users
 
 A verified sending domain is the only way, and it needs a domain whose DNS you
@@ -395,15 +427,143 @@ people actually job-hunt from.
 Each provider must be enabled with a client ID and secret in the dashboard;
 those secrets live there and never in this repository.
 
+## The 2026-09-15 pass
+
+Gabe's brief asked for six things, from a set of prompts about authentication,
+data isolation, deployment, abuse, secrets and input validation, and then for
+"highly secured file uploads". What follows is what changed and — more usefully
+— what was already true, because roughly half the brief was already met and
+saying so is the point of writing an audit down.
+
+### Response headers — new, and there were none
+
+`next.config.ts` had no `headers()` at all, so the app sent no
+`Strict-Transport-Security`, no `X-Content-Type-Options`, no clickjacking
+defence and no CSP. Every one of those is a browser-enforced rule the server
+has to ask for, and nothing in the application code substitutes for any of
+them, which is exactly why their absence was invisible in review.
+
+Now sent on every path including `/api`: HSTS (two years, `includeSubDomains`,
+`preload`), `nosniff`, `X-Frame-Options: DENY`,
+`Referrer-Policy: strict-origin-when-cross-origin`, a `Permissions-Policy`
+denying camera/microphone/geolocation/payment/usb, and a CSP.
+
+**The CSP is deliberately partial and that is the honest shape.** It carries
+`base-uri`, `form-action`, `object-src`, `frame-ancestors` and
+`upgrade-insecure-requests` — the directives that are absolute, need no nonce
+and have no legitimate exception here. It carries no `script-src`, because a
+real one needs a per-request nonce threaded through Next's own hydration
+bootstrap and one with `'unsafe-inline'` permits precisely what it appears to
+forbid. It carries no `default-src`, because that supplies `connect-src` and
+would have cut the browser off from Supabase, Sentry and jobicy.com — an app
+that cannot reach its own auth provider is not a hardened app.
+`src/__tests__/securityHeaders.test.ts` asserts both absences so neither is
+"fixed" into an outage later.
+
+### Sessions now actually expire
+
+`jwt_expiry = 3600` was already set and is **not** a session lifetime: it is how
+long one access token is good for, and with refresh-token rotation on, the
+browser renews it forever. A session on a borrowed laptop lasted indefinitely.
+
+`[auth.sessions]` in `supabase/config.toml` now sets `timebox = "24h"` and
+`inactivity_timeout = "8h"`, enforced by GoTrue rather than by anything this
+repo ships. The client half is `sessionExpired` in `AuthContext` plus
+`SessionExpiredDialog`: a session that ends underneath a reader is told apart
+from a deliberate sign-out and from never having signed in, and gets a sentence
+and a `?next=` link instead of a silent bounce to `/login`.
+
+`otp_expiry` went from 3600 to 600. One number governs the sign-up code and the
+password-reset code, both single-factor; an hour is long enough for a forwarded
+email or a synced notification on a second device to still be a live key.
+
+**These need `npm run push:auth-config` to take effect.**
+
+### Logging — new
+
+`src/lib/securityLog.ts`, one JSON line per event to stdout, collected by
+Vercel Runtime Logs. Emitted from `authenticate()` for every refusal, and from
+`/api/autofill` and `/api/profile` for throttle trips, SSRF-gate rejections and
+upstream failures.
+
+Refusals only, never successes — a line per authorised request buries the
+interesting ones. **Never logged: tokens, passwords, email addresses, request
+bodies, or a caller-supplied URL.** An email in a log drain is a user-enumeration
+oracle; the user id is a UUID and is what a query needs.
+
+### File uploads — `src/lib/uploadSafety.ts`
+
+Three file inputs (documents, applications CSV, LinkedIn export) and before
+this **none of them checked anything**. `accept=".csv,text/csv"` filters the
+picker's default view; every picker has an "All files" option.
+
+| Gate | What it stops |
+|---|---|
+| Size cap, before any read | A 2GB mis-click freezing the tab. 8MB documents, 4MB CSV, 20MB per multi-file pick. |
+| Magic-byte check | A renamed PDF, executable, image or archive reaching a parser. A `.docx` must be a zip. |
+| Zip budget | A .docx bomb: ten kilobytes declaring four gigabytes. Checked before mammoth, not inside the try/catch that falls back on a corrupt package. |
+| `safeDocumentTitle` | Path components, control characters and bidi overrides in a filename that becomes a stored title and a `Content-Disposition`. |
+
+**Scope, stated honestly:** all of it runs in the browser and these files never
+reach a server as files, so it is a boundary against a mis-click, a hostile
+file somebody was *sent*, and a parser handed something it cannot survive —
+not against a determined attacker, who is attacking their own tab. No virus
+scanning: nothing here can execute an uploaded file.
+
+The one exception that crosses between people is `escapeCsvCell`, applied to
+every cell of the CSV **export**. A spreadsheet un-quotes a cell and then
+evaluates it, so a value beginning `=`, `+`, `-` or `@` is a formula with reach
+outside the document. Every export column is text somebody typed, and `company`
+is routinely pasted off a job posting — so a crafted posting becomes a CSV
+mailed to a recruiter. CWE-1236, and correct CSV quoting is exactly why it is
+missed.
+
+### What was already true, and was verified rather than assumed
+
+- **Password hashing, email verification, reset-token expiry** — GoTrue's, with
+  `enable_confirmations = true` and `minimum_password_length = 10` plus
+  `password_requirements` already in `config.toml`.
+- **Data isolation / IDOR** — twelve tables, twelve RLS policies; every API
+  route calls `authenticate()` before it reads a body; `middleware.ts` uses
+  `getUser()` rather than `getSession()`. `isPermissionDenied` in
+  `services/supabaseHelpers.ts` is new, and only changes what a refusal LOOKS
+  like: a denial now gets its own screen and no retry button, instead of "could
+  not load your dashboard" and a button that refuses identically every time.
+- **Secrets** — re-checked. No service-role key anywhere in `src/`; the only
+  `NEXT_PUBLIC_` variables are the anon key, the Sentry DSN and build metadata.
+- **Injection** — Supabase's client parameterises every query; there is no raw
+  SQL in `src/`. No `eval`, no `new Function`. Two `dangerouslySetInnerHTML`
+  call sites, both read: shadcn's chart theme block (a static config object)
+  and `SessionAttributeScript` (one interpolated value, constrained to
+  `^[a-z0-9]+$` and taken from a build-time variable). The .docx importer walks
+  mammoth's HTML with an **allowlist** — only headings, paragraphs and lists are
+  ever emitted — so a `<script>` in a document becomes visible text, not a node.
+- **SSRF** — `lib/jobUrl` gates the two routes that fetch a third-party page,
+  and the extractor re-checks the URL a redirect lands on.
+
 ## Fixed since the audit
 
 - `PasswordInput` drew its reveal control with a magnifying glass and its
   hidden state with a padlock — a search affordance inside a password field.
   It now uses `lu-eye` / `lu-eye-off` from the AnimateIcons registry, asserted
   on glyph geometry rather than on the imported name.
+- Sessions expire server-side; emailed codes expire in ten minutes; every
+  auth refusal and rate-limit trip is logged; the app sends security headers;
+  all three file pickers validate before reading. See the 2026-09-15 pass.
 
 ## Still open
 
+- **CAPTCHA is not enabled.** `[auth.captcha]` in `supabase/config.toml` is
+  commented out with the steps to turn it on. It needs a Turnstile secret that
+  must not live in this file and a site key wired into both auth forms, and
+  half of it — a config demanding a token the forms do not send — would lock
+  everybody out of registration. Until then, `[auth.rate_limit]` is the only
+  server-side bot defence, and it is per-IP.
+- **The CSP has no `script-src`.** The upgrade path is nonce middleware plus an
+  explicit `connect-src`; it should be taken the day this app renders anything
+  a user typed as markup.
 - Client-side validation is duplicated by nothing on the server beyond
   Supabase's own rules. That is acceptable while Supabase owns the user table;
   it stops being acceptable the moment a custom endpoint writes credentials.
+  (`minimum_password_length` and `password_requirements` in `config.toml` closed
+  the password half of this on 2026-09-11.)

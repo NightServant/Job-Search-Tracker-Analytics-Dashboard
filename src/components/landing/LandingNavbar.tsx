@@ -37,6 +37,27 @@ import { NAV_LINKS } from './content'
  * visually part of the hero, which is what the decision is about; it is a DOM
  * sibling, which is what makes it work.
  *
+ * ITS CONTENT SITS ON THE FOOTER'S COLUMN (Gabe, 2026-09-15: "top navigation
+ * bar must have the same width with the footer"). The BAR still spans the
+ * viewport -- it has to, because its background and its bottom border are what
+ * separate it from the page under it -- but everything inside it is now in the
+ * same `px-gutter` + `max-w-wide` container SiteFooter uses, so the brand
+ * lockup at the top of the page starts on the same vertical line as the brand
+ * lockup at the bottom of it, and as every section heading in between.
+ *
+ * THIS OVERTURNS THE RULE SiteFooter's DOCBLOCK WROTE DOWN -- "page CONTENT
+ * aligns to the 1200px column, and fixed chrome that frames the viewport spans
+ * it". That rule was defensible and is now decided against: the navbar carries
+ * a wordmark and three links, which read as content whatever the element is
+ * positioned as, and at 1440 the old `md:px-16` put the lockup 51px left of
+ * everything it sits above. The frame/content distinction still holds for
+ * SectionRail, SectionIndex and StickyMobileCta, none of which carry anything
+ * the eye lines up against a heading.
+ *
+ * The scrim stays a direct child of the <header> rather than moving into the
+ * container, because it is the bar's ground and has to reach both edges of the
+ * viewport; inset to a 1200px column it would end in a visible vertical seam.
+ *
  * `overHero` is a prop and nothing here computes it. Landing owns it via
  * navOverHero() so that one component cannot decide it is over the hero while
  * another decides it is not -- M5's sidebar and bottom nav each deriving their
@@ -111,19 +132,53 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
       data-landing-nav
       data-over-hero={overHero ? 'true' : 'false'}
       className={cn(
-        'fixed inset-x-0 top-0 z-50 flex h-[60px] items-center gap-6 px-gutter',
-        'md:h-20 md:gap-8 md:px-16',
+        // `px-gutter` at every width, with no `md:px-16` step: the gutter is
+        // the footer's, and the container below is what actually holds the
+        // content to 1200px once the viewport is wider than that.
+        'fixed inset-x-0 top-0 z-50 flex h-[60px] items-center px-gutter',
+        'md:h-20',
         // Colour only, and only these three properties. A bar that resizes or
         // slides on scroll is the pattern this design system's restraint rules
         // out, and it would fight the pinned hero underneath it.
         'transition-[background-color,border-color,color] duration-150',
         'motion-reduce:transition-none',
-        // No `border-b-0` on the blended branch: no border is already the
-        // default, and the redundant class would make a "has no bottom border"
-        // assertion pass on the substring while meaning nothing.
+        /*
+          IT BLURS WHAT PASSES BEHIND IT (Gabe, 2026-09-15: "implement backdrop
+          blur or increase the z-index of the top navigation bar to avoid
+          overlapping with other visual elements").
+          THE Z-INDEX HALF WAS ALREADY DONE and is not what was wrong. Measured
+          in the browser: this bar is `z-50` and every other piece of landing
+          chrome -- the rail, the section index, the sticky mobile CTA, the
+          mobile menu panel -- is `z-40`, so nothing on the page paints over
+          it. The overlap being reported is not a stacking failure, it is that
+          the bar was TRANSPARENT over the hero and OPAQUE-BUT-HARD-EDGED
+          everywhere else: over the hero a headline scrolls straight through
+          the nav links with only a gradient scrim between them, and off it a
+          section's top edge is guillotined by a flat white band.
+          So blur is the fix and the two branches want different amounts of it.
+          OVER THE HERO: `bg-ink-950/30` plus a blur, which is EXACTLY what
+          SectionRail already does for the same problem in the opposite margin
+          -- its docblock is the argument, that white-at-45% marks on a bright
+          moving frame drift in and out of legibility as the clip plays, which
+          is worse than being consistently wrong because it looks like a
+          flicker. The bar has the same problem in the same footage. The scrim
+          gradient below stays: it handles the top of the bar, this handles the
+          whole plate.
+          OFF THE HERO: `bg-bg-canvas/80` plus a blur, so the content under the
+          bar softens as it passes rather than being cut off by an opaque edge.
+          SUPPORTS-GUARDED, and that is not decoration. Without the guard a
+          browser with no `backdrop-filter` gets a bar that is 80% opaque and
+          NOT blurred -- text sliding through legible text, which is strictly
+          worse than the flat bar this replaces. The translucency is therefore
+          bought only where the blur that justifies it is available; everywhere
+          else the bar stays opaque.
+        */
         overHero
-          ? 'bg-transparent text-ink-50'
-          : 'border-b border-border-subtle bg-bg-canvas text-text-primary'
+          ? 'bg-transparent text-ink-50 supports-[backdrop-filter]:bg-ink-950/30 supports-[backdrop-filter]:backdrop-blur-sm'
+          : cn(
+              'border-b border-border-subtle bg-bg-canvas text-text-primary',
+              'supports-[backdrop-filter]:bg-bg-canvas/80 supports-[backdrop-filter]:backdrop-blur-md'
+            )
       )}
     >
       {overHero && (
@@ -137,103 +192,114 @@ export function LandingNavbar({ overHero }: LandingNavbarProps) {
         />
       )}
 
-      <Link href="/" aria-label="Worktrack home" className="shrink-0">
-        {/*
-          Over the hero the lockup renders its DARK-MODE colours whatever the
-          page theme is, because the hero is dark in both. Two halves to that:
-
-          `text-ink-50` carries the wordmark and BrandMark's three static
-          cells, which are `currentColor`.
-
-          The accent cell is `fill="var(--color-accent-default)"`, which
-          resolves to accent-700 (#c2410c) in the light theme -- too dark
-          against near-black, and the same contrast problem that made the hero
-          eyebrow accent-400 rather than accent-default in the frame. So the
-          token itself is redefined for this subtree rather than the component
-          being forked or given a variant prop, which is what BrandMark's own
-          docblock asks callers to do.
-
-          `[&>svg]:text-ink-50` is NOT redundant with the container's
-          `text-ink-50`, and leaving it out is a bug that only shows in the
-          light theme. BrandMark sets `text-text-primary` on its OWN <svg>, so
-          the inherited colour never reaches the three currentColor cells --
-          the svg re-declares it. In dark mode text-text-primary is near-white
-          and the mark looks correct by accident; in light mode it is
-          near-black and the cells vanish into the hero. The descendant
-          selector out-specifies the svg's own class, which is what actually
-          repaints them.
-        */}
-        <BrandLockup
-          className={cn(
-            overHero &&
-              'text-ink-50 [&>svg]:text-ink-50 [--color-accent-default:var(--color-accent-400)]'
-          )}
-        />
-      </Link>
-
-      <div className="flex-1" />
-
-      <nav
-        data-nav-links
-        aria-label="Landing sections"
-        className="hidden items-center gap-8 md:flex"
+      {/*
+        THE FOOTER'S COLUMN, copied rather than imported for the same reason
+        SiteFooter copies it from Section: one `mx-auto w-full max-w-wide`
+        is smaller than a component that exists to hold two class names, and
+        the three places that spend it are the three the eye compares.
+      */}
+      <div
+        data-nav-container
+        className="mx-auto flex w-full max-w-wide items-center gap-6 md:gap-8"
       >
-        {NAV_LINKS.map((link) => (
-          <Link
-            key={link.label}
-            href={link.href}
-            {...(link.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
-            {...(link.external ? {} : { onClick: linkHandler(link.href) })}
+        <Link href="/" aria-label="Worktrack home" className="shrink-0">
+          {/*
+            Over the hero the lockup renders its DARK-MODE colours whatever the
+            page theme is, because the hero is dark in both. Two halves to that:
+
+            `text-ink-50` carries the wordmark and BrandMark's three static
+            cells, which are `currentColor`.
+
+            The accent cell is `fill="var(--color-accent-default)"`, which
+            resolves to accent-700 (#c2410c) in the light theme -- too dark
+            against near-black, and the same contrast problem that made the hero
+            eyebrow accent-400 rather than accent-default in the frame. So the
+            token itself is redefined for this subtree rather than the component
+            being forked or given a variant prop, which is what BrandMark's own
+            docblock asks callers to do.
+
+            `[&>svg]:text-ink-50` is NOT redundant with the container's
+            `text-ink-50`, and leaving it out is a bug that only shows in the
+            light theme. BrandMark sets `text-text-primary` on its OWN <svg>, so
+            the inherited colour never reaches the three currentColor cells --
+            the svg re-declares it. In dark mode text-text-primary is near-white
+            and the mark looks correct by accident; in light mode it is
+            near-black and the cells vanish into the hero. The descendant
+            selector out-specifies the svg's own class, which is what actually
+            repaints them.
+          */}
+          <BrandLockup
             className={cn(
-              'text-body-s transition-colors',
-              overHero
-                ? 'text-ink-50/85 hover:text-ink-50'
-                : 'text-text-secondary hover:text-text-primary'
+              overHero &&
+                'text-ink-50 [&>svg]:text-ink-50 [--color-accent-default:var(--color-accent-400)]'
             )}
-          >
-            {link.label}
-          </Link>
-        ))}
-      </nav>
+          />
+        </Link>
 
-      {/*
-        Shown at EVERY width, including mobile. Figma 64:1020 draws no toggle
-        in the 375px bar, and this deliberately departs from it: the footer's
-        toggle was removed on 2026-09-02, and the frame's omission was only
-        survivable while the footer carried one. Following it now would leave a
-        phone visitor with no way to change the theme anywhere on the page.
-      */}
-      <div data-nav-toggle>
-        <ThemeToggle size={32} className={cn(overHero && 'text-ink-50')} />
+        <div className="flex-1" />
+
+        <nav
+          data-nav-links
+          aria-label="Landing sections"
+          className="hidden items-center gap-8 md:flex"
+        >
+          {NAV_LINKS.map((link) => (
+            <Link
+              key={link.label}
+              href={link.href}
+              {...(link.external ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+              {...(link.external ? {} : { onClick: linkHandler(link.href) })}
+              className={cn(
+                'text-body-s transition-colors',
+                overHero
+                  ? 'text-ink-50/85 hover:text-ink-50'
+                  : 'text-text-secondary hover:text-text-primary'
+              )}
+            >
+              {link.label}
+            </Link>
+          ))}
+        </nav>
+
+        {/*
+          Shown at EVERY width, including mobile. Figma 64:1020 draws no toggle
+          in the 375px bar, and this deliberately departs from it: the footer's
+          toggle was removed on 2026-09-02, and the frame's omission was only
+          survivable while the footer carried one. Following it now would leave a
+          phone visitor with no way to change the theme anywhere on the page.
+        */}
+        <div data-nav-toggle>
+          <ThemeToggle size={32} className={cn(overHero && 'text-ink-50')} />
+        </div>
+
+        {/*
+          THE MOBILE MENU. Below md the three links were simply hidden, which
+          left a phone visitor with no route to the FAQ or the repository from
+          the top of the page -- the nav did not degrade, it disappeared.
+
+          A disclosure rather than a Sheet or a Drawer: this is three links and
+          the shadcn overlays bring a focus trap, a portal and an animation
+          library for a panel that needs none of them. The trade is that the
+          focus trap has to be replaced by something, which is why Escape closes
+          it, the page beneath it stops scrolling, and the button owns
+          aria-expanded and aria-controls.
+        */}
+        <button
+          type="button"
+          data-nav-menu-toggle
+          aria-expanded={menuOpen}
+          aria-controls="landing-mobile-nav"
+          aria-label={menuOpen ? 'Close menu' : 'Open menu'}
+          onClick={() => setMenuOpen((v) => !v)}
+          className={cn(
+            'grid h-10 w-10 place-items-center rounded-md md:hidden',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
+            overHero ? 'text-ink-50' : 'text-text-primary'
+          )}
+        >
+          {menuOpen ? <CloseIcon size={20} /> : <MenuIcon size={20} />}
+        </button>
       </div>
-
-      {/*
-        THE MOBILE MENU. Below md the three links were simply hidden, which
-        left a phone visitor with no route to the FAQ or the repository from
-        the top of the page -- the nav did not degrade, it disappeared.
-
-        A disclosure rather than a Sheet or a Drawer: this is three links and
-        the shadcn overlays bring a focus trap, a portal and an animation
-        library for a panel that needs none of them. The trade is that the
-        focus trap has to be replaced by something, which is why Escape closes
-        it, the page beneath it stops scrolling, and the button owns
-        aria-expanded and aria-controls.
-      */}
-      <button
-        type="button"
-        data-nav-menu-toggle
-        aria-expanded={menuOpen}
-        aria-controls="landing-mobile-nav"
-        aria-label={menuOpen ? 'Close menu' : 'Open menu'}
-        onClick={() => setMenuOpen((v) => !v)}
-        className={cn(
-          'grid h-10 w-10 place-items-center rounded-md md:hidden',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-default',
-          overHero ? 'text-ink-50' : 'text-text-primary'
-        )}
-      >
-        {menuOpen ? <CloseIcon size={20} /> : <MenuIcon size={20} />}
-      </button>
 
       {menuOpen && (
         <div

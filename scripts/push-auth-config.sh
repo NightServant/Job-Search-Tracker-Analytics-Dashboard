@@ -30,9 +30,10 @@ cd "$(dirname "$0")/.."
 
 REQUIRED=(
   SUPABASE_AUTH_SITE_URL      # the production origin; no default, on purpose
-  RESEND_API_KEY              # SMTP password. Empty here means broken email there.
+  SUPABASE_AUTH_SMTP_USER     # the Brevo login email, which is the SMTP username
+  BREVO_SMTP_KEY              # SMTP password. Empty here means broken email there.
                               # Read from the keychain when absent -- see below.
-  SUPABASE_AUTH_SMTP_SENDER   # the From address; Resend rejects unverified domains
+  SUPABASE_AUTH_SMTP_SENDER   # the From address; must be a VERIFIED SENDER in Brevo
 )
 
 if [ -f .env ]; then
@@ -42,25 +43,27 @@ if [ -f .env ]; then
   set +a
 fi
 
-# RESEND_API_KEY comes from the macOS keychain if it is not already in .env.
+# BREVO_SMTP_KEY comes from the macOS keychain if it is not already in .env.
 #
-# `resend login` stores the key under service "resend-cli" with storage set to
-# "secure_storage", so the key is in the keychain and NOT in
-# ~/.config/resend/credentials.json -- that file holds only the profile name,
-# the key type and its permission.
+# THE KEYCHAIN READ IS KEPT FROM THE RESEND ERA and the reasoning is unchanged:
+# this is an SMTP password, and the alternative is a plaintext credential in
+# the working tree, in a file that is one `git add -f` away from being
+# committed. It stays in the keychain, is read into one process's environment
+# for the length of one push, and is never echoed -- the assignment is quiet
+# and nothing below prints the value.
 #
-# Reading it here rather than copying it into .env is the point: the key is an
-# SMTP password that would otherwise sit in plaintext in the working tree, in a
-# file that is one `git add -f` away from being committed. This way it stays in
-# the keychain, is read into one process's environment for the length of one
-# push, and is never written down. It is also never echoed -- the assignment is
-# quiet and nothing below prints the value.
+# THE SERVICE NAME IS OURS, NOT A CLI'S. `resend login` created its own
+# keychain entry under "resend-cli"; Brevo ships no CLI, so store it yourself,
+# once:
 #
-# If the entry is absent the assignment is empty and the check below catches
-# it, so a machine without the CLI simply falls back to .env.
-if [ -z "${RESEND_API_KEY:-}" ] && command -v security >/dev/null 2>&1; then
-  RESEND_API_KEY="$(security find-generic-password -s resend-cli -w 2>/dev/null || true)"
-  export RESEND_API_KEY
+#   security add-generic-password -s worktrack-smtp -a brevo -w
+#
+# and it is read back here. If the entry is absent the assignment is empty and
+# the check below catches it, so a machine without a keychain simply falls back
+# to .env.
+if [ -z "${BREVO_SMTP_KEY:-}" ] && command -v security >/dev/null 2>&1; then
+  BREVO_SMTP_KEY="$(security find-generic-password -s worktrack-smtp -w 2>/dev/null || true)"
+  export BREVO_SMTP_KEY
 fi
 
 missing=()

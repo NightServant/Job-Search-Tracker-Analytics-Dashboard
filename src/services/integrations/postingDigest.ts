@@ -44,6 +44,24 @@ export interface PostingFields {
   salary_max: number | null
   salary_currency: string | null
   tech_stack: string[]
+  /**
+   * The role-overview terms that have no column of their own -- employment
+   * type, the office days, a shift pattern (Gabe, 2026-09-15: "role overview
+   * information must be used to fill-up the application form").
+   *
+   * WHY THEY GO IN `tags` RATHER THAN A NEW COLUMN. The description used to
+   * carry a `Role overview:` block precisely because "this app stores none of
+   * them except the work arrangement, so if they are not here they are lost".
+   * That block is gone now -- the description is duties and qualifications --
+   * so the terms had to land somewhere or the instruction would trade one loss
+   * for another. `tags` is a free string array that already exists on the form,
+   * already round-trips to the database, and is already what a reader uses to
+   * mark an application with something the schema never anticipated.
+   *
+   * Grounded verbatim, exactly like `tech_stack`: a tag the posting does not
+   * contain is invention wearing a shorter word.
+   */
+  tags: string[]
 }
 
 export interface PostingDigest {
@@ -86,6 +104,7 @@ const EMPTY_FIELDS: PostingFields = {
   salary_max: null,
   salary_currency: null,
   tech_stack: [],
+  tags: [],
 }
 
 const WORK_MODES = new Set(['onsite', 'hybrid', 'remote'])
@@ -193,10 +212,53 @@ function inVocabulary(word: string, vocabulary: Set<string>, suffixes: string[])
  * other, which is what stops `Working at Google:` walking in as structure.
  */
 const STRUCTURE_WORDS = new Set([
-  'role', 'overview', 'responsibilities', 'qualifications', 'technical',
-  'skills', 'benefits', 'compensation', 'how', 'apply', 'about', 'summary',
-  'requirements', 'details', 'arrangement',
+  'responsibilities', 'duties', 'qualifications', 'requirements', 'technical',
+  'skills', 'experience', 'role', 'what', 'you', 'will',
 ])
+
+/**
+ * The headings the description MUST NOT carry, however the model words them.
+ *
+ * WHY A DENYLIST AND NOT AN ALLOWLIST (Gabe, 2026-09-15: "role overview
+ * information must be used to fill-up the application form and duties and
+ * responsibilities and qualifications must be used for job description
+ * section. Do not include benefits since it affects the ATS scoring and
+ * matching").
+ *
+ * An allowlist of three exact strings was the first draft and it is a trap:
+ * the moment a model writes "Duties and responsibilities:" -- which is Gabe's
+ * own phrasing -- an allowlist drops the duties, and a description with its
+ * duties removed falls back to the raw advert, which contains every benefit.
+ * The denylist fails the safe way round: an unforeseen heading survives, and
+ * only the content that was named as unwanted is removed.
+ *
+ * WHAT IS ON IT, and each entry is a different reason:
+ *
+ *   BENEFITS AND PERKS -- the instruction, and the reason is ATS scoring.
+ *     src/services/atsMatch.ts mines the description for the terms a CV is
+ *     matched against, and it cannot tell a requirement from a perk: "free
+ *     catered lunches, gym membership, unlimited holiday" becomes six
+ *     "requirements" no CV will ever contain, and every one of them counts as
+ *     a miss. That is the 30%-on-a-good-CV failure that grew the stopword list
+ *     in the first place, arriving through a different door.
+ *
+ *   COMPENSATION, SALARY -- not because they are noise but because they are
+ *     already FIELDS. `salary_min`, `salary_max` and `salary_currency` are
+ *     mined from the same reply and rendered as a band on the record; leaving
+ *     the figures in the description too states them twice and adds digits to
+ *     the keyword pool.
+ *
+ *   ROLE OVERVIEW, ABOUT, CULTURE, WHY JOIN -- the first is where the
+ *     instruction sends its content (to the form's own fields and to `tags`);
+ *     the rest are the advert selling itself, which states no requirement.
+ *
+ *   HOW TO APPLY, NEXT STEPS -- genuinely useful to a reader, and dropped
+ *     anyway. They are neither duties nor qualifications, the posting's own URL
+ *     is on the record one click away, and an application process described in
+ *     the ATS keyword pool is more unmatched tokens.
+ */
+const EXCLUDED_HEADING =
+  /\b(benefits?|perks?|compensation|salar(y|ies)|pay|remuneration|package|role overview|overview|about (us|the company|our)|who we are|why join|culture|how to apply|apply|next steps|we offer|our offer)\b/i
 
 /**
  * Word for word the rule `components/applications/record/postingSections`
@@ -223,7 +285,9 @@ function isHeadingLine(line: string): boolean {
  * byte-identical to what `serializePosting(parsePosting(text))` would produce:
  * a heading, its bullets, one blank line, the next heading.
  */
-function asSections(raw: string): { heading: string; bullets: string[] }[] | null {
+function asSections(
+  raw: string
+): { sections: { heading: string; bullets: string[] }[]; excluded: string[] } | null {
   const sections: { heading: string; bullets: string[] }[] = []
   for (const line of raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) {
     if (isHeadingLine(line)) {
@@ -239,8 +303,32 @@ function asSections(raw: string): { heading: string; bullets: string[] }[] | nul
   if (sections.length === 0) return null
   // A heading with nothing under it renders as "nothing under this heading
   // yet", which is an invitation in an editor and a defect in generated text.
+  //
+  // CHECKED BEFORE THE EXCLUSION BELOW, deliberately. An empty `Benefits:` is
+  // still a malformed reply, and letting it through because the section was
+  // going to be dropped anyway would mean the shape of the answer stopped
+  // being checked whenever the model happened to break a rule we also enforce.
   if (sections.some((section) => section.bullets.length === 0)) return null
-  return sections
+
+  /*
+    THE EXCLUDED SECTIONS ARE DROPPED, NOT REJECTED, and the difference is the
+    whole point. Rejecting would return null, the caller would fall back to
+    `formatted`, and `formatted` is the advert -- benefits, culture, salary and
+    all. Refusing the description because it mentions benefits would therefore
+    put MORE benefits in front of the reader than accepting it. See
+    EXCLUDED_HEADING.
+  */
+  const kept = sections.filter((section) => !EXCLUDED_HEADING.test(section.heading))
+  const excluded = sections
+    .filter((section) => EXCLUDED_HEADING.test(section.heading))
+    .map((section) => section.heading.replace(/:$/, ''))
+
+  // Everything was excluded. There is no description left to show, so this is
+  // a genuine fallback rather than a filtered one -- and `formatted` at least
+  // contains the duties somewhere, unlabelled, which is more than nothing.
+  if (kept.length === 0) return null
+
+  return { sections: kept, excluded }
 }
 
 /**
@@ -301,9 +389,14 @@ const WORDS = /[A-Za-z][A-Za-z0-9+#.]*/g
 export function groundDescription(
   raw: string,
   source: string
-): { description: string; reason: null } | { description: null; reason: string } {
-  const sections = asSections(raw)
-  if (!sections) return { description: null, reason: 'description (not headings and bullets)' }
+):
+  | { description: string; reason: null; excluded: string[] }
+  | { description: null; reason: string; excluded: string[] } {
+  const parsed = asSections(raw)
+  if (!parsed) {
+    return { description: null, reason: 'description (not headings and bullets)', excluded: [] }
+  }
+  const { sections, excluded } = parsed
 
   const text = sections
     .map((section) => [section.heading, ...section.bullets].join('\n'))
@@ -311,7 +404,11 @@ export function groundDescription(
 
   const numbers = ungroundedNumbers(text, source)
   if (numbers.length > 0) {
-    return { description: null, reason: `description (invented figures: ${numbers.slice(0, 5).join(', ')})` }
+    return {
+      description: null,
+      reason: `description (invented figures: ${numbers.slice(0, 5).join(', ')})`,
+      excluded,
+    }
   }
 
   const vocabulary = new Set(normalise(source).split(' '))
@@ -329,64 +426,113 @@ export function groundDescription(
   }
 
   if (named.length > 0) {
-    return { description: null, reason: `description (invented: ${[...new Set(named)].slice(0, 5).join(', ')})` }
+    return {
+      description: null,
+      reason: `description (invented: ${[...new Set(named)].slice(0, 5).join(', ')})`,
+      excluded,
+    }
   }
   if (content > 0 && loose.length / content > MAX_NEW_WORD_SHARE) {
     return {
       description: null,
       reason: `description (rewritten: ${[...new Set(loose)].slice(0, 5).join(', ')})`,
+      excluded,
     }
   }
 
-  return { description: text, reason: null }
+  return { description: text, reason: null, excluded }
 }
 
+/**
+ * THE POSTING IS SPLIT IN TWO, NOT SUMMARISED (Gabe, 2026-09-15: "the AI model
+ * must be smart enough to distinguish role overview, duties and
+ * responsibilities, and qualifications. Role overview information must be used
+ * to fill-up the application form and duties and responsibilities and
+ * qualifications must be used for job description section. Do not include
+ * benefits since it affects the ATS scoring and matching").
+ *
+ * WHAT CHANGED AND WHY IT IS NOT COSMETIC. The old prompt asked for one
+ * document with seven allowed headings, `Role overview:` first and `Benefits:`
+ * among them, and the form fields were mined from the same reply as a
+ * side-effect. So the same facts landed in two places: the job title was a
+ * form field AND the first line of the description, the salary was two numeric
+ * fields AND a `Compensation:` bullet.
+ *
+ * That duplication is not merely untidy -- it is measurable, because
+ * src/services/atsMatch.ts mines the DESCRIPTION for the terms a CV is scored
+ * against and cannot tell a requirement from anything else in there. A perk is
+ * a requirement to it. "Free catered lunches, gym membership and unlimited
+ * holiday" is six terms no CV will contain and six misses on the score.
+ *
+ * So the two halves now have one home each:
+ *
+ *   THE FORM        every fact a reader DECIDES on -- title, company, place,
+ *                   arrangement, money, and the terms with no column of their
+ *                   own (employment type, office days, shift), which go to
+ *                   `tags`. See `PostingFields.tags`.
+ *   THE DESCRIPTION what the job ASKS OF YOU -- duties, qualifications, the
+ *                   technical skills. Which is exactly the text ATS matching
+ *                   should be reading, and nothing else.
+ *
+ * THE PROMPT IS NOT THE ENFORCEMENT. A model told not to write benefits will
+ * sometimes write benefits, at temperature 0 and with a plain instruction.
+ * `EXCLUDED_HEADING` drops the section afterwards, which is what makes the
+ * rule true rather than requested -- the same "propose, then verify" split
+ * this whole file is built on.
+ */
 const SYSTEM_PROMPT = `You read a job posting and report what it says. You never infer, guess or complete.
 
-EXTRACTION RULES
-- Copy values EXACTLY as they appear in the posting. Do not rephrase, expand or tidy them.
-- If the posting does not state something, return null. Returning null is always correct when unsure.
-- Never state a salary, company or location the posting does not contain.
+You produce TWO separate things and they must not overlap.
 
-THE DESCRIPTION: the posting reorganised so a person can read it in half a minute.
-- Understand the posting first, then write the structure it needs. This is not a copy
-  of the page with the decoration taken off.
-- Headings, each on its own line, ending in a colon, under 80 characters. Prefer these
-  and use only the ones the posting actually covers:
-  "Role overview:", "Responsibilities:", "Qualifications:", "Technical skills:",
-  "Benefits:", "Compensation:", "How to apply:"
-  Add a heading of your own only when the posting covers something none of those hold.
-- Under every heading, one fact per line, each line starting "- ". Nothing else: no
-  paragraphs, no text above the first heading, no heading with nothing under it.
-- "Role overview:" is the one place you interpret: a line or two saying what the work
-  is and how far it reaches, built only from what the posting states.
-- "Role overview:" also carries the TERMS the posting states - job title, company,
-  location, work arrangement (remote, hybrid, onsite, the office days) and employment
-  type (full-time, contract, the hours). Those are facts a reader decides on and this
-  app stores none of them except the work arrangement, so if they are not here they
-  are lost. Salary goes under "Compensation:", not here.
-- Combine facts that belong together, drop repeats, and drop anything that states no
-  fact - mission, culture, and the selling.
-- Job adverts sell. Do not carry the selling across. Drop "exciting", "dynamic",
-  "fast-paced", "world-class", "rockstar", "passionate" and anything like them
-  even when the posting uses them - they describe no fact.
-- No inflated significance: nothing "plays a vital role", "stands as a testament"
-  or "offers a unique opportunity". Never write "not just X, but Y".
-- End a line on a fact. "Hybrid in Pasig, 50-70k" is a fact. "...offering excellent
-  growth" is not.
-- Plain connectives. "and", "but", "so" - not "moreover", "furthermore",
-  "additionally".
-- Keep every concrete detail wherever it appeared. A shift pattern in the last
-  paragraph belongs under the heading it is about.
-- USE THE POSTING'S OWN WORDS for every name, company, place, technology, title, date
-  and figure. Write no number the posting does not contain.
+1. THE FIELDS: what the reader decides on. Copy each EXACTLY as the posting
+   writes it. If the posting does not state something, return null. Returning
+   null is always correct when unsure.
+   - role, company, location, work_mode, salary_min, salary_max,
+     salary_currency, tech_stack.
+   - tags: the other terms the posting states about the ARRANGEMENT and nowhere
+     else can hold - employment type ("full-time", "contract", "part-time"),
+     the hours or shift ("night shift", "40 hours"), the office pattern
+     ("3 days onsite"). Short phrases, each one the posting's own words. Not
+     skills, not duties, not selling.
+
+2. THE DESCRIPTION: what the job asks OF the applicant, and nothing else.
+   - ONLY these three headings, each on its own line, ending in a colon:
+     "Responsibilities:", "Qualifications:", "Technical skills:"
+     Use only the ones the posting actually covers.
+   - Under every heading, one fact per line, each line starting "- ". Nothing
+     else: no paragraphs, no text above the first heading, no heading with
+     nothing under it.
+   - NEVER write a section about benefits, perks, compensation, salary, the
+     company, its culture, why to join, or how to apply. Those are either
+     fields above or they are not information. A benefits list is scored
+     against the reader's CV as if it were a list of requirements, which costs
+     them a match they deserved.
+   - Do not repeat the fields. The job title, the company, the location, the
+     work arrangement and the money are already reported above; writing them
+     here states them twice.
+   - Combine facts that belong together and drop repeats.
+   - Job adverts sell. Do not carry the selling across. Drop "exciting",
+     "dynamic", "fast-paced", "world-class", "rockstar", "passionate" and
+     anything like them even when the posting uses them - they describe no
+     fact.
+   - No inflated significance: nothing "plays a vital role", "stands as a
+     testament" or "offers a unique opportunity". Never write "not just X,
+     but Y".
+   - End a line on a fact. "Five years with React" is a fact. "...offering
+     excellent growth" is not.
+   - Plain connectives. "and", "but", "so" - not "moreover", "furthermore",
+     "additionally".
+   - Keep every concrete requirement wherever it appeared. A certification
+     named in the last paragraph belongs under Qualifications.
+   - USE THE POSTING'S OWN WORDS for every name, company, place, technology,
+     title, date and figure. Write no number the posting does not contain.
 
 Reply with JSON only, no prose and no code fence:
 {"description": string,
  "role": string|null, "company": string|null, "location": string|null,
  "work_mode": "onsite"|"hybrid"|"remote"|null,
  "salary_min": number|null, "salary_max": number|null, "salary_currency": string|null,
- "tech_stack": string[]}`
+ "tech_stack": string[], "tags": string[]}`
 
 interface Options {
   config?: IntegrationConfig
@@ -418,7 +564,7 @@ export function groundFields(
   raw: Record<string, unknown>,
   source: string
 ): { fields: PostingFields; dropped: string[] } {
-  const fields: PostingFields = { ...EMPTY_FIELDS, tech_stack: [] }
+  const fields: PostingFields = { ...EMPTY_FIELDS, tech_stack: [], tags: [] }
   const dropped: string[] = []
 
   const text = (key: keyof PostingFields, value: unknown) => {
@@ -462,11 +608,15 @@ export function groundFields(
     }
   }
 
-  if (Array.isArray(raw.tech_stack)) {
-    for (const entry of raw.tech_stack.slice(0, 40)) {
+  // Two string arrays, one rule. Both are lists of short phrases lifted from
+  // the posting, and both are invention the moment a phrase is not in it.
+  for (const key of ['tech_stack', 'tags'] as const) {
+    const value = raw[key]
+    if (!Array.isArray(value)) continue
+    for (const entry of value.slice(0, 40)) {
       if (typeof entry !== 'string' || !entry.trim()) continue
-      if (isGrounded(entry, source)) fields.tech_stack.push(entry.trim())
-      else dropped.push(`tech_stack: "${entry.trim()}"`)
+      if (isGrounded(entry, source)) fields[key].push(entry.trim())
+      else dropped.push(`${key}: "${entry.trim()}"`)
     }
   }
 
@@ -483,7 +633,7 @@ export async function digestPosting(rawText: string, options: Options = {}): Pro
     // empty description. `usedModel: false` is what says it was not
     // restructured, so this costs nothing in `dropped`.
     description: formatted,
-    fields: { ...EMPTY_FIELDS, tech_stack: [] },
+    fields: { ...EMPTY_FIELDS, tech_stack: [], tags: [] },
     usedModel: false,
     dropped: [],
   }
@@ -537,6 +687,15 @@ export async function digestPosting(rawText: string, options: Options = {}): Pro
       // branch of the other test.
       if (checked.description === null) dropped.push(checked.reason)
       else description = checked.description
+      // REPORTED, NOT SILENTLY REMOVED. `dropped` exists so a reader can tell
+      // "the model got it right" from "something was taken out on the way",
+      // and a benefits block the prompt asked for and did not get is exactly
+      // the kind of thing that should be visible rather than inferred from an
+      // absence. It is listed even when the description was then rejected for
+      // another reason, because the model still wrote it.
+      for (const heading of checked.excluded) {
+        dropped.push(`description section: "${heading}" (not duties or qualifications)`)
+      }
     } else {
       // Asked for and not delivered. Worth saying: the reader is looking at a
       // tidied advert on a deployment that paid for a restructure.

@@ -3,7 +3,7 @@
   "private": true,
   "license": "MIT",
   "version": "1.0.0",
-  "homepage": "https://nightservant.github.io/Job-Search-Tracker-Analytics-Dashboard",
+  "homepage": "https://github.com/NightServant/Worktrack",
   "type": "module",
   "scripts": {
     "dev": "next dev",

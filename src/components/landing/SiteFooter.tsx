@@ -29,14 +29,24 @@ import { FOOTER } from './content'
  * Section.tsx's docblock already makes the argument -- one vertical line
  * through every heading, card edge and accordion row is "the single thing that
  * most separates a page that was designed from a page that was assembled" -- it
- * just never reached down here. The same `px-gutter` + `max-w-[1200px]` pair is
+ * just never reached down here. The same `px-gutter` + `max-w-wide` pair is
  * copied rather than imported because Section is a `<section>` with a `tone`
  * and an `id` and a scroll margin, none of which a footer wants.
  *
- * THE NAVBAR IS DELIBERATELY NOT DOING THIS, which is the rule rather than an
- * omission: page CONTENT aligns to the 1200px column, and fixed chrome that
- * frames the viewport spans it. The footer is the end of the content column.
- * LandingNavbar, SectionRail, SectionIndex and StickyMobileCta are all frame.
+ * THE NAVBAR IS DOING THIS TOO SINCE 2026-09-15, which reverses what stood
+ * here. The rule used to be "page CONTENT aligns to the column, and fixed
+ * chrome that frames the viewport spans it", with the navbar named as frame.
+ * Gabe overruled it -- "top navigation bar must have the same width with the
+ * footer" -- and the reason the old rule was wrong about that one element is
+ * that the bar carries a wordmark, which the eye lines up against the wordmark
+ * down here whatever the element is positioned as. SectionRail, SectionIndex
+ * and StickyMobileCta are still frame and still span; none of them carries
+ * anything that has a counterpart in the content column.
+ *
+ * THE COLUMN IS 1440 NOW, not 1200 (same day, same instruction: "expand the
+ * width of all sections in the homepage"). `max-w-wide` is the app's own
+ * `--container-wide` token, so this footer, every section and the signed-in
+ * shell's grid screens are all one number rather than three that agree.
  *
  * NO THEME TOGGLE. Removed by Gabe on 2026-09-02.
  *
@@ -48,7 +58,7 @@ import { FOOTER } from './content'
 export function SiteFooter() {
   return (
     <footer className={cn('border-t border-border-subtle px-gutter', LANDING_RHYTHM.band)}>
-      <div className="mx-auto w-full max-w-[1200px]">
+      <div className="mx-auto w-full max-w-wide">
         <div className="flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
           <div className="flex flex-col gap-3">
             <BrandLockup />

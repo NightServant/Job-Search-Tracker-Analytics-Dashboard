@@ -376,3 +376,100 @@ If deployment breaks production:
 **UI Issues**: Browser console for errors, Sentry for production errors
 
 Last updated: May 6, 2026
+
+---
+
+## Renaming the repository (and the Vercel domain that follows it)
+
+Written 2026-09-15, when the rename was planned. Renaming the GitHub repo
+changes the Vercel project's default domain, and **most of the fallout is
+silent** — the build stays green and the app keeps serving while auth breaks.
+This is the order that avoids that.
+
+### What does NOT need touching
+
+The deployment origin is already derived, not written down:
+
+| Thing | Where it comes from |
+|---|---|
+| `metadataBase`, `sitemap.xml`, `robots.txt` | `src/lib/siteUrl.ts` → `NEXT_PUBLIC_SITE_URL`, falling back to `VERCEL_URL` |
+| Supabase `site_url` and the redirect allow-list in `config.toml` | `env(SUPABASE_AUTH_SITE_URL)` |
+
+So the only code change is the handful of literals below.
+
+### 1. In the repo — done on 2026-09-15 for the rename to `Worktrack`
+
+| File | What | Status |
+|---|---|---|
+| `src/components/landing/content.ts` | `REPO_URL`. **User-visible**: the hero's "read the source" button, the navbar's "open source" link, and `COMMITS_URL` all derive from it. | ✅ done |
+| `package.json` | `homepage`. Was **already stale** before any rename — it named a `github.io` Pages URL for an app deployed on Vercel. Now the repo URL, which stays true when the Vercel domain changes. | ✅ done |
+| `supabase/config.toml` | `project_id`. A local CLI label only: the linked hosted project lives in the gitignored `supabase/.temp/project-ref` and is unaffected. | ✅ done |
+| `CONTRIBUTING.md` | the `git clone` / `cd` lines and the issues link. Also replaced the `yourusername` placeholder, which was never right. | ✅ done |
+| `README.md` | the **Live** link near the top. | ✅ done — `worktrack-jobs.vercel.app` |
+
+**⚠️ DO NOT CHANGE THE LINEAGE LINK IN `README.md`.** The first blockquote
+points at `github.com/Ensues/Job-Search-Tracker-Analytics-Dashboard`, which is
+**Ensues' original repository — a different repo that is not being renamed**.
+An earlier draft of this checklist listed it for updating, which would have
+broken the attribution and pointed the credit at a repo that does not exist.
+A `git grep Job-Search-Tracker-Analytics-Dashboard` should return exactly that
+one line and nothing else.
+
+GitHub keeps redirecting the old URL after a rename, so `REPO_URL` would not
+have 404'd in the meantime — but it would have sent readers to a name that no
+longer exists, which on a portfolio page is the wrong first impression.
+
+### 2. Outside the repo — done on 2026-09-15, with one surprise
+
+**`worktrack.vercel.app` WAS ALREADY TAKEN by another Vercel account**, which
+is the thing this section did not anticipate. Renaming the project therefore
+changed its NAME but not its DOMAIN: Vercel only auto-assigns
+`<project>.vercel.app` when that subdomain is free, and when it is not it
+silently leaves the existing one in place. The project was called `worktrack`
+while still serving from `job-search-tracker-analytics-dashbo-one.vercel.app`,
+and nothing reported a problem — the rename looked like it had worked.
+
+The fix was to attach a free subdomain explicitly rather than hope for one.
+**The old domain was kept**, not removed: it is in the Supabase redirect
+allow-list, it is what any existing link points at, and a project may hold
+several `.vercel.app` domains at no cost. Removing it would have been the only
+genuinely breaking step in this whole rename.
+
+### The steps, in this order
+
+1. **Rename on GitHub.** Settings → General → Repository name → `Worktrack`.
+   Or: `gh repo rename Worktrack`. Your local remote keeps working via
+   GitHub's redirect; update it anyway so the redirect is not load-bearing:
+   `git remote set-url origin git@github.com:NightServant/Worktrack.git`
+2. **Rename the Vercel project.** This changes the production domain. Note the
+   new origin — everything below needs it, and so does the README's Live link
+   from step 1.
+3. **Set `NEXT_PUBLIC_SITE_URL`** in Vercel → Settings → Environment Variables
+   to the new origin, and redeploy. Without it `siteUrl` falls back to
+   `VERCEL_URL`, which is the *deployment* hostname and differs per deployment —
+   so the sitemap and `og:image` would point at a preview URL.
+4. **⚠️ Supabase dashboard → Authentication → URL Configuration.** Add the new
+   origin to the redirect allow-list. **This is the one that breaks silently:**
+   `signInWithProvider` sends `redirectTo: ${window.location.origin}/dashboard`,
+   and an origin that is not on the allow-list makes Google and Microsoft
+   sign-in fail *after* the user has already authorised — with a provider error
+   page, not one of ours. Nothing in this repo can detect it.
+5. **`SUPABASE_AUTH_SITE_URL=https://<new-origin> npm run push:auth-config`.**
+   This rewrites `site_url` and the allow-list from `config.toml`, which is
+   what puts the new origin into the confirmation emails. Never
+   `supabase config push` directly — see `docs/SECURITY.md`.
+
+### 3. Verify, in this order
+
+```bash
+curl -sI https://<new-origin>/ | head -1          # 200
+curl -s  https://<new-origin>/robots.txt          # Sitemap: names the NEW origin
+curl -s  https://<new-origin>/sitemap.xml | head  # <loc> names the NEW origin
+```
+
+Then, by hand, because no command covers them:
+
+- Sign in with **Google** and with **Microsoft**. This is step 4's check, and
+  it is the only way to catch a stale allow-list.
+- Request a signup code and confirm the link in the email points at the new
+  origin. That is step 5's check.

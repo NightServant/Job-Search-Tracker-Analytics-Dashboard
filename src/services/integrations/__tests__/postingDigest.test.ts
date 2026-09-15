@@ -249,16 +249,25 @@ describe('formatting text a page shouted', () => {
  * company or a technology.
  */
 describe('restructuring the posting', () => {
+  /*
+    THE DESCRIPTION IS DUTIES AND QUALIFICATIONS NOW, and this fixture changed
+    shape with it on 2026-09-15 (Gabe: "role overview information must be used
+    to fill-up the application form and duties and responsibilities and
+    qualifications must be used for job description section. Do not include
+    benefits since it affects the ATS scoring and matching").
+
+    It used to open with `Role overview:` and close with `Compensation:`, and
+    both are now EXCLUDED headings -- their content belongs to the form's own
+    fields. Leaving them in the fixture would have meant these tests asserting
+    the behaviour the instruction reversed.
+  */
   const STRUCTURED = [
-    'Role overview:',
-    '- Senior Frontend Engineer at Acme Corp, building interfaces with React and TypeScript.',
+    'Responsibilities:',
+    '- Build interfaces with React and TypeScript.',
     '',
     'Technical skills:',
     '- React',
     '- TypeScript',
-    '',
-    'Compensation:',
-    '- PHP 50,000 - 70,000 per month.',
   ].join('\n')
 
   const structuredDigest = (description: string, source = POSTING) =>
@@ -270,7 +279,7 @@ describe('restructuring the posting', () => {
   it('keeps a structured description the posting can back up', async () => {
     const digest = await structuredDigest(STRUCTURED)
     expect(digest.dropped).toEqual([])
-    expect(digest.description).toContain('Role overview:')
+    expect(digest.description).toContain('Responsibilities:')
     expect(digest.description).toContain('- React')
     // `formatted` is untouched: it is the evidence everything above was
     // checked against, and overwriting it would mean checking the model's
@@ -287,9 +296,8 @@ describe('restructuring the posting', () => {
     const sections = parsePosting(digest.description)
     expect(serializePosting(sections)).toBe(digest.description)
     expect(sections.map((section) => section.heading)).toEqual([
-      'Role overview:',
+      'Responsibilities:',
       'Technical skills:',
-      'Compensation:',
     ])
   })
 
@@ -306,8 +314,12 @@ describe('restructuring the posting', () => {
   it('rejects a salary the posting does not state, and falls back', async () => {
     // THE SHARPEST CASE. Every word here is the posting's; only the figure is
     // invented, and a figure is the one thing reorganising can never produce.
+    // Under `Qualifications:` rather than the `Compensation:` this used to
+    // use. Compensation is an EXCLUDED heading since 2026-09-15 -- the section
+    // is dropped before grounding ever sees it, so the old fixture would have
+    // tested the exclusion rather than the figure check it is named for.
     const digest = await structuredDigest(
-      'Compensation:\n- PHP 90,000 - 120,000 per month.'
+      'Qualifications:\n- Five years at PHP 90,000 - 120,000 per month.'
     )
     expect(digest.description).toBe(digest.formatted)
     expect(digest.description).not.toContain('90,000')
@@ -316,7 +328,7 @@ describe('restructuring the posting', () => {
 
   it('rejects an invented company or technology', async () => {
     const digest = await structuredDigest(
-      'Technical skills:\n- Kubernetes and Docker\n\nRole overview:\n- Engineer at Google.'
+      'Technical skills:\n- Kubernetes and Docker\n\nQualifications:\n- Engineer at Google.'
     )
     expect(digest.description).toBe(digest.formatted)
     expect(digest.dropped.join(' ')).toContain('description (invented')
@@ -337,7 +349,7 @@ describe('restructuring the posting', () => {
     // are how scattered facts get joined, not things being made up.
     const digest = await structuredDigest(
       [
-        'Role overview:',
+        'Qualifications:',
         '- Senior Frontend Engineer at Acme Corp, based in Pasig City.',
         '',
         'Technical skills:',
@@ -351,9 +363,12 @@ describe('restructuring the posting', () => {
   it('rejects a description that is mostly its own words', async () => {
     // Grounded on every name and figure, and still not this posting: the
     // model stopped reorganising and started writing.
+    // Under `Responsibilities:`, because a `Benefits:` heading no longer
+    // reaches this check at all -- it is dropped first, which is a different
+    // (and also tested) behaviour. The point of THIS test is the ratio.
     const digest = await structuredDigest(
       [
-        'Benefits:',
+        'Responsibilities:',
         '- Acme offers free catered lunches, gym membership and unlimited holiday.',
         '- React engineers also get quarterly wellness retreats, learning budget and commuter allowance.',
       ].join('\n')
@@ -371,9 +386,98 @@ describe('restructuring the posting', () => {
   })
 
   it('rejects a heading with nothing under it', async () => {
-    const digest = await structuredDigest('Role overview:\n- React.\n\nBenefits:')
+    const digest = await structuredDigest('Responsibilities:\n- React.\n\nQualifications:')
     expect(digest.description).toBe(digest.formatted)
     expect(digest.dropped.join(' ')).toContain('not headings and bullets')
+  })
+
+  /**
+   * THE SPLIT (Gabe, 2026-09-15): role-overview facts fill the FORM, duties and
+   * qualifications fill the DESCRIPTION, and benefits appear in neither.
+   *
+   * The reason benefits are singled out is measurable rather than aesthetic.
+   * `services/atsMatch.ts` mines the description for the terms a CV is scored
+   * against and cannot tell a requirement from a perk -- so "free catered
+   * lunches, gym membership and unlimited holiday" becomes half a dozen
+   * requirements no CV will ever contain, and every one of them counts as a
+   * miss. That is the same failure mode that grew the stopword list, arriving
+   * through a heading instead of a sentence.
+   */
+  describe('the split between the form and the description', () => {
+    it('drops a benefits section and keeps the rest of the description', async () => {
+      // DROPPED, NOT REJECTED, and this is the assertion that pins the
+      // difference. Rejecting would fall back to `formatted` -- the raw advert
+      // -- which contains the benefits in full, so refusing the description for
+      // mentioning them would put MORE of them in front of the reader.
+      const digest = await structuredDigest(
+        [
+          'Responsibilities:',
+          '- Build interfaces with React and TypeScript.',
+          '',
+          'Benefits:',
+          '- Free lunches and gym membership.',
+        ].join('\n')
+      )
+      expect(digest.description).toContain('Responsibilities:')
+      expect(digest.description).not.toContain('Benefits')
+      expect(digest.description).not.toContain('gym')
+      expect(digest.dropped.join(' ')).toContain('Benefits')
+    })
+
+    it('drops the sections whose facts are form fields instead', async () => {
+      // Role overview and compensation are not noise -- they are DUPLICATES.
+      // The title, the company and the money are mined as fields from the same
+      // reply, so repeating them here states them twice and adds digits to the
+      // keyword pool the CV is scored against.
+      const digest = await structuredDigest(
+        [
+          'Role overview:',
+          '- Senior Frontend Engineer at Acme Corp.',
+          '',
+          'Qualifications:',
+          '- React and TypeScript.',
+          '',
+          'Compensation:',
+          '- PHP 50,000 - 70,000 per month.',
+        ].join('\n')
+      )
+      const headings = parsePosting(digest.description).map((section) => section.heading)
+      expect(headings).toEqual(['Qualifications:'])
+    })
+
+    it('falls back when every section was excluded', async () => {
+      // Nothing left is a genuine fallback rather than a filtered result. The
+      // tidied advert at least contains the duties somewhere, unlabelled,
+      // which is more than an empty description.
+      const digest = await structuredDigest('Benefits:\n- Free lunches.')
+      expect(digest.description).toBe(digest.formatted)
+    })
+
+    it('mines the arrangement terms the form has no column for', async () => {
+      // Employment type, shift and office pattern used to ride in the
+      // description's `Role overview:` block, whose own comment said they
+      // would otherwise be "lost". That block is gone, so they became `tags` --
+      // grounded verbatim like tech_stack, because a tag the posting does not
+      // contain is invention wearing a shorter word.
+      const digest = await digestPosting('Full-time, hybrid in Pasig City. React required.', {
+        config: configWith(),
+        fetchImpl: vi.fn().mockResolvedValue(
+          reply({ tags: ['Full-time', 'hybrid'], tech_stack: ['React'] })
+        ) as unknown as typeof fetch,
+      })
+      expect(digest.fields.tags).toEqual(['Full-time', 'hybrid'])
+    })
+
+    it('refuses a tag the posting never states', async () => {
+      const digest = await digestPosting('Full-time in Pasig City.', {
+        config: configWith(),
+        fetchImpl: vi.fn().mockResolvedValue(
+          reply({ tags: ['Full-time', 'four-day week'] })
+        ) as unknown as typeof fetch,
+      })
+      expect(digest.fields.tags).toEqual(['Full-time'])
+      expect(digest.dropped.join(' ')).toContain('four-day week')
+    })
   })
 
   it('says so when the model answered without one', async () => {

@@ -135,9 +135,17 @@ export function HeroMedia({ posterSrc, videoSrc, paused = false }: HeroMediaProp
         into the section below it so the boundary is a fade rather than a hard
         horizontal edge against bg-canvas, which at this height reads as two
         stacked blocks rather than one page.
+
+        `h-24` (96px), DOWN FROM `h-32` ON 2026-09-15. In light mode this band
+        fades to near-white, and anything drawn inside it in the hero's own
+        near-white ink disappears -- which is what happened to the scroll cue
+        the day it was added. The cue moved up out of the band and the band
+        came down 32px to leave clearance rather than a touching edge; 96px
+        still softens the boundary, which is the only thing it was ever for.
+        Anything placed at the foot of the hero has to clear this.
       */}
       <div className="absolute inset-0 bg-gradient-to-r from-ink-950/90 via-ink-950/70 via-[45%] to-ink-950/30" />
-      <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-b from-transparent to-bg-canvas" />
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-b from-transparent to-bg-canvas" />
     </div>
   )
 }

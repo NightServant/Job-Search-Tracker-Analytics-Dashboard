@@ -6,6 +6,11 @@ import { CssSpinner } from '@/components/ui/css-spinner'
 import { Field } from '@/components/ui/field'
 import { Input } from '@/components/ui/input'
 import { readFileText } from '@/lib/readFileText'
+import {
+  RejectedUploadError,
+  assertBatchWithinSizeLimit,
+  assertContentMatchesExtension,
+} from '@/lib/uploadSafety'
 import { DownloadIcon, UploadIcon, TrashIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
 
@@ -63,12 +68,41 @@ export function ProfileImport({
   const input = React.useRef<HTMLInputElement>(null)
   const busy = importing || clearing
 
+  const [rejected, setRejected] = React.useState<string | null>(null)
+
   const choose = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const chosen = [...(event.target.files ?? [])]
     // Reset first, so picking the SAME file twice still fires a change event --
     // otherwise a retry after a failed parse is a click that does nothing.
     event.target.value = ''
     if (!chosen.length) return
+
+    setRejected(null)
+    /*
+      CHECKED BEFORE A SINGLE BYTE IS READ, and until 2026-09-15 nothing here
+      was checked at all. `accept=".csv,text/csv"` on the input below looks
+      like a control and is not -- it filters the picker's default view, and
+      every picker has an "All files" option.
+
+      THIS ONE IS `multiple`, which is why the batch form is used. A LinkedIn
+      export is a folder of CSVs and the picker takes them all at once, so a
+      per-file cap alone bounds nothing: fifty files at the limit is fifty
+      times the limit, and `readFileText` holds every one of them in memory at
+      the same time because of the Promise.all below.
+
+      The content check catches the common real mistake here, which is picking
+      the .zip LinkedIn actually emails you rather than the CSVs inside it.
+    */
+    try {
+      assertBatchWithinSizeLimit(chosen, 'csv')
+      for (const file of chosen) await assertContentMatchesExtension(file, '.csv')
+    } catch (error) {
+      setRejected(
+        error instanceof RejectedUploadError ? error.message : 'Those files could not be read.'
+      )
+      return
+    }
+
     onImport(
       await Promise.all(
         chosen.map(async (file) => ({ name: file.name, text: await readFileText(file) }))
@@ -87,7 +121,16 @@ export function ProfileImport({
         onChange={(event) => void choose(event)}
       />
 
-      {note && (
+      {/* A refusal is the reader's own mistake to fix -- the wrong file, or too
+          many of them -- so it says which, in the failure colour, where the
+          ordinary note already sits. It clears on the next pick. */}
+      {rejected && (
+        <p role="alert" className="text-body-s text-status-rejected-mark" data-profile-rejected>
+          {rejected}
+        </p>
+      )}
+
+      {note && !rejected && (
         <p className="text-body-s text-text-muted" data-profile-note>
           {note}
         </p>

@@ -8,7 +8,24 @@ import useEmblaCarousel, {
 } from "embla-carousel-react"
 
 import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/shadcn-button"
+/**
+ * THE APP'S OWN BUTTON, not `./shadcn-button` (2026-09-15).
+ *
+ * The two are different design systems wearing the same name. shadcn-button
+ * draws a 28px control with an 8px radius, a 3px `ring/50` focus ring and a
+ * `translate-y-px` press; this app's draws 32 or 40px with a 4px radius, a 2px
+ * accent ring with an offset, and a `scale-[0.97]` press. The carousel's
+ * arrows were the only controls in the app taking the first set, so the one
+ * control a reader sees on four different screens was the one control that
+ * did not match anything around it -- which is what Gabe means by "buttons of
+ * the system are inconsistent in terms of design".
+ *
+ * `variant="secondary"` and `size="icon-s"` are the equivalents of the
+ * `outline` / `icon-sm` pair they replace: a hairline-bordered square on the
+ * page ground. `icon-s` is the size that did not exist until this change and
+ * is why every square control in the app had to invent its own box.
+ */
+import { Button } from "@/components/ui/button"
 import { ChevronLeftIcon } from "@/components/icons/chevron-left"
 import { ChevronRightIcon } from "@/components/icons/chevron-right"
 
@@ -135,13 +152,58 @@ function Carousel({
   )
 }
 
+/**
+ * THE FLANKED LAYOUT: previous, the track, next -- all three in flow, in one
+ * row (Gabe, 2026-09-15: "left and right must be placed besides carousel
+ * content ... this change must be applied in general in order for other
+ * carousel sections to follow the new design rules").
+ *
+ * WHAT IT REPLACES, AND IT WAS TWO DIFFERENT THINGS. The arrows shipped
+ * `absolute -left-12 / -right-12`, which every caller in this app overrode:
+ * TemplateGallery, JobFeed and UpNext each pushed them up onto the heading row
+ * with `static translate-y-0`, and the landing carousel put them in a row
+ * UNDER the stage. So the one control that appears on four screens was drawn
+ * in three places, and a reader moving between them had to look for it each
+ * time. This is the one arrangement, and it is the one the request names.
+ *
+ * WHY A WRAPPER RATHER THAN RESTORING THE ABSOLUTE DEFAULT. Absolute arrows
+ * hang OUTSIDE the track's box, so they need 48px of clear space on each side
+ * that nothing in the layout reserves -- which is why they were overridden
+ * everywhere rather than used. In a flex row the track takes the width that is
+ * actually left, so a narrow panel shrinks the cards instead of clipping a
+ * control, and there is nothing to keep in sync.
+ *
+ * `min-w-0` ON THE TRACK IS LOAD-BEARING. A flex item's default `min-width` is
+ * `auto`, which for an `overflow-hidden` scroller resolves to its CONTENT
+ * width -- so a rail of eleven cards would refuse to shrink, push both arrows
+ * off the panel, and overflow the page horizontally. It is set on
+ * `CarouselContent`'s viewport below rather than asked of every caller.
+ */
+function CarouselRow({ className, children, ...props }: React.ComponentProps<"div">) {
+  return (
+    <div
+      data-slot="carousel-row"
+      // `gap-2` at phone width and `gap-3` above it: the arrows are 28-40px
+      // controls and the gap between one and the cards is air, not structure,
+      // so it is the first thing that should give when the viewport is narrow.
+      className={cn("flex w-full items-center gap-2 sm:gap-3", className)}
+      {...props}
+    >
+      {children}
+    </div>
+  )
+}
+
 function CarouselContent({ className, ...props }: React.ComponentProps<"div">) {
   const { carouselRef, orientation } = useCarousel()
 
   return (
     <div
       ref={carouselRef}
-      className="overflow-hidden"
+      // `flex-1 min-w-0` is inert outside a flex row and essential inside one
+      // -- see CarouselRow. Stated here so the rule cannot be forgotten at a
+      // call site.
+      className="min-w-0 flex-1 overflow-hidden"
       data-slot="carousel-content"
     >
       <div
@@ -176,8 +238,8 @@ function CarouselItem({ className, ...props }: React.ComponentProps<"div">) {
 
 function CarouselPrevious({
   className,
-  variant = "outline",
-  size = "icon-sm",
+  variant = "secondary",
+  size = "icon-s",
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { orientation, scrollPrev, canScrollPrev } = useCarousel()
@@ -188,17 +250,25 @@ function CarouselPrevious({
       variant={variant}
       size={size}
       className={cn(
-        "absolute touch-manipulation rounded-full",
-        orientation === "horizontal"
-          ? "inset-y-0 -left-12 my-auto"
-          : "-top-12 left-1/2 -translate-x-1/2 rotate-90",
+        // IN FLOW, NOT ABSOLUTE. See CarouselRow for why the default flipped.
+        // `shrink-0` so the control keeps its size when the row is tight --
+        // without it a flex row squashes the button before it squashes the
+        // track, which is backwards: a 40px card is still a card, a 12px
+        // button is a smudge.
+        "shrink-0 touch-manipulation rounded-full",
+        orientation === "vertical" && "rotate-90",
         className
       )}
       disabled={!canScrollPrev}
       onClick={scrollPrev}
       {...props}
     >
-      <ChevronLeftIcon />
+      {/* `size={16}`, not an `h-4 w-4` class. An AnimateIcon's root is a
+          <div> wrapping a LazyMotion tree and the <svg> inside sizes off this
+          numeric prop -- a Tailwind size class squeezes the wrapper and leaves
+          a 24px glyph overflowing a 32px button. Same rule as the accordion's
+          chevrons and skiper51's. */}
+      <ChevronLeftIcon size={16} />
       <span className="sr-only">Previous slide</span>
     </Button>
   )
@@ -206,8 +276,8 @@ function CarouselPrevious({
 
 function CarouselNext({
   className,
-  variant = "outline",
-  size = "icon-sm",
+  variant = "secondary",
+  size = "icon-s",
   ...props
 }: React.ComponentProps<typeof Button>) {
   const { orientation, scrollNext, canScrollNext } = useCarousel()
@@ -218,17 +288,15 @@ function CarouselNext({
       variant={variant}
       size={size}
       className={cn(
-        "absolute touch-manipulation rounded-full",
-        orientation === "horizontal"
-          ? "inset-y-0 -right-12 my-auto"
-          : "-bottom-12 left-1/2 -translate-x-1/2 rotate-90",
+        "shrink-0 touch-manipulation rounded-full",
+        orientation === "vertical" && "rotate-90",
         className
       )}
       disabled={!canScrollNext}
       onClick={scrollNext}
       {...props}
     >
-      <ChevronRightIcon />
+      <ChevronRightIcon size={16} />
       <span className="sr-only">Next slide</span>
     </Button>
   )
@@ -239,6 +307,7 @@ export {
   Carousel,
   CarouselContent,
   CarouselItem,
+  CarouselRow,
   CarouselPrevious,
   CarouselNext,
   useCarousel,

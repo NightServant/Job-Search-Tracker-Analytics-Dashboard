@@ -1,1 +1,46 @@
-<svg width="32" height="32" viewBox="0 0 23 23" xmlns="http://www.w3.org/2000/svg"><rect x="0" y="0" width="10" height="10" rx="1" fill="#18181b"/><rect x="13" y="0" width="10" height="10" rx="1" fill="#18181b"/><rect x="0" y="13" width="10" height="10" rx="1" fill="#c2410c"/><rect x="13" y="13" width="10" height="10" rx="1" fill="#18181b"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 23 23" role="img" aria-label="Worktrack">
+  <!-- THE TAB ICON, and it follows the BROWSER's theme rather than the page's
+       (Gabe, 2026-09-15: "the logo is unreadable when the browser itself is in
+       dark mode"). Three cells were neutral-900 unconditionally, which on a
+       dark tab strip is near-black on near-black: the mark read as one orange
+       square floating on nothing.
+
+       IT IS THE SAME SWAP public/brand/worktrack-mark-dark.svg MAKES, and the
+       same pair the app itself resolves to: neutral-50 cells with accent-400,
+       because accent-700 fails contrast on near-black. So the tab, the README
+       and the in-app lockup all show the same two versions of one mark.
+
+       WHY A STYLE BLOCK AND NOT TWO FILES. A favicon gets no CSS context and
+       no inherited colour, which is the exact problem the two brand marks
+       exist to solve for GitHub. A tab icon cannot be picked between by a
+       picture element, so the media query has to travel INSIDE the file. Every
+       browser that renders an SVG favicon at all evaluates it.
+
+       prefers-color-scheme HERE MEANS THE OS, NOT THE APP'S TOGGLE, and that
+       is correct rather than a limitation: this icon is drawn by the browser
+       chrome, so what it has to be legible against is the browser's tab strip.
+       Somebody running a light OS with the app in dark mode has a light tab
+       strip and wants the dark mark.
+
+       favicon.ico stays beside this and cannot be theme-aware, which is what
+       an .ico is. Next emits it FIRST with an explicit pixel size and this
+       file SECOND with type="image/svg+xml" and sizes="any", which is the
+       ordering that makes every browser with SVG favicon support prefer this
+       one and leaves the .ico to the ones without it.
+
+       KEEP EVERY HYPHEN IN THIS COMMENT SINGLE. An XML comment may not contain
+       a double hyphen anywhere, and a malformed SVG does not render at all.
+       svgWellFormed.test.ts fails if that is broken. -->
+  <style>
+    .wt-cell { fill: #18181b; }
+    .wt-accent { fill: #c2410c; }
+    @media (prefers-color-scheme: dark) {
+      .wt-cell { fill: #fafafa; }
+      .wt-accent { fill: #fb923c; }
+    }
+  </style>
+  <rect class="wt-cell" x="0" y="0" width="10" height="10" rx="1"/>
+  <rect class="wt-cell" x="13" y="0" width="10" height="10" rx="1"/>
+  <rect class="wt-accent" x="0" y="13" width="10" height="10" rx="1"/>
+  <rect class="wt-cell" x="13" y="13" width="10" height="10" rx="1"/>
+</svg>

@@ -30,13 +30,18 @@ import type { RailSection } from './SectionRail'
  * rail. Rotating a flex container rather than each glyph keeps the tabular
  * figures aligned.
  *
- * Hidden below 2xl (1440) for the same reason as the rail, and it must stay in
- * step with it: these two are a matched pair in opposite margins, so a
- * threshold that differs by one step leaves the page visibly lopsided at every
- * width between them. See SectionRail for the margin arithmetic.
+ * Hidden below 1640 for the same reason as the rail, and it must stay in step
+ * with it: these two are a matched pair in opposite margins, so a threshold
+ * that differs by one step leaves the page visibly lopsided at every width
+ * between them. See SectionRail for the margin arithmetic.
  *
- * THE COUNTER DROPS BELOW 1560, the same width at which the rail opposite
- * stops showing words. Between 1440 and 1560 both margins are at their
+ * BOTH NUMBERS MOVED ON 2026-09-15 (1440 -> 1640, 1560 -> 1800) because the
+ * page's container went from 1200 to 1440 and these live in the margin it
+ * leaves. They are recomputed sums, not a change of taste; SectionRail carries
+ * the working.
+ *
+ * THE COUNTER DROPS BELOW 1800, the same width at which the rail opposite
+ * stops showing words. Between 1640 and 1800 both margins are at their
  * narrowest, and of the two things here the counter is the one carrying least
  * per pixel: the rail is already showing position as six dots, so "04 / 06"
  * restates that in a form you have to count against a list you cannot see,
@@ -80,7 +85,7 @@ export function SectionIndex({ sections, activeId, overHero = false }: SectionIn
       data-over-hero={overHero ? 'true' : 'false'}
       aria-hidden
       className={cn(
-        'fixed left-6 top-1/2 z-40 hidden -translate-y-1/2 select-none rounded-md px-3 py-4 2xl:block',
+        'fixed left-6 top-1/2 z-40 hidden -translate-y-1/2 select-none rounded-md px-3 py-4 min-[1640px]:block',
         'transition-colors duration-150 motion-reduce:transition-none',
         // Its own plate over the hero, for the same reason the rail has one:
         // the footage behind it is video, and its brightness changes as the
@@ -106,7 +111,7 @@ export function SectionIndex({ sections, activeId, overHero = false }: SectionIn
           aria-hidden
           data-section-index-rule
           className={cn(
-            'hidden h-10 w-px min-[1560px]:block',
+            'hidden h-10 w-px min-[1800px]:block',
             overHero ? 'bg-white/40' : 'bg-border-default'
           )}
         />
@@ -118,7 +123,7 @@ export function SectionIndex({ sections, activeId, overHero = false }: SectionIn
             cannot see -- and the rail opposite is already showing position as
             six dots. The name survives because it is the one thing on this
             page that states the current section outright. */}
-        <span className="hidden tabular text-data-s min-[1560px]:block">
+        <span className="hidden tabular text-data-s min-[1800px]:block">
           <span
             data-section-index-position
             className={overHero ? 'text-white' : 'text-accent-default'}

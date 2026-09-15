@@ -2,7 +2,7 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "Job-Search-Tracker-Analytics-Dashboard"
+project_id = "Worktrack"
 
 [api]
 enabled = true
@@ -227,10 +227,33 @@ token_verifications = 30
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 
+# CAPTCHA IS THE ONE REMAINING BOT DEFENCE AND IT IS NOT ENABLED HERE.
+#
+# STATED PLAINLY BECAUSE THE ALTERNATIVE IS PRETENDING. The brief asks to
+# "prevent automated scripts and harmful users from exploiting your system",
+# and what this repo has is: `[auth.rate_limit]` above, which is a real
+# server-side ceiling per IP; a per-user throttle on the two routes that spend
+# money; and `lib/authRateLimit`, which its own docblock calls "an affordance,
+# not a boundary" because it runs in the browser. None of those stops a
+# distributed sign-up flood, and no amount of code in this repository can --
+# the auth endpoint is Supabase's, not ours, so the only place the check can
+# live is here.
+#
+# IT IS COMMENTED OUT because turning it on needs a `secret` that must not be
+# in this file, and a matching site key wired into the sign-up and sign-in
+# forms. That is a deployment decision with a credential attached, not a code
+# change, and half of it -- a config that demands a token the forms do not
+# send -- would lock everybody out of registration.
+#
+# TO ENABLE: get a Cloudflare Turnstile key pair, put the secret in the
+# dashboard (never here), uncomment this block, and pass
+# `options: { captchaToken }` to signUp/signInWithPassword in AuthContext.
+# Then `npm run push:auth-config`.
+#
 # Configure one of the supported captcha providers: `hcaptcha`, `turnstile`.
 # [auth.captcha]
 # enabled = true
-# provider = "hcaptcha"
+# provider = "turnstile"
 # secret = ""
 
 [auth.email]
@@ -255,7 +278,21 @@ max_frequency = "60s"
 # Number of characters used in the email OTP.
 otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
-otp_expiry = 3600
+# 600 (10 MINUTES), NOT THE HOUR THIS INHERITED (2026-09-15). This one number
+# governs the sign-up confirmation code AND the password-reset code, and both
+# are single-factor: whoever holds the code holds the account. An hour is the
+# window in which a forwarded email, a shared screen, a synced notification on
+# a second device or a mailbox somebody else can read is still a live key.
+#
+# Supabase's own security advisor flags anything above 3600 and recommends
+# under an hour; ten minutes is the interval a person who asked for a code
+# actually uses -- they are looking at their inbox when they ask.
+#
+# IT COSTS A RESEND, and that is the trade being made deliberately. Somebody
+# who requests a reset and comes back after lunch types a dead code and has to
+# press resend; `max_frequency` below allows that after 60 seconds. A minute of
+# friction against fifty minutes of a live credential sitting in an inbox.
+otp_expiry = 600
 
 # CUSTOM SMTP, VIA RESEND. Two things depend on this block, and only one of
 # them is about deliverability.
@@ -285,12 +322,46 @@ otp_expiry = 3600
 # useless for real signups, since every other recipient is silently dropped.
 # It is env-driven so switching from the test sender to a real one is a
 # variable change rather than a commit.
+# BREVO, NOT RESEND, AND THE REASON IS THE ONE THING THAT WAS BLOCKING REAL
+# SIGNUPS (2026-09-15). Gabe: "I am so tired of waiting for the free domain."
+#
+# THE PROBLEM WAS NEVER OTP. The code flow works and has worked since
+# 2026-09-03: a rendered template reached `last_event: delivered`. What did not
+# work was WHO it could reach. Resend's shared `onboarding@resend.dev` sender
+# delivers ONLY to the Resend account owner, and every other recipient is
+# dropped silently -- not bounced, not errored, never delivered. Lifting that
+# needs a VERIFIED SENDING DOMAIN, which is what the `worktrack.eu.org` request
+# has been waiting on since 2026-09-03 with no queue position and no support
+# channel.
+#
+# BREVO VERIFIES A SENDER ADDRESS RATHER THAN A DOMAIN. Its free tier lets you
+# verify one ordinary mailbox -- a Gmail address is fine -- by clicking a link
+# sent to it, and from then on you may send to ANY recipient. 300 a day, which
+# is two orders of magnitude more than a portfolio project's signups. No DNS,
+# no delegation, no waiting on a volunteer reviewer.
+#
+# THE DOMAIN IS NOW AN UPGRADE, NOT A BLOCKER. When `worktrack.eu.org` lands,
+# adding DKIM records to Brevo improves deliverability (fewer spam folders) and
+# lets the From address stop being a Gmail one. Nothing about this app has to
+# change for that, and nobody is blocked while it is pending.
+#
+# WHAT TO SET, and neither value belongs in this file:
+#   SUPABASE_AUTH_SMTP_USER  the Brevo login email
+#   BREVO_SMTP_KEY           an SMTP key from Brevo's dashboard -- NOT the
+#                            account password, and not the transactional API
+#                            key, which is a different credential
+#   SUPABASE_AUTH_SMTP_SENDER  the verified sender address
+# Then `npm run push:auth-config`.
+#
+# PORT 587, NOT 465. Brevo documents 587 with STARTTLS as its primary relay;
+# 465 works but several hosts block it outbound, and a port that fails on some
+# networks is the same silent-drop failure this block exists to end.
 [auth.email.smtp]
 enabled = true
-host = "smtp.resend.com"
-port = 465
-user = "resend"
-pass = "env(RESEND_API_KEY)"
+host = "smtp-relay.brevo.com"
+port = 587
+user = "env(SUPABASE_AUTH_SMTP_USER)"
+pass = "env(BREVO_SMTP_KEY)"
 admin_email = "env(SUPABASE_AUTH_SMTP_SENDER)"
 sender_name = "Worktrack"
 
@@ -336,11 +407,37 @@ max_frequency = "5s"
 # 4152127777 = "123456"
 
 # Configure logged in session timeouts.
-# [auth.sessions]
+# SESSIONS EXPIRE ON THE SERVER, NOT ONLY IN THE BROWSER (2026-09-15).
+#
+# `jwt_expiry = 3600` above is NOT a session expiry and it is worth saying so,
+# because the two are easy to confuse. It is how long one access token is good
+# for; with refresh-token rotation on, the browser renews it every hour
+# forever. So a session on a shared or stolen laptop lasted indefinitely -- the
+# security item Gabe's brief names as "sessions expire" was half-implemented.
+#
+# These two close it, and they are enforced by GoTrue rather than by anything
+# this repo ships, which is the point: a timeout the client enforces is a
+# timeout anyone can skip by not running the client.
+#
+#   timebox             a session is dead 24h after sign-in whatever happens.
+#                       Long enough that an ordinary working day never hits it,
+#                       short enough that a session is not a permanent key.
+#   inactivity_timeout  8h with no activity ends it. Someone who closes the lid
+#                       on Friday signs in again on Monday.
+#
+# THE CLIENT ALREADY HANDLES THE CONSEQUENCE. When a refresh is refused
+# supabase-js emits SIGNED_OUT, and AuthContext turns that into an explicit
+# "your session expired" dialog rather than a silent bounce to /login -- see
+# `sessionExpired` there. Without that half, this half reads to the user as the
+# app logging them out at random.
+#
+# THESE ONLY TAKE EFFECT ON A PUSH. `npm run push:auth-config` -- never
+# `supabase config push` directly; see docs/SECURITY.md for why.
+[auth.sessions]
 # Force log out after the specified duration.
-# timebox = "24h"
+timebox = "24h"
 # Force log out if the user has been inactive longer than the specified duration.
-# inactivity_timeout = "8h"
+inactivity_timeout = "8h"
 
 # This hook runs before a new user is created and allows developers to reject the request based on the incoming user object.
 # [auth.hook.before_user_created]

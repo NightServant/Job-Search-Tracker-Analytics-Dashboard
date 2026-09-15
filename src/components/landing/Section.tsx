@@ -17,9 +17,34 @@ import { LANDING_RHYTHM } from './rhythm'
  * single thing that most separates a page that was designed from a page that
  * was assembled.
  *
- * 1200px because the content is text and cards, not a dashboard. Past roughly
- * 1200 a four-card row starts to look like four islands, and body copy runs
- * past a comfortable measure.
+ * `max-w-wide` -- 1440px, the app's OWN `--container-wide` token -- since
+ * 2026-09-15 (Gabe: "expand the width of all sections in the homepage to the
+ * desirable UI/UX standard"). It was 1200, and the note that stood here argued
+ * for it: "past roughly 1200 a four-card row starts to look like four islands,
+ * and body copy runs past a comfortable measure."
+ *
+ * HALF OF THAT ARGUMENT WAS ALREADY DEAD and the other half is answered
+ * elsewhere. Body copy does not run to the container: every lede is
+ * `max-w-2xl`, every proof body `max-w-[62ch]`, every FAQ answer `max-w-3xl`.
+ * The measure is set per block and the container never governed it, so
+ * widening the container cannot lengthen a line.
+ *
+ * What the extra 240px actually buys is the carousel. The screenshots under
+ * public/screens are 1440px wide and were being rendered into a 1200px stage
+ * minus two 40px arrows -- so the one section whose entire job is showing the
+ * product was showing it at 78% scale and resampling every capture on the way.
+ * At 1440 the stage is the capture's own size.
+ *
+ * THE TOKEN, NOT A LITERAL. `--container-wide` is what the signed-in shell
+ * already caps its grid screens at, and index.css describes it as the width
+ * "for the grid screens where a 1440 measure is columns rather than prose".
+ * The landing page is columns and screenshots; it is the same answer to the
+ * same question, so it should not be a second number that happens to agree.
+ *
+ * IT MOVED THE FIXED RAILS WITH IT. SectionRail and SectionIndex sit in the
+ * margins this container leaves, so their thresholds are arithmetic on this
+ * number -- widening it here without widening them there is how a rail ends up
+ * printed over the last word of a paragraph. See SectionRail for the sums.
  *
  * `tone` alternates the ground rather than drawing boxes around sections. The
  * design system separates with hairlines and surface changes, never with
@@ -83,7 +108,7 @@ export function Section({
       )}
       {...props}
     >
-      <div className="mx-auto w-full max-w-[1200px]">{children}</div>
+      <div className="mx-auto w-full max-w-wide">{children}</div>
     </section>
   )
 }

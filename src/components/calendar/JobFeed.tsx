@@ -6,7 +6,6 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import {
   Card,
-  CardAction,
   CardContent,
   CardDescription,
   CardHeader,
@@ -18,15 +17,18 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  CarouselRow,
 } from '@/components/ui/carousel'
+import { Button } from '@/components/ui/button'
 import { EmptyState } from '@/components/ui/empty-state'
-import { Select } from '@/components/ui/select'
+import { FilterBar } from '@/components/ui/filter-bar'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ExternalIcon, PlusIcon } from '@/components/icons'
 import { ICON_MOTION_GROUP, iconMotion } from '@/components/icons/motion'
 import { localDayKey } from '@/services/date'
 import { parseDayKey } from '@/lib/calendar'
 import { useAppHref } from '@/components/shell/routeBase'
+import { matchesTerms, searchTerms } from '@/lib/search'
 import type { FeedFacet, FeedJob } from '@/services/jobFeed'
 
 /**
@@ -118,6 +120,29 @@ export function JobFeed({
   const appHref = useAppHref()
   const today = React.useMemo(() => localDayKey(new Date().toISOString()), [])
 
+  /**
+   * THE SEARCH IS LOCAL, AND THE TWO DROPDOWNS ARE NOT (2026-09-15).
+   *
+   * That asymmetry is the honest one rather than an inconsistency. Region and
+   * field are Jobicy's own taxonomy and are sent to the API, so changing
+   * either fetches a different list -- they are the only way to reach roles
+   * that are not on this page. A title search is not: the feed offers no
+   * keyword parameter, so the only thing this box can honestly do is narrow
+   * what has already arrived. Sending it upstream is not an option, and
+   * pretending otherwise would mean a search that silently misses every role
+   * past the fetch limit.
+   *
+   * The title AND the company are searched, joined by `matchesTerms` -- see
+   * lib/search. Somebody scanning this rail is looking for one or the other
+   * and does not think of them as two fields.
+   */
+  const [query, setQuery] = React.useState('')
+  const terms = React.useMemo(() => searchTerms(query), [query])
+  const visible = React.useMemo(
+    () => jobs.filter((job) => matchesTerms(terms, job.title, job.company)),
+    [jobs, terms]
+  )
+
   return (
     // `@container/feed` is declared HERE, on the card, and queried by the cards
     // inside it. An element cannot query its own container, so the declaration
@@ -133,77 +158,114 @@ export function JobFeed({
       className={cn('@container/feed border-0 bg-transparent py-0', className)}
       data-job-feed
     >
-      {/* THE CAROUSEL WRAPS THE HEADER TOO, because its arrows live up there
-          rather than floating over the first and last card. `CarouselPrevious`
-          only works inside the provider, so the provider has to contain both.
-          The card's own vertical rhythm is restated on it, since a wrapper
-          between `Card` and its children would otherwise swallow the gap. */}
+      {/* THE CAROUSEL WRAPS THE HEADER TOO. It no longer has to -- the arrows
+          moved down beside the rail on 2026-09-15 -- but the provider still
+          has to sit above everything that reads it, and the header's filter
+          row is inside the same vertical rhythm. The card's own `--card-spacing`
+          is restated on it, since a wrapper between `Card` and its children
+          would otherwise swallow the gap. */}
       <Carousel
         opts={{ align: 'start', dragFree: true, containScroll: 'trimSnaps' }}
-        className="flex flex-col gap-(--card-spacing)"
+        // `gap-6` (24px), not `--card-spacing` (16px). This is the distance
+        // from the card's HEADER GROUP to the rail, and 16px was the value for
+        // a header with its controls tucked into its own trailing column --
+        // with the controls on their own row beneath, it read as a flat stack.
+        // See FilterBar for the three steps.
+        className="flex flex-col gap-6"
       >
-        <CardHeader className="px-0">
-          <CardTitle icon="Applications">
-            <h2>fresh remote roles</h2>
-          </CardTitle>
-          <CardDescription>
-            what went up recently, newest first — track one and Worktrack reads the posting for
-            you.
-          </CardDescription>
-          <CardAction>
-            <div className="flex flex-wrap items-center gap-2">
-              {/* WHERE, THEN WHAT. Region first because it is the filter that
-                  decides whether the rail is usable at all: unfiltered, this
-                  feed is overwhelmingly US-eligible, so somebody outside the
-                  US was reading a list of roles they cannot take (Gabe,
-                  2026-09-11). It opens on the reader's own country when the
-                  feed lists one -- see `geoSlugForCountry`. */}
-              {locations.length > 0 && (
-                <div className="w-48 max-sm:w-full">
-                  <Select
-                    id="job-feed-geo"
-                    icon="Globe"
-                    aria-label="Filter roles by region"
-                    value={geo ?? ANY_INDUSTRY}
-                    onValueChange={(next) => onGeoChange?.(next)}
-                    items={[
-                      { value: ANY_INDUSTRY, label: 'anywhere' },
-                      ...locations
-                        .filter((facet) => facet.slug !== 'anywhere')
-                        .map((facet) => ({ value: facet.slug, label: facet.name })),
-                    ]}
-                  />
-                </div>
-              )}
-              {industries.length > 0 && (
-                // Width on a wrapper, not on the Select: `Select`'s own root is
-                // `w-full` and only its trigger takes `className`.
-                <div className="w-52 max-sm:w-full">
-                  <Select
-                    id="job-feed-industry"
-                    icon="Tag"
-                    aria-label="Filter roles by field"
-                    value={industry ?? ANY_INDUSTRY}
-                    onValueChange={(next) => onIndustryChange?.(next)}
-                    items={[
-                      { value: ANY_INDUSTRY, label: 'every field' },
-                      ...industries.map((facet) => ({ value: facet.slug, label: facet.name })),
-                    ]}
-                  />
-                </div>
-              )}
-              {/* ARROWS ONLY WHEN THERE IS A RAIL TO PAGE, which is how the
-                  band above already behaves. Two disabled chevrons over an
-                  empty state are controls for a list that is not there. */}
-              {jobs.length > 0 && (
-                <div className="flex shrink-0 items-center gap-2">
-                  <CarouselPrevious className="static translate-y-0" />
-                  <CarouselNext className="static translate-y-0" />
-                </div>
-              )}
-            </div>
-          </CardAction>
-        </CardHeader>
+        {/* THE HEADER GROUP: the panel's title, its sentence, and the controls
+            that narrow it -- 12px apart because they are one thing, and 24px
+            clear of the rail below.
+
+            NO `CardAction` ANY MORE. The three controls used to sit in that
+            slot, which is the header grid's trailing column -- so on a card
+            whose description is a full sentence they were squeezed into
+            whatever the sentence left, and wrapped inside their own corner at
+            widths where the row had space going spare. They are their own row
+            below the header now (Gabe, 2026-09-15). */}
+        <div className="flex flex-col gap-3">
+          <CardHeader className="px-0">
+            <CardTitle icon="Applications">
+              <h2>fresh remote roles</h2>
+            </CardTitle>
+            <CardDescription>
+              what went up recently, newest first — track one and Worktrack reads the posting for
+              you.
+            </CardDescription>
+          </CardHeader>
+
+          {/* SEARCH, THEN WHERE, THEN WHAT -- the order `FilterBar` sets for
+              every narrowing row in the app, applied to a rail that until
+              2026-09-15 had the two dropdowns and no search at all.
+
+              WHERE BEFORE WHAT among the dropdowns, and that ordering is older
+              than this row: region is the filter that decides whether the rail
+              is usable at all, because unfiltered this feed is overwhelmingly
+              US-eligible and somebody outside the US was reading a list of
+              roles they cannot take (Gabe, 2026-09-11). It opens on the
+              reader's own country when the feed lists one -- see
+              `geoSlugForCountry`.
+
+              THE ROW IS DRAWN EVEN WHILE THE FEED IS LOADING OR FAILED, and
+              that is deliberate: the two dropdowns are what RE-FETCH, so
+              hiding them on a failed read would take away the control most
+              likely to fix it. The search box is the exception the other way --
+              it narrows what arrived, so with nothing arrived there is nothing
+              for it to do, and a box that cannot affect anything is a control
+              that lies. */}
+          <FilterBar
+            search={
+              jobs.length > 0
+                ? {
+                    id: 'job-feed-search',
+                    label: 'Search these roles by title or company',
+                    placeholder: 'search roles',
+                    value: query,
+                    onChange: setQuery,
+                  }
+                : undefined
+            }
+            selects={[
+              ...(locations.length > 0
+                ? [
+                    {
+                      id: 'job-feed-geo',
+                      label: 'Filter roles by region',
+                      icon: 'Globe' as const,
+                      value: geo ?? ANY_INDUSTRY,
+                      onValueChange: (next: string) => onGeoChange?.(next),
+                      items: [
+                        { value: ANY_INDUSTRY, label: 'anywhere' },
+                        ...locations
+                          .filter((facet) => facet.slug !== 'anywhere')
+                          .map((facet) => ({ value: facet.slug, label: facet.name })),
+                      ],
+                    },
+                  ]
+                : []),
+              ...(industries.length > 0
+                ? [
+                    {
+                      id: 'job-feed-industry',
+                      label: 'Filter roles by field',
+                      icon: 'Tag' as const,
+                      width: 'l' as const,
+                      value: industry ?? ANY_INDUSTRY,
+                      onValueChange: (next: string) => onIndustryChange?.(next),
+                      items: [
+                        { value: ANY_INDUSTRY, label: 'every field' },
+                        ...industries.map((facet) => ({
+                          value: facet.slug,
+                          label: facet.name,
+                        })),
+                      ],
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        </div>
+
 
         <CardContent className="flex flex-col gap-4 px-0">
           {loading && (
@@ -239,12 +301,48 @@ export function JobFeed({
             </EmptyState>
           )}
 
-          {!loading && !error && jobs.length > 0 && (
-            // -ml-4 / pl-4 is the carousel's own gutter idiom: the track shifts
-            // left by one gap so the first card sits flush with the card's
-            // padding while every later one keeps its spacing.
-            <CarouselContent className="-ml-4">
-              {jobs.map((job) => {
+          {/* A SEARCH THAT MATCHES NOTHING IS NOT AN EMPTY FEED, which is the
+              same rule the documents list and the template gallery follow: say
+              which control emptied the list, and there are three here. The
+              feed DID return roles -- `jobs.length > 0` is in the condition --
+              so "nothing posted" would be a false statement about the job
+              market, and the region and field dropdowns are innocent. Only the
+              word that was typed can have done this, so that is what is named,
+              and clearing it is offered as the action rather than described. */}
+          {!loading && !error && jobs.length > 0 && visible.length === 0 && (
+            <EmptyState
+              icon="Search"
+              className="py-10"
+              data-job-feed-state="no-results"
+              action={
+                <Button variant="secondary" size="s" onClick={() => setQuery('')}>
+                  clear the search
+                </Button>
+              }
+            >
+              none of the {jobs.length} roles here match “{query.trim()}”.
+            </EmptyState>
+          )}
+
+          {/* ARROWS ONLY WHEN THERE IS A RAIL TO PAGE, which is how the band
+              above already behaves -- two disabled chevrons beside an empty
+              state are controls for a list that is not there. That rule is
+              unchanged; what moved on 2026-09-15 is WHERE they sit. They were
+              on the card's header row beside the two filters, and they now
+              flank the rail itself, which is the one arrangement every
+              carousel in this app uses -- see `CarouselRow` in ui/carousel.
+
+              Rendering the row only in the populated branch is what keeps the
+              rule true: the loading, error and empty branches above are not
+              wrapped in it, so there is nothing to disable. */}
+          {!loading && !error && visible.length > 0 && (
+            <CarouselRow>
+              <CarouselPrevious />
+              {/* -ml-4 / pl-4 is the carousel's own gutter idiom: the track
+                  shifts left by one gap so the first card sits flush with the
+                  row's left edge while every later one keeps its spacing. */}
+              <CarouselContent className="-ml-4">
+              {visible.map((job) => {
                 const band = formatBand(job)
                 const facts = [job.geo, job.level].filter(Boolean).join(' · ')
                 return (
@@ -317,7 +415,9 @@ export function JobFeed({
                   </CarouselItem>
                 )
               })}
-            </CarouselContent>
+              </CarouselContent>
+              <CarouselNext />
+            </CarouselRow>
           )}
 
           {/* ATTRIBUTION, AS THE FEED ASKS FOR IT. Not a footnote this app is

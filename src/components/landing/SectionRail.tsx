@@ -53,21 +53,36 @@ import { scrollToSection } from '@/lib/scrollToSection'
  * Below that the page is not left without a sense of position: the scrollbar
  * is the progress indicator and the navbar is the jump.
  *
- * THE LABELS HAVE THEIR OWN, WIDER THRESHOLD, and it is arithmetic rather than
- * taste. The <ol> is a flex column, so every row is as wide as the widest
- * label -- 74px for "how it works" -- which makes this component a CONSTANT
- * 121px box at every viewport: 12 (pl-3) + 7 (dot) + 12 (gap-3) + 74 + 16
- * (pr-4). With `right-6` that puts its left edge at `100vw - 145`, and the
- * container's right edge is at `(100vw + 1200) / 2`. The first is only clear of
- * the second from 1490px up.
+ * BOTH THRESHOLDS MOVED ON 2026-09-15, because the container did. The page's
+ * sections went from `max-w-[1200px]` to `max-w-wide` (1440) and this rail
+ * lives in the margin that container leaves -- so the widths below are not a
+ * taste that happens to have changed, they are the same two sums recomputed
+ * against a different number. Leaving them at 1440/1560 would have put a fixed
+ * rail over the last word of every paragraph on a 1440 monitor, which is
+ * exactly the defect the 2xl move fixed for laptops.
  *
- * So between 1440 and 1490 a labelled rail necessarily sits on the text, which
- * is what it was doing. Below 1560 the labels are therefore clipped to zero
- * width and the rail is dots only -- 35px, with 60px of daylight at 1440. 1560
- * rather than the bare 1490 leaves ~35px of clearance instead of nothing, so
- * the labels do not arrive touching the edge of the paragraph beside them, and
- * a slightly longer label added later does not immediately overlap again.
- * Recompute it as `1200 + 2 * (145 + clearance)` if the labels change.
+ * THE SUMS, so the next person who changes the container can redo them rather
+ * than guess. The rail is `right-6`, so with a box `W_rail` wide its left edge
+ * is at `100vw - 24 - W_rail`. The container's right edge is at
+ * `(100vw + 1440) / 2`. Clearing it needs
+ *
+ *     100vw - 24 - W_rail > (100vw + 1440) / 2
+ *     100vw > 1440 + 2 * (24 + W_rail)
+ *
+ * DOTS ONLY: the box is 35px, so the rail is clear from 1558px. The breakpoint
+ * is `min-[1640px]`, which leaves ~41px of daylight rather than none -- a rail
+ * that arrives exactly touching the text reads as a collision even when the
+ * arithmetic says otherwise.
+ *
+ * WITH LABELS: the <ol> is a flex column, so every row is as wide as the widest
+ * label -- 74px for "how it works" -- which makes the box a CONSTANT 121px:
+ * 12 (pl-3) + 7 (dot) + 12 (gap-3) + 74 + 16 (pr-4). That is clear from 1730px,
+ * and the breakpoint is `min-[1800px]` for the same ~35px of clearance the old
+ * 1560 bought against 1490. A slightly longer label added later does not
+ * immediately overlap.
+ *
+ * Recompute both as `1440 + 2 * (24 + W_rail + clearance)` if either the labels
+ * or the container change.
  *
  * CLIPPED, NOT `hidden`. Zero width plus `overflow-hidden` is the same
  * mechanism `sr-only` uses: the label contributes nothing to the box and paints
@@ -127,7 +142,7 @@ export function SectionRail({
       data-over-hero={overHero ? 'true' : 'false'}
       aria-label="Page sections"
       className={cn(
-        'fixed right-6 top-1/2 z-40 hidden -translate-y-1/2 rounded-md py-4 pl-3 pr-4 2xl:block',
+        'fixed right-6 top-1/2 z-40 hidden -translate-y-1/2 rounded-md py-4 pl-3 pr-4 min-[1640px]:block',
         'transition-colors duration-150 motion-reduce:transition-none',
         // Its own plate over the hero, for the reason the navbar has its own
         // scrim: the rail is pinned to the RIGHT edge, which is precisely
@@ -202,7 +217,7 @@ export function SectionRail({
                 // not really clickable, which is half of what was reported.
                 // `gap-0` until the labels exist -- a 12px gap after a
                 // zero-width label is 12px of nothing inside a 35px rail.
-                className="group -my-2 flex items-center gap-0 py-2 outline-none min-[1560px]:gap-3"
+                className="group -my-2 flex items-center gap-0 py-2 outline-none min-[1800px]:gap-3"
               >
                 <span
                   aria-hidden
@@ -234,10 +249,10 @@ export function SectionRail({
                     'group-hover:opacity-100 group-focus-visible:opacity-100',
                     'motion-reduce:transition-none',
                     active && 'opacity-100',
-                    // Clipped to nothing below 1560, where there is no margin
+                    // Clipped to nothing below 1800, where there is no margin
                     // to reveal into -- see the docblock for the arithmetic.
                     // This is what keeps the rail 35px wide and off the text.
-                    'max-w-0 overflow-hidden min-[1560px]:max-w-none min-[1560px]:overflow-visible',
+                    'max-w-0 overflow-hidden min-[1800px]:max-w-none min-[1800px]:overflow-visible',
                     overHero ? 'text-white' : 'text-text-secondary'
                   )}
                 >

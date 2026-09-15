@@ -101,32 +101,35 @@ describe('SectionRail', () => {
     expect(inactive.className).not.toContain('bg-border-default')
   })
 
-  // 2xl (1440), not lg. At 1024-1439 the 1200px container leaves no usable
-  // margin -- none at all at 1024, 40px at 1280 -- so the fixed furniture
-  // overlapped the content on every small laptop. Both halves of the pair move
-  // together; see SectionRail's docblock.
-  it('is hidden below 2xl, where there is no margin to live in', () => {
+  // 1640, not lg and no longer 2xl. The rail lives in the margin the page's
+  // container leaves, so its threshold is arithmetic on that container's
+  // width: `1440 + 2 * (24 + 35)` clears at 1558, and 1640 buys ~41px of
+  // daylight so it does not arrive touching the text. It was `2xl` (1440)
+  // while the container was 1200; the container went to 1440 on 2026-09-15 and
+  // this moved with it. Both halves of the pair move together; see
+  // SectionRail's docblock for the working.
+  it('is hidden until the container leaves a margin to live in', () => {
     render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
     expect(rail().className).toContain('hidden')
-    expect(rail().className).toContain('2xl:block')
+    expect(rail().className).toContain('min-[1640px]:block')
   })
 
   /**
-   * The rail is visible from 1440 and its LABELS from 1560, and the gap between
+   * The rail is visible from 1640 and its LABELS from 1800, and the gap between
    * those two numbers is not slack -- it is the band where a labelled rail
    * provably does not fit.
    *
    * The box is a constant 121px (the flex column is as wide as its widest
    * label), `right-6` puts its left edge at `100vw - 145`, and the container's
-   * right edge is at `(100vw + 1200) / 2`. They only clear from 1490px. So
-   * between 1440 and 1490 a revealed label sits on the paragraph beside it,
-   * which is exactly what was reported.
+   * right edge is at `(100vw + 1440) / 2`. They only clear from 1730px. So
+   * between 1640 and 1730 a revealed label would sit on the paragraph beside
+   * it, which is exactly what was reported at the old numbers.
    *
    * jsdom has no layout, so this cannot measure the 121px. What it CAN hold
    * still is the thing that would actually regress: the label being clipped
    * below the threshold, and the two classes that implement it agreeing on one
-   * number. A future editor who reveals the label at `2xl` to "match the rail"
-   * fails here rather than in a browser at 1456px.
+   * number. A future editor who reveals the label at the rail's own threshold
+   * to "match the rail" fails here rather than in a browser at 1660px.
    */
   it('clips its labels until there is margin to reveal them into', () => {
     render(<SectionRail sections={SECTIONS} activeId="hero" progress={0} />)
@@ -142,18 +145,18 @@ describe('SectionRail', () => {
     // contains "hidden", so `not.toContain('hidden')` fails against the very
     // class that implements the clipping.
     expect(label.className.split(' ')).not.toContain('hidden')
-    expect(label.className).toContain('min-[1560px]:max-w-none')
+    expect(label.className).toContain('min-[1800px]:max-w-none')
 
     // The gap is gated on the same number -- 12px after a zero-width label is
     // 12px of nothing inside a 35px rail.
     const link = rail().querySelector('[data-rail-item]') as HTMLElement
     expect(link.className).toContain('gap-0')
-    expect(link.className).toContain('min-[1560px]:gap-3')
+    expect(link.className).toContain('min-[1800px]:gap-3')
 
     // The label threshold must be WIDER than the rail's own, never equal to
-    // it: at 1440 the rail fits and the label does not.
-    expect(rail().className).toContain('2xl:block')
-    expect(rail().className).not.toContain('min-[1560px]:block')
+    // it: at 1640 the rail fits and the label does not.
+    expect(rail().className).toContain('min-[1640px]:block')
+    expect(rail().className).not.toContain('min-[1800px]:block')
   })
 })
 

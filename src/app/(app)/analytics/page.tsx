@@ -80,6 +80,8 @@ export default function Page() {
       <RouteError
         title="could not load your analytics."
         message={first instanceof Error ? first.message : 'An error occurred while loading your analytics.'}
+        // See RouteError: a refusal gets its own screen and no retry button.
+        error={first}
       />
     )
   }

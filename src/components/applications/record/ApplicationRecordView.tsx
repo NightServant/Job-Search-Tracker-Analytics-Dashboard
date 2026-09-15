@@ -2,7 +2,6 @@
 
 import * as React from 'react'
 import { Button } from '@/components/ui/button'
-import { CssSpinner } from '@/components/ui/css-spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { BriefcaseIcon, CheckIcon } from '@/components/icons'
 import { iconMotion } from '@/components/icons/motion'
@@ -516,7 +515,36 @@ export function ApplicationRecordView({
     e.preventDefault()
     attempt()
     setFormError('')
-    if (Object.keys(errors).length > 0) return
+    /*
+      A SILENT RETURN IS A BUTTON THAT DOES NOTHING (2026-09-15). This branch
+      used to be a bare `return`: `attempt()` turned on the per-field marks and
+      the submit stopped, which is correct as far as it goes -- and on this
+      surface it goes nowhere useful. The record is a TWO-COLUMN dialog with
+      its own scrollport, so the field that is wrong is very often above the
+      fold, and the Save button is in a bar pinned below it. Pressing Save and
+      seeing nothing change at all is indistinguishable from a broken button;
+      the person presses it again.
+
+      So the form says, at the form's own level, that there is something to
+      fix and how many -- and it says it in the SAME place a failed save
+      already speaks, three lines above the button, which is the one part of
+      this dialog that never scrolls away.
+
+      NAMED, NOT COUNTED ONLY. "check company and salary" sends somebody
+      straight to the field; "2 fields need fixing" sends them hunting. Three
+      at most, because the list is a pointer rather than a report and the
+      per-field messages are the report.
+    */
+    const invalid = Object.keys(errors)
+    if (invalid.length > 0) {
+      const named = invalid.slice(0, 3).join(', ')
+      setFormError(
+        invalid.length > 3
+          ? `Check ${named} and ${invalid.length - 3} more before saving.`
+          : `Check ${named} before saving.`
+      )
+      return
+    }
     try {
       assertJobFormDataValid(payload)
     } catch (err) {
@@ -788,17 +816,27 @@ export function ApplicationRecordView({
             the trailing edge, where the eye finishes; the wizard's review step
             keeps its own arrangement, because there the save is the end of a
             four-step flow rather than one of the things this surface does. */}
+        {/* `loading` + `loadingText`, NOT THE HAND-ROLLED PENDING STATE this
+            carried until 2026-09-15. It rendered its own `CssSpinner`, swapped
+            its own label and passed `saving` into `disabled` -- which is three
+            of the four things `Button` does, and the fourth is `aria-busy`,
+            which this was quietly missing. It also swapped the label with a
+            ternary, so the control changed width the moment it was pressed;
+            `Button` keeps both strings in one grid cell and does not.
+
+            `disabled` now carries only `nothingToSave`. `Button` derives the
+            rest: a button that is loading is disabled by construction, which
+            is what makes a double submit unrepresentable rather than merely
+            discouraged. */}
         <Button
           type="submit"
-          disabled={saving || nothingToSave}
+          loading={saving}
+          loadingText="Saving..."
+          disabled={nothingToSave}
           className={cn(layout === 'record' && 'ms-auto')}
         >
-          {saving ? (
-            <CssSpinner size={14} />
-          ) : (
-            <CheckIcon size={16} aria-hidden className={iconMotion('none')} />
-          )}
-          {saving ? 'Saving' : (submitLabel ?? 'Save application')}
+          {!saving && <CheckIcon size={16} aria-hidden className={iconMotion('none')} />}
+          {submitLabel ?? 'Save application'}
         </Button>
         {footer}
       </div>

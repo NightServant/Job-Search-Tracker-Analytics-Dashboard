@@ -114,6 +114,7 @@ export function OtpStep({ email, onVerify, onResend, onBack }: OtpStepProps) {
         size="m"
         disabled={!ready}
         loading={busy}
+        loadingText="Checking the code..."
       >
         {!busy && <ShieldCheckIcon size={16} aria-hidden className={iconMotion('lift')} />}
         Verify and continue

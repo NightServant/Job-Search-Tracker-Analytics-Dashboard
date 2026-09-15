@@ -68,6 +68,15 @@ const COPY = {
     title: 'sign in',
     lede: 'Pick up where you left off.',
     submit: 'Sign in',
+    /**
+     * What the button says while the request is out (`Button`'s `loadingText`).
+     *
+     * PRESENT TENSE, NEVER PAST. The control is disabled while this shows, so
+     * "Signed in" would be a claim the button is in no position to make -- and
+     * it is the claim somebody would read as a success before the redirect
+     * lands. "Signing in" says only that it went.
+     */
+    submitBusy: 'Signing in...',
     switchPrompt: 'no account yet?',
     switchLabel: 'sign up',
     switchHref: '/signup',
@@ -76,6 +85,7 @@ const COPY = {
     title: 'create an account',
     lede: 'An email and a password. Nothing else.',
     submit: 'Create account',
+    submitBusy: 'Creating your account...',
     switchPrompt: 'have an account?',
     switchLabel: 'sign in',
     switchHref: '/login',
@@ -214,7 +224,20 @@ export function AuthScreen({ mode, onSubmit, onProvider }: AuthScreenProps) {
             spinner in the same leading slot, and showing both would put two
             marks where the control has one thing to say.
           */}
-          <Button type="submit" variant="primary" size="m" loading={busy}>
+          {/*
+            `loadingText` (2026-09-15). A spinner says "something is happening";
+            this says WHICH something, which is what somebody who has just typed
+            a password into a form wants to know before they reach for the
+            button again. The label is swapped in place and the control does not
+            resize -- see Button, which keeps both strings in one grid cell.
+          */}
+          <Button
+            type="submit"
+            variant="primary"
+            size="m"
+            loading={busy}
+            loadingText={copy.submitBusy}
+          >
             {!busy &&
               (isSignUp ? (
                 <UserRoundIcon size={16} aria-hidden className={iconMotion('lift')} />

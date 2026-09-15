@@ -112,16 +112,35 @@ import { cn } from '@/lib/utils'
  *    including the slides themselves, and one circular control on it would be
  *    the only round thing on the page.
  *
- * 9. THE CONTROLS MOVED OUT OF THE STAGE, into one row beneath it: dots at the
- *    leading edge, arrows at the trailing edge. Swiper floats both over the
- *    media -- arrows inset 4px from the sides, dots 8px off the bottom -- which
- *    is right for the sample photography it ships with and wrong for
- *    screenshots, where an arrow at the left edge sits exactly on top of the
- *    application's own sidebar. It is also what this repo already decided:
- *    TemplateGallery pulls the same controls out of the card strip "rather
- *    than floating over the first and last cards". The row is the full width
- *    of the stage, so both controls land on the page's 1200px grid lines
- *    rather than on the image's.
+ * 9. THE CONTROLS MOVED OUT OF THE STAGE. Swiper floats both over the media --
+ *    arrows inset 4px from the sides, dots 8px off the bottom -- which is right
+ *    for the sample photography it ships with and wrong for screenshots, where
+ *    an arrow at the left edge sits exactly on top of the application's own
+ *    sidebar.
+ *
+ *    THE ARROWS NOW FLANK THE STAGE and the dots sit under it (Gabe,
+ *    2026-09-15: "left and right must be placed besides carousel content ...
+ *    this change must be applied in general in order for other carousel
+ *    sections to follow the new design rules"). Until then both sat in one row
+ *    beneath the stage, dots left and arrows right, which was the right answer
+ *    to "get them off the screenshot" and the wrong answer to "where does a
+ *    reader look for them" -- a previous control 900px to the right of the
+ *    edge it moves is a control you find by searching.
+ *
+ *    THE TWO CONTROLS SPLIT UP BECAUSE THEY DO DIFFERENT JOBS. The arrows MOVE
+ *    the stage, so they belong on the edges they move it towards. The dots SAY
+ *    WHERE YOU ARE, which is a caption on the stage rather than a control of
+ *    it, so they stay centred underneath it. Putting both on the flanking row
+ *    would have squeezed the screenshot for a readout that never needed to be
+ *    beside it.
+ *
+ *    This is the same arrangement `CarouselRow` gives every embla carousel in
+ *    the app. It is BUILT SEPARATELY here rather than imported, because this
+ *    file is Swiper and that one is embla: the layout is three flex children
+ *    and importing a component for it would drag embla's context provider --
+ *    `CarouselRow`'s siblings all call `useCarousel` -- into a Swiper tree
+ *    that has none. Two implementations of one rule, and the rule is written
+ *    down in both places.
  *
  *    The dots come with it. `el`, `bulletClass`, `bulletActiveClass` and
  *    `modifierClass` are all renamed to ours for the same reason the arrows
@@ -152,20 +171,27 @@ const DOT_ACTIVE_CLASS = 'landing-carousel-dot-active'
 /**
  * One arrow, as this app draws a square icon control.
  *
- * `size: 'm'` is the 40px every button on the landing page is, and `w-10 px-0`
- * squares it -- `buttonVariants` sizes for a label, so height comes from the
- * variant and width has to be said.
+ * `size: 'icon-m'` IS NOW A REAL SIZE, and until 2026-09-15 it was not: this
+ * line read `buttonVariants({ size: 'm' }) + 'w-10 px-0'` -- a size recipe
+ * followed immediately by two classes undoing half of it, because
+ * `buttonVariants` only described buttons that carry a label. That hack was
+ * one of four different boxes the app's square controls had invented, and
+ * naming the size is what let all four converge. See button-variants.ts.
  *
  * 40px rather than the 28px `IconButton` would have given. That control is
  * sized to fit in the gutter of a 44px list row without pushing the row's
  * content, which is a real constraint and not one that applies here; at 28px
- * under a 1200px stage it would read as a leftover from a denser screen. 40px
+ * beside a 1200px stage it would read as a leftover from a denser screen. 40px
  * is 4px under the 44px touch guideline and matched to the page's own buttons,
  * which is the trade this page already makes everywhere else -- and below md
  * the carousel is not scroll-driven, so touch drag is on and the arrows are a
  * second way in rather than the only one.
+ *
+ * `shrink-0` because the arrows are now flex children of the row that holds
+ * the stage. Without it the row squashes the 40px buttons before it squashes
+ * the screenshot, which is backwards.
  */
-const ARROW_CLASS = cn(buttonVariants({ variant: 'secondary', size: 'm' }), 'w-10 px-0')
+const ARROW_CLASS = cn(buttonVariants({ variant: 'secondary', size: 'icon-m' }), 'shrink-0')
 
 export interface Carousel005Props {
   /**
@@ -222,6 +248,32 @@ const Carousel_005 = ({
         transition={{ duration: 0.3 }}
         className="w-full"
       >
+        {/*
+          THE FLANKING ROW: previous, the stage, next. See edit 9.
+
+          `min-w-0` ON THE STAGE IS LOAD-BEARING. A flex item's default
+          `min-width` is `auto`, which for Swiper's `overflow: hidden` track
+          resolves to its CONTENT width -- so a stage holding 1440px captures
+          would refuse to shrink, push both arrows off the page, and give the
+          landing page a horizontal scrollbar. The same trap `CarouselContent`
+          handles for the embla carousels.
+        */}
+        <div className="flex w-full items-center gap-2 sm:gap-4">
+          {showNavigation && (
+            /*
+              `type="button"` is not boilerplate here. Swiper's Navigation
+              module disables a control by setting `el.disabled` when the tag
+              is BUTTON, and a <button> with no type submits the form it might
+              one day find itself inside.
+
+              The label is an sr-only span rather than an aria-label, which is
+              how src/components/ui/carousel.tsx labels the same pair.
+            */
+            <button type="button" className={cn(PREV_CLASS, ARROW_CLASS)}>
+              <ChevronLeftIcon size={16} />
+              <span className="sr-only">Previous screen</span>
+            </button>
+          )}
         <Swiper
           spaceBetween={spaceBetween}
           onSwiper={onSwiper}
@@ -268,7 +320,13 @@ const Carousel_005 = ({
                 }
               : false
           }
-          className="Carousal_005"
+          // `min-w-0 flex-1` makes the stage the row's flexible middle: the
+          // two arrows keep their 40px and everything left over is the
+          // screenshot. `.Carousal_005`'s own `width: 100%` in index.css is
+          // unlayered and would beat a Tailwind width utility -- it does not
+          // fight this, because a flex item in a row takes its main size from
+          // `flex-basis` (0% here) rather than from `width`.
+          className="Carousal_005 min-w-0 flex-1"
           creativeEffect={{
             prev: {
               shadow: false,
@@ -329,51 +387,41 @@ const Carousel_005 = ({
           ))}
         </Swiper>
 
+          {showNavigation && (
+            <button type="button" className={cn(NEXT_CLASS, ARROW_CLASS)}>
+              <ChevronRightIcon size={16} />
+              <span className="sr-only">Next screen</span>
+            </button>
+          )}
+        </div>
+
         {/*
-          THE CONTROL ROW, and it is a SIBLING of <Swiper> rather than a child.
+          THE DOTS, and they are a SIBLING of <Swiper> rather than a child.
           Swiper renders any non-SwiperSlide child inside `.swiper`, which is
-          `overflow: hidden` and is the stage the screenshots fill -- putting
-          the controls there is what made them float over the image. Out here
-          they are ordinary flow content one `--spacing-section` below it.
+          `overflow: hidden` and is the stage the screenshots fill -- putting a
+          control there is what made them float over the image. Out here they
+          are ordinary flow content one `--spacing-section` below it.
 
-          Swiper finds them by selector, not by tree position, so the move
-          costs nothing: the module resolves `nextEl` through
-          `document.querySelectorAll` and binds the click itself. The whole
-          tree is committed before Swiper's mount effect runs, so the elements
-          exist by the time it looks.
+          Swiper finds every control by selector rather than by tree position,
+          which is what lets the arrows sit in the flex row above and the dots
+          sit here: the module resolves `nextEl` and `el` through
+          `document.querySelectorAll` and binds the handlers itself. The whole
+          tree is committed before Swiper's mount effect runs, so all three
+          elements exist by the time it looks.
 
-          `justify-between` with the dots first: the dots say where you are and
-          the arrows are what you press, so they take the reading order and the
-          two ends of the row respectively. The row renders whenever either
-          control is on; a missing dots element leaves the arrows to be pushed
-          right by `justify-between` on their own.
+          CENTRED, not at the leading edge. They used to sit left in a row that
+          also held the arrows on its right; with the arrows gone, a run of
+          five 6px dots hard against the left margin reads as debris rather
+          than as a readout. Centred under the stage it is a caption on the
+          thing it describes.
         */}
-        {(showNavigation || showPagination) && (
-          <div className="mt-[var(--spacing-section)] flex items-center justify-between gap-4">
-            {showPagination && <div className={cn(DOTS_CLASS, 'flex items-center gap-2')} />}
-
-            {showNavigation && (
-              <div className="ml-auto flex items-center gap-2">
-                {/*
-                  `type="button"` is not boilerplate here. Swiper's Navigation
-                  module disables a control by setting `el.disabled` when the
-                  tag is BUTTON, and a <button> with no type submits the form
-                  it might one day find itself inside.
-
-                  The label is an sr-only span rather than an aria-label, which
-                  is how src/components/ui/carousel.tsx labels the same pair.
-                */}
-                <button type="button" className={cn(PREV_CLASS, ARROW_CLASS)}>
-                  <ChevronLeftIcon size={16} />
-                  <span className="sr-only">Previous screen</span>
-                </button>
-                <button type="button" className={cn(NEXT_CLASS, ARROW_CLASS)}>
-                  <ChevronRightIcon size={16} />
-                  <span className="sr-only">Next screen</span>
-                </button>
-              </div>
+        {showPagination && (
+          <div
+            className={cn(
+              DOTS_CLASS,
+              'mt-[var(--spacing-section)] flex items-center justify-center gap-2'
             )}
-          </div>
+          />
         )}
       </motion.div>
     </motion.div>

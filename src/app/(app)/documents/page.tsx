@@ -94,6 +94,8 @@ export default function Page() {
       <RouteError
         title="could not load your CVs."
         message={error instanceof Error ? error.message : 'An error occurred while loading them.'}
+        // See RouteError: a refusal gets its own screen and no retry button.
+        error={error}
       />
     )
   }

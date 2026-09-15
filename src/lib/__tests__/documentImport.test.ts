@@ -1,24 +1,37 @@
 import { describe, it, expect } from 'vitest'
 import type { ParagraphFormat } from '../pageGeometry'
+import { safeDocumentTitle } from '../uploadSafety'
 import {
   importDocument,
   htmlToWordContent,
   textToWordContent,
-  titleFromFilename,
   UnsupportedDocumentError,
 } from '../documentImport'
 
 const file = (name: string, body: string) =>
   new File([body], name, { type: 'text/plain' })
 
-describe('titleFromFilename', () => {
+describe('the imported title', () => {
+  /*
+    THESE MOVED FROM `titleFromFilename`, which was deleted on 2026-09-15 --
+    it was `safeDocumentTitle` minus the sanitising, and the import now uses
+    the safe one. The two assertions are kept verbatim because they pin the
+    behaviour that matters most on this screen and is easiest to lose while
+    adding character classes to a regex: a CV called
+    "Gabe Cervantes - CV (ATS) v5" must survive untouched.
+
+    The sanitising half is tested in lib/__tests__/uploadSafety.test.ts,
+    beside the function.
+  */
   it('uses the filename, which beats "Untitled" every time', () => {
-    expect(titleFromFilename('Gabe Cervantes - CV (ATS) v5.tex')).toBe('Gabe Cervantes - CV (ATS) v5')
-    expect(titleFromFilename('/Users/gabe/Documents/resume.md')).toBe('resume')
+    expect(safeDocumentTitle('Gabe Cervantes - CV (ATS) v5.tex')).toBe(
+      'Gabe Cervantes - CV (ATS) v5'
+    )
+    expect(safeDocumentTitle('/Users/gabe/Documents/resume.md')).toBe('resume')
   })
 
   it('falls back rather than producing an empty title', () => {
-    expect(titleFromFilename('.txt')).toBe('Imported CV')
+    expect(safeDocumentTitle('.txt')).toBe('Imported CV')
   })
 })
 

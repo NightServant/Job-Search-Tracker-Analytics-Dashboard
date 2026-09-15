@@ -92,6 +92,11 @@ export default function Page() {
       <RouteError
         title="could not load your calendar."
         message={error instanceof Error ? error.message : 'An error occurred while loading your events.'}
+        // The thrown value, so a row-level-security REFUSAL renders as one
+        // rather than as a failed read with a retry that cannot work. The two
+        // are indistinguishable from `message` alone -- only the code says
+        // which. See `isPermissionDenied`.
+        error={error}
       />
     )
   }
