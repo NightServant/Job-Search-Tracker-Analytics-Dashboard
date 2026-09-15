@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { authenticate } from '@/lib/apiAuth'
-import { readIntegrationConfig, capabilitiesOf } from '@/services/integrations/config'
+import { readIntegrationConfig, capabilitiesOf, configProblems } from '@/services/integrations/config'
 import { tailorCv, type TailoringInput } from '@/services/integrations/tailoring'
 
 /**
@@ -37,12 +37,31 @@ export async function POST(request: Request) {
   if (!capabilitiesOf(config).tailorCv) {
     // 501, not 500: nothing is broken, the capability was never configured,
     // and the UI says "set these variables" rather than "something failed".
+    //
+    // TWO DIFFERENT FAULTS SHARE THIS BRANCH, and until now they shared one
+    // sentence. "Never set up" is fixed by setting the three variables;
+    // "set up wrong" -- the base URL and the model transposed, which is what
+    // `configProblems` was written for -- leaves all three NON-EMPTY, so the
+    // old message told the operator to do the one thing they had already
+    // done. `configProblems` is the only thing that can tell them apart, and
+    // it was being computed nowhere.
+    const problems = configProblems(config)
+    if (problems.length) {
+      // Server-side, not in the response: a problem string quotes the value it
+      // objected to, and that is deployment configuration rather than
+      // something a signed-in user asked for. `console.*` reaches Vercel
+      // Runtime Logs, which is this app's whole logging story -- see
+      // lib/securityLog for why that is deliberate. The API key is never part
+      // of a problem string, and must not become one.
+      console.warn(JSON.stringify({ at: 'integrations', route: '/api/tailor', problems }))
+    }
     return NextResponse.json(
       {
         ok: false,
         reason: 'unconfigured',
-        message:
-          'AI tailoring is not configured. Set TAILORING_BASE_URL, TAILORING_API_KEY and TAILORING_MODEL.',
+        message: problems.length
+          ? 'AI tailoring is misconfigured on the server. The deployment logs name the problem.'
+          : 'AI tailoring is not configured. Set TAILORING_BASE_URL, TAILORING_API_KEY and TAILORING_MODEL.',
       },
       { status: 501 }
     )
