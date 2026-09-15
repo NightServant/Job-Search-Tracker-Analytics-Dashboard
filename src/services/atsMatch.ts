@@ -72,6 +72,59 @@ const STOPWORDS = new Set([
   'improvement', 'improvements', 'practice', 'practices', 'version', 'versions',
   'trend', 'trends', 'graduate', 'graduates', 'student', 'students', 'course',
   'courses', 'shifter', 'shifters', 'business', 'businesses',
+
+  // ADDED 2026-09-15, from a real posting Gabe was scored against. Out of 100
+  // terms it counted `responsible`, `key`, `enhance`, `sit`, `someone`,
+  // `paced` and `inc` as things a CV had to say -- `inc` because the employer
+  // is "IT Managers, Inc." and the company name is in the text like any other
+  // word. None can be answered, so each one is a guaranteed miss dragging the
+  // denominator down. Same defect as the 2026-09-06 pass above, found again
+  // because the list was tuned against one advert and postings do not share a
+  // vocabulary.
+  //
+  // WHAT WAS LEFT IN ON PURPOSE, having looked at each: `governance`, `uat`,
+  // `context`, `generation`, `rules`, `files`, `retrieval`, `prompt`,
+  // `compliance`, `pipelines`, `stakeholders`, `support`, `delivery`,
+  // `features`, `build` and `write`. They read as ordinary words in a list
+  // like this, and every one of them is a real answer to "what does this job
+  // need" in an AI or platform role. Under-removing is the safe direction:
+  // a junk term costs a few points, a removed REAL term hides a gap the CV
+  // actually has.
+
+  // Verbs for doing a job, not for having a skill.
+  'collaborate', 'collaborates', 'collaborated', 'collaborating',
+  'contribute', 'contributes', 'contributed', 'contributing',
+  'participate', 'participates', 'participated', 'participating',
+  'deliver', 'delivers', 'delivered', 'delivering',
+  'enhance', 'enhances', 'enhanced', 'enhancing',
+  'enable', 'enables', 'enabled', 'enabling',
+  'leverage', 'leverages', 'leveraged', 'leveraging',
+  'utilize', 'utilizes', 'utilized', 'utilizing',
+  'utilise', 'utilises', 'utilised', 'utilising',
+  'execute', 'executes', 'executed', 'executing',
+  'oversee', 'oversees', 'overseeing', 'oversaw',
+  'prepare', 'prepares', 'prepared', 'preparing',
+  'drive', 'drives', 'driving', 'drove',
+  'own', 'owns', 'owned', 'owning',
+  'sit', 'sits', 'sitting', 'take', 'takes', 'taking', 'took',
+  'need', 'needs', 'needed',
+
+  // Adjectives a posting uses about a person.
+  'responsible', 'accountable', 'comfortable', 'confident', 'dynamic',
+  'passionate', 'enthusiastic', 'proactive', 'reliable', 'flexible', 'eager',
+  'existing', 'internal', 'fast', 'paced', 'key', 'overall', 'successful',
+  'based', 'aware', 'closely',
+
+  // The vocabulary of an advert: how it asks, and what it offers.
+  'knowledge', 'understanding', 'familiarity', 'awareness', 'expertise',
+  'proficiency', 'ownership', 'passion', 'attitude', 'mindset', 'culture',
+  'mission', 'vision', 'values', 'benefits', 'salary', 'compensation',
+  'bonus', 'pension', 'holiday', 'perks', 'someone', 'anyone',
+  'environment', 'environments',
+
+  // Company-name scaffolding. The employer's legal suffix is in the posting
+  // text like any other word, and no CV answers "inc".
+  'inc', 'ltd', 'llc', 'plc', 'gmbh',
 ])
 
 /**
@@ -118,13 +171,15 @@ function tokenize(text: string): string[] {
  * past these earns nothing.
  */
 const IRREGULAR: Record<string, string[]> = {
-  drive: ['drove', 'driven', 'driving', 'drives'],
+  // `drive`, `run` and `take` were here and are gone: all three are STOPWORDS,
+  // so they never become required terms and the entries could never fire. An
+  // irregular form for a word that is not a requirement is dead configuration
+  // that reads like coverage.
+
   lead: ['led', 'leading', 'leads'],
   build: ['built', 'building', 'builds'],
   write: ['wrote', 'written', 'writing', 'writes'],
-  run: ['ran', 'running', 'runs'],
   grow: ['grew', 'grown', 'growing', 'grows'],
-  take: ['took', 'taken', 'taking', 'takes'],
   make: ['made', 'making', 'makes'],
   give: ['gave', 'given', 'giving', 'gives'],
   hold: ['held', 'holding', 'holds'],

@@ -192,3 +192,57 @@ describe('matchKeywords still refuses near-misses', () => {
     expect(matchKeywords(cv, posting).score).toBe(0)
   })
 })
+
+/**
+ * Prose is not a requirement, and a company's legal suffix is not a skill.
+ *
+ * MEASURED ON A REAL POSTING (Gabe, 2026-09-15). Out of 100 terms the matcher
+ * asked a CV to contain `responsible`, `key`, `enhance`, `sit`, `someone`,
+ * `paced` and `inc` -- the last one because the employer is "IT Managers,
+ * Inc." and the company name sits in the text like any other word. None can be
+ * answered, so each was a guaranteed miss pulling the score down.
+ */
+describe('matchKeywords ignores the vocabulary of an advert', () => {
+  it.each([
+    'responsible', 'key', 'enhance', 'sit', 'someone', 'paced', 'closely',
+    'knowledge', 'ownership', 'environment', 'dynamic', 'inc',
+  ])('does not make "%s" a requirement', (word) => {
+    const { matched, missing } = matchKeywords('React and TypeScript', `We need ${word} and React.`)
+    expect([...matched, ...missing]).not.toContain(word)
+  })
+
+  it('drops the prose without dropping the job', () => {
+    // The whole point: the real requirements survive the cull.
+    const { matched, missing } = matchKeywords(
+      '',
+      'You will be responsible for key AI governance, UAT and code generation at Acme, Inc.'
+    )
+    const terms = [...matched, ...missing]
+    expect(terms).toEqual(expect.arrayContaining(['ai', 'governance', 'uat', 'code', 'generation']))
+    expect(terms).not.toEqual(expect.arrayContaining(['responsible', 'key', 'inc']))
+  })
+})
+
+/**
+ * The list the file names as "deliberately absent, and must stay absent".
+ *
+ * Every pass over STOPWORDS is a chance to sweep one of these in by accident:
+ * they all read as ordinary English. A posting that says "Go" means the
+ * language, and `r`, `c`, `ai` and `qa` are real answers to what a job needs.
+ * The existing test covered three of them; this covers the list.
+ */
+describe('matchKeywords keeps short technology names', () => {
+  it.each([
+    ['go', 'Go developer wanted', 'Go and Kubernetes'],
+    ['ai', 'AI engineer wanted', 'AI and Python'],
+    ['ml', 'ML engineer wanted', 'ML pipelines'],
+    ['ui', 'UI engineer wanted', 'UI work'],
+    ['ux', 'UX designer wanted', 'UX research'],
+    ['qa', 'QA engineer wanted', 'QA automation'],
+    ['aws', 'AWS experience', 'AWS and Docker'],
+    ['sql', 'SQL experience', 'SQL and Python'],
+    ['php', 'PHP experience', 'PHP and MySQL'],
+  ])('treats "%s" as a requirement', (term, posting, cv) => {
+    expect(matchKeywords(cv, posting).matched).toContain(term)
+  })
+})
