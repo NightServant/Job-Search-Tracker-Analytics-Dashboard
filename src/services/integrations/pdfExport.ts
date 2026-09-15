@@ -168,9 +168,11 @@ export async function buildPdf(content: unknown, title: string): Promise<Uint8Ar
 
   try {
     const page = await browser.newPage()
-    // `networkidle0`: the markup has no remote assets today, but a CV with an
-    // image in it would otherwise be captured before the image arrived.
-    await page.setContent(fullHtml, { waitUntil: 'networkidle0' })
+    // `load`, not `domcontentloaded`: the markup has no remote assets today,
+    // but a CV with an image in it would otherwise be captured before the
+    // image arrived. (`networkidle0` was the stronger version of this and
+    // puppeteer-core 25 no longer accepts it on `setContent`.)
+    await page.setContent(fullHtml, { waitUntil: 'load' })
     return await page.pdf({
       format: 'letter',
       printBackground: true,

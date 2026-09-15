@@ -29,7 +29,24 @@ const nextConfig: NextConfig = {
    * time instead, which is correct for a server-only library anyway -- it is
    * ~2MB of zip machinery no client should ever receive.
    */
-  serverExternalPackages: ['docx'],
+  /**
+   * `@sparticuz/chromium` AND `puppeteer-core` ARE HERE FOR A DIFFERENT
+   * REASON THAN `docx`, and it is worth the extra sentence because the symptom
+   * is nothing like a build failure.
+   *
+   * The build passed. Production then answered 500 with
+   * `/tmp/chromium: error while loading shared libraries: libnss3.so: cannot
+   * open shared object file`. `@sparticuz/chromium` is not really a JS package:
+   * it is a Brotli-compressed Chromium plus its shared libraries under `bin/`
+   * (`chromium.br`, `al2023.tar.br`, `fonts.tar.br`, `swiftshader.tar.br`),
+   * which it extracts to /tmp at runtime. Bundled by webpack, the JS is
+   * inlined and those archives are not traced into the function -- so the
+   * binary appears and the libraries it links against do not.
+   *
+   * Listed here, Next `require()`s both from node_modules at request time and
+   * traces their files, which is what puts `bin/` in the deployment.
+   */
+  serverExternalPackages: ['docx', '@sparticuz/chromium', 'puppeteer-core'],
   /**
    * THE MIDDLEWARE RUNS ON NODE, AND THIS FLAG IS WHAT MAKES THAT REAL.
    *
