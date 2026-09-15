@@ -108,26 +108,113 @@ function tokenize(text: string): string[] {
 }
 
 /**
- * Whether the CV mentions a term, allowing for a plural on either side.
+ * The handful of irregular verbs a CV and a posting actually disagree over.
  *
- * ADDITIVE ONLY: it tries the term, then the term plus `s`, then the term with
- * a trailing `s` removed. It never rewrites the canonical term, so nothing is
- * corrupted for display and nothing can be merged by accident -- the worst a
- * wrong guess does is fail to find a word that was not there anyway. A
- * transform-then-compare stemmer would have turned `kubernetes` into
- * `kubernete` and `aws` into `aw`.
+ * Suffix rules cannot reach these: "drove" is not "drive" plus anything. Kept
+ * deliberately short -- these are the forms that turn up in bullet points
+ * ("Drove the migration", "Led the rewrite", "Built the pipeline") against
+ * postings written in the infinitive ("drive the strategy", "lead a team").
+ * An exhaustive English irregular list would be a dictionary, and every entry
+ * past these earns nothing.
+ */
+const IRREGULAR: Record<string, string[]> = {
+  drive: ['drove', 'driven', 'driving', 'drives'],
+  lead: ['led', 'leading', 'leads'],
+  build: ['built', 'building', 'builds'],
+  write: ['wrote', 'written', 'writing', 'writes'],
+  run: ['ran', 'running', 'runs'],
+  grow: ['grew', 'grown', 'growing', 'grows'],
+  take: ['took', 'taken', 'taking', 'takes'],
+  make: ['made', 'making', 'makes'],
+  give: ['gave', 'given', 'giving', 'gives'],
+  hold: ['held', 'holding', 'holds'],
+  teach: ['taught', 'teaching', 'teaches'],
+  bring: ['brought', 'bringing', 'brings'],
+  win: ['won', 'winning', 'wins'],
+  speak: ['spoke', 'spoken', 'speaking', 'speaks'],
+  rise: ['rose', 'risen', 'rising', 'rises'],
+}
+
+/** The shortest stem allowed to grow variants. Below this the guesses stop
+ *  being about the same word: `aws` must never reach `awe`, `css` never `cse`. */
+const MIN_STEM = 4
+
+/**
+ * Every way the same requirement might be spelled, derived FROM the term.
  *
- * The two floors are different on purpose. ADDING an `s` is safe from three
- * characters up, which is what lets `api` find `apis`. REMOVING one is only
- * safe from four, and never from a word ending `ss` -- otherwise a posting's
- * `css` would be satisfied by a CV that merely said `cs`.
+ * STILL ADDITIVE, which is the rule this file already lived by and the reason
+ * it is written this way round. The CV's own tokens are never transformed, so
+ * `kubernetes` is still `kubernetes` and `aws` is still `aws`; the worst a bad
+ * guess does is invent a spelling no CV contains, which simply fails to match.
+ * A transform-then-compare stemmer is the version that corrupts those.
+ *
+ * WHY IT GREW BEYOND PLURALS (2026-09-15). A posting asks for "REST API
+ * integration" and the CV says "Integrated REST APIs"; it asks for "mentoring"
+ * and the CV says "Mentored"; it asks for "performance optimisation" and the
+ * CV says "Optimised performance". Every one of those is a CV that MEETS the
+ * requirement being counted as missing it -- measured at 50-67% on pairs that
+ * a human reads as a full match. That is not a rewriting problem the model can
+ * fix, and asking it to would mean pasting the posting's exact word into a
+ * sentence that already said the same thing.
+ */
+function variantsOf(term: string): string[] {
+  const out = new Set<string>([term])
+  const add = (value: string) => {
+    if (value.length >= 3) out.add(value)
+  }
+
+  if (IRREGULAR[term]) IRREGULAR[term].forEach(add)
+
+  // The plural pair this function started as.
+  if (term.length >= 3) add(`${term}s`)
+  if (term.length >= 4 && !term.endsWith('ss') && term.endsWith('s')) add(term.slice(0, -1))
+
+  // Stems: strip one known ending, longest first so `-ation` wins over `-ion`.
+  const stems = new Set<string>()
+  const strip = (suffix: string, replacement = '') => {
+    if (!term.endsWith(suffix)) return
+    const stem = term.slice(0, -suffix.length) + replacement
+    if (stem.length >= MIN_STEM) stems.add(stem)
+  }
+  strip('ation')
+  strip('ility', 'le') // accessibility -> accessible
+  strip('ment')
+  strip('ing')
+  strip('ion')
+  strip('ity')
+  strip('ed')
+  strip('es')
+  strip('e')
+  if (term.length >= MIN_STEM) stems.add(term)
+
+  // Surface forms each stem can take. `-e` handling is why both `integrat` and
+  // `integrate` are grown: the stem may or may not have kept its silent e.
+  for (const stem of stems) {
+    if (stem.length < MIN_STEM) continue
+    const bases = [stem, stem.endsWith('e') ? stem.slice(0, -1) : `${stem}e`]
+    for (const base of bases) {
+      if (base.length < MIN_STEM - 1) continue
+      for (const suffix of ['', 's', 'd', 'ed', 'ing', 'ion', 'ation', 'ity', 'ment', 'es']) {
+        add(`${base}${suffix}`)
+      }
+    }
+  }
+
+  return [...out]
+}
+
+/**
+ * Whether the CV mentions a term, in any spelling of the same word.
+ *
+ * The floors that were here are now inside `variantsOf`: nothing shorter than
+ * `MIN_STEM` grows a variant, so `css` is still not satisfied by `cs` and
+ * `java` is still not satisfied by `javascript` -- no suffix rule turns one
+ * into the other, which is the false positive this is most often accused of.
  */
 function mentions(cvTokens: Set<string>, term: string): boolean {
   if (cvTokens.has(term)) return true
   if (term.length < 3) return false
-  if (cvTokens.has(`${term}s`)) return true
-  if (term.length < 4 || term.endsWith('ss')) return false
-  return term.endsWith('s') && cvTokens.has(term.slice(0, -1))
+  return variantsOf(term).some((variant) => cvTokens.has(variant))
 }
 
 /**

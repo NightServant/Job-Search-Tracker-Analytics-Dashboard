@@ -146,3 +146,49 @@ describe('what counts as a requirement at all', () => {
     expect(once.missing).toEqual(twice.missing)
   })
 })
+
+/**
+ * A CV that MEETS a requirement must not be told it is missing it.
+ *
+ * Measured on 2026-09-15, before this existed: a posting asking to "drive the
+ * testing strategy" scored 67 against a CV saying "Drove the testing
+ * strategy", and "REST API integration" scored 67 against "Integrated REST
+ * APIs". Five such pairs sat between 0 and 67 where a human reads a full
+ * match. That is a counting bug, not a rewriting one -- and the fix for it is
+ * here rather than in the tailoring prompt, because asking a model to close it
+ * means pasting the posting's exact word into a sentence that already said the
+ * same thing.
+ */
+describe('matchKeywords across word forms', () => {
+  it.each([
+    ['drive the testing strategy', 'Drove the testing strategy'],
+    ['REST API integration', 'Integrated REST APIs'],
+    ['mentoring junior engineers', 'Mentored junior engineers'],
+    ['performance optimisation', 'Optimised performance'],
+    ['accessibility standards', 'Accessible interfaces meeting standards'],
+    ['lead a team', 'Led a team'],
+    ['automated testing', 'Automate tests'],
+  ])('counts "%s" as answered by "%s"', (posting, cv) => {
+    expect(matchKeywords(cv, posting).score).toBe(100)
+  })
+})
+
+/**
+ * The other half of the same change, and the more important half.
+ *
+ * Widening what counts as the same word is exactly how a matcher starts
+ * claiming a CV said something it did not. These are the pairs the file has
+ * always refused to merge, and they must keep failing however many suffix
+ * rules get added above -- `java` is not answered by `javascript`, and no
+ * amount of stemming may make `css` reachable from `cs`.
+ */
+describe('matchKeywords still refuses near-misses', () => {
+  it.each([
+    ['Java', 'JavaScript and TypeScript'],
+    ['CSS', 'I know cs'],
+    ['AWS', 'full of awe'],
+    ['React', 'reactive programming'],
+  ])('does not let "%s" be satisfied by "%s"', (posting, cv) => {
+    expect(matchKeywords(cv, posting).score).toBe(0)
+  })
+})
