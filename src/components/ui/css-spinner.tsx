@@ -15,17 +15,40 @@ import { cn } from '@/lib/utils'
  * only: sighted users read the motion, and a spinner captioned "Loading" beside
  * a button that already says "Saving" is a duplicate.
  */
-export function CssSpinner({ size = 16, className }: { size?: number; className?: string }) {
+export function CssSpinner({
+  size = 16,
+  className,
+  decorative = false,
+}: {
+  size?: number
+  className?: string
+  /**
+   * Drops the `status` role and the "Loading" label, leaving only the motion.
+   *
+   * FOR WHEN SOMETHING ELSE ALREADY SAYS IT. The docblock above has always
+   * argued that a spinner captioned "Loading" next to a button reading
+   * "Saving" is a duplicate; `Button`'s `loadingText` is what finally made
+   * that concrete, because the two labels CONCATENATE into the control's
+   * accessible name. A sign-in button mid-submit announced itself as
+   * "Loading Signing in...", which is not a sentence and was found by the
+   * test written for the layout bug next to it.
+   *
+   * Default false, so a bare spinner with nothing else to speak for it still
+   * announces itself -- which is most of them.
+   */
+  decorative?: boolean
+}) {
   return (
     <span
-      role="status"
+      role={decorative ? undefined : 'status'}
+      aria-hidden={decorative || undefined}
       style={{ width: size, height: size, borderWidth: Math.max(2, Math.round(size / 8)) }}
       className={cn(
         'inline-block animate-spin rounded-full border-current border-t-transparent align-middle',
         className
       )}
     >
-      <span className="sr-only">Loading</span>
+      {!decorative && <span className="sr-only">Loading</span>}
     </span>
   )
 }

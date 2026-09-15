@@ -625,7 +625,14 @@ describe('the record’s fields and its one submit', () => {
     renderRecord({ saving: true })
     const submit = screen.getByRole('button', { name: /saving/i })
     expect(submit).toHaveProperty('disabled', true)
-    expect(submit.querySelector('[role="status"]')).toBeTruthy()
+    // `aria-busy` AND the spinning element, rather than the spinner's old
+    // `role="status"`. This button now passes a `loadingText`, so its label
+    // already reads "Saving..." and CssSpinner drops its own "Loading" label
+    // to keep the two from concatenating into "Loading Saving...". The state
+    // is still announced -- by aria-busy and by the name this query matched --
+    // and the spinner is still drawn. Only the redundant role went.
+    expect(submit).toHaveAttribute('aria-busy', 'true')
+    expect(submit.querySelector('.animate-spin')).toBeTruthy()
   })
 
   it('keeps the job own currency when editing rather than the account default', () => {

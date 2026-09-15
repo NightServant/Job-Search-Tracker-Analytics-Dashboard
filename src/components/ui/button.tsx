@@ -92,6 +92,36 @@ export interface ButtonProps
   loadingText?: React.ReactNode
 }
 
+/**
+ * One stacked label cell: a flex ROW that inherits the button's own gap.
+ *
+ * `flex`, NOT the default block flow, AND IT IS NOT COSMETIC. Tailwind's
+ * preflight sets `svg { display: block }` -- correct, and harmless while an
+ * icon is a direct child of the button, because the button is `inline-flex`
+ * and a block-level flex ITEM still sits in the row. Wrapping `children` in a
+ * plain `<span>` took that away: the icon became a block in normal flow, which
+ * takes a line to itself, and `<Button><Icon/>Continue with Google</Button>`
+ * rendered as a G stacked ON TOP OF its label. Reported from production on
+ * 2026-09-15 ("button layout for OAuth is destroyed") on the one screen where
+ * it was most visible, but every icon+text button with a `loadingText` had it.
+ *
+ * `gap-[inherit]` ON BOTH THIS AND THE GRID ABOVE IT, and the pair is the
+ * point. The size variants own the icon-to-label distance (`gap-2` on `m`,
+ * `gap-1.5` on `s`, `gap-0` on the icon-only sizes), and that gap applies
+ * between the BUTTON's flex items -- of which there is now exactly one, this
+ * wrapper. So the spacing silently became zero and the lock on "Sign in" sat
+ * welded to the word. Inheriting it down the two levels restores the variant's
+ * own value instead of hardcoding one, which would have been wrong for three
+ * of the four sizes. The grid has a single track, so a gap on it draws no
+ * gutter -- it is there only to carry the value down.
+ *
+ * `justify-center` centres the SHORTER label inside the shared cell, whose
+ * width is set by the longer. Without it "Redirecting..." would sit left of
+ * where "Continue with Google" was, and the label would appear to jump
+ * sideways on click -- the exact reflow the stacking trick exists to prevent.
+ */
+const LABEL_CELL = 'col-start-1 row-start-1 flex items-center justify-center gap-[inherit]'
+
 export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   (
     {
@@ -123,21 +153,23 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       className={cn(ICON_MOTION_GROUP, buttonVariants({ variant, size }), className)}
       {...props}
     >
-      {loading && <CssSpinner size={14} />}
+      {/* Decorative only when `loadingText` speaks for it -- otherwise the
+          button's accessible name becomes "Loading Signing in...". */}
+      {loading && <CssSpinner size={14} decorative={loadingText !== undefined} />}
       {loadingText === undefined ? (
         children
       ) : (
         // Both labels in ONE grid cell, so the cell is as wide as the longer
         // and the control never resizes mid-click. See the docblock.
-        <span data-button-label className="grid">
+        <span data-button-label className="grid gap-[inherit]">
           <span
-            className={cn('col-start-1 row-start-1', loading && 'invisible')}
+            className={cn(LABEL_CELL, loading && 'invisible')}
             aria-hidden={loading || undefined}
           >
             {children}
           </span>
           <span
-            className={cn('col-start-1 row-start-1', !loading && 'invisible')}
+            className={cn(LABEL_CELL, !loading && 'invisible')}
             aria-hidden={!loading || undefined}
           >
             {loadingText}
