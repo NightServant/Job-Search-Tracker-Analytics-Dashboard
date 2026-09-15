@@ -83,10 +83,44 @@ if [ ${#missing[@]} -gt 0 ]; then
   echo "With [auth.email.smtp] enabled = true, an empty password breaks every" >&2
   echo "auth email on the project. See docs/SECURITY.md." >&2
   echo >&2
-  echo "RESEND_API_KEY is read from .env, or from the macOS keychain if you" >&2
-  echo "have run: resend login" >&2
+  echo "BREVO_SMTP_KEY is read from .env, or from the macOS keychain. Brevo" >&2
+  echo "ships no CLI, so store it yourself, once:" >&2
+  echo >&2
+  echo "  security add-generic-password -s worktrack-smtp -a brevo -w" >&2
+  echo >&2
+  echo "It is the SMTP KEY from Brevo's SMTP & API page -- not the account" >&2
+  echo "password and not the xkeysib- API key, neither of which authenticates" >&2
+  echo "against smtp-relay.brevo.com." >&2
+  echo >&2
+  echo "SUPABASE_AUTH_SMTP_USER is the 'Login' on that same page, which is a" >&2
+  echo "generated <id>@smtp-brevo.com address rather than your own email." >&2
+  echo "SUPABASE_AUTH_SMTP_SENDER must be an address VERIFIED under Senders." >&2
   exit 1
 fi
+
+# A LEFTOVER SENDER IS PRESENT-BUT-WRONG, which the loop above cannot see.
+#
+# The checks above only catch EMPTY values, and the failure this one prevents
+# is worse than empty: `onboarding@resend.dev` is Resend's shared sender, it
+# sat in .env for months, and it is a perfectly non-empty string. Pushed to a
+# project whose SMTP block now points at Brevo, it produces a config that the
+# API accepts and that Brevo then refuses on every send -- because Brevo will
+# only send FROM an address verified under Senders, and it has never heard of
+# resend.dev. Same silent, remote, day-later failure the rest of this script
+# exists to stop, arriving through the one gap the emptiness test leaves.
+case "$SUPABASE_AUTH_SMTP_SENDER" in
+  *@resend.dev)
+    echo "Refusing to push: SUPABASE_AUTH_SMTP_SENDER is still a Resend address." >&2
+    echo >&2
+    echo "  $SUPABASE_AUTH_SMTP_SENDER" >&2
+    echo >&2
+    echo "The SMTP block sends through Brevo now, and Brevo will only send FROM" >&2
+    echo "an address you have verified under Senders, Domains & Dedicated IPs." >&2
+    echo "Verify one there, then set it here. A resend.dev sender would push" >&2
+    echo "cleanly and fail on every email afterwards." >&2
+    exit 1
+    ;;
+esac
 
 echo "All required variables are set. Pushing…"
 exec npx supabase config push "$@"
