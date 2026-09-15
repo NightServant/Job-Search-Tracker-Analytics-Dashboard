@@ -501,6 +501,58 @@ async function pressKey(user: ReturnType<typeof userEvent.setup>, key: string) {
   await user.keyboard(`{${key}}`)
 }
 
+/**
+ * The empty board, which is the first screen a new account ever sees.
+ *
+ * IT WAS THE ONE SURFACE NOT USING THE DESIGN SYSTEM'S EMPTY STATE. A
+ * hand-rolled block: left-aligned, its own `h2`, `text-muted` copy, no glyph.
+ * Every other empty surface in the app -- documents, both calendar rails, four
+ * analytics panels, and the applications TABLE in the next file -- already
+ * went through `EmptyState`, so this screen was the only one that looked like
+ * a different product.
+ *
+ * WHY THESE ASSERT ON STRUCTURE AND NOT ON COPY: the sentence should be
+ * editable without a red build. What must not drift is that this screen uses
+ * the shared component, and that it carries exactly ONE call to action.
+ */
+describe('an account with nothing in it yet', () => {
+  it('renders the design system empty state rather than a bespoke block', () => {
+    const { container } = render(<ApplicationsPage jobs={[]} />)
+    expect(container.querySelector('[data-empty-state]')).toBeTruthy()
+  })
+
+  it('keeps the call to action, in the empty state', () => {
+    // Gabe, 2026-09-15: "empty state must have the CTA". Removing the header
+    // button must not leave the screen with no way to add anything.
+    render(<ApplicationsPage jobs={[]} />)
+    const cta = screen.getByRole('button', { name: 'add your first application' })
+    expect(cta.closest('[data-empty-state]')).toBeTruthy()
+  })
+
+  it('drops the header action, so one screen does not offer two primaries', () => {
+    // THE ASSERTION THAT WOULD CATCH A REVERT. Both buttons open the same
+    // dialog; showing both is the page arguing with itself about where to
+    // start.
+    render(<ApplicationsPage jobs={[]} />)
+    expect(screen.queryByRole('button', { name: 'add' })).toBeNull()
+  })
+
+  it('brings the header action back as soon as there is anything to add to', () => {
+    // The suppression is scoped to the empty case. On a populated board the
+    // empty state is not rendered at all, so the header is the only way in.
+    const { container } = render(<ApplicationsPage jobs={JOBS} />)
+    expect(screen.getByRole('button', { name: 'add' })).toBeInTheDocument()
+    expect(container.querySelector('[data-empty-state]')).toBeNull()
+  })
+
+  it('still offers the import route the empty copy points at', () => {
+    // The sentence tells people they can import a spreadsheet instead; the
+    // toolbar has to still be there for that to be true.
+    render(<ApplicationsPage jobs={[]} />)
+    expect(screen.getByRole('button', { name: /import csv/i })).toBeInTheDocument()
+  })
+})
+
 describe('StatusTabs', () => {
   it('moves focus and selection with ArrowRight/ArrowLeft, wrapping at the ends', async () => {
     const user = userEvent.setup()

@@ -96,7 +96,20 @@ import Page from '../page'
  * what the ROUTE does with the save.
  */
 async function addUpToReview(user: ReturnType<typeof userEvent.setup>) {
-  await user.click(screen.getByRole('button', { name: 'add' }))
+  /*
+    WHICHEVER "add" THE SCREEN IS ACTUALLY OFFERING. These tests run against an
+    empty board, and since 2026-09-15 the header's `add` is suppressed there --
+    two primary buttons pointing at one action is the screen arguing with
+    itself, so the empty state's CTA is the only one. A fixed
+    `{ name: 'add' }` broke on all three, which is the right kind of break:
+    the affordance moved and the test was naming the old one.
+
+    Matching either keeps this helper honest for a populated board too, where
+    the header button IS the way in and the empty state is not rendered.
+  */
+  await user.click(
+    screen.getByRole('button', { name: /^(add|add your first application)$/ })
+  )
   // A LINK IS REQUIRED FROM THE FIRST STEP (Gabe, 2026-09-11): `continue` is
   // disabled until there is one, because every step after it is built from
   // that page. These tests are about the save, but they still have to get

@@ -10,6 +10,7 @@ import { ApplicationsToolbar } from './ApplicationsToolbar'
 import { ApplicationsInsights } from './ApplicationsInsights'
 import { ApplicationsTable } from './ApplicationsTable'
 import { Card, CardContent } from '@/components/ui/card'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   Pagination,
   PaginationContent,
@@ -348,10 +349,24 @@ export function ApplicationsPage({
         title="applications"
         description="every role you are tracking, from wishlist through to an offer."
         action={
-          <Button size="s" className="max-sm:w-full" onClick={() => setAddOpen(true)}>
-            <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
-            add
-          </Button>
+          /*
+            GONE ON AN EMPTY BOARD (Gabe, 2026-09-15). The empty state below
+            carries the same offer two inches away, and two primary buttons
+            pointing at one action is the screen arguing with itself about
+            where to start.
+
+            UNCONDITIONALLY, unlike /documents, which keeps its header CTA
+            below `lg`. That exception exists because the compact documents
+            layout puts recents first and pushes the empty state off the fold.
+            This page has no such split -- the empty state sits directly under
+            the toolbar at every width -- so there is nothing to compensate for.
+          */
+          jobs.length === 0 ? undefined : (
+            <Button size="s" className="max-sm:w-full" onClick={() => setAddOpen(true)}>
+              <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
+              add
+            </Button>
+          )
         }
         rule
       />
@@ -469,17 +484,42 @@ export function ApplicationsPage({
       )}
 
       {jobs.length === 0 ? (
-        <div className="flex flex-col items-start gap-3 border-t border-border-subtle py-12">
-          <h2 className="text-heading-m text-text-primary">no applications yet</h2>
-          <p className="max-w-prose text-body-m text-text-muted">
-            Add the first one by hand, or import the spreadsheet you have been keeping
-            instead. Company and role are the only columns an import needs.
-          </p>
-          <Button onClick={() => setAddOpen(true)}>
-            <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
-            add your first application
-          </Button>
-        </div>
+        /*
+          `EmptyState`, NOT THE HAND-ROLLED BLOCK THIS REPLACED. That block was
+          left-aligned, drew its own `h2`, used `text-muted` for copy that IS
+          the page's content, and had no glyph -- so the one screen a new
+          account opens on looked like nothing the rest of the app does. Every
+          other empty surface here already goes through this component:
+          documents, the calendar rails, four analytics panels, and the
+          applications TABLE two files over.
+
+          NO HEADING OF ITS OWN, which is the component's shape rather than an
+          omission. `PageHeader` above already owns this screen's `h1`; an
+          `h2` here inserted a subsection into the document outline whose only
+          content was the sentence beneath it. The sentence carries "no
+          applications yet" instead.
+
+          `text-muted` -> the component's `text-secondary` is the same
+          correction EmptyState's own docblock records: muted is right for a
+          note beside real content and wrong for copy that is the only content
+          on screen.
+        */
+        <EmptyState
+          icon="Applications"
+          className="border-t border-border-subtle"
+          action={
+            // Primary, and the only call to action on the screen now that the
+            // header's is suppressed. `import` is a step away in the toolbar
+            // above, which is why the sentence names it.
+            <Button onClick={() => setAddOpen(true)}>
+              <PlusIcon size={16} aria-hidden className={iconMotion('open')} />
+              add your first application
+            </Button>
+          }
+        >
+          No applications yet. Add the first one by hand, or import the spreadsheet you have
+          been keeping — company and role are the only columns an import needs.
+        </EmptyState>
       ) : (
         <>
           <StatusTabs
